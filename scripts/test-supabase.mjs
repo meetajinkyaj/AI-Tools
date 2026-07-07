@@ -17,7 +17,7 @@ const { error: anonError } = await anonClient
   .select("*")
   .limit(1);
 
-if (anonError?.code === "42P01") {
+if (anonError?.code === "42P01" || anonError?.code === "PGRST205") {
   console.log("anon key: OK (reached the database, table doesn't exist yet — expected)");
 } else if (anonError) {
   console.error("anon key: FAILED —", anonError.message);
