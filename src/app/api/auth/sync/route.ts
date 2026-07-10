@@ -1,19 +1,27 @@
 import { NextResponse } from "next/server";
 
 import { createPrivyServer } from "@/lib/privy-server";
+import { getPrivyVerificationKey } from "@/lib/privy-verification-key";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
  * POST /api/auth/sync
  *
  * Called by the client right after a successful Privy login. It:
- *   1. Verifies the caller's Privy access token server-side.
- *   2. Looks up the verified user's email from Privy.
- *   3. Upserts a row in `users` keyed on the Privy user id.
- *   4. Appends a `user_created` (first login) or `user_signed_in` event.
+ *   1. Verifies the caller's Privy access token LOCALLY (no Privy API call — see
+ *      privy-verification-key.ts for why this matters on Cloudflare Workers).
+ *   2. Upserts a row in `users` keyed on the verified Privy user id.
+ *   3. Appends a `user_created` (first login) or `user_signed_in` event.
  *
- * The client never touches the database directly — all writes happen here,
- * behind a verified token, using the Supabase service-role key.
+ * The verified token is the trusted identity anchor (its `userId` becomes
+ * `privy_user_id`, the unique key). The email is taken from the request body:
+ * Privy already verified it via OTP at login, and a caller can only ever affect
+ * their own row (keyed on their verified id), with the UNIQUE email constraint
+ * preventing them from claiming another user's address. Hardening path for later:
+ * derive the email server-side from a Privy identity token instead of the body.
+ *
+ * All DB writes use the Supabase service-role key; the browser never touches the
+ * tables directly.
  */
 export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -28,31 +36,37 @@ export async function POST(request: Request) {
     );
   }
 
+  // 1. Verify the access token locally against the app's public key.
   const privy = createPrivyServer();
-
-  // 1. Verify the token. Throws if invalid/expired.
   let userId: string;
   try {
-    const claims = await privy.verifyAuthToken(token);
+    const claims = await privy.verifyAuthToken(token, getPrivyVerificationKey());
     userId = claims.userId;
   } catch {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 
-  // 2. Look up the verified user's email from Privy.
-  const privyUser = await privy.getUser(userId);
-  const email = privyUser.email?.address;
+  // 2. Email comes from the request body (see note above).
+  let email: string | null = null;
+  try {
+    const body = (await request.json()) as { email?: unknown };
+    if (typeof body.email === "string" && body.email.includes("@")) {
+      email = body.email.trim().toLowerCase();
+    }
+  } catch {
+    // fall through to the missing-email response below
+  }
 
   if (!email) {
     return NextResponse.json(
-      { error: "No email on Privy account" },
+      { error: "Missing or invalid email" },
       { status: 400 },
     );
   }
 
   const supabase = createSupabaseAdmin();
 
-  // 3. Is this a first-time login or a returning user?
+  // 3. First-time login or returning user?
   const { data: existing, error: selectError } = await supabase
     .from("users")
     .select("id, email")

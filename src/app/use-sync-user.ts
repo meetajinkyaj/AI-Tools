@@ -4,12 +4,13 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useEffect, useRef } from "react";
 
 /**
- * After a successful Privy login, POST the access token to /api/auth/sync so
- * the server can verify it and upsert the user into Supabase. Runs once per
- * authenticated session (guarded by a ref) and resets on logout.
+ * After a successful Privy login, POST the access token (for server-side
+ * verification) and the user's email to /api/auth/sync, which upserts the user
+ * into Supabase. Runs once per authenticated session (guarded by a ref) and
+ * resets on logout.
  */
 export function useSyncUser() {
-  const { ready, authenticated, getAccessToken } = usePrivy();
+  const { ready, authenticated, user, getAccessToken } = usePrivy();
   const syncedRef = useRef(false);
 
   useEffect(() => {
@@ -26,11 +27,19 @@ export function useSyncUser() {
     (async () => {
       try {
         const token = await getAccessToken();
-        if (!token) return;
+        const email = user?.email?.address;
+        if (!token || !email) {
+          syncedRef.current = false;
+          return;
+        }
 
         const res = await fetch("/api/auth/sync", {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email }),
         });
 
         if (!res.ok) {
@@ -43,5 +52,5 @@ export function useSyncUser() {
         console.error("User sync error:", err);
       }
     })();
-  }, [ready, authenticated, getAccessToken]);
+  }, [ready, authenticated, user, getAccessToken]);
 }
