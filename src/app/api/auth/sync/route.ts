@@ -1,30 +1,26 @@
 import { NextResponse } from "next/server";
-import { importSPKI, jwtVerify } from "jose";
 
-import { getPrivyVerificationKey } from "@/lib/privy-verification-key";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
+import { verifyPrivyToken } from "@/lib/verify-privy-token";
 
 /**
  * POST /api/auth/sync
  *
  * Called by the client right after a successful Privy login. It:
- *   1. Verifies the caller's Privy access token LOCALLY with `jose`.
+ *   1. Verifies the caller's Privy access token locally (Web Crypto).
  *   2. Upserts a row in `users` keyed on the verified Privy user id.
  *   3. Appends a `user_created` (first login) or `user_signed_in` event.
  *
- * We verify with `jose` imported directly (not via @privy-io/server-auth's
- * verifyAuthToken). The SDK bundles its own copy of jose resolved to the Node
- * crypto build, whose ECDSA verification does not work on Cloudflare Workers —
- * every token failed there with 401. A direct `jose` import resolves to its
- * `workerd`/WebCrypto build, which works. See privy-verification-key.ts for the
- * public key we verify against.
+ * Token verification lives in verify-privy-token.ts, which uses the Web Crypto
+ * API directly (jose / @privy-io/server-auth resolve to a node:crypto build that
+ * fails on Cloudflare Workers). See privy-verification-key.ts for the key.
  *
  * The verified token is the trusted identity anchor (its `sub` becomes
  * `privy_user_id`, the unique key). The email is taken from the request body:
  * Privy already verified it via OTP at login, and a caller can only ever affect
- * their own row, with the UNIQUE email constraint preventing them from claiming
- * another user's address. Hardening path for later: derive the email server-side
- * from a Privy identity token instead of the body.
+ * their own row (keyed on their verified id), with the UNIQUE email constraint
+ * preventing them from claiming another user's address. Hardening path for later:
+ * derive the email server-side from a Privy identity token instead of the body.
  *
  * All DB writes use the Supabase service-role key; the browser never touches the
  * tables directly.
@@ -53,13 +49,7 @@ export async function POST(request: Request) {
   // 1. Verify the access token locally against the app's public key.
   let userId: string;
   try {
-    const publicKey = await importSPKI(getPrivyVerificationKey(), "ES256");
-    const { payload } = await jwtVerify(token, publicKey, {
-      issuer: "privy.io",
-      audience: appId,
-    });
-    if (!payload.sub) throw new Error("Token missing subject");
-    userId = payload.sub;
+    userId = await verifyPrivyToken(token, appId);
   } catch {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
