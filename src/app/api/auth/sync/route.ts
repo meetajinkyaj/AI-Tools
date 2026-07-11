@@ -72,60 +72,64 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createSupabaseAdmin();
+  // 3. Upsert the user and log the event. Wrapped so any unexpected failure
+  //    returns a readable JSON error instead of an opaque empty 500.
+  try {
+    const supabase = createSupabaseAdmin();
 
-  // 3. First-time login or returning user?
-  const { data: existing, error: selectError } = await supabase
-    .from("users")
-    .select("id, email")
-    .eq("privy_user_id", userId)
-    .maybeSingle();
-
-  if (selectError) {
-    return NextResponse.json({ error: selectError.message }, { status: 500 });
-  }
-
-  let userRow: { id: string };
-  let eventType: string;
-
-  if (!existing) {
-    const { data, error } = await supabase
+    // First-time login or returning user?
+    const { data: existing, error: selectError } = await supabase
       .from("users")
-      .insert({ privy_user_id: userId, email })
-      .select("id")
-      .single();
+      .select("id, email")
+      .eq("privy_user_id", userId)
+      .maybeSingle();
 
-    if (error || !data) {
-      return NextResponse.json(
-        { error: error?.message ?? "Failed to create user" },
-        { status: 500 },
-      );
+    if (selectError) {
+      throw new Error(`users select failed: ${selectError.message}`);
     }
-    userRow = data;
-    eventType = "user_created";
-  } else {
-    // Keep email in sync if it changed at Privy; touch updated_at via trigger.
-    if (existing.email !== email) {
-      const { error } = await supabase
+
+    let userRow: { id: string };
+    let eventType: string;
+
+    if (!existing) {
+      const { data, error } = await supabase
         .from("users")
-        .update({ email })
-        .eq("id", existing.id);
+        .insert({ privy_user_id: userId, email })
+        .select("id")
+        .single();
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error || !data) {
+        throw new Error(`users insert failed: ${error?.message ?? "no row"}`);
       }
+      userRow = data;
+      eventType = "user_created";
+    } else {
+      // Keep email in sync if it changed at Privy; touch updated_at via trigger.
+      if (existing.email !== email) {
+        const { error } = await supabase
+          .from("users")
+          .update({ email })
+          .eq("id", existing.id);
+
+        if (error) {
+          throw new Error(`users update failed: ${error.message}`);
+        }
+      }
+      userRow = { id: existing.id };
+      eventType = "user_signed_in";
     }
-    userRow = { id: existing.id };
-    eventType = "user_signed_in";
+
+    // Append to the event timeline (best-effort; don't fail the request on it).
+    await supabase
+      .from("events")
+      .insert({ user_id: userRow.id, type: eventType });
+
+    return NextResponse.json({
+      user: { id: userRow.id, email },
+      created: eventType === "user_created",
+    });
+  } catch (err) {
+    console.error("auth/sync failed:", err);
+    return NextResponse.json({ error: "Sync failed" }, { status: 500 });
   }
-
-  // 4. Append to the event timeline (best-effort; don't fail the request on it).
-  await supabase
-    .from("events")
-    .insert({ user_id: userRow.id, type: eventType });
-
-  return NextResponse.json({
-    user: { id: userRow.id, email },
-    created: eventType === "user_created",
-  });
 }
