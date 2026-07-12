@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { getPrivyUserId } from "@/lib/api-auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
-import { verifyPrivyToken } from "@/lib/verify-privy-token";
 
 /**
  * POST /api/auth/sync
@@ -26,31 +26,9 @@ import { verifyPrivyToken } from "@/lib/verify-privy-token";
  * tables directly.
  */
 export async function POST(request: Request) {
-  const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
-  if (!appId) {
-    return NextResponse.json(
-      { error: "Server not configured" },
-      { status: 500 },
-    );
-  }
-
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length)
-    : null;
-
-  if (!token) {
-    return NextResponse.json(
-      { error: "Missing bearer token" },
-      { status: 401 },
-    );
-  }
-
   // 1. Verify the access token locally against the app's public key.
-  let userId: string;
-  try {
-    userId = await verifyPrivyToken(token, appId);
-  } catch {
+  const userId = await getPrivyUserId(request);
+  if (!userId) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 

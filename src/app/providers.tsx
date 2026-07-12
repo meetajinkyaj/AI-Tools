@@ -2,13 +2,6 @@
 
 import { PrivyProvider } from "@privy-io/react-auth";
 
-import { useSyncUser } from "./use-sync-user";
-
-function UserSync() {
-  useSyncUser();
-  return null;
-}
-
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <PrivyProvider
@@ -20,7 +13,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       }}
     >
-      <UserSync />
       {children}
     </PrivyProvider>
   );
