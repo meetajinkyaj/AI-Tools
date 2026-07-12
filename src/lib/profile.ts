@@ -40,6 +40,13 @@ export const ACTIVITY_LEVEL_LABELS: Record<ActivityLevel, string> = {
   high: "Highly active",
 };
 
+export const ACTIVITY_LEVEL_DESCRIPTIONS: Record<ActivityLevel, string> = {
+  sedentary: "Mostly seated, under 5k steps/day.",
+  light: "Moving a bit each day, around 5k–7.5k steps/day.",
+  moderate: "On your feet often, around 7.5k–10k steps/day.",
+  high: "Active most of the day, 10k+ steps/day.",
+};
+
 /** The fields collected during onboarding (the "lean" set). */
 export interface ProfileInput {
   full_name: string;

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import {
   ACTIVITY_LEVEL,
+  ACTIVITY_LEVEL_DESCRIPTIONS,
   ACTIVITY_LEVEL_LABELS,
   BIOLOGICAL_SEX,
   BIOLOGICAL_SEX_LABELS,
@@ -117,7 +118,7 @@ export function OnboardingForm({
           </label>
 
           <label className={labelClass}>
-            Biological sex
+            Gender
             <select
               className={fieldClass}
               value={biologicalSex}
@@ -171,6 +172,16 @@ export function OnboardingForm({
                 </option>
               ))}
             </select>
+            <ul className="mt-1 flex flex-col gap-1 text-xs font-normal text-zinc-500 dark:text-zinc-400">
+              {ACTIVITY_LEVEL.map((v) => (
+                <li key={v}>
+                  <span className="font-medium text-zinc-600 dark:text-zinc-300">
+                    {ACTIVITY_LEVEL_LABELS[v]}:
+                  </span>{" "}
+                  {ACTIVITY_LEVEL_DESCRIPTIONS[v]}
+                </li>
+              ))}
+            </ul>
           </label>
 
           <label className="flex items-start gap-2.5 text-sm text-zinc-600 dark:text-zinc-400">
