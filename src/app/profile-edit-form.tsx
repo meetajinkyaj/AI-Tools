@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import {
   ACTIVITY_LEVEL,
-  ACTIVITY_LEVEL_DESCRIPTIONS,
   ACTIVITY_LEVEL_LABELS,
   BIOLOGICAL_SEX,
   BIOLOGICAL_SEX_LABELS,
@@ -12,21 +11,44 @@ import {
   PRIMARY_GOAL_LABELS,
   type ProfileRow,
 } from "@/lib/profile";
-import { fieldClass, labelClass, primaryButtonClass, Screen } from "./ui";
+import {
+  fieldClass,
+  labelClass,
+  primaryButtonClass,
+  Screen,
+  secondaryButtonClass,
+} from "./ui";
 
-export function OnboardingForm({
+/**
+ * Profile edit screen. Pre-filled from the user's current profile and covers
+ * the full editable set — the lean onboarding fields plus the fields deferred
+ * from onboarding (known conditions, country, city). Reuses POST /api/profile,
+ * which upserts the whole row.
+ */
+export function ProfileEditForm({
+  profile,
   getToken,
-  onComplete,
+  onSaved,
+  onCancel,
 }: {
+  profile: ProfileRow;
   getToken: () => Promise<string | null>;
-  onComplete: (profile: ProfileRow) => void;
+  onSaved: (profile: ProfileRow) => void;
+  onCancel: () => void;
 }) {
-  const [fullName, setFullName] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-  const [biologicalSex, setBiologicalSex] = useState("");
-  const [primaryGoal, setPrimaryGoal] = useState("");
-  const [activityLevel, setActivityLevel] = useState("");
-  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [fullName, setFullName] = useState(profile.full_name);
+  const [dateOfBirth, setDateOfBirth] = useState(profile.date_of_birth);
+  const [biologicalSex, setBiologicalSex] = useState(profile.biological_sex);
+  const [primaryGoal, setPrimaryGoal] = useState(profile.primary_goal);
+  const [activityLevel, setActivityLevel] = useState(profile.activity_level);
+  const [knownConditions, setKnownConditions] = useState(
+    profile.known_conditions ?? "",
+  );
+  const [country, setCountry] = useState(profile.country ?? "");
+  const [city, setCity] = useState(profile.city ?? "");
+  const [marketingConsent, setMarketingConsent] = useState(
+    profile.marketing_consent,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,8 +64,6 @@ export function OnboardingForm({
         setError("You're not signed in. Please reload and try again.");
         return;
       }
-      const timezone =
-        Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
 
       const res = await fetch("/api/profile", {
         method: "POST",
@@ -57,8 +77,12 @@ export function OnboardingForm({
           biological_sex: biologicalSex,
           primary_goal: primaryGoal,
           activity_level: activityLevel,
-          timezone,
+          // Preserve the timezone captured at onboarding.
+          timezone: profile.timezone,
           marketing_consent: marketingConsent,
+          known_conditions: knownConditions,
+          country,
+          city,
         }),
       });
       const data = (await res.json()) as { profile?: ProfileRow; error?: string };
@@ -66,9 +90,9 @@ export function OnboardingForm({
         setError(data.error ?? "Something went wrong. Please try again.");
         return;
       }
-      onComplete(data.profile);
+      onSaved(data.profile);
     } catch (err) {
-      console.error("Onboarding submit failed:", err);
+      console.error("Profile update failed:", err);
       setError("Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
@@ -80,10 +104,10 @@ export function OnboardingForm({
       <main className="flex w-full max-w-md flex-col gap-6">
         <div className="flex flex-col gap-1.5">
           <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
-            Tell us about you
+            Edit your profile
           </h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            A few basics so we can tailor your health tracking.
+            Keep your details up to date so we can tailor your health tracking.
           </p>
         </div>
 
@@ -117,12 +141,9 @@ export function OnboardingForm({
             <select
               className={fieldClass}
               value={biologicalSex}
-              onChange={(e) => setBiologicalSex(e.target.value)}
+              onChange={(e) => setBiologicalSex(e.target.value as typeof biologicalSex)}
               required
             >
-              <option value="" disabled>
-                Select…
-              </option>
               {BIOLOGICAL_SEX.map((v) => (
                 <option key={v} value={v}>
                   {BIOLOGICAL_SEX_LABELS[v]}
@@ -136,12 +157,9 @@ export function OnboardingForm({
             <select
               className={fieldClass}
               value={primaryGoal}
-              onChange={(e) => setPrimaryGoal(e.target.value)}
+              onChange={(e) => setPrimaryGoal(e.target.value as typeof primaryGoal)}
               required
             >
-              <option value="" disabled>
-                Select…
-              </option>
               {PRIMARY_GOAL.map((v) => (
                 <option key={v} value={v}>
                   {PRIMARY_GOAL_LABELS[v]}
@@ -155,28 +173,48 @@ export function OnboardingForm({
             <select
               className={fieldClass}
               value={activityLevel}
-              onChange={(e) => setActivityLevel(e.target.value)}
+              onChange={(e) => setActivityLevel(e.target.value as typeof activityLevel)}
               required
             >
-              <option value="" disabled>
-                Select…
-              </option>
               {ACTIVITY_LEVEL.map((v) => (
                 <option key={v} value={v}>
                   {ACTIVITY_LEVEL_LABELS[v]}
                 </option>
               ))}
             </select>
-            <ul className="mt-1 flex flex-col gap-1 text-xs font-normal text-zinc-500 dark:text-zinc-400">
-              {ACTIVITY_LEVEL.map((v) => (
-                <li key={v}>
-                  <span className="font-medium text-zinc-600 dark:text-zinc-300">
-                    {ACTIVITY_LEVEL_LABELS[v]}:
-                  </span>{" "}
-                  {ACTIVITY_LEVEL_DESCRIPTIONS[v]}
-                </li>
-              ))}
-            </ul>
+          </label>
+
+          <label className={labelClass}>
+            Known conditions
+            <textarea
+              className={`${fieldClass} h-auto min-h-24 resize-y py-2`}
+              value={knownConditions}
+              onChange={(e) => setKnownConditions(e.target.value)}
+              maxLength={2000}
+              placeholder="Any conditions we should know about (optional)."
+            />
+          </label>
+
+          <label className={labelClass}>
+            Country
+            <input
+              className={fieldClass}
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              maxLength={120}
+              autoComplete="country-name"
+            />
+          </label>
+
+          <label className={labelClass}>
+            City
+            <input
+              className={fieldClass}
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              maxLength={120}
+              autoComplete="address-level2"
+            />
           </label>
 
           <label className="flex items-start gap-2.5 text-sm text-zinc-600 dark:text-zinc-400">
@@ -193,13 +231,23 @@ export function OnboardingForm({
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           )}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className={`${primaryButtonClass} mt-2 w-full`}
-          >
-            {submitting ? "Saving…" : "Continue"}
-          </button>
+          <div className="mt-2 flex flex-col gap-3 sm:flex-row-reverse">
+            <button
+              type="submit"
+              disabled={submitting}
+              className={`${primaryButtonClass} w-full sm:flex-1`}
+            >
+              {submitting ? "Saving…" : "Save changes"}
+            </button>
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={submitting}
+              className={`${secondaryButtonClass} w-full sm:flex-1`}
+            >
+              Cancel
+            </button>
+          </div>
         </form>
       </main>
     </Screen>

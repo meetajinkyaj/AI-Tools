@@ -5,7 +5,13 @@ import { usePrivy } from "@privy-io/react-auth";
 import { PRIMARY_GOAL_LABELS, type ProfileRow } from "@/lib/profile";
 import { secondaryButtonClass, Screen } from "./ui";
 
-export function Dashboard({ profile }: { profile: ProfileRow }) {
+export function Dashboard({
+  profile,
+  onEdit,
+}: {
+  profile: ProfileRow;
+  onEdit: () => void;
+}) {
   const { logout } = usePrivy();
   const firstName = profile.full_name.split(" ")[0] || profile.full_name;
 
@@ -28,9 +34,14 @@ export function Dashboard({ profile }: { profile: ProfileRow }) {
           Health tracking is coming soon. Your profile is set up and ready.
         </div>
 
-        <button onClick={logout} className={secondaryButtonClass}>
-          Log out
-        </button>
+        <div className="flex flex-col items-center gap-3 sm:flex-row">
+          <button onClick={onEdit} className={secondaryButtonClass}>
+            Edit profile
+          </button>
+          <button onClick={logout} className={secondaryButtonClass}>
+            Log out
+          </button>
+        </div>
       </main>
     </Screen>
   );

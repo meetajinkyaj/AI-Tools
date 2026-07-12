@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProfileRow } from "@/lib/profile";
 import { Dashboard } from "./dashboard";
 import { OnboardingForm } from "./onboarding-form";
+import { ProfileEditForm } from "./profile-edit-form";
 import { CenteredMessage, primaryButtonClass, Screen } from "./ui";
 
 type Status = "loading" | "onboarding" | "ready" | "error";
@@ -23,6 +24,7 @@ export function AuthedApp() {
   const { user, getAccessToken } = usePrivy();
   const [status, setStatus] = useState<Status>("loading");
   const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [editing, setEditing] = useState(false);
   const startedRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -106,5 +108,21 @@ export function AuthedApp() {
     );
   }
 
-  return <Dashboard profile={profile as ProfileRow} />;
+  if (editing) {
+    return (
+      <ProfileEditForm
+        profile={profile as ProfileRow}
+        getToken={getAccessToken}
+        onSaved={(updated) => {
+          setProfile(updated);
+          setEditing(false);
+        }}
+        onCancel={() => setEditing(false)}
+      />
+    );
+  }
+
+  return (
+    <Dashboard profile={profile as ProfileRow} onEdit={() => setEditing(true)} />
+  );
 }

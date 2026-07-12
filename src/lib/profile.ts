@@ -47,7 +47,15 @@ export const ACTIVITY_LEVEL_DESCRIPTIONS: Record<ActivityLevel, string> = {
   high: "Active most of the day, 10k+ steps/day.",
 };
 
-/** The fields collected during onboarding (the "lean" set). */
+/**
+ * The full set of user-editable profile fields.
+ *
+ * `full_name` through `marketing_consent` make up the "lean" set collected
+ * during onboarding; `known_conditions`, `country`, and `city` are deferred
+ * from onboarding and captured later on the profile edit screen. All of the
+ * deferred fields are optional (nullable), so a lean onboarding body that omits
+ * them still validates.
+ */
 export interface ProfileInput {
   full_name: string;
   date_of_birth: string; // ISO date, YYYY-MM-DD
@@ -56,15 +64,15 @@ export interface ProfileInput {
   activity_level: ActivityLevel;
   timezone: string | null;
   marketing_consent: boolean;
+  known_conditions: string | null;
+  country: string | null;
+  city: string | null;
 }
 
 /** A profile row as returned by the API (the DB row shape). */
 export interface ProfileRow extends ProfileInput {
   id: string;
   user_id: string;
-  known_conditions: string | null;
-  country: string | null;
-  city: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -76,6 +84,8 @@ export type ValidationResult =
 const MAX_NAME_LENGTH = 120;
 const MIN_AGE_YEARS = 13;
 const MAX_AGE_YEARS = 120;
+const MAX_CONDITIONS_LENGTH = 2000;
+const MAX_LOCATION_LENGTH = 120;
 
 /**
  * Validate and normalize an untrusted request body into a ProfileInput.
@@ -109,10 +119,22 @@ export function validateProfileInput(body: unknown): ValidationResult {
     return { ok: false, error: "Invalid activity level" };
   }
 
-  const timezone =
-    typeof b.timezone === "string" && b.timezone.trim().length > 0
-      ? b.timezone.trim()
-      : null;
+  const timezone = optionalTrimmed(b.timezone);
+
+  const knownConditions = optionalTrimmed(b.known_conditions);
+  if (knownConditions !== null && knownConditions.length > MAX_CONDITIONS_LENGTH) {
+    return { ok: false, error: "Known conditions is too long" };
+  }
+
+  const country = optionalTrimmed(b.country);
+  if (country !== null && country.length > MAX_LOCATION_LENGTH) {
+    return { ok: false, error: "Country is too long" };
+  }
+
+  const city = optionalTrimmed(b.city);
+  if (city !== null && city.length > MAX_LOCATION_LENGTH) {
+    return { ok: false, error: "City is too long" };
+  }
 
   return {
     ok: true,
@@ -124,8 +146,18 @@ export function validateProfileInput(body: unknown): ValidationResult {
       activity_level: b.activity_level,
       timezone,
       marketing_consent: b.marketing_consent === true,
+      known_conditions: knownConditions,
+      country,
+      city,
     },
   };
+}
+
+/** Trim an untrusted value to a non-empty string, or null when absent/blank. */
+function optionalTrimmed(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
 }
 
 function isOneOf<T extends readonly string[]>(

@@ -11,6 +11,9 @@ function validBody(overrides: Record<string, unknown> = {}) {
     activity_level: "moderate",
     timezone: "Europe/London",
     marketing_consent: true,
+    known_conditions: "Type 2 diabetes",
+    country: "United Kingdom",
+    city: "London",
     ...overrides,
   };
 }
@@ -24,6 +27,9 @@ describe("validateProfileInput", () => {
       expect(result.value.biological_sex).toBe("female");
       expect(result.value.marketing_consent).toBe(true);
       expect(result.value.timezone).toBe("Europe/London");
+      expect(result.value.known_conditions).toBe("Type 2 diabetes");
+      expect(result.value.country).toBe("United Kingdom");
+      expect(result.value.city).toBe("London");
     }
   });
 
@@ -36,6 +42,34 @@ describe("validateProfileInput", () => {
       expect(result.value.marketing_consent).toBe(false);
       expect(result.value.timezone).toBeNull();
     }
+  });
+
+  it("accepts a lean onboarding body that omits the deferred fields", () => {
+    const result = validateProfileInput(
+      validBody({
+        known_conditions: undefined,
+        country: undefined,
+        city: "   ",
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.known_conditions).toBeNull();
+      expect(result.value.country).toBeNull();
+      expect(result.value.city).toBeNull();
+    }
+  });
+
+  it("rejects deferred fields that are too long", () => {
+    expect(
+      validateProfileInput(validBody({ known_conditions: "x".repeat(2001) })).ok,
+    ).toBe(false);
+    expect(
+      validateProfileInput(validBody({ country: "x".repeat(121) })).ok,
+    ).toBe(false);
+    expect(validateProfileInput(validBody({ city: "x".repeat(121) })).ok).toBe(
+      false,
+    );
   });
 
   it("rejects a missing name", () => {
