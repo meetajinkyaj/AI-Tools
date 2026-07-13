@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
+/*
+ * Ikigaro design tokens — the "golden-hour" brand system.
+ * Source of truth: Ikigaro Brand Guidelines v1.0.
+ *
+ * Grounds: charcoal (Obsidian Stone) + cream (Onsen Linen), used ~60/30.
+ * Terracotta (Golden Hour) is the single accent — ~10%, never body text.
+ * The app runs on the cream ground by default; the marketing-style hero
+ * (landing) uses the charcoal ground explicitly via `bg-obsidian`.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Raw brand palette */
+  --obsidian-stone: #1b1815;
+  --onsen-linen: #f1e9dc;
+  --golden-hour: #b5562d;
+  --sauna-smoke: #272320;
+  --clay-ember: #cd7144;
+  --burnt-cedar: #8f3f1d;
+  --desert-tan: #c9b79c;
+
+  /* Semantic tokens — light (cream) ground */
+  --background: var(--onsen-linen);
+  --surface: #fbf7f0; /* warm near-white card lift */
+  --surface-2: #f4ecdf; /* subtle raised / hover */
+  --foreground: var(--obsidian-stone);
+  --muted: #6e645b; /* warm gray for secondary text (AA on cream) */
+  --border: rgba(27, 24, 21, 0.12);
+  --border-strong: rgba(27, 24, 21, 0.24);
+  --accent: var(--golden-hour);
+  --accent-hover: var(--burnt-cedar);
+  --accent-contrast: var(--onsen-linen);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-contrast: var(--accent-contrast);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Fixed brand colors for deliberate use (e.g. the charcoal hero) */
+  --color-obsidian: var(--obsidian-stone);
+  --color-linen: var(--onsen-linen);
+  --color-terracotta: var(--golden-hour);
+  --color-clay: var(--clay-ember);
+  --color-tan: var(--desert-tan);
+
+  /* Type — three voices, wired from next/font in layout.tsx */
+  --font-display: var(--font-cormorant);
+  --font-label: var(--font-marcellus);
+  --font-body: var(--font-hanken);
+
+  /* Corner radius — 8 controls, 14 cards */
+  --radius-control: 8px;
+  --radius-card: 14px;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }

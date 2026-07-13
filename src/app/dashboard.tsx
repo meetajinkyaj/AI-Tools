@@ -1,10 +1,12 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
-
 import { PRIMARY_GOAL_LABELS, type ProfileRow } from "@/lib/profile";
-import { secondaryButtonClass, Screen } from "./ui";
+import { Card, Eyebrow, PageHeader, secondaryButtonClass } from "./ui";
 
+/**
+ * Home tab content. Rendered inside the AppShell, so it returns content only
+ * (no full-screen wrapper, no log-out — those live in the shell).
+ */
 export function Dashboard({
   profile,
   onEdit,
@@ -12,37 +14,42 @@ export function Dashboard({
   profile: ProfileRow;
   onEdit: () => void;
 }) {
-  const { logout } = usePrivy();
   const firstName = profile.full_name.split(" ")[0] || profile.full_name;
 
   return (
-    <Screen>
-      <main className="flex w-full max-w-md flex-col items-center gap-6 text-center">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
-            Welcome, {firstName}
-          </h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Your goal:{" "}
-            <span className="font-medium text-zinc-800 dark:text-zinc-200">
-              {PRIMARY_GOAL_LABELS[profile.primary_goal]}
-            </span>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        eyebrow="Home"
+        title={`Welcome, ${firstName}`}
+        subtitle="Your baseline is set up. Health tracking is coming online soon."
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="flex flex-col gap-2 p-6">
+          <Eyebrow>Primary goal</Eyebrow>
+          <p className="font-display text-2xl font-medium text-foreground">
+            {PRIMARY_GOAL_LABELS[profile.primary_goal]}
           </p>
-        </div>
+        </Card>
 
-        <div className="w-full rounded-xl border border-black/[.08] bg-white p-6 text-sm text-zinc-600 dark:border-white/[.1] dark:bg-zinc-950 dark:text-zinc-400">
-          Health tracking is coming soon. Your profile is set up and ready.
-        </div>
+        <Card className="flex flex-col gap-2 p-6">
+          <Eyebrow>iki points</Eyebrow>
+          <p className="font-display text-2xl font-medium text-foreground">0</p>
+          <p className="font-body text-xs text-muted">
+            Earn points from daily check-ins and your first blood panel.
+          </p>
+        </Card>
+      </div>
 
-        <div className="flex flex-col items-center gap-3 sm:flex-row">
-          <button onClick={onEdit} className={secondaryButtonClass}>
-            Edit profile
-          </button>
-          <button onClick={logout} className={secondaryButtonClass}>
-            Log out
-          </button>
-        </div>
-      </main>
-    </Screen>
+      <Card className="flex flex-col gap-4 p-6">
+        <p className="font-body text-sm text-muted">
+          Daily check-ins, your biomarker report, and rewards will appear here
+          as each section comes online.
+        </p>
+        <button onClick={onEdit} className={secondaryButtonClass}>
+          Edit profile
+        </button>
+      </Card>
+    </div>
   );
 }

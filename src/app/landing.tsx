@@ -2,26 +2,29 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 
-import { primaryButtonClass, Screen } from "./ui";
+import { primaryButtonClass, Wordmark } from "./ui";
 
 export function Landing() {
   const { login } = usePrivy();
 
   return (
-    <Screen>
+    // The signed-out hero uses the charcoal ground (the brand's second core
+    // ground) for a premium, editorial first impression.
+    <div className="flex flex-1 items-center justify-center bg-obsidian px-6 py-12">
       <main className="flex w-full max-w-md flex-col items-center gap-8 text-center">
-        <div className="flex flex-col items-center gap-3">
-          <h1 className="text-4xl font-semibold tracking-tight text-black dark:text-zinc-50">
-            Ikigaro
-          </h1>
-          <p className="text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Your health, tracked with intention.
+        <div className="flex flex-col items-center gap-5">
+          <Wordmark className="text-5xl text-linen" />
+          <p className="font-label text-[0.7rem] uppercase tracking-[0.34em] text-tan">
+            Performance · Recovery · Longevity
           </p>
         </div>
+        <p className="font-display text-2xl font-medium leading-snug text-linen/90">
+          The operating system for performance, recovery &amp; longevity.
+        </p>
         <button onClick={login} className={primaryButtonClass}>
-          Sign in with Privy
+          Sign in
         </button>
       </main>
-    </Screen>
+    </div>
   );
 }

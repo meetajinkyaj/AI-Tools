@@ -1,9 +1,23 @@
 import type { ReactNode } from "react";
 
-/** Full-height centered container used by every top-level view. */
-export function Screen({ children }: { children: ReactNode }) {
+/**
+ * Shared UI primitives, styled to the Ikigaro brand system (see globals.css
+ * for the design tokens). Screens compose these so every surface stays
+ * consistent as new tabs are added.
+ */
+
+/** Full-height centered container — used by pre-app screens (landing, auth, onboarding). */
+export function Screen({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="flex flex-1 items-center justify-center bg-zinc-50 px-6 py-12 font-sans dark:bg-black">
+    <div
+      className={`flex flex-1 items-center justify-center bg-background px-6 py-12 ${className}`}
+    >
       {children}
     </div>
   );
@@ -13,21 +27,133 @@ export function Screen({ children }: { children: ReactNode }) {
 export function CenteredMessage({ children }: { children: ReactNode }) {
   return (
     <Screen>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">{children}</p>
+      <p className="font-body text-sm text-muted">{children}</p>
     </Screen>
   );
 }
 
-/** Shared primary/secondary button class strings (kept consistent app-wide). */
+/**
+ * The Ikigaro wordmark: lowercase "ikigaro" in Cormorant Garamond with the
+ * tittle of the "i" rendered in terracotta — the brand's single mandatory
+ * accent. Size it by setting a font-size on `className` (e.g. `text-2xl`).
+ */
+export function Wordmark({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`font-display font-medium lowercase leading-none tracking-tight ${className}`}
+    >
+      <span className="relative inline-block">
+        {/* dotless i, so we can place the terracotta tittle precisely */}
+        {"ı"}
+        <span
+          aria-hidden
+          className="absolute left-1/2 rounded-full bg-terracotta"
+          style={{
+            width: "0.13em",
+            height: "0.13em",
+            top: "0.06em",
+            transform: "translateX(-50%)",
+          }}
+        />
+      </span>
+      kigaro
+    </span>
+  );
+}
+
+/** Marcellus eyebrow — letterspaced caps, used above titles and as section labels. */
+export function Eyebrow({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <p
+      className={`font-label text-[0.7rem] uppercase tracking-[0.28em] text-accent ${className}`}
+    >
+      {children}
+    </p>
+  );
+}
+
+/** Standard page header: optional eyebrow, a Cormorant title, and optional subtitle. */
+export function PageHeader({
+  eyebrow,
+  title,
+  subtitle,
+  className = "",
+}: {
+  eyebrow?: string;
+  title: string;
+  subtitle?: string;
+  className?: string;
+}) {
+  return (
+    <div className={`flex flex-col gap-2 ${className}`}>
+      {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
+      <h1 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground sm:text-4xl">
+        {title}
+      </h1>
+      {subtitle && <p className="font-body text-sm text-muted">{subtitle}</p>}
+    </div>
+  );
+}
+
+/** Rounded surface card (radius 14) with a subtle warm border. */
+export function Card({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-card border border-border bg-surface ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Placeholder pane for sections not yet built, so nav is real end-to-end. */
+export function ComingSoon({
+  eyebrow,
+  title,
+  note,
+}: {
+  eyebrow: string;
+  title: string;
+  note: string;
+}) {
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader eyebrow={eyebrow} title={title} />
+      <Card className="p-8">
+        <p className="font-body text-sm text-muted">{note}</p>
+      </Card>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Shared class strings — kept so form fields stay consistent app-wide */
+/* ------------------------------------------------------------------ */
+
+/** Primary action: terracotta fill, cream text (radius 8). */
 export const primaryButtonClass =
-  "flex h-12 items-center justify-center rounded-full bg-foreground px-6 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]";
+  "inline-flex h-11 items-center justify-center rounded-control bg-accent px-6 font-body text-sm font-medium text-accent-contrast transition-colors hover:bg-accent-hover disabled:pointer-events-none disabled:opacity-50";
 
+/** Secondary action: outline on the current ground. */
 export const secondaryButtonClass =
-  "flex h-11 items-center justify-center rounded-full border border-solid border-black/[.1] px-5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.15] dark:hover:bg-[#1a1a1a]";
+  "inline-flex h-11 items-center justify-center rounded-control border border-border-strong bg-transparent px-5 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-50";
 
-/** Shared form field + label styling (used by the profile forms). */
+/** Form input / select / textarea base (radius 8, terracotta focus). */
 export const fieldClass =
-  "h-11 w-full rounded-lg border border-black/[.12] bg-white px-3 text-sm text-black outline-none focus:border-black/[.4] dark:border-white/[.15] dark:bg-black dark:text-zinc-50 dark:focus:border-white/[.4]";
+  "h-11 w-full rounded-control border border-border bg-surface px-3 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted/60 focus:border-accent focus:ring-2 focus:ring-accent/20";
 
+/** Form field label wrapper. */
 export const labelClass =
-  "flex flex-col gap-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300";
+  "flex flex-col gap-1.5 font-body text-sm font-medium text-foreground/80";

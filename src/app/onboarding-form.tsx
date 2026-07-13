@@ -12,7 +12,13 @@ import {
   PRIMARY_GOAL_LABELS,
   type ProfileRow,
 } from "@/lib/profile";
-import { fieldClass, labelClass, primaryButtonClass, Screen } from "./ui";
+import {
+  fieldClass,
+  labelClass,
+  PageHeader,
+  primaryButtonClass,
+  Screen,
+} from "./ui";
 
 export function OnboardingForm({
   getToken,
@@ -78,14 +84,11 @@ export function OnboardingForm({
   return (
     <Screen>
       <main className="flex w-full max-w-md flex-col gap-6">
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
-            Tell us about you
-          </h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            A few basics so we can tailor your health tracking.
-          </p>
-        </div>
+        <PageHeader
+          eyebrow="Welcome"
+          title="Tell us about you"
+          subtitle="A few basics so we can tailor your health tracking."
+        />
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <label className={labelClass}>
@@ -167,10 +170,10 @@ export function OnboardingForm({
                 </option>
               ))}
             </select>
-            <ul className="mt-1 flex flex-col gap-1 text-xs font-normal text-zinc-500 dark:text-zinc-400">
+            <ul className="mt-1 flex flex-col gap-1 text-xs font-normal text-muted">
               {ACTIVITY_LEVEL.map((v) => (
                 <li key={v}>
-                  <span className="font-medium text-zinc-600 dark:text-zinc-300">
+                  <span className="font-medium text-foreground/70">
                     {ACTIVITY_LEVEL_LABELS[v]}:
                   </span>{" "}
                   {ACTIVITY_LEVEL_DESCRIPTIONS[v]}
@@ -179,19 +182,17 @@ export function OnboardingForm({
             </ul>
           </label>
 
-          <label className="flex items-start gap-2.5 text-sm text-zinc-600 dark:text-zinc-400">
+          <label className="flex items-start gap-2.5 font-body text-sm text-muted">
             <input
               type="checkbox"
-              className="mt-0.5 h-4 w-4"
+              className="mt-0.5 h-4 w-4 accent-accent"
               checked={marketingConsent}
               onChange={(e) => setMarketingConsent(e.target.checked)}
             />
             Email me occasional product tips and updates.
           </label>
 
-          {error && (
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-          )}
+          {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
 
           <button
             type="submit"

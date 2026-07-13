@@ -14,8 +14,8 @@ import {
 import {
   fieldClass,
   labelClass,
+  PageHeader,
   primaryButtonClass,
-  Screen,
   secondaryButtonClass,
 } from "./ui";
 
@@ -100,16 +100,13 @@ export function ProfileEditForm({
   }
 
   return (
-    <Screen>
-      <main className="flex w-full max-w-md flex-col gap-6">
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
-            Edit your profile
-          </h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Keep your details up to date so we can tailor your health tracking.
-          </p>
-        </div>
+    <div className="w-full max-w-md">
+      <main className="flex w-full flex-col gap-6">
+        <PageHeader
+          eyebrow="Profile"
+          title="Edit your profile"
+          subtitle="Keep your details up to date so we can tailor your health tracking."
+        />
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <label className={labelClass}>
@@ -217,19 +214,17 @@ export function ProfileEditForm({
             />
           </label>
 
-          <label className="flex items-start gap-2.5 text-sm text-zinc-600 dark:text-zinc-400">
+          <label className="flex items-start gap-2.5 font-body text-sm text-muted">
             <input
               type="checkbox"
-              className="mt-0.5 h-4 w-4"
+              className="mt-0.5 h-4 w-4 accent-accent"
               checked={marketingConsent}
               onChange={(e) => setMarketingConsent(e.target.checked)}
             />
             Email me occasional product tips and updates.
           </label>
 
-          {error && (
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-          )}
+          {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
 
           <div className="mt-2 flex flex-col gap-3 sm:flex-row-reverse">
             <button
@@ -250,6 +245,6 @@ export function ProfileEditForm({
           </div>
         </form>
       </main>
-    </Screen>
+    </div>
   );
 }
