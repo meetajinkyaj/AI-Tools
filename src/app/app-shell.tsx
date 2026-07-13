@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { Wordmark } from "./ui";
 
 /**
@@ -89,6 +91,18 @@ export function AppShell({
       <main className="mx-auto w-full max-w-[1080px] flex-1 px-6 py-10">
         {children}
       </main>
+
+      <footer className="border-t border-border">
+        <div className="mx-auto flex w-full max-w-[1080px] flex-wrap items-center gap-x-5 gap-y-2 px-6 py-5 font-body text-xs text-muted">
+          <span>© {new Date().getFullYear()} Ikigaro</span>
+          <Link href="/privacy" className="transition-colors hover:text-foreground">
+            Privacy
+          </Link>
+          <Link href="/terms" className="transition-colors hover:text-foreground">
+            Terms
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }

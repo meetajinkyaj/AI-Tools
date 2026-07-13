@@ -1,6 +1,7 @@
 "use client";
 
 import { usePrivy } from "@privy-io/react-auth";
+import Link from "next/link";
 
 import { primaryButtonClass, Wordmark } from "./ui";
 
@@ -24,6 +25,15 @@ export function Landing() {
         <button onClick={login} className={primaryButtonClass}>
           Sign in
         </button>
+
+        <nav className="mt-4 flex gap-5 font-body text-xs uppercase tracking-[0.18em] text-tan">
+          <Link href="/privacy" className="transition-colors hover:text-linen">
+            Privacy
+          </Link>
+          <Link href="/terms" className="transition-colors hover:text-linen">
+            Terms
+          </Link>
+        </nav>
       </main>
     </div>
   );

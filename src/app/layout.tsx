@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Hanken_Grotesk, Marcellus } from "next/font/google";
 import "./globals.css";
-import { ClientLayout } from "./client-layout";
 
 // Three brand voices (Ikigaro Brand Guidelines §9):
 //  - Cormorant Garamond → display & wordmark (editorial serif)
@@ -44,9 +43,7 @@ export default function RootLayout({
       lang="en"
       className={`${cormorant.variable} ${marcellus.variable} ${hanken.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        <ClientLayout>{children}</ClientLayout>
-      </body>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }
