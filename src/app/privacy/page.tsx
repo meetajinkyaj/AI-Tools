@@ -12,10 +12,11 @@ export default function PrivacyPage() {
     <LegalShell eyebrow="Legal" title="Privacy Policy">
       <p>
         This Privacy Policy explains how Ikigaro (&ldquo;Ikigaro,&rdquo;
-        &ldquo;we,&rdquo; &ldquo;us&rdquo;), operated by{" "}
-        <strong>[Ikigaro operating entity — legal company name]</strong>,
-        collects, uses, shares, and protects information when you use the
+        &ldquo;we,&rdquo; &ldquo;us&rdquo;) collects, uses, shares, and protects
+        information when you use the
         Ikigaro web application at app.ikigaro.com (the &ldquo;Service&rdquo;).
+        Ikigaro is operated by <strong>Ikigaro by Avisa Innovation LLP</strong>,
+        based in Pune, Maharashtra, India.
         Because the Service handles health-related information, we treat that
         data with particular care, as described below.
       </p>
@@ -89,8 +90,8 @@ export default function PrivacyPage() {
           and only with your consent.
         </li>
         <li>
-          You can view, edit, export, or delete your health data at any time
-          (see &ldquo;Your rights&rdquo;).
+          To delete your health data at any time, just send us an email with
+          &ldquo;delete&rdquo; in the subject and we will erase all your data.
         </li>
       </ul>
 
@@ -141,9 +142,10 @@ export default function PrivacyPage() {
           in the app.
         </li>
         <li>
-          <strong>Export &amp; deletion.</strong> Request a copy of your data or
-          deletion of your account and associated data by contacting us at{" "}
-          <a href="mailto:privacy@ikigaro.com">privacy@ikigaro.com</a>.
+          <strong>Deletion.</strong> To delete your account and all associated
+          data, email{" "}
+          <a href="mailto:hello@ikigaro.com">hello@ikigaro.com</a> with
+          &ldquo;delete&rdquo; in the subject and we will erase all your data.
         </li>
         <li>
           <strong>Marketing.</strong> Opt out of product emails at any time.
@@ -178,7 +180,7 @@ export default function PrivacyPage() {
 
       <h2>10. Contact</h2>
       <p>
-        Questions or requests: <a href="mailto:privacy@ikigaro.com">privacy@ikigaro.com</a>.
+        Questions or requests: <a href="mailto:hello@ikigaro.com">hello@ikigaro.com</a>.
       </p>
     </LegalShell>
   );

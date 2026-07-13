@@ -14,8 +14,9 @@ export default function TermsPage() {
         These Terms of Service (&ldquo;Terms&rdquo;) govern your use of the
         Ikigaro web application at app.ikigaro.com (the &ldquo;Service&rdquo;),
         operated by{" "}
-        <strong>[Ikigaro operating entity — legal company name]</strong>{" "}
-        (&ldquo;Ikigaro,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;). By creating
+        <strong>Ikigaro by Avisa Innovation LLP</strong>, based in Pune,
+        Maharashtra, India (&ldquo;Ikigaro,&rdquo; &ldquo;we,&rdquo;
+        &ldquo;us&rdquo;). By creating
         an account or using the Service, you agree to these Terms and to our{" "}
         <a href="/privacy">Privacy Policy</a>. If you do not agree, do not use
         the Service.
@@ -100,9 +101,8 @@ export default function TermsPage() {
       <h2>5. iki points &amp; rewards</h2>
       <ul>
         <li>
-          iki points have <strong>no cash value</strong>, are not money or legal
-          tender, cannot be exchanged for cash, and are non-transferable except
-          as we expressly allow.
+          iki points are not money or legal tender, cannot be exchanged for
+          cash, and are non-transferable except as we expressly allow.
         </li>
         <li>
           Points are awarded and redeemed at our discretion under the current
@@ -141,9 +141,9 @@ export default function TermsPage() {
       <h2>8. Intellectual property</h2>
       <p>
         The Service, including its content, design, and trademarks (including
-        the Ikigaro name and wordmark), is owned by Ikigaro or its licensors.
-        You retain ownership of the data you submit and grant us a limited
-        license to process it solely to provide the Service.
+        the Ikigaro name and wordmark), is owned by Avisa Innovation LLP. You
+        retain ownership of the data you submit and grant us a license to
+        process it.
       </p>
 
       <h2>9. Third-party services</h2>
@@ -198,14 +198,14 @@ export default function TermsPage() {
       <h2>15. Governing law</h2>
       <p>
         These Terms are governed by the laws of{" "}
-        <strong>[governing jurisdiction — e.g. Dubai/DIFC, UAE]</strong>,
-        without regard to conflict-of-laws rules, and any disputes will be
-        resolved in the courts or forum specified there.
+        <strong>Pune, Maharashtra, India</strong>, without regard to
+        conflict-of-laws rules, and any disputes will be subject to the
+        jurisdiction of the courts of Pune, Maharashtra, India.
       </p>
 
       <h2>16. Contact</h2>
       <p>
-        Questions about these Terms: <a href="mailto:legal@ikigaro.com">legal@ikigaro.com</a>.
+        Questions about these Terms: <a href="mailto:hello@ikigaro.com">hello@ikigaro.com</a>.
       </p>
     </LegalShell>
   );

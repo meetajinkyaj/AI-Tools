@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { Eyebrow, Wordmark } from "./ui";
 
 /** Effective date shown on the legal pages. Update when the policies change. */
-export const LEGAL_EFFECTIVE_DATE = "13 July 2026";
+export const LEGAL_EFFECTIVE_DATE = "1 January 2026";
 
 /**
  * Shared chrome + typographic styling for the public legal pages (/privacy,
