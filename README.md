@@ -65,4 +65,21 @@ node --env-file=.env.local scripts/test-supabase.mjs   # verify Supabase connect
 ## Database migrations
 
 Apply `supabase/migrations/*.sql` via the Supabase SQL editor (or the Supabase
-CLI) in filename order.
+CLI) in filename order:
+
+- `0001_init_core_schema.sql` — core identity: `users`, `profiles`,
+  `connections`, `events`.
+- `0002_product_schema.sql` — Phase 0 product model: biomarker panels &
+  readings, the marker catalog (taxonomy + reference ranges), daily check-ins,
+  the iki-points economy (balance + append-only ledger), the redemption
+  marketplace, and "Future You" predictions. `healthkit_syncs` is defined but
+  unused until the Phase 2 native app.
+
+Every table keeps the same auth posture: RLS enabled, no policies, all access
+via the service-role key.
+
+> **Clinical safety:** the reference ranges seeded into `biomarker_catalog` are
+> common, unvalidated adult intervals used only to bootstrap the schema (every
+> row is flagged `is_validated = false`). They must be reviewed and signed off
+> by a qualified professional — and localized per partner lab — before any
+> production use.
