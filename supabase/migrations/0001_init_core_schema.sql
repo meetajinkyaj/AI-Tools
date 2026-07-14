@@ -35,6 +35,7 @@ create table if not exists users (
 
 create index if not exists users_privy_user_id_idx on users (privy_user_id);
 
+drop trigger if exists users_set_updated_at on users;
 create trigger users_set_updated_at
   before update on users
   for each row execute function set_updated_at();
@@ -60,6 +61,7 @@ create table if not exists profiles (
   unique (user_id)  -- one profile per user
 );
 
+drop trigger if exists profiles_set_updated_at on profiles;
 create trigger profiles_set_updated_at
   before update on profiles
   for each row execute function set_updated_at();
@@ -90,6 +92,7 @@ create table if not exists connections (
 
 create index if not exists connections_user_id_idx on connections (user_id);
 
+drop trigger if exists connections_set_updated_at on connections;
 create trigger connections_set_updated_at
   before update on connections
   for each row execute function set_updated_at();

@@ -47,6 +47,7 @@ create table if not exists biomarker_catalog (
 create index if not exists biomarker_catalog_category_idx
   on biomarker_catalog (category, sort_order);
 
+drop trigger if exists biomarker_catalog_set_updated_at on biomarker_catalog;
 create trigger biomarker_catalog_set_updated_at
   before update on biomarker_catalog
   for each row execute function set_updated_at();
@@ -71,6 +72,7 @@ create table if not exists biomarker_panels (
 create index if not exists biomarker_panels_user_date_idx
   on biomarker_panels (user_id, test_date desc);
 
+drop trigger if exists biomarker_panels_set_updated_at on biomarker_panels;
 create trigger biomarker_panels_set_updated_at
   before update on biomarker_panels
   for each row execute function set_updated_at();
@@ -123,6 +125,7 @@ create table if not exists daily_checkins (
 create index if not exists daily_checkins_user_date_idx
   on daily_checkins (user_id, checkin_date desc);
 
+drop trigger if exists daily_checkins_set_updated_at on daily_checkins;
 create trigger daily_checkins_set_updated_at
   before update on daily_checkins
   for each row execute function set_updated_at();
@@ -142,6 +145,7 @@ create table if not exists reward_points (
   unique (user_id)
 );
 
+drop trigger if exists reward_points_set_updated_at on reward_points;
 create trigger reward_points_set_updated_at
   before update on reward_points
   for each row execute function set_updated_at();
@@ -190,6 +194,7 @@ create table if not exists redemption_items (
 create index if not exists redemption_items_status_idx
   on redemption_items (inventory_status, category);
 
+drop trigger if exists redemption_items_set_updated_at on redemption_items;
 create trigger redemption_items_set_updated_at
   before update on redemption_items
   for each row execute function set_updated_at();
@@ -215,6 +220,7 @@ create table if not exists redemption_transactions (
 create index if not exists redemption_transactions_user_idx
   on redemption_transactions (user_id, created_at desc);
 
+drop trigger if exists redemption_transactions_set_updated_at on redemption_transactions;
 create trigger redemption_transactions_set_updated_at
   before update on redemption_transactions
   for each row execute function set_updated_at();
