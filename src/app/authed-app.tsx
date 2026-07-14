@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ProfileRow } from "@/lib/profile";
 import { AppShell, type NavKey } from "./app-shell";
+import { CheckinForm } from "./checkin-form";
 import { Dashboard } from "./dashboard";
 import { OnboardingForm } from "./onboarding-form";
 import { ProfileEditForm } from "./profile-edit-form";
@@ -26,6 +27,7 @@ export function AuthedApp() {
   const [status, setStatus] = useState<Status>("loading");
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [tab, setTab] = useState<NavKey>("home");
+  const [summaryVersion, setSummaryVersion] = useState(0);
   const startedRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -114,7 +116,16 @@ export function AuthedApp() {
       {tab === "home" && (
         <Dashboard
           profile={profile as ProfileRow}
+          getToken={getAccessToken}
           onEdit={() => setTab("profile")}
+          onCheckIn={() => setTab("checkin")}
+          refreshKey={summaryVersion}
+        />
+      )}
+      {tab === "checkin" && (
+        <CheckinForm
+          getToken={getAccessToken}
+          onChange={() => setSummaryVersion((v) => v + 1)}
         />
       )}
       {tab === "profile" && (
@@ -126,13 +137,6 @@ export function AuthedApp() {
             setTab("home");
           }}
           onCancel={() => setTab("home")}
-        />
-      )}
-      {tab === "checkin" && (
-        <ComingSoon
-          eyebrow="Coming soon"
-          title="Daily Check-in"
-          note="A 30-second daily check-in — sleep, energy, and one training or nutrition note — is on the way. It will build your streak and earn iki points."
         />
       )}
       {tab === "report" && (
