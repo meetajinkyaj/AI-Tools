@@ -3,8 +3,10 @@ import { NextResponse } from "next/server";
 import { getPrivyUserId } from "@/lib/api-auth";
 import {
   type CatalogEntry,
+  computeDerived,
   computeFlag,
   dedupeCatalogForSex,
+  qualitativeFlag,
   validatePanelInput,
 } from "@/lib/biomarkers";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
@@ -48,7 +50,7 @@ async function loadCatalog(sex: string): Promise<CatalogEntry[]> {
   const { data, error } = await supabase
     .from("biomarker_catalog")
     .select(
-      "marker_key, display_name, category, unit, sex, ref_low, ref_high, direction, sort_order, result_kind, is_derived",
+      "marker_key, display_name, category, unit, sex, ref_low, ref_high, direction, sort_order, result_kind, is_derived, normal_text, bands",
     )
     .order("sort_order", { ascending: true });
   if (error) throw new Error(`biomarker_catalog select failed: ${error.message}`);
@@ -153,22 +155,71 @@ export async function POST(request: Request) {
 
     const readingRows = validation.value.readings.map((r) => {
       const entry = byKey.get(r.marker_key)!;
-      return {
+      const base = {
         panel_id: panel.id,
         user_id: resolved.userId,
         marker_key: r.marker_key,
         marker_name: entry.display_name,
-        value: r.value,
         unit: entry.unit,
-        reference_range_low: entry.ref_low,
-        reference_range_high: entry.ref_high,
-        flag: computeFlag(r.value, entry.ref_low, entry.ref_high),
+      };
+
+      if (entry.result_kind === "qualitative") {
+        return {
+          ...base,
+          value: null,
+          value_text: r.value_text,
+          result_kind: "qualitative",
+          reference_range_low: null,
+          reference_range_high: null,
+          range_source: "catalog",
+          flag: qualitativeFlag(r.value_text ?? "", entry.normal_text),
+        };
+      }
+
+      // Numeric — use a lab-provided range override when given.
+      const hasOverride = r.ref_low != null || r.ref_high != null;
+      const refLow = hasOverride ? r.ref_low : entry.ref_low;
+      const refHigh = hasOverride ? r.ref_high : entry.ref_high;
+      return {
+        ...base,
+        value: r.value,
+        value_text: null,
+        result_kind: "numeric",
+        reference_range_low: refLow,
+        reference_range_high: refHigh,
+        range_source: hasOverride ? "lab" : "catalog",
+        flag: computeFlag(r.value as number, refLow, refHigh),
       };
     });
 
+    // Derive markers (Non-HDL, ratios, eAG…) from the entered numeric values.
+    const enteredNumeric = new Map<string, number>();
+    for (const r of validation.value.readings) {
+      if (r.value != null) enteredNumeric.set(r.marker_key, r.value);
+    }
+    const derivedRows = computeDerived(enteredNumeric)
+      .filter((d) => byKey.has(d.marker_key))
+      .map((d) => {
+        const entry = byKey.get(d.marker_key)!;
+        return {
+          panel_id: panel.id,
+          user_id: resolved.userId,
+          marker_key: d.marker_key,
+          marker_name: entry.display_name,
+          unit: entry.unit,
+          value: d.value,
+          value_text: null,
+          result_kind: "numeric",
+          reference_range_low: entry.ref_low,
+          reference_range_high: entry.ref_high,
+          range_source: "catalog",
+          flag: computeFlag(d.value, entry.ref_low, entry.ref_high),
+        };
+      });
+
     const { data: readings, error: readingsError } = await supabase
       .from("biomarker_readings")
-      .insert(readingRows)
+      .insert([...readingRows, ...derivedRows])
       .select("*");
     if (readingsError) {
       throw new Error(`biomarker_readings insert failed: ${readingsError.message}`);
@@ -178,7 +229,10 @@ export async function POST(request: Request) {
     await supabase.from("events").insert({
       user_id: resolved.userId,
       type: "biomarker_panel_created",
-      metadata: { panel_id: panel.id, marker_count: readingRows.length },
+      metadata: {
+        panel_id: panel.id,
+        marker_count: readingRows.length + derivedRows.length,
+      },
     });
 
     return NextResponse.json({ panel, readings: readings ?? [] });

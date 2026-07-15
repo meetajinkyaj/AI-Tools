@@ -3,11 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  type Band,
+  bandFor,
   type CatalogEntry,
   type Flag,
   FLAG_LABELS,
   groupByCategory,
   isEnterableNumeric,
+  isQualitative,
+  qualitativeOptions,
 } from "@/lib/biomarkers";
 import {
   Card,
@@ -23,7 +27,9 @@ interface ReadingRow {
   id: string;
   marker_key: string;
   marker_name: string;
-  value: number;
+  value: number | null;
+  value_text: string | null;
+  result_kind: string;
   unit: string | null;
   reference_range_low: number | null;
   reference_range_high: number | null;
@@ -71,20 +77,38 @@ function rangeText(low: number | null, high: number | null, unit: string | null)
   return "—";
 }
 
-function FlagPill({ flag }: { flag: Flag }) {
-  const cls =
-    flag === "in_range"
-      ? "bg-surface-2 text-muted"
-      : flag === "unknown"
-        ? "bg-surface-2 text-muted"
-        : "bg-accent/10 text-accent";
+function FlagPill({ flag, qualitative }: { flag: Flag; qualitative?: boolean }) {
+  const attention = flag === "low" || flag === "high";
+  const cls = attention ? "bg-accent/10 text-accent" : "bg-surface-2 text-muted";
+  const label = qualitative
+    ? flag === "in_range"
+      ? "Normal"
+      : "Review"
+    : FLAG_LABELS[flag];
   return (
     <span
       className={`shrink-0 rounded-full px-2.5 py-0.5 font-body text-xs font-medium ${cls}`}
     >
-      {FLAG_LABELS[flag]}
+      {label}
     </span>
   );
+}
+
+/** A short, educational line for an out-of-range reading (numeric or qualitative). */
+function calloutText(r: ReadingRow, band: Band | null): string {
+  if (r.result_kind === "qualitative") {
+    return `came back ${r.value_text} — worth confirming with your doctor.`;
+  }
+  const at = `at ${r.value}${r.unit ? ` ${r.unit}` : ""}`;
+  if (band) {
+    return `is in the ${band.label} range (${at}).`;
+  }
+  const dir = r.flag === "low" ? "below" : "above";
+  return `is ${dir} the typical range (${rangeText(
+    r.reference_range_low,
+    r.reference_range_high,
+    r.unit,
+  )}) ${at}.`;
 }
 
 const DISCLAIMER = "Educational, not a diagnosis — please consult a doctor.";
@@ -98,6 +122,7 @@ export function BiomarkerReport({
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [mode, setMode] = useState<"report" | "entry">("report");
   const [values, setValues] = useState<Record<string, string>>({});
+  const [qualValues, setQualValues] = useState<Record<string, string>>({});
   const [testDate, setTestDate] = useState("");
   const [labName, setLabName] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -131,10 +156,16 @@ export function BiomarkerReport({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    const readings = Object.entries(values)
+    const numericReadings = Object.entries(values)
       .map(([marker_key, v]) => ({ marker_key, v: v.trim() }))
       .filter((r) => r.v !== "" && Number.isFinite(Number(r.v)))
       .map((r) => ({ marker_key: r.marker_key, value: Number(r.v) }));
+
+    const qualReadings = Object.entries(qualValues)
+      .filter(([, v]) => v !== "")
+      .map(([marker_key, value_text]) => ({ marker_key, value_text }));
+
+    const readings = [...numericReadings, ...qualReadings];
 
     if (readings.length === 0) {
       setError("Enter at least one marker value.");
@@ -174,6 +205,7 @@ export function BiomarkerReport({
         latestPanel: { panel: result.panel!, readings: result.readings! },
       }));
       setValues({});
+      setQualValues({});
       setTestDate("");
       setLabName("");
       setMode("report");
@@ -204,9 +236,10 @@ export function BiomarkerReport({
 
   // ---------------------------------------------------------------- Entry form
   if (mode === "entry") {
-    // Only numeric, non-derived markers are typed here; qualitative and derived
-    // markers are handled in the report v2 work.
+    // Numeric (non-derived) markers are typed; qualitative markers are chosen
+    // from a dropdown. Derived markers are computed server-side.
     const groups = groupByCategory(catalog.filter(isEnterableNumeric));
+    const qualGroups = groupByCategory(catalog.filter(isQualitative));
     return (
       <div className="flex w-full max-w-xl flex-col gap-6">
         <PageHeader
@@ -276,6 +309,41 @@ export function BiomarkerReport({
             </div>
           ))}
 
+          {qualGroups.map((group) => (
+            <div key={group.category} className="flex flex-col gap-3">
+              <Eyebrow>{categoryLabel(group.category)}</Eyebrow>
+              <div className="flex flex-col gap-2">
+                {group.entries.map((entry) => (
+                  <div
+                    key={entry.marker_key}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <span className="min-w-0 truncate font-body text-sm text-foreground">
+                      {entry.display_name}
+                    </span>
+                    <select
+                      className={`${fieldClass} w-36 shrink-0`}
+                      value={qualValues[entry.marker_key] ?? ""}
+                      onChange={(e) =>
+                        setQualValues((prev) => ({
+                          ...prev,
+                          [entry.marker_key]: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">—</option>
+                      {qualitativeOptions(entry.normal_text).map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
           {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
 
           <p className="font-body text-xs text-muted">{DISCLAIMER}</p>
@@ -307,8 +375,13 @@ export function BiomarkerReport({
   // ------------------------------------------------------------- Report view
   const readings = latestPanel?.readings ?? [];
   const outOfRange = readings.filter((r) => r.flag === "low" || r.flag === "high");
+  const entryByKey = new Map(catalog.map((e) => [e.marker_key, e]));
   const categoryByKey = new Map(catalog.map((e) => [e.marker_key, e.category]));
   const readingGroups = groupReadings(readings, categoryByKey);
+  const bandOf = (r: ReadingRow): Band | null => {
+    const bands = entryByKey.get(r.marker_key)?.bands ?? [];
+    return r.value != null && bands.length > 0 ? bandFor(r.value, bands) : null;
+  };
 
   return (
     <div className="flex w-full max-w-xl flex-col gap-6">
@@ -343,10 +416,7 @@ export function BiomarkerReport({
             {outOfRange.map((r) => (
               <li key={r.id} className="font-body text-sm text-foreground/80">
                 <span className="font-medium text-foreground">{r.marker_name}</span>{" "}
-                is {r.flag === "low" ? "below" : "above"} the typical range (
-                {rangeText(r.reference_range_low, r.reference_range_high, r.unit)}) at{" "}
-                {r.value}
-                {r.unit ? ` ${r.unit}` : ""}.
+                {calloutText(r, bandOf(r))}
               </li>
             ))}
           </ul>
@@ -362,32 +432,49 @@ export function BiomarkerReport({
           <div className="px-5 pt-4 pb-2">
             <Eyebrow>{categoryLabel(group.category)}</Eyebrow>
           </div>
-          {group.readings.map((r) => (
-            <div
-              key={r.id}
-              className="flex items-center justify-between gap-3 px-5 py-3"
-            >
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate font-body text-sm text-foreground">
-                  {r.marker_name}
-                </span>
-                <span className="font-body text-xs text-muted">
-                  {rangeText(r.reference_range_low, r.reference_range_high, r.unit)}
-                </span>
-              </div>
-              <div className="flex shrink-0 items-center gap-3">
-                <span className="font-body text-sm font-medium text-foreground">
-                  {r.value}
-                  {r.unit ? (
-                    <span className="ml-1 text-xs font-normal text-muted">
-                      {r.unit}
+          {group.readings.map((r) => {
+            const band = bandOf(r);
+            const qualitative = r.result_kind === "qualitative";
+            return (
+              <div
+                key={r.id}
+                className="flex items-center justify-between gap-3 px-5 py-3"
+              >
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate font-body text-sm text-foreground">
+                    {r.marker_name}
+                  </span>
+                  <span className="font-body text-xs text-muted">
+                    {qualitative
+                      ? "Screening"
+                      : rangeText(r.reference_range_low, r.reference_range_high, r.unit)}
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  {band && (
+                    <span className="hidden font-body text-xs text-muted sm:inline">
+                      {band.label}
                     </span>
-                  ) : null}
-                </span>
-                <FlagPill flag={r.flag} />
+                  )}
+                  <span className="font-body text-sm font-medium text-foreground">
+                    {qualitative ? (
+                      r.value_text
+                    ) : (
+                      <>
+                        {r.value}
+                        {r.unit ? (
+                          <span className="ml-1 text-xs font-normal text-muted">
+                            {r.unit}
+                          </span>
+                        ) : null}
+                      </>
+                    )}
+                  </span>
+                  <FlagPill flag={r.flag} qualitative={qualitative} />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </Card>
       ))}
 
