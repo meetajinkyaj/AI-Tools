@@ -17,7 +17,7 @@ export type NavKey =
   | "report"
   | "trends"
   | "future"
-  | "rewards"
+  | "partners"
   | "profile";
 
 export const NAV_ITEMS: { key: NavKey; label: string }[] = [
@@ -26,7 +26,7 @@ export const NAV_ITEMS: { key: NavKey; label: string }[] = [
   { key: "report", label: "Report" },
   { key: "trends", label: "Trends" },
   { key: "future", label: "Future You" },
-  { key: "rewards", label: "Rewards" },
+  { key: "partners", label: "Partners" },
   { key: "profile", label: "Profile" },
 ];
 

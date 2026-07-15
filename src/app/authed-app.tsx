@@ -8,6 +8,7 @@ import { AppShell, type NavKey } from "./app-shell";
 import { CheckinForm } from "./checkin-form";
 import { Dashboard } from "./dashboard";
 import { OnboardingForm } from "./onboarding-form";
+import { PartnersView } from "./partners-view";
 import { ProfileEditForm } from "./profile-edit-form";
 import { ProfileView } from "./profile-view";
 import { CenteredMessage, ComingSoon, primaryButtonClass, Screen } from "./ui";
@@ -174,13 +175,7 @@ export function AuthedApp() {
           note="A directional six-month projection for each marker — motivational, not diagnostic — is coming soon."
         />
       )}
-      {tab === "rewards" && (
-        <ComingSoon
-          eyebrow="Coming soon"
-          title="Rewards"
-          note="Spend iki points on partner perks and, eventually, Ikigaro Space. The catalog is coming soon."
-        />
-      )}
+      {tab === "partners" && <PartnersView getToken={getAccessToken} />}
     </AppShell>
   );
 }
