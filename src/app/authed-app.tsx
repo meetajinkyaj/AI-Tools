@@ -132,6 +132,7 @@ export function AuthedApp() {
       {tab === "checkin" && (
         <CheckinForm
           getToken={getAccessToken}
+          activities={(profile as ProfileRow).activities ?? []}
           onChange={() => setSummaryVersion((v) => v + 1)}
         />
       )}

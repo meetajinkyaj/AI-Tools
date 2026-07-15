@@ -1,8 +1,10 @@
 /**
  * Daily check-in domain logic: validation, streak, and the iki-points economy.
  * Pure and dependency-free so it can be unit tested and shared by the API route
- * and the UI. The DB shapes it maps to live in supabase/migrations/0002.
+ * and the UI. The DB shapes it maps to live in supabase/migrations/0002 & 0003.
  */
+
+import { type ExerciseEntry, validateExercises } from "./exercises";
 
 /** iki-points awarded for the day's first check-in. */
 export const CHECKIN_POINTS = 10;
@@ -30,6 +32,7 @@ export interface CheckinInput {
   energy_score: number; // 1..5
   training_logged: boolean;
   nutrition_note: string | null;
+  exercises: ExerciseEntry[]; // what they did today, with per-activity duration
 }
 
 /** A daily_checkins row as returned by the API. */
@@ -92,6 +95,11 @@ export function validateCheckinInput(body: unknown): ValidationResult {
     return { ok: false, error: "Note is too long" };
   }
 
+  const exercises = validateExercises(b.exercises);
+  if (!exercises.ok) {
+    return { ok: false, error: exercises.error };
+  }
+
   return {
     ok: true,
     value: {
@@ -99,6 +107,7 @@ export function validateCheckinInput(body: unknown): ValidationResult {
       energy_score: energy,
       training_logged: b.training_logged === true,
       nutrition_note: note,
+      exercises: exercises.value,
     },
   };
 }

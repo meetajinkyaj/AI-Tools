@@ -14,6 +14,7 @@ function validBody(overrides: Record<string, unknown> = {}) {
     known_conditions: "Type 2 diabetes",
     country: "United Kingdom",
     city: "London",
+    activities: ["running", "gym"],
     ...overrides,
   };
 }
@@ -30,7 +31,20 @@ describe("validateProfileInput", () => {
       expect(result.value.known_conditions).toBe("Type 2 diabetes");
       expect(result.value.country).toBe("United Kingdom");
       expect(result.value.city).toBe("London");
+      expect(result.value.activities).toEqual(["running", "gym"]);
     }
+  });
+
+  it("normalizes activities (drops invalid, dedupes, defaults to [])", () => {
+    const r = validateProfileInput(
+      validBody({ activities: ["running", "running", "bogus"] }),
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.activities).toEqual(["running"]);
+
+    const r2 = validateProfileInput(validBody({ activities: undefined }));
+    expect(r2.ok).toBe(true);
+    if (r2.ok) expect(r2.value.activities).toEqual([]);
   });
 
   it("defaults marketing_consent to false and timezone to null", () => {

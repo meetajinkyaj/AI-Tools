@@ -64,6 +64,34 @@ describe("validateCheckinInput", () => {
     expect(validateCheckinInput(null).ok).toBe(false);
     expect(validateCheckinInput("nope").ok).toBe(false);
   });
+
+  it("defaults exercises to [] and normalizes per-activity entries", () => {
+    const base = validateCheckinInput(validBody());
+    expect(base.ok).toBe(true);
+    if (base.ok) expect(base.value.exercises).toEqual([]);
+
+    const r = validateCheckinInput(
+      validBody({
+        exercises: [
+          { type: "running", duration: "medium" },
+          { type: "other", label: "  padel  ", duration: "short" },
+        ],
+      }),
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.exercises).toEqual([
+        { type: "running", label: null, duration: "medium" },
+        { type: "other", label: "padel", duration: "short" },
+      ]);
+    }
+  });
+
+  it("rejects exercises with an unknown type", () => {
+    expect(
+      validateCheckinInput(validBody({ exercises: [{ type: "quidditch" }] })).ok,
+    ).toBe(false);
+  });
 });
 
 describe("daysBetweenUTC", () => {

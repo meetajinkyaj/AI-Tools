@@ -12,6 +12,7 @@ import {
   PRIMARY_GOAL_LABELS,
   type ProfileRow,
 } from "@/lib/profile";
+import { ActivityChips } from "./activity-chips";
 import {
   fieldClass,
   labelClass,
@@ -32,6 +33,7 @@ export function OnboardingForm({
   const [biologicalSex, setBiologicalSex] = useState("");
   const [primaryGoal, setPrimaryGoal] = useState("");
   const [activityLevel, setActivityLevel] = useState("");
+  const [activities, setActivities] = useState<string[]>([]);
   const [marketingConsent, setMarketingConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +67,7 @@ export function OnboardingForm({
           activity_level: activityLevel,
           timezone,
           marketing_consent: marketingConsent,
+          activities,
         }),
       });
       const data = (await res.json()) as { profile?: ProfileRow; error?: string };
@@ -181,6 +184,17 @@ export function OnboardingForm({
               ))}
             </ul>
           </label>
+
+          <div className={labelClass}>
+            <span>Which activities do you do?</span>
+            <span className="text-xs font-normal text-muted">
+              Pick the ones you do regularly — they become your quick options at
+              check-in. You can change these anytime.
+            </span>
+            <div className="mt-1">
+              <ActivityChips value={activities} onChange={setActivities} />
+            </div>
+          </div>
 
           <label className="flex items-start gap-2.5 font-body text-sm text-muted">
             <input

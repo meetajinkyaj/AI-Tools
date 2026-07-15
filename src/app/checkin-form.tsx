@@ -9,6 +9,18 @@ import {
   MIN_ENERGY,
 } from "@/lib/checkin";
 import {
+  DURATION_BUCKETS,
+  DURATION_HINTS,
+  DURATION_LABELS,
+  type DurationBucket,
+  EXERCISE_TYPE_LABELS,
+  EXERCISE_TYPES,
+  type ExerciseEntry,
+  type ExerciseType,
+  isExerciseType,
+  OTHER_TYPE,
+} from "@/lib/exercises";
+import {
   Card,
   Eyebrow,
   fieldClass,
@@ -36,9 +48,11 @@ const ENERGY_VALUES = Array.from(
  */
 export function CheckinForm({
   getToken,
+  activities,
   onChange,
 }: {
   getToken: () => Promise<string | null>;
+  activities: string[];
   onChange?: () => void;
 }) {
   const [state, setState] = useState<CheckinState | null>(null);
@@ -46,6 +60,7 @@ export function CheckinForm({
   const [energy, setEnergy] = useState<number | null>(null);
   const [sleepHours, setSleepHours] = useState("");
   const [trainingLogged, setTrainingLogged] = useState(false);
+  const [exercises, setExercises] = useState<ExerciseEntry[]>([]);
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,10 +74,40 @@ export function CheckinForm({
     if (justSaved) setJustSaved(false);
   }
 
+  function toggleExercise(type: string) {
+    markEdited();
+    setExercises((prev) =>
+      prev.some((e) => e.type === type)
+        ? prev.filter((e) => e.type !== type)
+        : [...prev, { type, label: null, duration: null }],
+    );
+  }
+
+  function setDuration(type: string, duration: DurationBucket) {
+    markEdited();
+    setExercises((prev) =>
+      prev.map((e) =>
+        e.type === type
+          ? { ...e, duration: e.duration === duration ? null : duration }
+          : e,
+      ),
+    );
+  }
+
+  function setOtherLabel(label: string) {
+    markEdited();
+    setExercises((prev) =>
+      prev.map((e) =>
+        e.type === OTHER_TYPE ? { ...e, label: label || null } : e,
+      ),
+    );
+  }
+
   const applyCheckin = useCallback((c: CheckinRow | null) => {
     setEnergy(c?.energy_score ?? null);
     setSleepHours(c?.sleep_hours != null ? String(c.sleep_hours) : "");
     setTrainingLogged(c?.training_logged ?? false);
+    setExercises(c?.exercises ?? []);
     setNote(c?.nutrition_note ?? "");
   }, []);
 
@@ -117,6 +162,7 @@ export function CheckinForm({
           sleep_hours: sleepHours === "" ? null : Number(sleepHours),
           training_logged: trainingLogged,
           nutrition_note: note,
+          exercises: trainingLogged ? exercises : [],
         }),
       });
       const data = (await res.json()) as CheckinState & {
@@ -161,6 +207,11 @@ export function CheckinForm({
   }
 
   const checkedInToday = state?.checkedInToday ?? false;
+  // Show the user's usual activities as quick options; fall back to the full
+  // list if they haven't set any. "Other" is always available.
+  const activityOptions: string[] =
+    activities.length > 0 ? activities.filter(isExerciseType) : [...EXERCISE_TYPES];
+  const selectedTypes = exercises.map((e) => e.type);
 
   return (
     <div className="flex w-full max-w-md flex-col gap-6">
@@ -250,18 +301,97 @@ export function CheckinForm({
           />
         </label>
 
-        <label className="flex items-start gap-2.5 font-body text-sm text-muted">
-          <input
-            type="checkbox"
-            className="mt-0.5 h-4 w-4 accent-accent"
-            checked={trainingLogged}
-            onChange={(e) => {
-              setTrainingLogged(e.target.checked);
-              markEdited();
-            }}
-          />
-          I trained today.
-        </label>
+        <div className="flex flex-col gap-3 font-body">
+          <label className="flex items-start gap-2.5 text-sm text-muted">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 accent-accent"
+              checked={trainingLogged}
+              onChange={(e) => {
+                setTrainingLogged(e.target.checked);
+                markEdited();
+              }}
+            />
+            I trained today.
+          </label>
+
+          {trainingLogged && (
+            <div className="flex flex-col gap-3">
+              <span className="text-xs text-muted">
+                Tap what you did, then set how long.
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {[...activityOptions, OTHER_TYPE].map((type) => {
+                  const on = selectedTypes.includes(type);
+                  const label =
+                    type === OTHER_TYPE
+                      ? "Other"
+                      : EXERCISE_TYPE_LABELS[type as ExerciseType];
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => toggleExercise(type)}
+                      aria-pressed={on}
+                      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                        on
+                          ? "border-accent bg-accent text-accent-contrast"
+                          : "border-border bg-surface text-foreground hover:border-accent/50"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {exercises.map((e) => (
+                <div
+                  key={e.type}
+                  className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3"
+                >
+                  <span className="text-sm font-medium text-foreground">
+                    {e.type === OTHER_TYPE
+                      ? "Other"
+                      : EXERCISE_TYPE_LABELS[e.type as ExerciseType]}
+                  </span>
+                  {e.type === OTHER_TYPE && (
+                    <input
+                      className={fieldClass}
+                      value={e.label ?? ""}
+                      onChange={(ev) => setOtherLabel(ev.target.value)}
+                      maxLength={60}
+                      placeholder="What did you do?"
+                    />
+                  )}
+                  <div className="grid grid-cols-3 gap-2">
+                    {DURATION_BUCKETS.map((b) => {
+                      const on = e.duration === b;
+                      return (
+                        <button
+                          key={b}
+                          type="button"
+                          onClick={() => setDuration(e.type, b)}
+                          aria-pressed={on}
+                          className={`flex h-10 flex-col items-center justify-center rounded-control border text-xs transition-colors ${
+                            on
+                              ? "border-accent bg-accent text-accent-contrast"
+                              : "border-border bg-surface text-foreground hover:border-accent/50"
+                          }`}
+                        >
+                          <span className="text-sm font-medium">
+                            {DURATION_LABELS[b]}
+                          </span>
+                          <span className="opacity-70">{DURATION_HINTS[b]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <label className={labelClass}>
           Nutrition note

@@ -6,6 +6,7 @@ import {
   PRIMARY_GOAL_LABELS,
   type ProfileRow,
 } from "@/lib/profile";
+import { EXERCISE_TYPE_LABELS, isExerciseType } from "@/lib/exercises";
 import { Card, Eyebrow, secondaryButtonClass } from "./ui";
 
 /**
@@ -28,6 +29,16 @@ export function ProfileView({
     { label: "Known conditions", value: profile.known_conditions || "—" },
     { label: "Country", value: profile.country || "—" },
     { label: "City", value: profile.city || "—" },
+    {
+      label: "Activities",
+      value:
+        profile.activities && profile.activities.length > 0
+          ? profile.activities
+              .filter(isExerciseType)
+              .map((t) => EXERCISE_TYPE_LABELS[t])
+              .join(", ")
+          : "—",
+    },
     { label: "Product emails", value: profile.marketing_consent ? "On" : "Off" },
   ];
 
