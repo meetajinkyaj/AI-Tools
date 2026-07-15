@@ -50,7 +50,14 @@ export function CheckinForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [earned, setEarned] = useState<number | null>(null);
+  const [justSaved, setJustSaved] = useState(false);
   const startedRef = useRef(false);
+
+  // Any edit after a save clears the "Done" confirmation so the button invites
+  // another save.
+  function markEdited() {
+    if (justSaved) setJustSaved(false);
+  }
 
   const applyCheckin = useCallback((c: CheckinRow | null) => {
     setEnergy(c?.energy_score ?? null);
@@ -127,6 +134,7 @@ export function CheckinForm({
         pointsBalance: data.pointsBalance,
       });
       setEarned(data.pointsAwarded ?? 0);
+      setJustSaved(true);
       onChange?.();
     } catch (err) {
       console.error("Check-in submit failed:", err);
@@ -180,12 +188,12 @@ export function CheckinForm({
         </Card>
       </div>
 
-      {earned !== null && (
+      {justSaved && (
         <Card className="border-accent/40 bg-surface-2 p-4">
-          <p className="font-body text-sm text-foreground">
-            {earned > 0
-              ? `Checked in — you earned ${earned} iki points.`
-              : "Check-in updated."}
+          <p className="font-body text-sm font-medium text-foreground">
+            {earned && earned > 0
+              ? `Done ✓ You're checked in for today and earned ${earned} iki points.`
+              : "Done ✓ Your check-in has been updated."}
           </p>
         </Card>
       )}
@@ -200,7 +208,10 @@ export function CheckinForm({
                 <button
                   key={v}
                   type="button"
-                  onClick={() => setEnergy(v)}
+                  onClick={() => {
+                    setEnergy(v);
+                    markEdited();
+                  }}
                   aria-pressed={selected}
                   title={ENERGY_LABELS[v]}
                   className={`flex h-11 items-center justify-center rounded-control border text-sm font-medium transition-colors ${
@@ -231,7 +242,10 @@ export function CheckinForm({
             max={24}
             step={0.5}
             value={sleepHours}
-            onChange={(e) => setSleepHours(e.target.value)}
+            onChange={(e) => {
+              setSleepHours(e.target.value);
+              markEdited();
+            }}
             placeholder="e.g. 7.5"
           />
         </label>
@@ -241,7 +255,10 @@ export function CheckinForm({
             type="checkbox"
             className="mt-0.5 h-4 w-4 accent-accent"
             checked={trainingLogged}
-            onChange={(e) => setTrainingLogged(e.target.checked)}
+            onChange={(e) => {
+              setTrainingLogged(e.target.checked);
+              markEdited();
+            }}
           />
           I trained today.
         </label>
@@ -251,7 +268,10 @@ export function CheckinForm({
           <textarea
             className={`${fieldClass} h-auto min-h-20 resize-y py-2`}
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(e) => {
+              setNote(e.target.value);
+              markEdited();
+            }}
             maxLength={500}
             placeholder="Anything worth noting about food today (optional)."
           />
@@ -266,9 +286,11 @@ export function CheckinForm({
         >
           {submitting
             ? "Saving…"
-            : checkedInToday
-              ? "Update check-in"
-              : "Check in"}
+            : justSaved
+              ? "Done ✓"
+              : checkedInToday
+                ? "Update check-in"
+                : "Check in"}
         </button>
       </form>
     </div>

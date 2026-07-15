@@ -9,6 +9,7 @@ import { CheckinForm } from "./checkin-form";
 import { Dashboard } from "./dashboard";
 import { OnboardingForm } from "./onboarding-form";
 import { ProfileEditForm } from "./profile-edit-form";
+import { ProfileView } from "./profile-view";
 import { CenteredMessage, ComingSoon, primaryButtonClass, Screen } from "./ui";
 
 type Status = "loading" | "onboarding" | "ready" | "error";
@@ -28,7 +29,14 @@ export function AuthedApp() {
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [tab, setTab] = useState<NavKey>("home");
   const [summaryVersion, setSummaryVersion] = useState(0);
+  const [profileMode, setProfileMode] = useState<"view" | "edit">("view");
   const startedRef = useRef(false);
+
+  // Navigating always lands on the Profile tab in view mode (edit is explicit).
+  const navigate = (key: NavKey) => {
+    if (key === "profile") setProfileMode("view");
+    setTab(key);
+  };
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -112,12 +120,11 @@ export function AuthedApp() {
   }
 
   return (
-    <AppShell active={tab} onNavigate={setTab} onLogout={() => void logout()}>
+    <AppShell active={tab} onNavigate={navigate} onLogout={() => void logout()}>
       {tab === "home" && (
         <Dashboard
           profile={profile as ProfileRow}
           getToken={getAccessToken}
-          onEdit={() => setTab("profile")}
           onCheckIn={() => setTab("checkin")}
           refreshKey={summaryVersion}
         />
@@ -128,15 +135,21 @@ export function AuthedApp() {
           onChange={() => setSummaryVersion((v) => v + 1)}
         />
       )}
-      {tab === "profile" && (
+      {tab === "profile" && profileMode === "view" && (
+        <ProfileView
+          profile={profile as ProfileRow}
+          onEdit={() => setProfileMode("edit")}
+        />
+      )}
+      {tab === "profile" && profileMode === "edit" && (
         <ProfileEditForm
           profile={profile as ProfileRow}
           getToken={getAccessToken}
           onSaved={(updated) => {
             setProfile(updated);
-            setTab("home");
+            setProfileMode("view");
           }}
-          onCancel={() => setTab("home")}
+          onCancel={() => setProfileMode("view")}
         />
       )}
       {tab === "report" && (
