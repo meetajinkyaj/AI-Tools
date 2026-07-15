@@ -212,6 +212,15 @@ export function CheckinForm({
   const activityOptions: string[] =
     activities.length > 0 ? activities.filter(isExerciseType) : [...EXERCISE_TYPES];
   const selectedTypes = exercises.map((e) => e.type);
+  // Always show a chip for anything already logged today, even if it's no longer
+  // one of the user's profile activities — otherwise a logged activity can't be
+  // deselected.
+  const chipTypes = [
+    ...activityOptions,
+    ...selectedTypes.filter(
+      (t) => t !== OTHER_TYPE && isExerciseType(t) && !activityOptions.includes(t),
+    ),
+  ];
 
   return (
     <div className="flex w-full max-w-md flex-col gap-6">
@@ -321,7 +330,7 @@ export function CheckinForm({
                 Tap what you did, then set how long.
               </span>
               <div className="flex flex-wrap gap-2">
-                {[...activityOptions, OTHER_TYPE].map((type) => {
+                {[...chipTypes, OTHER_TYPE].map((type) => {
                   const on = selectedTypes.includes(type);
                   const label =
                     type === OTHER_TYPE
@@ -350,11 +359,20 @@ export function CheckinForm({
                   key={e.type}
                   className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3"
                 >
-                  <span className="text-sm font-medium text-foreground">
-                    {e.type === OTHER_TYPE
-                      ? "Other"
-                      : EXERCISE_TYPE_LABELS[e.type as ExerciseType]}
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-foreground">
+                      {e.type === OTHER_TYPE
+                        ? "Other"
+                        : EXERCISE_TYPE_LABELS[e.type as ExerciseType]}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleExercise(e.type)}
+                      className="text-xs text-muted underline transition-colors hover:text-foreground"
+                    >
+                      Remove
+                    </button>
+                  </div>
                   {e.type === OTHER_TYPE && (
                     <input
                       className={fieldClass}
