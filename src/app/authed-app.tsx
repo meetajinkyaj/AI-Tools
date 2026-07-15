@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ProfileRow } from "@/lib/profile";
 import { AppShell, type NavKey } from "./app-shell";
+import { BiomarkerReport } from "./biomarker-report";
 import { CheckinForm } from "./checkin-form";
 import { Dashboard } from "./dashboard";
 import { OnboardingForm } from "./onboarding-form";
@@ -154,13 +155,7 @@ export function AuthedApp() {
           onCancel={() => setProfileMode("view")}
         />
       )}
-      {tab === "report" && (
-        <ComingSoon
-          eyebrow="Coming soon"
-          title="Biomarker Report"
-          note="Enter or upload a blood panel to get a plain-language, in-range / out-of-range report. Coming soon."
-        />
-      )}
+      {tab === "report" && <BiomarkerReport getToken={getAccessToken} />}
       {tab === "trends" && (
         <ComingSoon
           eyebrow="Coming soon"
