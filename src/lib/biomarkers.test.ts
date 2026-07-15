@@ -5,6 +5,7 @@ import {
   computeFlag,
   dedupeCatalogForSex,
   groupByCategory,
+  isEnterableNumeric,
   isValidDate,
   validatePanelInput,
 } from "./biomarkers";
@@ -20,9 +21,19 @@ function entry(over: Partial<CatalogEntry> = {}): CatalogEntry {
     ref_high: 100,
     direction: "lower_better",
     sort_order: 10,
+    result_kind: "numeric",
+    is_derived: false,
     ...over,
   };
 }
+
+describe("isEnterableNumeric", () => {
+  it("is true only for numeric, non-derived markers", () => {
+    expect(isEnterableNumeric(entry())).toBe(true);
+    expect(isEnterableNumeric(entry({ is_derived: true }))).toBe(false);
+    expect(isEnterableNumeric(entry({ result_kind: "qualitative" }))).toBe(false);
+  });
+});
 
 describe("computeFlag", () => {
   it("flags below/above/within a range", () => {

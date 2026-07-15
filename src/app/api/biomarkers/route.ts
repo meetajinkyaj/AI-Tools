@@ -48,7 +48,7 @@ async function loadCatalog(sex: string): Promise<CatalogEntry[]> {
   const { data, error } = await supabase
     .from("biomarker_catalog")
     .select(
-      "marker_key, display_name, category, unit, sex, ref_low, ref_high, direction, sort_order",
+      "marker_key, display_name, category, unit, sex, ref_low, ref_high, direction, sort_order, result_kind, is_derived",
     )
     .order("sort_order", { ascending: true });
   if (error) throw new Error(`biomarker_catalog select failed: ${error.message}`);

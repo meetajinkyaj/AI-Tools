@@ -31,6 +31,17 @@ export interface CatalogEntry {
   ref_high: number | null;
   direction: string; // 'in_range' | 'lower_better' | 'higher_better'
   sort_order: number;
+  result_kind: string; // 'numeric' | 'qualitative'
+  is_derived: boolean;
+}
+
+/**
+ * Whether a marker can be typed into the manual entry form. Derived markers are
+ * computed from other values, and qualitative markers need a different input —
+ * both are handled in the report v2 work, not the numeric entry form.
+ */
+export function isEnterableNumeric(entry: CatalogEntry): boolean {
+  return entry.result_kind === "numeric" && !entry.is_derived;
 }
 
 /** One entered marker value. */

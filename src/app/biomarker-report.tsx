@@ -7,6 +7,7 @@ import {
   type Flag,
   FLAG_LABELS,
   groupByCategory,
+  isEnterableNumeric,
 } from "@/lib/biomarkers";
 import {
   Card,
@@ -45,12 +46,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   lipids: "Lipids",
   metabolic: "Metabolic",
   inflammation: "Inflammation",
-  hematology: "Hematology",
+  cardiac: "Cardiac",
+  hematology: "Hematology & iron",
   thyroid: "Thyroid",
   hormones: "Hormones",
   nutrients: "Vitamins & minerals",
   liver: "Liver",
-  kidney: "Kidney",
+  kidney: "Kidney & electrolytes",
+  pancreas: "Pancreas",
+  autoimmune: "Autoimmune",
+  screening: "Screening",
+  urine: "Urine",
 };
 
 function categoryLabel(key: string): string {
@@ -81,8 +87,7 @@ function FlagPill({ flag }: { flag: Flag }) {
   );
 }
 
-const DISCLAIMER =
-  "This report flags your values against common reference ranges for general education only — it is not a medical diagnosis. Ranges vary by lab and individual; discuss your results with a qualified professional.";
+const DISCLAIMER = "Educational, not a diagnosis — please consult a doctor.";
 
 export function BiomarkerReport({
   getToken,
@@ -199,7 +204,9 @@ export function BiomarkerReport({
 
   // ---------------------------------------------------------------- Entry form
   if (mode === "entry") {
-    const groups = groupByCategory(catalog);
+    // Only numeric, non-derived markers are typed here; qualitative and derived
+    // markers are handled in the report v2 work.
+    const groups = groupByCategory(catalog.filter(isEnterableNumeric));
     return (
       <div className="flex w-full max-w-xl flex-col gap-6">
         <PageHeader
