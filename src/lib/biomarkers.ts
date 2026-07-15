@@ -2,12 +2,9 @@
  * Baseline Biomarker Report domain logic: reference-range flagging, sex-aware
  * catalog selection, and panel-input validation. Pure and dependency-free so it
  * can be unit tested and shared by the API route and the UI. The DB shapes it
- * maps to live in supabase/migrations/0002 (biomarker_catalog / _panels /
- * _readings).
- *
- * v1 is numeric-only. Qualitative results (e.g. HIV "Non-reactive", urine
- * "Absent") are out of scope here and would need a value_text/result_kind
- * column before they can be stored.
+ * maps to live in supabase/migrations/0002 & 0004 (biomarker_catalog /
+ * _panels / _readings). Supports numeric and qualitative results, multi-band
+ * interpretation, derived markers, and lab-provided range overrides.
  */
 
 export const FLAGS = ["in_range", "low", "high", "unknown"] as const;
@@ -19,6 +16,14 @@ export const FLAG_LABELS: Record<Flag, string> = {
   high: "High",
   unknown: "No range",
 };
+
+/** A single interpretation band (e.g. Vitamin D "Insufficiency"). */
+export interface Band {
+  label: string;
+  low?: number;
+  high?: number;
+  severity: string; // 'optimal' | 'borderline' | 'low' | 'high'
+}
 
 /** A biomarker_catalog row (one marker, for one sex bucket). */
 export interface CatalogEntry {
@@ -33,21 +38,27 @@ export interface CatalogEntry {
   sort_order: number;
   result_kind: string; // 'numeric' | 'qualitative'
   is_derived: boolean;
+  normal_text: string | null; // expected normal for qualitative markers
+  bands: Band[];
 }
 
-/**
- * Whether a marker can be typed into the manual entry form. Derived markers are
- * computed from other values, and qualitative markers need a different input —
- * both are handled in the report v2 work, not the numeric entry form.
- */
+/** Numeric markers the user types in directly (not derived). */
 export function isEnterableNumeric(entry: CatalogEntry): boolean {
   return entry.result_kind === "numeric" && !entry.is_derived;
 }
 
-/** One entered marker value. */
+/** Qualitative markers (entered as a choice, e.g. Negative / Positive). */
+export function isQualitative(entry: CatalogEntry): boolean {
+  return entry.result_kind === "qualitative";
+}
+
+/** One entered marker value — numeric or qualitative, with an optional range override. */
 export interface ReadingInput {
   marker_key: string;
-  value: number;
+  value: number | null;
+  value_text: string | null;
+  ref_low: number | null; // lab-provided range override (numeric only)
+  ref_high: number | null;
 }
 
 export interface PanelInput {
@@ -160,14 +171,125 @@ export function validatePanelInput(body: unknown): ValidationResult {
     if (typeof r.marker_key !== "string" || r.marker_key.length === 0) {
       return { ok: false, error: "Invalid marker" };
     }
-    const value = typeof r.value === "string" ? Number(r.value) : r.value;
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      return { ok: false, error: `Enter a number for ${r.marker_key}` };
+
+    const valueText =
+      typeof r.value_text === "string" && r.value_text.trim().length > 0
+        ? r.value_text.trim()
+        : null;
+
+    let value: number | null = null;
+    if (r.value !== undefined && r.value !== null && r.value !== "") {
+      const n = typeof r.value === "string" ? Number(r.value) : r.value;
+      if (typeof n !== "number" || !Number.isFinite(n)) {
+        return { ok: false, error: `Enter a number for ${r.marker_key}` };
+      }
+      value = n;
     }
-    readings.push({ marker_key: r.marker_key, value });
+
+    if (value === null && valueText === null) {
+      return { ok: false, error: `Enter a value for ${r.marker_key}` };
+    }
+
+    const refLow = optionalNumber(r.ref_low);
+    const refHigh = optionalNumber(r.ref_high);
+
+    readings.push({
+      marker_key: r.marker_key,
+      value,
+      value_text: valueText,
+      ref_low: refLow,
+      ref_high: refHigh,
+    });
   }
 
   return { ok: true, value: { test_date: testDate, lab_name: labName, readings } };
+}
+
+function optionalNumber(v: unknown): number | null {
+  if (v === undefined || v === null || v === "") return null;
+  const n = typeof v === "string" ? Number(v) : v;
+  return typeof n === "number" && Number.isFinite(n) ? n : null;
+}
+
+/** Flag a qualitative result: matches the expected normal → in_range, else flagged. */
+export function qualitativeFlag(
+  valueText: string,
+  normalText: string | null,
+): Flag {
+  if (!normalText) return "unknown";
+  return valueText.trim().toLowerCase() === normalText.trim().toLowerCase()
+    ? "in_range"
+    : "high";
+}
+
+const ABNORMAL_FOR: Record<string, string> = {
+  negative: "Positive",
+  "non-reactive": "Reactive",
+  "not detected": "Detected",
+  absent: "Present",
+  normal: "Abnormal",
+};
+
+/** The two choices offered for a qualitative marker: [normal, abnormal]. */
+export function qualitativeOptions(normalText: string | null): string[] {
+  const normal = normalText ?? "Negative";
+  const abnormal = ABNORMAL_FOR[normal.trim().toLowerCase()] ?? "Abnormal";
+  return [normal, abnormal];
+}
+
+/** The band a value falls into (high treated as exclusive), or null. */
+export function bandFor(value: number, bands: Band[]): Band | null {
+  for (const band of bands) {
+    const lo = band.low ?? -Infinity;
+    const hi = band.high ?? Infinity;
+    if (value >= lo && value < hi) return band;
+  }
+  return null;
+}
+
+function round(n: number, dp = 0): number {
+  const f = 10 ** dp;
+  return Math.round(n * f) / f;
+}
+
+/**
+ * Compute the derived markers whose inputs are all present in `entered`
+ * (a map of marker_key -> numeric value). Returns { marker_key, value } pairs.
+ */
+export function computeDerived(
+  entered: Map<string, number>,
+): { marker_key: string; value: number }[] {
+  const out: { marker_key: string; value: number }[] = [];
+  const g = (k: string) => entered.get(k);
+
+  const tc = g("total_cholesterol");
+  const hdl = g("hdl_c");
+  const ldl = g("ldl_c");
+  const tg = g("triglycerides");
+  const hba1c = g("hba1c");
+  const ast = g("ast");
+  const alt = g("alt");
+  const albumin = g("albumin");
+  const globulin = g("globulin");
+
+  if (tc != null && hdl != null) {
+    out.push({ marker_key: "non_hdl_c", value: round(tc - hdl) });
+    if (hdl > 0) out.push({ marker_key: "tc_hdl_ratio", value: round(tc / hdl, 2) });
+  }
+  if (tg != null) out.push({ marker_key: "vldl", value: round(tg / 5) });
+  if (ldl != null && hdl != null && hdl > 0) {
+    out.push({ marker_key: "ldl_hdl_ratio", value: round(ldl / hdl, 2) });
+  }
+  if (hba1c != null) {
+    out.push({ marker_key: "hba1c_eag", value: round(28.7 * hba1c - 46.7) });
+  }
+  if (ast != null && alt != null && alt > 0) {
+    out.push({ marker_key: "ast_alt_ratio", value: round(ast / alt, 2) });
+  }
+  if (albumin != null && globulin != null && globulin > 0) {
+    out.push({ marker_key: "ag_ratio", value: round(albumin / globulin, 2) });
+  }
+  return out;
 }
 
 /** Accepts a real YYYY-MM-DD calendar date that is not in the future. */

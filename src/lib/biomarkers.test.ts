@@ -1,14 +1,25 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  bandFor,
   type CatalogEntry,
+  computeDerived,
   computeFlag,
   dedupeCatalogForSex,
   groupByCategory,
   isEnterableNumeric,
   isValidDate,
+  qualitativeFlag,
+  qualitativeOptions,
   validatePanelInput,
 } from "./biomarkers";
+
+const VITD_BANDS = [
+  { label: "Deficiency", high: 20, severity: "low" },
+  { label: "Insufficiency", low: 20, high: 30, severity: "borderline" },
+  { label: "Sufficiency", low: 30, high: 100, severity: "optimal" },
+  { label: "Toxicity", low: 100, severity: "high" },
+];
 
 function entry(over: Partial<CatalogEntry> = {}): CatalogEntry {
   return {
@@ -23,6 +34,8 @@ function entry(over: Partial<CatalogEntry> = {}): CatalogEntry {
     sort_order: 10,
     result_kind: "numeric",
     is_derived: false,
+    normal_text: null,
+    bands: [],
     ...over,
   };
 }
@@ -119,5 +132,69 @@ describe("isValidDate", () => {
     expect(isValidDate("2026-05-22")).toBe(true);
     expect(isValidDate("2026-02-31")).toBe(false);
     expect(isValidDate("2999-01-01")).toBe(false);
+  });
+});
+
+describe("qualitativeFlag / qualitativeOptions", () => {
+  it("flags a match as in range and a mismatch otherwise (case-insensitive)", () => {
+    expect(qualitativeFlag("negative", "Negative")).toBe("in_range");
+    expect(qualitativeFlag("Positive", "Negative")).toBe("high");
+    expect(qualitativeFlag("Reactive", null)).toBe("unknown");
+  });
+  it("offers [normal, abnormal] choices", () => {
+    expect(qualitativeOptions("Negative")).toEqual(["Negative", "Positive"]);
+    expect(qualitativeOptions("Non-reactive")).toEqual(["Non-reactive", "Reactive"]);
+    expect(qualitativeOptions("Absent")).toEqual(["Absent", "Present"]);
+  });
+});
+
+describe("bandFor", () => {
+  it("finds the band a value sits in (high exclusive)", () => {
+    expect(bandFor(23.4, VITD_BANDS)?.label).toBe("Insufficiency");
+    expect(bandFor(30, VITD_BANDS)?.label).toBe("Sufficiency");
+    expect(bandFor(8, VITD_BANDS)?.label).toBe("Deficiency");
+    expect(bandFor(120, VITD_BANDS)?.label).toBe("Toxicity");
+  });
+});
+
+describe("computeDerived", () => {
+  it("computes markers whose inputs are present", () => {
+    const m = new Map<string, number>([
+      ["total_cholesterol", 185],
+      ["hdl_c", 66],
+      ["ldl_c", 108],
+      ["triglycerides", 55],
+      ["hba1c", 5.0],
+    ]);
+    const out = new Map(computeDerived(m).map((d) => [d.marker_key, d.value]));
+    expect(out.get("non_hdl_c")).toBe(119);
+    expect(out.get("tc_hdl_ratio")).toBe(2.8);
+    expect(out.get("vldl")).toBe(11);
+    expect(out.get("ldl_hdl_ratio")).toBe(1.64);
+    expect(out.get("hba1c_eag")).toBe(97); // 28.7*5 - 46.7 = 96.8
+  });
+  it("skips derived markers with missing inputs", () => {
+    const out = computeDerived(new Map([["triglycerides", 100]]));
+    expect(out.map((d) => d.marker_key)).toEqual(["vldl"]);
+  });
+});
+
+describe("validatePanelInput — qualitative & range override", () => {
+  it("accepts a qualitative reading and a lab range override", () => {
+    const r = validatePanelInput({
+      readings: [
+        { marker_key: "hiv", value_text: "Negative" },
+        { marker_key: "ldl_c", value: 108, ref_low: 0, ref_high: 130 },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.readings[0].value_text).toBe("Negative");
+      expect(r.value.readings[0].value).toBeNull();
+      expect(r.value.readings[1].ref_high).toBe(130);
+    }
+  });
+  it("rejects a reading with neither value nor value_text", () => {
+    expect(validatePanelInput({ readings: [{ marker_key: "ldl_c" }] }).ok).toBe(false);
   });
 });
