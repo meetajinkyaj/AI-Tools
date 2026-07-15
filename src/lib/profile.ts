@@ -4,6 +4,8 @@
  * on both client and server.
  */
 
+import { normalizeActivities } from "./exercises";
+
 export const BIOLOGICAL_SEX = ["male", "female", "prefer_not_to_say"] as const;
 export const PRIMARY_GOAL = [
   "fat_loss",
@@ -67,6 +69,7 @@ export interface ProfileInput {
   known_conditions: string | null;
   country: string | null;
   city: string | null;
+  activities: string[]; // the user's usual activity types (exercise keys)
 }
 
 /** A profile row as returned by the API (the DB row shape). */
@@ -149,6 +152,7 @@ export function validateProfileInput(body: unknown): ValidationResult {
       known_conditions: knownConditions,
       country,
       city,
+      activities: normalizeActivities(b.activities),
     },
   };
 }

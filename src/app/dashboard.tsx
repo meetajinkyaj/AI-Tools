@@ -3,13 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PRIMARY_GOAL_LABELS, type ProfileRow } from "@/lib/profile";
-import {
-  Card,
-  Eyebrow,
-  PageHeader,
-  primaryButtonClass,
-  secondaryButtonClass,
-} from "./ui";
+import { Card, Eyebrow, PageHeader, primaryButtonClass } from "./ui";
 
 interface Summary {
   streak: number;
@@ -25,13 +19,11 @@ interface Summary {
 export function Dashboard({
   profile,
   getToken,
-  onEdit,
   onCheckIn,
   refreshKey,
 }: {
   profile: ProfileRow;
   getToken: () => Promise<string | null>;
-  onEdit: () => void;
   onCheckIn: () => void;
   refreshKey: number;
 }) {
@@ -110,12 +102,9 @@ export function Dashboard({
               : "A 30-second check-in earns iki points and grows your streak."}
           </p>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div>
           <button onClick={onCheckIn} className={primaryButtonClass}>
             {checkedInToday ? "View check-in" : "Check in"}
-          </button>
-          <button onClick={onEdit} className={secondaryButtonClass}>
-            Edit profile
           </button>
         </div>
       </Card>

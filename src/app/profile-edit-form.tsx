@@ -11,6 +11,7 @@ import {
   PRIMARY_GOAL_LABELS,
   type ProfileRow,
 } from "@/lib/profile";
+import { ActivityChips } from "./activity-chips";
 import {
   fieldClass,
   labelClass,
@@ -46,6 +47,9 @@ export function ProfileEditForm({
   );
   const [country, setCountry] = useState(profile.country ?? "");
   const [city, setCity] = useState(profile.city ?? "");
+  const [activities, setActivities] = useState<string[]>(
+    profile.activities ?? [],
+  );
   const [marketingConsent, setMarketingConsent] = useState(
     profile.marketing_consent,
   );
@@ -83,6 +87,7 @@ export function ProfileEditForm({
           known_conditions: knownConditions,
           country,
           city,
+          activities,
         }),
       });
       const data = (await res.json()) as { profile?: ProfileRow; error?: string };
@@ -213,6 +218,16 @@ export function ProfileEditForm({
               autoComplete="address-level2"
             />
           </label>
+
+          <div className={labelClass}>
+            <span>Activities you do</span>
+            <span className="text-xs font-normal text-muted">
+              These become your quick options at check-in.
+            </span>
+            <div className="mt-1">
+              <ActivityChips value={activities} onChange={setActivities} />
+            </div>
+          </div>
 
           <label className="flex items-start gap-2.5 font-body text-sm text-muted">
             <input
