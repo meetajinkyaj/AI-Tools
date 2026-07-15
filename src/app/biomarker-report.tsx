@@ -13,6 +13,7 @@ import {
   isQualitative,
   qualitativeOptions,
 } from "@/lib/biomarkers";
+import type { ExtractedReading, ExtractionResult } from "@/lib/extraction";
 import {
   Card,
   Eyebrow,
@@ -46,6 +47,22 @@ interface PanelRow {
 interface ReportData {
   catalog: CatalogEntry[];
   latestPanel: { panel: PanelRow; readings: ReadingRow[] } | null;
+}
+
+type Mode = "report" | "upload" | "review" | "entry";
+
+/** A reading in the shape POST /api/biomarkers expects. */
+type SaveReading = { marker_key: string; value?: number; value_text?: string };
+
+/** One row in the confirmation screen — values kept as editable strings. */
+interface DraftReading {
+  marker_key: string;
+  marker_name: string;
+  category: string;
+  unit: string | null;
+  result_kind: string;
+  value: string;
+  value_text: string;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -113,6 +130,41 @@ function calloutText(r: ReadingRow, band: Band | null): string {
 
 const DISCLAIMER = "Educational, not a diagnosis — please consult a doctor.";
 
+/** Map a normalized extraction result into editable draft rows. */
+function toDraftReadings(readings: ExtractedReading[]): DraftReading[] {
+  return readings.map((r) => ({
+    marker_key: r.marker_key,
+    marker_name: r.display_name,
+    category: r.category,
+    unit: r.unit,
+    result_kind: r.result_kind,
+    value: r.value != null ? String(r.value) : "",
+    value_text: r.value_text ?? "",
+  }));
+}
+
+/** Group any keyed rows by category, ordered by CATEGORY_LABELS then extras. */
+function groupByCategoryOrder<T extends { category: string }>(
+  rows: T[],
+): { category: string; rows: T[] }[] {
+  const order = Object.keys(CATEGORY_LABELS);
+  const byCat = new Map<string, T[]>();
+  for (const r of rows) {
+    const list = byCat.get(r.category) ?? [];
+    list.push(r);
+    byCat.set(r.category, list);
+  }
+  const groups: { category: string; rows: T[] }[] = [];
+  for (const cat of order) {
+    const list = byCat.get(cat);
+    if (list) groups.push({ category: cat, rows: list });
+  }
+  for (const [cat, list] of byCat) {
+    if (!order.includes(cat)) groups.push({ category: cat, rows: list });
+  }
+  return groups;
+}
+
 export function BiomarkerReport({
   getToken,
 }: {
@@ -120,11 +172,22 @@ export function BiomarkerReport({
 }) {
   const [data, setData] = useState<ReportData | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [mode, setMode] = useState<"report" | "entry">("report");
+  const [mode, setMode] = useState<Mode>("report");
+
+  // Manual-entry state (fallback path).
   const [values, setValues] = useState<Record<string, string>>({});
   const [qualValues, setQualValues] = useState<Record<string, string>>({});
   const [testDate, setTestDate] = useState("");
   const [labName, setLabName] = useState("");
+
+  // Upload / review (primary path) state.
+  const [file, setFile] = useState<File | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [draft, setDraft] = useState<DraftReading[]>([]);
+  const [draftDate, setDraftDate] = useState("");
+  const [draftLab, setDraftLab] = useState("");
+  const [unmatched, setUnmatched] = useState<string[]>([]);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
@@ -140,7 +203,7 @@ export function BiomarkerReport({
       if (!res.ok) return setStatus("error");
       const d = (await res.json()) as ReportData;
       setData(d);
-      setMode(d.latestPanel ? "report" : "entry");
+      setMode(d.latestPanel ? "report" : "upload");
       setStatus("ready");
     } catch (err) {
       console.error("Failed to load report:", err);
@@ -154,7 +217,120 @@ export function BiomarkerReport({
     void load();
   }, [load]);
 
-  async function handleSubmit(event: React.FormEvent) {
+  /** Persist a set of readings and swap to the report view on success. */
+  async function saveReadings(
+    readings: SaveReading[],
+    source: "manual" | "pdf",
+    meta: { test_date: string; lab_name: string },
+  ): Promise<boolean> {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      if (!token) {
+        setError("You're not signed in. Please reload and try again.");
+        return false;
+      }
+      const res = await fetch("/api/biomarkers", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          test_date: meta.test_date || null,
+          lab_name: meta.lab_name || null,
+          source,
+          readings,
+        }),
+      });
+      const result = (await res.json()) as {
+        panel?: PanelRow;
+        readings?: ReadingRow[];
+        error?: string;
+      };
+      if (!res.ok || !result.panel || !result.readings) {
+        setError(result.error ?? "Something went wrong. Please try again.");
+        return false;
+      }
+      setData((prev) => ({
+        catalog: prev?.catalog ?? [],
+        latestPanel: { panel: result.panel!, readings: result.readings! },
+      }));
+      setMode("report");
+      return true;
+    } catch (err) {
+      console.error("Report save failed:", err);
+      setError("Something went wrong. Please try again.");
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleExtract(event: React.FormEvent) {
+    event.preventDefault();
+    if (!file) {
+      setError("Choose a PDF of your lab report first.");
+      return;
+    }
+    setExtracting(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      if (!token) {
+        setError("You're not signed in. Please reload and try again.");
+        return;
+      }
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/biomarkers/extract", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const result = (await res.json()) as ExtractionResult & { error?: string };
+      if (!res.ok || !result.readings) {
+        setError(result.error ?? "We couldn't read that PDF. Please try again.");
+        return;
+      }
+      setDraft(toDraftReadings(result.readings));
+      setDraftDate(result.test_date ?? "");
+      setDraftLab(result.lab_name ?? "");
+      setUnmatched(result.unmatched ?? []);
+      setMode("review");
+    } catch (err) {
+      console.error("Extraction failed:", err);
+      setError("We couldn't read that PDF. Please try again.");
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  async function handleSaveDraft(event: React.FormEvent) {
+    event.preventDefault();
+    const readings = draft
+      .map((d): SaveReading | null => {
+        if (d.result_kind === "qualitative") {
+          return d.value_text.trim() !== ""
+            ? { marker_key: d.marker_key, value_text: d.value_text }
+            : null;
+        }
+        const n = Number(d.value.trim());
+        return d.value.trim() !== "" && Number.isFinite(n)
+          ? { marker_key: d.marker_key, value: n }
+          : null;
+      })
+      .filter((r): r is SaveReading => r !== null);
+
+    if (readings.length === 0) {
+      setError("Add at least one value before saving.");
+      return;
+    }
+    await saveReadings(readings, "pdf", { test_date: draftDate, lab_name: draftLab });
+  }
+
+  async function handleManualSubmit(event: React.FormEvent) {
     event.preventDefault();
     const numericReadings = Object.entries(values)
       .map(([marker_key, v]) => ({ marker_key, v: v.trim() }))
@@ -166,54 +342,19 @@ export function BiomarkerReport({
       .map(([marker_key, value_text]) => ({ marker_key, value_text }));
 
     const readings = [...numericReadings, ...qualReadings];
-
     if (readings.length === 0) {
       setError("Enter at least one marker value.");
       return;
     }
-    setSubmitting(true);
-    setError(null);
-    try {
-      const token = await getToken();
-      if (!token) {
-        setError("You're not signed in. Please reload and try again.");
-        return;
-      }
-      const res = await fetch("/api/biomarkers", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          test_date: testDate || null,
-          lab_name: labName || null,
-          readings,
-        }),
-      });
-      const result = (await res.json()) as {
-        panel?: PanelRow;
-        readings?: ReadingRow[];
-        error?: string;
-      };
-      if (!res.ok || !result.panel || !result.readings) {
-        setError(result.error ?? "Something went wrong. Please try again.");
-        return;
-      }
-      setData((prev) => ({
-        catalog: prev?.catalog ?? [],
-        latestPanel: { panel: result.panel!, readings: result.readings! },
-      }));
+    const ok = await saveReadings(readings, "manual", {
+      test_date: testDate,
+      lab_name: labName,
+    });
+    if (ok) {
       setValues({});
       setQualValues({});
       setTestDate("");
       setLabName("");
-      setMode("report");
-    } catch (err) {
-      console.error("Report submit failed:", err);
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setSubmitting(false);
     }
   }
 
@@ -233,22 +374,249 @@ export function BiomarkerReport({
 
   const catalog = data?.catalog ?? [];
   const latestPanel = data?.latestPanel ?? null;
+  const catalogByKey = new Map(catalog.map((e) => [e.marker_key, e]));
 
-  // ---------------------------------------------------------------- Entry form
+  // ---------------------------------------------------------------- Upload
+  if (mode === "upload") {
+    return (
+      <div className="flex w-full max-w-xl flex-col gap-6">
+        <PageHeader
+          eyebrow="Report"
+          title="Upload your lab report"
+          subtitle="Drop in the PDF from your blood test. We'll read the values, you confirm them — no typing required."
+        />
+
+        <form onSubmit={handleExtract} className="flex flex-col gap-5">
+          <label
+            className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border-strong bg-surface px-6 py-10 text-center transition-colors hover:bg-surface-2"
+          >
+            <input
+              type="file"
+              accept="application/pdf"
+              className="sr-only"
+              onChange={(e) => {
+                setFile(e.target.files?.[0] ?? null);
+                setError(null);
+              }}
+            />
+            <span className="font-body text-sm font-medium text-foreground">
+              {file ? file.name : "Choose a PDF"}
+            </span>
+            <span className="font-body text-xs text-muted">
+              {file ? "Tap to pick a different file" : "PDF up to 15 MB"}
+            </span>
+          </label>
+
+          {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
+
+          <p className="font-body text-xs text-muted">{DISCLAIMER}</p>
+
+          <div className="flex flex-col gap-3 sm:flex-row-reverse">
+            <button
+              type="submit"
+              disabled={extracting || !file}
+              className={`${primaryButtonClass} w-full sm:flex-1`}
+            >
+              {extracting ? "Reading your report…" : "Read my report"}
+            </button>
+            {latestPanel && (
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setMode("report");
+                }}
+                disabled={extracting}
+                className={`${secondaryButtonClass} w-full sm:flex-1`}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setMode("entry");
+            }}
+            className="self-center font-body text-xs text-muted underline underline-offset-4 hover:text-foreground"
+          >
+            Or enter values manually
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------- Review
+  if (mode === "review") {
+    const groups = groupByCategoryOrder(draft);
+    const update = (key: string, patch: Partial<DraftReading>) =>
+      setDraft((prev) =>
+        prev.map((d) => (d.marker_key === key ? { ...d, ...patch } : d)),
+      );
+    const remove = (key: string) =>
+      setDraft((prev) => prev.filter((d) => d.marker_key !== key));
+
+    return (
+      <div className="flex w-full max-w-xl flex-col gap-6">
+        <PageHeader
+          eyebrow="Report"
+          title="Check your results"
+          subtitle="We read these from your PDF. Fix anything that looks off, then save."
+        />
+
+        <form onSubmit={handleSaveDraft} className="flex flex-col gap-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className={labelClass}>
+              Test date
+              <input
+                className={fieldClass}
+                type="date"
+                max={new Date().toISOString().slice(0, 10)}
+                value={draftDate}
+                onChange={(e) => setDraftDate(e.target.value)}
+              />
+            </label>
+            <label className={labelClass}>
+              Lab name
+              <input
+                className={fieldClass}
+                value={draftLab}
+                onChange={(e) => setDraftLab(e.target.value)}
+                maxLength={120}
+                placeholder="e.g. FITTR"
+              />
+            </label>
+          </div>
+
+          {draft.length === 0 && (
+            <p className="font-body text-sm text-muted">
+              No markers left. Re-upload your report or enter values manually.
+            </p>
+          )}
+
+          {groups.map((group) => (
+            <div key={group.category} className="flex flex-col gap-3">
+              <Eyebrow>{categoryLabel(group.category)}</Eyebrow>
+              <div className="flex flex-col gap-2">
+                {group.rows.map((d) => {
+                  const entry = catalogByKey.get(d.marker_key);
+                  const qualitative = d.result_kind === "qualitative";
+                  return (
+                    <div
+                      key={d.marker_key}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate font-body text-sm text-foreground">
+                          {d.marker_name}
+                        </span>
+                        {!qualitative && (
+                          <span className="font-body text-xs text-muted">
+                            {rangeText(entry?.ref_low ?? null, entry?.ref_high ?? null, d.unit)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {qualitative ? (
+                          <select
+                            className={`${fieldClass} w-36`}
+                            value={d.value_text}
+                            onChange={(e) =>
+                              update(d.marker_key, { value_text: e.target.value })
+                            }
+                          >
+                            <option value="">—</option>
+                            {qualitativeOptions(entry?.normal_text ?? null).map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            className={`${fieldClass} w-24`}
+                            type="number"
+                            inputMode="decimal"
+                            step="any"
+                            value={d.value}
+                            onChange={(e) =>
+                              update(d.marker_key, { value: e.target.value })
+                            }
+                            placeholder={d.unit ?? ""}
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => remove(d.marker_key)}
+                          aria-label={`Remove ${d.marker_name}`}
+                          className="shrink-0 rounded-full px-2 py-1 font-body text-xs text-muted hover:text-accent"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {unmatched.length > 0 && (
+            <Card className="flex flex-col gap-1 p-4">
+              <Eyebrow>Not matched</Eyebrow>
+              <p className="font-body text-xs text-muted">
+                We saw these on your report but don&rsquo;t track them yet:{" "}
+                {unmatched.join(", ")}.
+              </p>
+            </Card>
+          )}
+
+          {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
+
+          <p className="font-body text-xs text-muted">{DISCLAIMER}</p>
+
+          <div className="flex flex-col gap-3 sm:flex-row-reverse">
+            <button
+              type="submit"
+              disabled={submitting || draft.length === 0}
+              className={`${primaryButtonClass} w-full sm:flex-1`}
+            >
+              {submitting ? "Saving…" : "Save report"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setFile(null);
+                setMode("upload");
+              }}
+              disabled={submitting}
+              className={`${secondaryButtonClass} w-full sm:flex-1`}
+            >
+              Re-upload
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------- Manual entry (fallback)
   if (mode === "entry") {
-    // Numeric (non-derived) markers are typed; qualitative markers are chosen
-    // from a dropdown. Derived markers are computed server-side.
     const groups = groupByCategory(catalog.filter(isEnterableNumeric));
     const qualGroups = groupByCategory(catalog.filter(isQualitative));
     return (
       <div className="flex w-full max-w-xl flex-col gap-6">
         <PageHeader
           eyebrow="Report"
-          title="Add your blood panel"
-          subtitle="Enter the markers you have — leave the rest blank. We'll flag anything outside its typical range."
+          title="Enter your blood panel"
+          subtitle="Type the markers you have — leave the rest blank. We'll flag anything outside its typical range."
         />
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        <form onSubmit={handleManualSubmit} className="flex flex-col gap-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <label className={labelClass}>
               Test date
@@ -356,16 +724,17 @@ export function BiomarkerReport({
             >
               {submitting ? "Saving…" : "Generate report"}
             </button>
-            {latestPanel && (
-              <button
-                type="button"
-                onClick={() => setMode("report")}
-                disabled={submitting}
-                className={`${secondaryButtonClass} w-full sm:flex-1`}
-              >
-                Cancel
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setMode("upload");
+              }}
+              disabled={submitting}
+              className={`${secondaryButtonClass} w-full sm:flex-1`}
+            >
+              Back to upload
+            </button>
           </div>
         </form>
       </div>
@@ -375,11 +744,10 @@ export function BiomarkerReport({
   // ------------------------------------------------------------- Report view
   const readings = latestPanel?.readings ?? [];
   const outOfRange = readings.filter((r) => r.flag === "low" || r.flag === "high");
-  const entryByKey = new Map(catalog.map((e) => [e.marker_key, e]));
   const categoryByKey = new Map(catalog.map((e) => [e.marker_key, e.category]));
   const readingGroups = groupReadings(readings, categoryByKey);
   const bandOf = (r: ReadingRow): Band | null => {
-    const bands = entryByKey.get(r.marker_key)?.bands ?? [];
+    const bands = catalogByKey.get(r.marker_key)?.bands ?? [];
     return r.value != null && bands.length > 0 ? bandFor(r.value, bands) : null;
   };
 
@@ -392,7 +760,11 @@ export function BiomarkerReport({
           subtitle={panelSubtitle(latestPanel?.panel)}
         />
         <button
-          onClick={() => setMode("entry")}
+          onClick={() => {
+            setError(null);
+            setFile(null);
+            setMode("upload");
+          }}
           className={`${secondaryButtonClass} shrink-0`}
         >
           Add panel

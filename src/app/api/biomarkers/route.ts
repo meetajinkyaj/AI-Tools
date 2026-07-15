@@ -2,13 +2,15 @@ import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
 import {
-  type CatalogEntry,
   computeDerived,
   computeFlag,
-  dedupeCatalogForSex,
   qualitativeFlag,
   validatePanelInput,
 } from "@/lib/biomarkers";
+import {
+  loadReportCatalog,
+  resolveReportUser,
+} from "@/lib/biomarker-report-data";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
@@ -23,40 +25,6 @@ import { createSupabaseAdmin } from "@/lib/supabase-admin";
  * uses the service-role key.
  */
 
-async function resolveUser(
-  privyUserId: string,
-): Promise<{ userId: string; sex: string } | null> {
-  const supabase = createSupabaseAdmin();
-  const { data: user, error } = await supabase
-    .from("users")
-    .select("id")
-    .eq("privy_user_id", privyUserId)
-    .maybeSingle();
-  if (error) throw new Error(`users lookup failed: ${error.message}`);
-  if (!user) return null;
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("biological_sex")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (profileError) throw new Error(`profiles lookup failed: ${profileError.message}`);
-
-  return { userId: user.id, sex: profile?.biological_sex ?? "any" };
-}
-
-async function loadCatalog(sex: string): Promise<CatalogEntry[]> {
-  const supabase = createSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("biomarker_catalog")
-    .select(
-      "marker_key, display_name, category, unit, sex, ref_low, ref_high, direction, sort_order, result_kind, is_derived, normal_text, bands",
-    )
-    .order("sort_order", { ascending: true });
-  if (error) throw new Error(`biomarker_catalog select failed: ${error.message}`);
-  return dedupeCatalogForSex((data ?? []) as CatalogEntry[], sex);
-}
-
 export async function GET(request: Request) {
   const privyUserId = await getPrivyUserId(request);
   if (!privyUserId) {
@@ -64,13 +32,13 @@ export async function GET(request: Request) {
   }
 
   try {
-    const resolved = await resolveUser(privyUserId);
+    const resolved = await resolveReportUser(privyUserId);
     if (!resolved) {
       return NextResponse.json({ catalog: [], latestPanel: null });
     }
 
     const supabase = createSupabaseAdmin();
-    const catalog = await loadCatalog(resolved.sex);
+    const catalog = await loadReportCatalog(resolved.sex);
 
     const { data: panel, error: panelError } = await supabase
       .from("biomarker_panels")
@@ -120,13 +88,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const resolved = await resolveUser(privyUserId);
+    const resolved = await resolveReportUser(privyUserId);
     if (!resolved) {
       return NextResponse.json({ error: "User not found" }, { status: 409 });
     }
 
     const supabase = createSupabaseAdmin();
-    const catalog = await loadCatalog(resolved.sex);
+    const catalog = await loadReportCatalog(resolved.sex);
     const byKey = new Map(catalog.map((e) => [e.marker_key, e]));
 
     // Reject unknown markers up front.
@@ -139,11 +107,17 @@ export async function POST(request: Request) {
       }
     }
 
+    const source =
+      typeof (rawBody as Record<string, unknown>).source === "string" &&
+      (rawBody as Record<string, unknown>).source === "pdf"
+        ? "pdf"
+        : "manual";
+
     const { data: panel, error: panelError } = await supabase
       .from("biomarker_panels")
       .insert({
         user_id: resolved.userId,
-        source: "manual",
+        source,
         test_date: validation.value.test_date,
         lab_name: validation.value.lab_name,
       })
