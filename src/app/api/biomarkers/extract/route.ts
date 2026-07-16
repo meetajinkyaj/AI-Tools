@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   AnthropicNotConfiguredError,
+  AnthropicOverloadedError,
   extractFromPdf,
 } from "@/lib/anthropic";
 import { getPrivyUserId } from "@/lib/api-auth";
@@ -25,7 +26,7 @@ import {
  *     -> { test_date, lab_name, readings, unmatched }
  */
 
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 const MAX_PDF_BYTES = 15 * 1024 * 1024; // 15 MB
 
@@ -97,6 +98,14 @@ export async function POST(request: Request) {
       console.error("Extraction unavailable:", err);
       return NextResponse.json(
         { error: "PDF reading isn't available right now. Please try again later." },
+        { status: 503 },
+      );
+    }
+    if (err instanceof AnthropicOverloadedError) {
+      // Transient (rate limit / overload / timeout) — the message survived a retry.
+      console.error("Extraction temporarily unavailable:", err);
+      return NextResponse.json(
+        { error: "The reader is busy right now. Please try again in a moment." },
         { status: 503 },
       );
     }
