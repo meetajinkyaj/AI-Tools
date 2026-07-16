@@ -210,3 +210,17 @@ export function parseExtractionResponse(
 ): ExtractionResult {
   return normalizeExtraction(extractJsonObject(text), catalog);
 }
+
+const MIN_TEXT_LAYER_CHARS = 200;
+
+/**
+ * Whether an extracted PDF text layer is rich enough to read from directly. A
+ * digitally-generated lab report yields thousands of alphanumeric characters; a
+ * scanned/image PDF yields almost none, in which case we fall back to sending
+ * the PDF itself for vision reading.
+ */
+export function hasUsableTextLayer(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const alnum = (text.match(/[A-Za-z0-9]/g) ?? []).length;
+  return alnum >= MIN_TEXT_LAYER_CHARS;
+}

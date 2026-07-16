@@ -33,15 +33,23 @@ function isRetryableStatus(status: number): boolean {
 }
 
 /**
- * Send a base64 PDF plus an instruction and return the model's text response.
- * Streams the response and concatenates the text blocks. Throws
+ * What we hand the model to read: the report's extracted text layer (fast,
+ * preferred) or the raw PDF for vision reading (fallback for scanned PDFs).
+ */
+export type ExtractionSource =
+  | { kind: "text"; text: string }
+  | { kind: "pdf"; base64: string };
+
+/**
+ * Send a lab report (as text or PDF) plus an instruction and return the model's
+ * text response. Streams the response and concatenates the text blocks. Throws
  * AnthropicNotConfiguredError if the key is missing (caller → 503),
  * AnthropicOverloadedError on a transient failure (caller → 503 "busy"), and
  * AnthropicError on any other non-2xx or unexpected shape (caller → 502).
  */
-export async function extractFromPdf(params: {
-  base64Pdf: string;
+export async function extractMarkers(params: {
   prompt: string;
+  source: ExtractionSource;
 }): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -49,26 +57,29 @@ export async function extractFromPdf(params: {
   }
   const model = process.env.ANTHROPIC_EXTRACTION_MODEL || DEFAULT_MODEL;
 
-  const body = JSON.stringify({
-    model,
-    max_tokens: MAX_TOKENS,
-    stream: true,
-    messages: [
-      {
-        role: "user",
-        content: [
+  const content =
+    params.source.kind === "text"
+      ? [
+          { type: "text", text: `Lab report text:\n\n${params.source.text}` },
+          { type: "text", text: params.prompt },
+        ]
+      : [
           {
             type: "document",
             source: {
               type: "base64",
               media_type: "application/pdf",
-              data: params.base64Pdf,
+              data: params.source.base64,
             },
           },
           { type: "text", text: params.prompt },
-        ],
-      },
-    ],
+        ];
+
+  const body = JSON.stringify({
+    model,
+    max_tokens: MAX_TOKENS,
+    stream: true,
+    messages: [{ role: "user", content }],
   });
 
   let lastError: unknown;

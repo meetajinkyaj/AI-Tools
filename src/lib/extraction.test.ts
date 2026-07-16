@@ -4,6 +4,7 @@ import { type CatalogEntry } from "./biomarkers";
 import {
   buildExtractionPrompt,
   extractJsonObject,
+  hasUsableTextLayer,
   normalizeExtraction,
   parseExtractionResponse,
 } from "./extraction";
@@ -146,6 +147,16 @@ describe("normalizeExtraction", () => {
     expect(normalizeExtraction(null, CATALOG).readings).toEqual([]);
     expect(normalizeExtraction({ markers: "nope" }, CATALOG).readings).toEqual([]);
     expect(normalizeExtraction(42, CATALOG).readings).toEqual([]);
+  });
+});
+
+describe("hasUsableTextLayer", () => {
+  it("accepts a real text layer, rejects empty/sparse ones", () => {
+    expect(hasUsableTextLayer("LDL Cholesterol ".repeat(50))).toBe(true);
+    expect(hasUsableTextLayer("")).toBe(false);
+    expect(hasUsableTextLayer(null)).toBe(false);
+    expect(hasUsableTextLayer("   \n\n  ")).toBe(false);
+    expect(hasUsableTextLayer("a few words only")).toBe(false); // scanned-PDF-like
   });
 });
 

@@ -1,9 +1,12 @@
+import { extractText, getDocumentProxy } from "unpdf";
+
 import { NextResponse } from "next/server";
 
 import {
   AnthropicNotConfiguredError,
   AnthropicOverloadedError,
-  extractFromPdf,
+  type ExtractionSource,
+  extractMarkers,
 } from "@/lib/anthropic";
 import { getPrivyUserId } from "@/lib/api-auth";
 import {
@@ -12,6 +15,7 @@ import {
 } from "@/lib/biomarker-report-data";
 import {
   buildExtractionPrompt,
+  hasUsableTextLayer,
   parseExtractionResponse,
 } from "@/lib/extraction";
 
@@ -29,6 +33,7 @@ import {
 export const maxDuration = 90;
 
 const MAX_PDF_BYTES = 15 * 1024 * 1024; // 15 MB
+const MAX_TEXT_CHARS = 400_000; // bound the token count sent to the model
 
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -37,6 +42,25 @@ function toBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   return btoa(binary);
+}
+
+/**
+ * Prefer the PDF's text layer — a digital lab report extracts in well under a
+ * second and reads in seconds, versus a slow, timeout-prone vision pass over
+ * every page. Fall back to sending the PDF for vision reading only when there's
+ * no usable text layer (e.g. a scanned report).
+ */
+async function buildSource(bytes: Uint8Array): Promise<ExtractionSource> {
+  try {
+    const pdf = await getDocumentProxy(bytes);
+    const { text } = await extractText(pdf, { mergePages: true });
+    if (hasUsableTextLayer(text)) {
+      return { kind: "text", text: text.slice(0, MAX_TEXT_CHARS) };
+    }
+  } catch (err) {
+    console.error("PDF text extraction failed; falling back to vision:", err);
+  }
+  return { kind: "pdf", base64: toBase64(bytes) };
 }
 
 export async function POST(request: Request) {
@@ -76,10 +100,10 @@ export async function POST(request: Request) {
     }
 
     const catalog = await loadReportCatalog(resolved.sex);
-    const base64Pdf = toBase64(new Uint8Array(await file.arrayBuffer()));
+    const source = await buildSource(new Uint8Array(await file.arrayBuffer()));
     const prompt = buildExtractionPrompt(catalog);
 
-    const raw = await extractFromPdf({ base64Pdf, prompt });
+    const raw = await extractMarkers({ prompt, source });
     const result = parseExtractionResponse(raw, catalog);
 
     if (result.readings.length === 0) {
