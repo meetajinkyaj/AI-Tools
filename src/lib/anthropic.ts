@@ -79,6 +79,12 @@ export async function extractMarkers(params: {
     model,
     max_tokens: MAX_TOKENS,
     stream: true,
+    // Extraction is transcription, not reasoning. On models where thinking is
+    // on by default (e.g. Sonnet 5 runs adaptive thinking when `thinking` is
+    // omitted), the model would spend many seconds — and much of the output
+    // budget — "thinking" over a ~18k-token report before emitting a value,
+    // which pushed the call past our timeout. Turn it off for a fast, direct read.
+    thinking: { type: "disabled" },
     messages: [{ role: "user", content }],
   });
 
