@@ -27,10 +27,18 @@ import {
  * deterministically after the human confirms.
  *
  *   POST /api/biomarkers/extract  (multipart/form-data, field "file")
- *     -> { test_date, lab_name, readings, unmatched }
+ *     -> streamed body: newline heartbeats while the model reads, then a final
+ *        JSON line — { test_date, lab_name, readings, unmatched } or { error }.
+ *
+ * The response is streamed because the model read takes ~20-30s: holding the
+ * HTTP connection open with no bytes for that long trips an idle-connection
+ * timeout between Cloudflare and the browser (fetch rejects with "Failed to
+ * fetch"). Emitting a newline every few seconds keeps the connection alive; the
+ * client reads the whole body and parses the last non-empty line as JSON.
  */
 
 export const maxDuration = 90;
+const HEARTBEAT_MS = 5000;
 
 const MAX_PDF_BYTES = 15 * 1024 * 1024; // 15 MB
 const MAX_TEXT_CHARS = 400_000; // bound the token count sent to the model
@@ -93,50 +101,86 @@ export async function POST(request: Request) {
     );
   }
 
-  try {
-    const resolved = await resolveReportUser(privyUserId);
-    if (!resolved) {
-      return NextResponse.json({ error: "User not found" }, { status: 409 });
-    }
+  // Read the file bytes up front (cheap) so the streamed body owns only the
+  // slow model call.
+  const bytes = new Uint8Array(await file.arrayBuffer());
 
-    const catalog = await loadReportCatalog(resolved.sex);
-    const source = await buildSource(new Uint8Array(await file.arrayBuffer()));
-    const prompt = buildExtractionPrompt(catalog);
+  // The extraction itself is slow; stream newline heartbeats to keep the
+  // connection alive, then emit the JSON payload as the final line. Because the
+  // 200 status commits when headers flush, errors past this point travel in the
+  // body ({ error }), not the status code.
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      controller.enqueue(encoder.encode("\n")); // flush headers immediately
 
-    const raw = await extractMarkers({ prompt, source });
-    const result = parseExtractionResponse(raw, catalog);
+      const work = runExtraction(privyUserId, bytes);
+      let settled = false;
+      void work.finally(() => {
+        settled = true;
+      });
 
-    if (result.readings.length === 0) {
-      return NextResponse.json(
-        {
-          error:
-            "We couldn't read any recognized markers from that PDF. Try a clearer copy of the lab report.",
-        },
-        { status: 422 },
-      );
-    }
+      while (!settled) {
+        await Promise.race([work.catch(() => undefined), sleep(HEARTBEAT_MS)]);
+        if (!settled) controller.enqueue(encoder.encode("\n"));
+      }
 
-    return NextResponse.json(result);
-  } catch (err) {
-    if (err instanceof AnthropicNotConfiguredError) {
-      console.error("Extraction unavailable:", err);
-      return NextResponse.json(
-        { error: "PDF reading isn't available right now. Please try again later." },
-        { status: 503 },
-      );
-    }
-    if (err instanceof AnthropicOverloadedError) {
-      // Transient (rate limit / overload / timeout) — the message survived a retry.
-      console.error("Extraction temporarily unavailable:", err);
-      return NextResponse.json(
-        { error: "The reader is busy right now. Please try again in a moment." },
-        { status: 503 },
-      );
-    }
-    console.error("POST /api/biomarkers/extract failed:", err);
-    return NextResponse.json(
-      { error: "We couldn't read that PDF. Please try again." },
-      { status: 502 },
-    );
+      const payload = await work.catch((err) => ({ error: mapError(err) }));
+      controller.enqueue(encoder.encode("\n" + JSON.stringify(payload)));
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+      "x-accel-buffering": "no",
+    },
+  });
+}
+
+type ExtractionOutcome = Awaited<ReturnType<typeof parseExtractionResponse>> | { error: string };
+
+/** Resolve the user, read the PDF, call the model — the slow work behind the stream. */
+async function runExtraction(
+  privyUserId: string,
+  bytes: Uint8Array,
+): Promise<ExtractionOutcome> {
+  const resolved = await resolveReportUser(privyUserId);
+  if (!resolved) return { error: "We couldn't find your account. Please reload and try again." };
+
+  const catalog = await loadReportCatalog(resolved.sex);
+  const source = await buildSource(bytes);
+  const prompt = buildExtractionPrompt(catalog);
+
+  const raw = await extractMarkers({ prompt, source });
+  const result = parseExtractionResponse(raw, catalog);
+
+  if (result.readings.length === 0) {
+    return {
+      error:
+        "We couldn't read any recognized markers from that PDF. Try a clearer copy of the lab report.",
+    };
   }
+  return result;
+}
+
+/** Map an extraction error to a user-facing message (logged server-side). */
+function mapError(err: unknown): string {
+  if (err instanceof AnthropicNotConfiguredError) {
+    console.error("Extraction unavailable:", err);
+    return "PDF reading isn't available right now. Please try again later.";
+  }
+  if (err instanceof AnthropicOverloadedError) {
+    console.error("Extraction temporarily unavailable:", err);
+    return "The reader is busy right now. Please try again in a moment.";
+  }
+  console.error("POST /api/biomarkers/extract failed:", err);
+  return "We couldn't read that PDF. Please try again.";
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

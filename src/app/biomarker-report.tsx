@@ -130,6 +130,25 @@ function calloutText(r: ReadingRow, band: Band | null): string {
 
 const DISCLAIMER = "Educational, not a diagnosis — please consult a doctor.";
 
+/**
+ * The extract endpoint streams newline heartbeats then a final JSON line. Parse
+ * the last non-empty line as JSON (also handles a plain single-line JSON body).
+ */
+function parseStreamedResult(
+  raw: string,
+): (ExtractionResult & { error?: string }) | null {
+  const lines = raw.split("\n").map((l) => l.trim());
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (!lines[i]) continue;
+    try {
+      return JSON.parse(lines[i]) as ExtractionResult & { error?: string };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 /** Map a normalized extraction result into editable draft rows. */
 function toDraftReadings(readings: ExtractedReading[]): DraftReading[] {
   return readings.map((r) => ({
@@ -289,9 +308,12 @@ export function BiomarkerReport({
         headers: { Authorization: `Bearer ${token}` },
         body: form,
       });
-      const result = (await res.json()) as ExtractionResult & { error?: string };
-      if (!res.ok || !result.readings) {
-        setError(result.error ?? "We couldn't read that PDF. Please try again.");
+      // Validation errors come back as a normal JSON error response; a 200 is a
+      // heartbeat-padded stream whose last non-empty line is the JSON payload.
+      const raw = await res.text();
+      const result = parseStreamedResult(raw);
+      if (!res.ok || !result || result.error || !result.readings) {
+        setError(result?.error ?? "We couldn't read that PDF. Please try again.");
         return;
       }
       setDraft(toDraftReadings(result.readings));
