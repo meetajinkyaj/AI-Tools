@@ -107,11 +107,10 @@ export async function POST(request: Request) {
       }
     }
 
-    const source =
-      typeof (rawBody as Record<string, unknown>).source === "string" &&
-      (rawBody as Record<string, unknown>).source === "pdf"
-        ? "pdf"
-        : "manual";
+    // The biomarker_panels.source CHECK allows 'manual' | 'pdf_upload' | 'lab_api'.
+    // The client sends "pdf" for the extraction flow — map it to "pdf_upload".
+    const rawSource = (rawBody as Record<string, unknown>).source;
+    const source = rawSource === "pdf" || rawSource === "pdf_upload" ? "pdf_upload" : "manual";
 
     const { data: panel, error: panelError } = await supabase
       .from("biomarker_panels")
