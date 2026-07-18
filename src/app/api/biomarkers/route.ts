@@ -13,6 +13,114 @@ import {
   resolveReportUser,
 } from "@/lib/biomarker-report-data";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
+import {
+  computeOutcomeAwards,
+  type MarkerReading,
+  type OutcomeAward,
+  type PanelSnapshot,
+} from "@/lib/trends";
+
+/** A saved reading row with the fields the reward engine needs. */
+interface ReadingRowLite {
+  marker_key: string;
+  marker_name?: string | null;
+  value: number | null;
+  flag: string;
+  reference_range_low: number | null;
+  reference_range_high: number | null;
+}
+
+/**
+ * Reward the user for a marker that meaningfully improved in its healthy
+ * direction since the previous panel (incl. continued improvement past the range
+ * boundary). Best-effort: never fails the save. The anti-gaming guards (bi-weekly
+ * interval, noise-floor %, cap) live in computeOutcomeAwards.
+ */
+async function awardOutcomeBonuses(
+  profileId: string,
+  userId: string,
+  newPanel: { id: string; test_date: string | null; created_at: string },
+  newReadings: ReadingRowLite[],
+  directionOf: Map<string, string>,
+): Promise<OutcomeAward[]> {
+  const toSnapshotReadings = (rows: ReadingRowLite[]): MarkerReading[] =>
+    rows.map((r) => ({
+      marker_key: r.marker_key,
+      marker_name: r.marker_name ?? null,
+      value: r.value,
+      flag: r.flag,
+      direction: directionOf.get(r.marker_key),
+      ref_low: r.reference_range_low,
+      ref_high: r.reference_range_high,
+    }));
+
+  try {
+    const supabase = createSupabaseAdmin();
+    const { data: prevPanel } = await supabase
+      .from("biomarker_panels")
+      .select("id, test_date, created_at")
+      .eq("profile_id", profileId)
+      .neq("id", newPanel.id)
+      .order("test_date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!prevPanel) return [];
+
+    const { data: prevReadings } = await supabase
+      .from("biomarker_readings")
+      .select("marker_key, marker_name, value, flag, reference_range_low, reference_range_high")
+      .eq("panel_id", prevPanel.id);
+    if (!prevReadings || prevReadings.length === 0) return [];
+
+    const previous: PanelSnapshot = {
+      date: prevPanel.test_date ?? prevPanel.created_at,
+      readings: toSnapshotReadings(prevReadings as ReadingRowLite[]),
+    };
+    const latest: PanelSnapshot = {
+      date: newPanel.test_date ?? newPanel.created_at,
+      readings: toSnapshotReadings(newReadings),
+    };
+
+    const awards = computeOutcomeAwards(previous, latest);
+    if (awards.length === 0) return [];
+
+    const earned = awards.reduce((sum, a) => sum + a.points, 0);
+    const { data: balanceRow } = await supabase
+      .from("reward_points")
+      .select("points_balance")
+      .eq("profile_id", profileId)
+      .maybeSingle();
+    const priorBalance = balanceRow?.points_balance ?? 0;
+
+    await supabase
+      .from("reward_points")
+      .upsert(
+        { user_id: userId, profile_id: profileId, points_balance: priorBalance + earned },
+        { onConflict: "profile_id" },
+      );
+
+    await supabase.from("points_transactions").insert(
+      awards.map((a) => ({
+        user_id: userId,
+        profile_id: profileId,
+        type: "earn",
+        amount: a.points,
+        reason: "outcome_bonus",
+        reference_id: newPanel.id,
+        source_panel_id: newPanel.id,
+        marker_key: a.marker_key,
+        delta_value: a.delta,
+        verified_at: new Date().toISOString(),
+      })),
+    );
+
+    return awards;
+  } catch (err) {
+    console.error("Outcome bonus awarding failed (non-fatal):", err);
+    return [];
+  }
+}
 
 /**
  * Baseline Biomarker Report for the authenticated user.
@@ -222,7 +330,17 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ panel, readings: readings ?? [] });
+    // Reward genuine improvement since the previous panel (best-effort).
+    const directionOf = new Map(catalog.map((e) => [e.marker_key, e.direction]));
+    const bonuses = await awardOutcomeBonuses(
+      resolved.profileId,
+      resolved.userId,
+      panel,
+      (readings ?? []) as ReadingRowLite[],
+      directionOf,
+    );
+
+    return NextResponse.json({ panel, readings: readings ?? [], bonuses });
   } catch (err) {
     console.error("POST /api/biomarkers failed:", err);
     return NextResponse.json({ error: "Failed to save report" }, { status: 500 });
