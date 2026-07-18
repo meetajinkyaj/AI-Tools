@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
 import { validateProfileInput } from "@/lib/profile";
+import { getOrCreateSelfProfileId } from "@/lib/profiles";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
@@ -45,6 +46,7 @@ export async function GET(request: Request) {
       .from("profiles")
       .select("*")
       .eq("user_id", userId)
+      .eq("relationship", "self")
       .maybeSingle();
     if (error) {
       throw new Error(`profiles select failed: ${error.message}`);
@@ -83,31 +85,34 @@ export async function POST(request: Request) {
 
     const supabase = createSupabaseAdmin();
 
+    // Was the self profile already filled in (vs. auto-created empty)? Drives the
+    // created/updated audit event.
     const { data: existing, error: existingError } = await supabase
       .from("profiles")
-      .select("id")
+      .select("full_name")
       .eq("user_id", userId)
+      .eq("relationship", "self")
       .maybeSingle();
     if (existingError) {
       throw new Error(`profiles lookup failed: ${existingError.message}`);
     }
+    const wasSetUp = Boolean(existing?.full_name);
 
-    const { data: profile, error: upsertError } = await supabase
+    const profileId = await getOrCreateSelfProfileId(userId);
+    const { data: profile, error: updateError } = await supabase
       .from("profiles")
-      .upsert(
-        { user_id: userId, ...validation.value },
-        { onConflict: "user_id" },
-      )
+      .update({ ...validation.value })
+      .eq("id", profileId)
       .select("*")
       .single();
-    if (upsertError || !profile) {
-      throw new Error(`profiles upsert failed: ${upsertError?.message ?? "no row"}`);
+    if (updateError || !profile) {
+      throw new Error(`profiles update failed: ${updateError?.message ?? "no row"}`);
     }
 
     // Best-effort event; don't fail the request if it doesn't land.
     await supabase.from("events").insert({
       user_id: userId,
-      type: existing ? "profile_updated" : "profile_created",
+      type: wasSetUp ? "profile_updated" : "profile_created",
     });
 
     return NextResponse.json({ profile });

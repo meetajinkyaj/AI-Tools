@@ -1,17 +1,19 @@
 import "server-only";
 
 import { type CatalogEntry, dedupeCatalogForSex } from "./biomarkers";
+import { getOrCreateSelfProfileId } from "./profiles";
 import { createSupabaseAdmin } from "./supabase-admin";
 
 /**
  * Shared server-side data access for the biomarker report: resolve the app user
- * (and their biological sex) from a Privy id, and load the sex-appropriate
- * catalog. Used by both the report save route and the PDF-extract route.
+ * (their self profile + biological sex) from a Privy id, and load the
+ * sex-appropriate catalog. Used by both the report save route and the PDF
+ * extract route. Panels and readings hang off the returned `profileId`.
  */
 
 export async function resolveReportUser(
   privyUserId: string,
-): Promise<{ userId: string; sex: string } | null> {
+): Promise<{ userId: string; profileId: string; sex: string } | null> {
   const supabase = createSupabaseAdmin();
   const { data: user, error } = await supabase
     .from("users")
@@ -21,14 +23,16 @@ export async function resolveReportUser(
   if (error) throw new Error(`users lookup failed: ${error.message}`);
   if (!user) return null;
 
+  const profileId = await getOrCreateSelfProfileId(user.id);
+
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("biological_sex")
-    .eq("user_id", user.id)
+    .eq("id", profileId)
     .maybeSingle();
   if (profileError) throw new Error(`profiles lookup failed: ${profileError.message}`);
 
-  return { userId: user.id, sex: profile?.biological_sex ?? "any" };
+  return { userId: user.id, profileId, sex: profile?.biological_sex ?? "any" };
 }
 
 export async function loadReportCatalog(sex: string): Promise<CatalogEntry[]> {
