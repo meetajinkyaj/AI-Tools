@@ -55,7 +55,15 @@ interface ReportData {
 type Mode = "report" | "upload" | "review" | "entry";
 
 /** A reading in the shape POST /api/biomarkers expects. */
-type SaveReading = { marker_key: string; value?: number; value_text?: string };
+type SaveReading = {
+  marker_key: string;
+  value?: number;
+  value_text?: string;
+  value_raw?: number | null;
+  unit_raw?: string | null;
+  lab_reference_low?: number | null;
+  lab_reference_high?: number | null;
+};
 
 /** One row in the confirmation screen — values kept as editable strings. */
 interface DraftReading {
@@ -66,6 +74,11 @@ interface DraftReading {
   result_kind: string;
   value: string;
   value_text: string;
+  // Raw-as-printed provenance carried from extraction (not edited).
+  value_raw: number | null;
+  unit_raw: string | null;
+  lab_reference_low: number | null;
+  lab_reference_high: number | null;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -176,6 +189,10 @@ function toDraftReadings(readings: ExtractedReading[]): DraftReading[] {
     result_kind: r.result_kind,
     value: r.value != null ? String(r.value) : "",
     value_text: r.value_text ?? "",
+    value_raw: r.value_raw,
+    unit_raw: r.unit_raw,
+    lab_reference_low: r.ref_low,
+    lab_reference_high: r.ref_high,
   }));
 }
 
@@ -352,12 +369,19 @@ export function BiomarkerReport({
       .map((d): SaveReading | null => {
         if (d.result_kind === "qualitative") {
           return d.value_text.trim() !== ""
-            ? { marker_key: d.marker_key, value_text: d.value_text }
+            ? { marker_key: d.marker_key, value_text: d.value_text, unit_raw: d.unit_raw }
             : null;
         }
         const n = Number(d.value.trim());
         return d.value.trim() !== "" && Number.isFinite(n)
-          ? { marker_key: d.marker_key, value: n }
+          ? {
+              marker_key: d.marker_key,
+              value: n,
+              value_raw: d.value_raw,
+              unit_raw: d.unit_raw,
+              lab_reference_low: d.lab_reference_low,
+              lab_reference_high: d.lab_reference_high,
+            }
           : null;
       })
       .filter((r): r is SaveReading => r !== null);

@@ -8,6 +8,7 @@ import { AppShell, type NavKey } from "./app-shell";
 import { BiomarkerReport } from "./biomarker-report";
 import { CheckinForm } from "./checkin-form";
 import { Dashboard } from "./dashboard";
+import { InterventionLog } from "./intervention-log";
 import { OnboardingForm } from "./onboarding-form";
 import { PartnersView } from "./partners-view";
 import { ProfileEditForm } from "./profile-edit-form";
@@ -124,12 +125,15 @@ export function AuthedApp() {
   return (
     <AppShell active={tab} onNavigate={navigate} onLogout={() => void logout()}>
       {tab === "home" && (
-        <Dashboard
-          profile={profile as ProfileRow}
-          getToken={getAccessToken}
-          onCheckIn={() => setTab("checkin")}
-          refreshKey={summaryVersion}
-        />
+        <div className="flex w-full max-w-xl flex-col gap-6">
+          <Dashboard
+            profile={profile as ProfileRow}
+            getToken={getAccessToken}
+            onCheckIn={() => setTab("checkin")}
+            refreshKey={summaryVersion}
+          />
+          <InterventionLog getToken={getAccessToken} />
+        </div>
       )}
       {tab === "checkin" && (
         <CheckinForm
