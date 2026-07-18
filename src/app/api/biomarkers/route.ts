@@ -117,6 +117,7 @@ export async function POST(request: Request) {
       .from("biomarker_panels")
       .insert({
         user_id: resolved.userId,
+        profile_id: resolved.profileId,
         source,
         test_date: validation.value.test_date,
         lab_name: validation.value.lab_name,
@@ -132,6 +133,7 @@ export async function POST(request: Request) {
       const base = {
         panel_id: panel.id,
         user_id: resolved.userId,
+        profile_id: resolved.profileId,
         marker_key: r.marker_key,
         marker_name: entry.display_name,
         unit: entry.unit,
@@ -182,6 +184,7 @@ export async function POST(request: Request) {
         return {
           panel_id: panel.id,
           user_id: resolved.userId,
+          profile_id: resolved.profileId,
           marker_key: d.marker_key,
           marker_name: entry.display_name,
           unit: entry.unit,

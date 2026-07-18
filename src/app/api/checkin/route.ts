@@ -9,6 +9,7 @@ import {
   totalAwarded,
   validateCheckinInput,
 } from "@/lib/checkin";
+import { getOrCreateSelfProfileId } from "@/lib/profiles";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
@@ -33,12 +34,12 @@ async function resolveUserId(privyUserId: string): Promise<string | null> {
   return data?.id ?? null;
 }
 
-async function getPointsBalance(userId: string): Promise<number> {
+async function getPointsBalance(profileId: string): Promise<number> {
   const supabase = createSupabaseAdmin();
   const { data, error } = await supabase
     .from("reward_points")
     .select("points_balance")
-    .eq("user_id", userId)
+    .eq("profile_id", profileId)
     .maybeSingle();
   if (error) throw new Error(`reward_points lookup failed: ${error.message}`);
   return data?.points_balance ?? 0;
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
         pointsBalance: 0,
       });
     }
+    const profileId = await getOrCreateSelfProfileId(userId);
 
     const supabase = createSupabaseAdmin();
     const today = todayUTC();
@@ -67,7 +69,7 @@ export async function GET(request: Request) {
     const { data: recent, error: recentError } = await supabase
       .from("daily_checkins")
       .select("*")
-      .eq("user_id", userId)
+      .eq("profile_id", profileId)
       .order("checkin_date", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -79,7 +81,7 @@ export async function GET(request: Request) {
       recent?.streak_count ?? 0,
       today,
     );
-    const pointsBalance = await getPointsBalance(userId);
+    const pointsBalance = await getPointsBalance(profileId);
 
     return NextResponse.json({
       checkin: checkedInToday ? recent : null,
@@ -116,6 +118,7 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: "User not found" }, { status: 409 });
     }
+    const profileId = await getOrCreateSelfProfileId(userId);
 
     const supabase = createSupabaseAdmin();
     const today = todayUTC();
@@ -124,7 +127,7 @@ export async function POST(request: Request) {
     const { data: existingToday, error: existingError } = await supabase
       .from("daily_checkins")
       .select("*")
-      .eq("user_id", userId)
+      .eq("profile_id", profileId)
       .eq("checkin_date", today)
       .maybeSingle();
     if (existingError) throw new Error(`daily_checkins lookup failed: ${existingError.message}`);
@@ -140,7 +143,7 @@ export async function POST(request: Request) {
       if (updateError || !updated) {
         throw new Error(`daily_checkins update failed: ${updateError?.message ?? "no row"}`);
       }
-      const pointsBalance = await getPointsBalance(userId);
+      const pointsBalance = await getPointsBalance(profileId);
       return NextResponse.json({
         checkin: updated,
         checkedInToday: true,
@@ -154,7 +157,7 @@ export async function POST(request: Request) {
     const { data: prior, error: priorError } = await supabase
       .from("daily_checkins")
       .select("checkin_date, streak_count")
-      .eq("user_id", userId)
+      .eq("profile_id", profileId)
       .order("checkin_date", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -170,6 +173,7 @@ export async function POST(request: Request) {
       .from("daily_checkins")
       .insert({
         user_id: userId,
+        profile_id: profileId,
         checkin_date: today,
         streak_count: streak,
         ...validation.value,
@@ -184,12 +188,12 @@ export async function POST(request: Request) {
     const awards = computeAwards(streak);
     const earned = totalAwarded(awards);
 
-    const priorBalance = await getPointsBalance(userId);
+    const priorBalance = await getPointsBalance(profileId);
     const { data: balanceRow, error: balanceError } = await supabase
       .from("reward_points")
       .upsert(
-        { user_id: userId, points_balance: priorBalance + earned },
-        { onConflict: "user_id" },
+        { user_id: userId, profile_id: profileId, points_balance: priorBalance + earned },
+        { onConflict: "profile_id" },
       )
       .select("points_balance")
       .single();
@@ -201,6 +205,7 @@ export async function POST(request: Request) {
     await supabase.from("points_transactions").insert(
       awards.map((a) => ({
         user_id: userId,
+        profile_id: profileId,
         type: "earn",
         amount: a.amount,
         reason: a.reason,
