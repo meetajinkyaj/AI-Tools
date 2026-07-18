@@ -1,16 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  type Band,
   bandFor,
+  canonicalizeCount,
   type CatalogEntry,
   computeDerived,
   computeFlag,
   dedupeCatalogForSex,
   groupByCategory,
   isEnterableNumeric,
+  isNoteworthy,
   isValidDate,
   qualitativeFlag,
   qualitativeOptions,
+  severityFromBand,
   validatePanelInput,
 } from "./biomarkers";
 
@@ -154,6 +158,46 @@ describe("bandFor", () => {
     expect(bandFor(30, VITD_BANDS)?.label).toBe("Sufficiency");
     expect(bandFor(8, VITD_BANDS)?.label).toBe("Deficiency");
     expect(bandFor(120, VITD_BANDS)?.label).toBe("Toxicity");
+  });
+});
+
+describe("severityFromBand", () => {
+  const ldlBands: Band[] = [
+    { label: "Optimal", high: 100, severity: "optimal" },
+    { label: "Near optimal", low: 100, high: 130, severity: "borderline" },
+    { label: "High", low: 160, severity: "high" },
+  ];
+  it("uses the band's severity when a band is present (pill agrees with callout)", () => {
+    // LDL 107.77 flags 'high' vs a 0–100 range, but sits in the 'Near optimal'
+    // (borderline) band — the band should win so the two labels agree.
+    expect(severityFromBand("high", bandFor(107.77, ldlBands))).toBe("borderline");
+    expect(severityFromBand("high", bandFor(180, ldlBands))).toBe("high");
+    expect(severityFromBand("in_range", bandFor(80, ldlBands))).toBe("optimal");
+  });
+  it("falls back to the numeric flag with no band", () => {
+    expect(severityFromBand("high", null)).toBe("high");
+    expect(severityFromBand("low", null)).toBe("low");
+    expect(severityFromBand("in_range", null)).toBe("in_range");
+  });
+});
+
+describe("isNoteworthy", () => {
+  it("surfaces low/high/borderline, not optimal/in_range/unknown", () => {
+    expect(["low", "high", "borderline"].every(isNoteworthy)).toBe(true);
+    expect(["optimal", "in_range", "unknown"].some(isNoteworthy)).toBe(false);
+  });
+});
+
+describe("canonicalizeCount", () => {
+  it("scales raw cell counts to the catalog's canonical unit", () => {
+    expect(canonicalizeCount("wbc", 6870)).toBe(6.87); // /µL -> 10^3/µL
+    expect(canonicalizeCount("platelets", 171000)).toBe(171);
+    expect(canonicalizeCount("rbc", 4_700_000)).toBe(4.7); // /µL -> million/µL
+  });
+  it("leaves already-canonical values and unknown markers untouched", () => {
+    expect(canonicalizeCount("wbc", 6.87)).toBe(6.87);
+    expect(canonicalizeCount("platelets", 171)).toBe(171);
+    expect(canonicalizeCount("ldl_c", 107.77)).toBe(107.77);
   });
 });
 

@@ -17,6 +17,43 @@ export const FLAG_LABELS: Record<Flag, string> = {
   unknown: "No range",
 };
 
+/**
+ * The severity a reading is displayed at. Richer than Flag: a marker with
+ * interpretation bands (e.g. LDL "Near optimal") carries the band's severity, so
+ * the pill and the callout describe the same thing instead of disagreeing (a
+ * blunt "High" pill next to "Near optimal" text). `optimal` is the banded
+ * equivalent of `in_range`; `borderline` sits between in-range and out-of-range.
+ */
+export type Severity = "optimal" | "in_range" | "borderline" | "low" | "high" | "unknown";
+
+export const SEVERITY_LABELS: Record<Severity, string> = {
+  optimal: "Optimal",
+  in_range: "In range",
+  borderline: "Borderline",
+  low: "Low",
+  high: "High",
+  unknown: "No range",
+};
+
+/**
+ * A reading's effective severity: the band it falls in wins (that's the more
+ * precise clinical read), otherwise the numeric in/low/high flag.
+ */
+export function severityFromBand(flag: Flag, band: Band | null): Severity {
+  if (band) {
+    const s = band.severity;
+    if (s === "optimal" || s === "borderline" || s === "low" || s === "high") {
+      return s;
+    }
+  }
+  return flag;
+}
+
+/** Whether a severity is worth surfacing in the "worth a look" summary. */
+export function isNoteworthy(s: Severity): boolean {
+  return s === "low" || s === "high" || s === "borderline";
+}
+
 /** A single interpretation band (e.g. Vitamin D "Insufficiency"). */
 export interface Band {
   label: string;
@@ -250,6 +287,31 @@ export function bandFor(value: number, bands: Band[]): Band | null {
 function round(n: number, dp = 0): number {
   const f = 10 ** dp;
   return Math.round(n * f) / f;
+}
+
+/**
+ * Some labs (e.g. FITTR) report cell counts in raw cells/µL, but our catalog's
+ * canonical unit is a scaled unit — 10^3/µL for WBC & platelets, million/µL for
+ * RBC. Left as-is, a WBC of 6870 gets compared to a 3.4–10.8 range and flags
+ * "high" when it's actually normal (6.87). When a value's magnitude clearly
+ * indicates the raw-count unit, scale it to the catalog unit.
+ *
+ * `threshold` sits well above any plausible canonical value and well below any
+ * raw-count value, so the mapping is unambiguous and idempotent — an
+ * already-canonical value passes through untouched. To support another marker,
+ * add a row here (see docs/REFERENCE_DATA.md).
+ */
+const COUNT_SCALES: Record<string, { factor: number; threshold: number }> = {
+  wbc: { factor: 1000, threshold: 200 }, // canonical ~3–11, raw ~4000–11000
+  platelets: { factor: 1000, threshold: 3000 }, // canonical ~150–450, raw ~150000+
+  rbc: { factor: 1_000_000, threshold: 100 }, // canonical ~4–6, raw ~4.7M
+};
+
+/** Scale a raw cell-count value to the catalog's canonical unit when needed. */
+export function canonicalizeCount(markerKey: string, value: number): number {
+  const scale = COUNT_SCALES[markerKey];
+  if (scale && value >= scale.threshold) return round(value / scale.factor, 2);
+  return value;
 }
 
 /**

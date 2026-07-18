@@ -7,11 +7,14 @@ import {
   bandFor,
   type CatalogEntry,
   type Flag,
-  FLAG_LABELS,
   groupByCategory,
   isEnterableNumeric,
+  isNoteworthy,
   isQualitative,
   qualitativeOptions,
+  type Severity,
+  SEVERITY_LABELS,
+  severityFromBand,
 } from "@/lib/biomarkers";
 import type { ExtractedReading, ExtractionResult } from "@/lib/extraction";
 import {
@@ -94,14 +97,14 @@ function rangeText(low: number | null, high: number | null, unit: string | null)
   return "—";
 }
 
-function FlagPill({ flag, qualitative }: { flag: Flag; qualitative?: boolean }) {
-  const attention = flag === "low" || flag === "high";
-  const cls = attention ? "bg-accent/10 text-accent" : "bg-surface-2 text-muted";
-  const label = qualitative
-    ? flag === "in_range"
-      ? "Normal"
-      : "Review"
-    : FLAG_LABELS[flag];
+/** A status chip coloured by severity: strong for low/high, soft for borderline. */
+function StatusPill({ severity, label }: { severity: Severity; label: string }) {
+  const cls =
+    severity === "low" || severity === "high"
+      ? "bg-accent/10 text-accent"
+      : severity === "borderline"
+        ? "bg-clay/10 text-clay"
+        : "bg-surface-2 text-muted";
   return (
     <span
       className={`shrink-0 rounded-full px-2.5 py-0.5 font-body text-xs font-medium ${cls}`}
@@ -109,6 +112,20 @@ function FlagPill({ flag, qualitative }: { flag: Flag; qualitative?: boolean }) 
       {label}
     </span>
   );
+}
+
+/** The severity + display label for a reading — the band wins over the raw flag. */
+function readingStatus(
+  r: ReadingRow,
+  band: Band | null,
+): { severity: Severity; label: string } {
+  if (r.result_kind === "qualitative") {
+    return r.flag === "in_range"
+      ? { severity: "in_range", label: "Normal" }
+      : { severity: "high", label: "Review" };
+  }
+  const severity = severityFromBand(r.flag, band);
+  return { severity, label: band ? band.label : SEVERITY_LABELS[severity] };
 }
 
 /** A short, educational line for an out-of-range reading (numeric or qualitative). */
@@ -765,13 +782,15 @@ export function BiomarkerReport({
 
   // ------------------------------------------------------------- Report view
   const readings = latestPanel?.readings ?? [];
-  const outOfRange = readings.filter((r) => r.flag === "low" || r.flag === "high");
   const categoryByKey = new Map(catalog.map((e) => [e.marker_key, e.category]));
   const readingGroups = groupReadings(readings, categoryByKey);
   const bandOf = (r: ReadingRow): Band | null => {
     const bands = catalogByKey.get(r.marker_key)?.bands ?? [];
     return r.value != null && bands.length > 0 ? bandFor(r.value, bands) : null;
   };
+  const outOfRange = readings.filter((r) =>
+    isNoteworthy(readingStatus(r, bandOf(r)).severity),
+  );
 
   return (
     <div className="flex w-full max-w-xl flex-col gap-6">
@@ -798,7 +817,7 @@ export function BiomarkerReport({
         <p className="font-display text-2xl font-medium text-foreground">
           {outOfRange.length} of {readings.length}
           <span className="ml-2 font-body text-sm text-muted">
-            {outOfRange.length === 1 ? "marker" : "markers"} outside range
+            {outOfRange.length === 1 ? "marker" : "markers"} to review
           </span>
         </p>
       </Card>
@@ -827,8 +846,8 @@ export function BiomarkerReport({
             <Eyebrow>{categoryLabel(group.category)}</Eyebrow>
           </div>
           {group.readings.map((r) => {
-            const band = bandOf(r);
             const qualitative = r.result_kind === "qualitative";
+            const status = readingStatus(r, bandOf(r));
             return (
               <div
                 key={r.id}
@@ -845,11 +864,6 @@ export function BiomarkerReport({
                   </span>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
-                  {band && (
-                    <span className="hidden font-body text-xs text-muted sm:inline">
-                      {band.label}
-                    </span>
-                  )}
                   <span className="font-body text-sm font-medium text-foreground">
                     {qualitative ? (
                       r.value_text
@@ -864,7 +878,7 @@ export function BiomarkerReport({
                       </>
                     )}
                   </span>
-                  <FlagPill flag={r.flag} qualitative={qualitative} />
+                  <StatusPill severity={status.severity} label={status.label} />
                 </div>
               </div>
             );
