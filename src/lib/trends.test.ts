@@ -12,17 +12,17 @@ import {
 const prev: PanelSnapshot = {
   date: "2026-01-01",
   readings: [
-    { marker_key: "hba1c", marker_name: "HbA1c", value: 5.9, flag: "high" },
-    { marker_key: "ldl_c", marker_name: "LDL", value: 165, flag: "high" },
-    { marker_key: "hdl_c", marker_name: "HDL", value: 66, flag: "in_range" },
+    { marker_key: "hba1c", marker_name: "HbA1c", value: 5.9, flag: "high", direction: "lower_better" },
+    { marker_key: "ldl_c", marker_name: "LDL", value: 165, flag: "high", direction: "lower_better" },
+    { marker_key: "hdl_c", marker_name: "HDL", value: 66, flag: "in_range", direction: "higher_better" },
   ],
 };
 const latest: PanelSnapshot = {
   date: "2026-05-01", // 120 days later
   readings: [
-    { marker_key: "hba1c", marker_name: "HbA1c", value: 5.4, flag: "in_range" }, // improved
-    { marker_key: "ldl_c", marker_name: "LDL", value: 150, flag: "high" }, // better but still high
-    { marker_key: "hdl_c", marker_name: "HDL", value: 70, flag: "in_range" }, // was fine
+    { marker_key: "hba1c", marker_name: "HbA1c", value: 5.4, flag: "in_range", direction: "lower_better" }, // improved into range
+    { marker_key: "ldl_c", marker_name: "LDL", value: 150, flag: "high", direction: "lower_better" }, // better, still high — now rewarded
+    { marker_key: "hdl_c", marker_name: "HDL", value: 66.5, flag: "in_range", direction: "higher_better" }, // <1% move — noise
   ],
 };
 
@@ -34,38 +34,49 @@ describe("daysBetween", () => {
 });
 
 describe("computeOutcomeAwards", () => {
-  it("rewards only markers that moved out-of-range → in-range", () => {
+  it("rewards healthy-direction improvement, including still-flagged and continued gains", () => {
     const awards = computeOutcomeAwards(prev, latest);
-    expect(awards.map((a) => a.marker_key)).toEqual(["hba1c"]);
-    expect(awards[0].delta).toBe(-0.5);
-    expect(awards[0].points).toBe(250);
+    // hba1c (5.9->5.4) and ldl (165->150) both improved >5%; hdl move is noise.
+    expect(awards.map((a) => a.marker_key).sort()).toEqual(["hba1c", "ldl_c"]);
+    expect(awards.every((a) => a.points === 250)).toBe(true);
   });
 
-  it("blocks awards when panels are too close together (anti-gaming)", () => {
-    const soon: PanelSnapshot = { ...latest, date: "2026-01-20" }; // 19 days
+  it("keeps rewarding continued improvement past the range boundary (visceral fat 9→8→6.5)", () => {
+    const opts = { minDays: 14 };
+    const p1 = { date: "2026-01-01", readings: [mk("visceral_fat", 9, "high")] };
+    const p2 = { date: "2026-02-01", readings: [mk("visceral_fat", 8, "in_range")] };
+    const p3 = { date: "2026-03-01", readings: [mk("visceral_fat", 6.5, "in_range")] };
+    expect(computeOutcomeAwards(p1, p2, opts)).toHaveLength(1); // 9->8, into range
+    expect(computeOutcomeAwards(p2, p3, opts)).toHaveLength(1); // 8->6.5, still rewarded
+  });
+
+  it("does not reward noise (a sub-threshold move)", () => {
+    const p1 = { date: "2026-01-01", readings: [mk("ldl_c", 100, "in_range")] };
+    const p2 = { date: "2026-02-01", readings: [mk("ldl_c", 99, "in_range")] }; // 1% < 5%
+    expect(computeOutcomeAwards(p1, p2)).toEqual([]);
+  });
+
+  it("accepts but does not reward panels closer than the bi-weekly floor", () => {
+    const soon: PanelSnapshot = { ...latest, date: "2026-01-10" }; // 9 days
     expect(computeOutcomeAwards(prev, soon)).toEqual([]);
   });
 
   it("caps the number of rewarded markers", () => {
     const manyPrev: PanelSnapshot = {
       date: "2026-01-01",
-      readings: ["a", "b", "c", "d"].map((k) => ({
-        marker_key: k,
-        value: 10,
-        flag: "high",
-      })),
+      readings: ["a", "b", "c", "d"].map((k) => mk(k, 10, "high")),
     };
     const manyLatest: PanelSnapshot = {
       date: "2026-06-01",
-      readings: ["a", "b", "c", "d"].map((k) => ({
-        marker_key: k,
-        value: 1,
-        flag: "in_range",
-      })),
+      readings: ["a", "b", "c", "d"].map((k) => mk(k, 1, "in_range")),
     };
     expect(computeOutcomeAwards(manyPrev, manyLatest)).toHaveLength(3);
   });
 });
+
+function mk(marker_key: string, value: number, flag: string) {
+  return { marker_key, value, flag, direction: "lower_better" };
+}
 
 describe("diffPanels", () => {
   it("computes per-marker baseline→latest deltas and into-range moves", () => {

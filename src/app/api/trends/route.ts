@@ -74,8 +74,17 @@ export async function GET(request: Request) {
       const latestP = panels[panels.length - 1];
       const { data: rows } = await supabase
         .from("biomarker_readings")
-        .select("panel_id, marker_key, marker_name, value, flag")
+        .select(
+          "panel_id, marker_key, marker_name, value, flag, reference_range_low, reference_range_high",
+        )
         .in("panel_id", [baselineP.id, latestP.id]);
+      // Direction ('lower_better'/…) drives whether a move counts as improvement.
+      const { data: catalog } = await supabase
+        .from("biomarker_catalog")
+        .select("marker_key, direction");
+      const directionOf = new Map(
+        (catalog ?? []).map((c) => [c.marker_key, c.direction]),
+      );
       const forPanel = (pid: string): MarkerReading[] =>
         (rows ?? [])
           .filter((r) => r.panel_id === pid)
@@ -84,6 +93,9 @@ export async function GET(request: Request) {
             marker_name: r.marker_name,
             value: r.value,
             flag: r.flag,
+            direction: directionOf.get(r.marker_key),
+            ref_low: r.reference_range_low,
+            ref_high: r.reference_range_high,
           }));
       const baseline: PanelSnapshot = {
         date: baselineP.test_date ?? baselineP.created_at,
@@ -93,10 +105,10 @@ export async function GET(request: Request) {
         date: latestP.test_date ?? latestP.created_at,
         readings: forPanel(latestP.id),
       };
-      // Surface movement first: into-range, then still-flagged, then the rest.
+      // Surface movement first: improved, then still-flagged, then the rest.
       const deltas = diffPanels(baseline, latest).sort((a, b) => {
         const score = (d: (typeof deltas)[number]) =>
-          d.moved_into_range ? 0 : d.latest_flag === "low" || d.latest_flag === "high" ? 1 : 2;
+          d.improved ? 0 : d.latest_flag === "low" || d.latest_flag === "high" ? 1 : 2;
         return score(a) - score(b);
       });
       biomarker = {

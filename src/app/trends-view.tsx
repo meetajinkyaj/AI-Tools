@@ -29,6 +29,50 @@ interface TrendsData {
 
 const DISCLAIMER = "Educational, not a diagnosis — please consult a doctor.";
 
+/** Kept in sync with docs/FAQ.md. */
+const FAQ: { q: string; a: string }[] = [
+  {
+    q: "How do I earn iki points?",
+    a: "10 points for your first daily check-in, streak bonuses (50 at 7 days, 250 at 30), and points when a marker genuinely improves between two lab panels.",
+  },
+  {
+    q: "What is an outcome-verified reward?",
+    a: "Points for a marker moving in its healthy direction between panels — and we keep rewarding continued improvement, not just the first time it reaches the normal range (e.g. visceral fat 9 → 8 → 6.5 earns at each step).",
+  },
+  {
+    q: "How often can a lab panel earn improvement rewards?",
+    a: "At most once every 14 days. Panels uploaded closer together are still saved and shown in your trends — they're important health data — but don't earn improvement points.",
+  },
+  {
+    q: "Why the 14-day rule?",
+    a: "During illness or recovery your markers (white/red blood cells especially) swing a lot as your body fights infection. The bi-weekly floor keeps rewards tied to genuine change, while still recording every result.",
+  },
+  {
+    q: "Are results that don't earn points still saved?",
+    a: "Yes. Every panel is stored and part of your trends and doctor-ready history. Rewards are a bonus for genuine progress — never a gate on your data.",
+  },
+];
+
+function RewardsFaq() {
+  return (
+    <Card className="flex flex-col gap-2 p-6">
+      <Eyebrow>Rewards &amp; trends — FAQ</Eyebrow>
+      <div className="flex flex-col divide-y divide-border">
+        {FAQ.map((item) => (
+          <details key={item.q} className="group py-2">
+            <summary className="cursor-pointer list-none font-body text-sm font-medium text-foreground marker:hidden">
+              <span className="text-accent group-open:hidden">＋ </span>
+              <span className="hidden text-accent group-open:inline">− </span>
+              {item.q}
+            </summary>
+            <p className="pt-2 font-body text-sm text-muted">{item.a}</p>
+          </details>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 /** A tiny inline sparkline — no chart library, keeps the Worker bundle lean. */
 function Sparkline({ values, className = "" }: { values: number[]; className?: string }) {
   const pts = values.filter((v) => Number.isFinite(v));
@@ -198,9 +242,9 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
                   <li key={d.marker_key} className="flex items-center justify-between gap-3 py-2">
                     <span className="min-w-0 font-body text-sm text-foreground">
                       {d.marker_name ?? d.marker_key}
-                      {d.moved_into_range && (
+                      {(d.moved_into_range || d.improved) && (
                         <span className="ml-2 rounded-full bg-clay/10 px-2 py-0.5 font-body text-xs text-clay">
-                          into range
+                          {d.moved_into_range ? "into range" : "improved"}
                         </span>
                       )}
                     </span>
@@ -217,6 +261,8 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
           </div>
         )}
       </Card>
+
+      <RewardsFaq />
 
       <p className="font-body text-xs text-muted">{DISCLAIMER}</p>
     </div>

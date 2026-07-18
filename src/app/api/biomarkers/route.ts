@@ -20,17 +20,40 @@ import {
   type PanelSnapshot,
 } from "@/lib/trends";
 
+/** A saved reading row with the fields the reward engine needs. */
+interface ReadingRowLite {
+  marker_key: string;
+  marker_name?: string | null;
+  value: number | null;
+  flag: string;
+  reference_range_low: number | null;
+  reference_range_high: number | null;
+}
+
 /**
- * Reward the user for a marker that genuinely moved out-of-range → in-range
- * since their previous panel. Best-effort: never fails the save. Anti-gaming
- * guards (min interval, cap, flagged→in-range only) live in computeOutcomeAwards.
+ * Reward the user for a marker that meaningfully improved in its healthy
+ * direction since the previous panel (incl. continued improvement past the range
+ * boundary). Best-effort: never fails the save. The anti-gaming guards (bi-weekly
+ * interval, noise-floor %, cap) live in computeOutcomeAwards.
  */
 async function awardOutcomeBonuses(
   profileId: string,
   userId: string,
   newPanel: { id: string; test_date: string | null; created_at: string },
-  newReadings: MarkerReading[],
+  newReadings: ReadingRowLite[],
+  directionOf: Map<string, string>,
 ): Promise<OutcomeAward[]> {
+  const toSnapshotReadings = (rows: ReadingRowLite[]): MarkerReading[] =>
+    rows.map((r) => ({
+      marker_key: r.marker_key,
+      marker_name: r.marker_name ?? null,
+      value: r.value,
+      flag: r.flag,
+      direction: directionOf.get(r.marker_key),
+      ref_low: r.reference_range_low,
+      ref_high: r.reference_range_high,
+    }));
+
   try {
     const supabase = createSupabaseAdmin();
     const { data: prevPanel } = await supabase
@@ -46,17 +69,17 @@ async function awardOutcomeBonuses(
 
     const { data: prevReadings } = await supabase
       .from("biomarker_readings")
-      .select("marker_key, marker_name, value, flag")
+      .select("marker_key, marker_name, value, flag, reference_range_low, reference_range_high")
       .eq("panel_id", prevPanel.id);
     if (!prevReadings || prevReadings.length === 0) return [];
 
     const previous: PanelSnapshot = {
       date: prevPanel.test_date ?? prevPanel.created_at,
-      readings: prevReadings as MarkerReading[],
+      readings: toSnapshotReadings(prevReadings as ReadingRowLite[]),
     };
     const latest: PanelSnapshot = {
       date: newPanel.test_date ?? newPanel.created_at,
-      readings: newReadings,
+      readings: toSnapshotReadings(newReadings),
     };
 
     const awards = computeOutcomeAwards(previous, latest);
@@ -308,11 +331,13 @@ export async function POST(request: Request) {
     });
 
     // Reward genuine improvement since the previous panel (best-effort).
+    const directionOf = new Map(catalog.map((e) => [e.marker_key, e.direction]));
     const bonuses = await awardOutcomeBonuses(
       resolved.profileId,
       resolved.userId,
       panel,
-      (readings ?? []) as MarkerReading[],
+      (readings ?? []) as ReadingRowLite[],
+      directionOf,
     );
 
     return NextResponse.json({ panel, readings: readings ?? [], bonuses });
