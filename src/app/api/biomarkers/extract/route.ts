@@ -13,6 +13,7 @@ import {
   loadReportCatalog,
   resolveReportUser,
 } from "@/lib/biomarker-report-data";
+import { canonicalizeCount } from "@/lib/biomarkers";
 import {
   buildExtractionPrompt,
   hasUsableTextLayer,
@@ -157,6 +158,12 @@ async function runExtraction(
 
   const raw = await extractMarkers({ prompt, source });
   const result = parseExtractionResponse(raw, catalog);
+
+  // Normalize raw cell-count units (e.g. WBC 6870 /µL -> 6.87) so the value the
+  // user confirms matches the catalog's unit and flags correctly.
+  for (const r of result.readings) {
+    if (r.value != null) r.value = canonicalizeCount(r.marker_key, r.value);
+  }
 
   if (result.readings.length === 0) {
     return {

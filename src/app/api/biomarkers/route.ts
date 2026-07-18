@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
 import {
+  canonicalizeCount,
   computeDerived,
   computeFlag,
   qualitativeFlag,
@@ -149,26 +150,30 @@ export async function POST(request: Request) {
         };
       }
 
-      // Numeric — use a lab-provided range override when given.
+      // Numeric — canonicalize raw cell-count units (idempotent) and use a
+      // lab-provided range override when given.
+      const value = canonicalizeCount(r.marker_key, r.value as number);
       const hasOverride = r.ref_low != null || r.ref_high != null;
       const refLow = hasOverride ? r.ref_low : entry.ref_low;
       const refHigh = hasOverride ? r.ref_high : entry.ref_high;
       return {
         ...base,
-        value: r.value,
+        value,
         value_text: null,
         result_kind: "numeric",
         reference_range_low: refLow,
         reference_range_high: refHigh,
         range_source: hasOverride ? "lab" : "catalog",
-        flag: computeFlag(r.value as number, refLow, refHigh),
+        flag: computeFlag(value, refLow, refHigh),
       };
     });
 
     // Derive markers (Non-HDL, ratios, eAG…) from the entered numeric values.
     const enteredNumeric = new Map<string, number>();
     for (const r of validation.value.readings) {
-      if (r.value != null) enteredNumeric.set(r.marker_key, r.value);
+      if (r.value != null) {
+        enteredNumeric.set(r.marker_key, canonicalizeCount(r.marker_key, r.value));
+      }
     }
     const derivedRows = computeDerived(enteredNumeric)
       .filter((d) => byKey.has(d.marker_key))
