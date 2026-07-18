@@ -13,6 +13,7 @@ import { OnboardingForm } from "./onboarding-form";
 import { PartnersView } from "./partners-view";
 import { ProfileEditForm } from "./profile-edit-form";
 import { ProfileView } from "./profile-view";
+import { TrendsView } from "./trends-view";
 import { CenteredMessage, ComingSoon, primaryButtonClass, Screen } from "./ui";
 
 type Status = "loading" | "onboarding" | "ready" | "error";
@@ -160,13 +161,7 @@ export function AuthedApp() {
         />
       )}
       {tab === "report" && <BiomarkerReport getToken={getAccessToken} />}
-      {tab === "trends" && (
-        <ComingSoon
-          eyebrow="Coming soon"
-          title="Progress & Trends"
-          note="Week-over-week movement across your markers and check-ins will appear here once you have enough data."
-        />
-      )}
+      {tab === "trends" && <TrendsView getToken={getAccessToken} />}
       {tab === "future" && (
         <ComingSoon
           eyebrow="Coming soon"
