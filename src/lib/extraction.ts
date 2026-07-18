@@ -18,9 +18,11 @@ export interface ExtractedReading {
   marker_key: string;
   display_name: string;
   category: string;
-  unit: string | null;
+  unit: string | null; // catalog (canonical) unit
+  unit_raw: string | null; // unit exactly as printed on the report
   result_kind: string; // 'numeric' | 'qualitative'
   value: number | null;
+  value_raw: number | null; // value exactly as printed (before canonicalization)
   value_text: string | null;
   ref_low: number | null; // lab-printed range, if the PDF showed one
   ref_high: number | null;
@@ -61,11 +63,14 @@ export function buildExtractionPrompt(catalog: CatalogEntry[]): string {
     "high or low — only transcribe what is printed.",
     "",
     "For each result you find that matches a catalog marker, output the marker_key",
-    "from the catalog, the printed value, and — if the report prints a reference",
-    "range next to it — that range's low and high numbers.",
+    "from the catalog, the printed value, the printed unit exactly as shown, and —",
+    "if the report prints a reference range next to it — that range's low and high",
+    "numbers.",
     "  • numeric markers: put the number in `value` (value_text null).",
     "  • qualitative markers (e.g. Negative/Positive): put the printed word in",
     "    `value_text` (value null).",
+    "  • `unit`: the unit string exactly as printed (e.g. \"mg/dL\", \"10^3/uL\",",
+    "    \"/cumm\"); null if none is printed. Do not convert it.",
     "If a printed lab *result* does not match any catalog marker, add its printed",
     "name to `unmatched` (do not guess a key) — but keep `unmatched` short: at most",
     "10 of the most notable unrecognized results, not every heading or line of text.",
@@ -80,7 +85,7 @@ export function buildExtractionPrompt(catalog: CatalogEntry[]): string {
     '  "lab_name": string | null,',
     '  "markers": [',
     '    { "marker_key": string, "value": number | null, "value_text": string | null,',
-    '      "ref_low": number | null, "ref_high": number | null }',
+    '      "unit": string | null, "ref_low": number | null, "ref_high": number | null }',
     "  ],",
     '  "unmatched": string[]',
     "}",
@@ -156,6 +161,11 @@ export function normalizeExtraction(
     // Unknown or derived markers are dropped (derived ones are computed later).
     if (!entry || entry.is_derived || seen.has(key)) continue;
 
+    const unitRaw =
+      typeof r.unit === "string" && r.unit.trim().length > 0
+        ? r.unit.trim().slice(0, 40)
+        : null;
+
     if (entry.result_kind === "qualitative") {
       const text =
         typeof r.value_text === "string" && r.value_text.trim().length > 0
@@ -167,8 +177,10 @@ export function normalizeExtraction(
         display_name: entry.display_name,
         category: entry.category,
         unit: entry.unit,
+        unit_raw: unitRaw,
         result_kind: "qualitative",
         value: null,
+        value_raw: null,
         value_text: text,
         ref_low: null,
         ref_high: null,
@@ -181,8 +193,10 @@ export function normalizeExtraction(
         display_name: entry.display_name,
         category: entry.category,
         unit: entry.unit,
+        unit_raw: unitRaw,
         result_kind: "numeric",
-        value,
+        value, // canonicalized by the caller; value_raw preserves the printed value
+        value_raw: value,
         value_text: null,
         ref_low: toNumberOrNull(r.ref_low),
         ref_high: toNumberOrNull(r.ref_high),

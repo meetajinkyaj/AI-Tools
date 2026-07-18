@@ -137,12 +137,17 @@ export async function POST(request: Request) {
         marker_key: r.marker_key,
         marker_name: entry.display_name,
         unit: entry.unit,
+        // Raw-as-printed provenance (stored, never used for flagging).
+        unit_raw: r.unit_raw,
+        lab_reference_low: r.lab_reference_low,
+        lab_reference_high: r.lab_reference_high,
       };
 
       if (entry.result_kind === "qualitative") {
         return {
           ...base,
           value: null,
+          value_raw: null,
           value_text: r.value_text,
           result_kind: "qualitative",
           reference_range_low: null,
@@ -161,6 +166,7 @@ export async function POST(request: Request) {
       return {
         ...base,
         value,
+        value_raw: r.value_raw ?? (r.value as number),
         value_text: null,
         result_kind: "numeric",
         reference_range_low: refLow,

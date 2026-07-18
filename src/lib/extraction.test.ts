@@ -105,6 +105,25 @@ describe("normalizeExtraction", () => {
     expect(result.unmatched).toEqual(["Some Weird Panel"]);
   });
 
+  it("captures the printed unit and preserves the raw value", () => {
+    const result = normalizeExtraction(
+      {
+        markers: [
+          { marker_key: "wbc", value: 6870, unit: "/cumm" },
+          { marker_key: "ldl_c", value: 107.77, unit: "mg/dL" },
+        ],
+      },
+      [
+        ...CATALOG,
+        entry({ marker_key: "wbc", display_name: "WBC", unit: "10^3/uL" }),
+      ],
+    );
+    const wbc = result.readings.find((r) => r.marker_key === "wbc")!;
+    expect(wbc.unit_raw).toBe("/cumm"); // as printed
+    expect(wbc.unit).toBe("10^3/uL"); // catalog canonical
+    expect(wbc.value_raw).toBe(6870); // caller canonicalizes value; raw is preserved
+  });
+
   it("coerces numeric strings and drops non-numeric numeric markers", () => {
     const result = normalizeExtraction(
       {

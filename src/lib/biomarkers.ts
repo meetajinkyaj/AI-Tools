@@ -96,6 +96,11 @@ export interface ReadingInput {
   value_text: string | null;
   ref_low: number | null; // lab-provided range override (numeric only)
   ref_high: number | null;
+  // Raw-as-printed provenance (stored, not used for flagging).
+  value_raw: number | null;
+  unit_raw: string | null;
+  lab_reference_low: number | null;
+  lab_reference_high: number | null;
 }
 
 export interface PanelInput {
@@ -229,6 +234,10 @@ export function validatePanelInput(body: unknown): ValidationResult {
 
     const refLow = optionalNumber(r.ref_low);
     const refHigh = optionalNumber(r.ref_high);
+    const unitRaw =
+      typeof r.unit_raw === "string" && r.unit_raw.trim().length > 0
+        ? r.unit_raw.trim().slice(0, 40)
+        : null;
 
     readings.push({
       marker_key: r.marker_key,
@@ -236,6 +245,10 @@ export function validatePanelInput(body: unknown): ValidationResult {
       value_text: valueText,
       ref_low: refLow,
       ref_high: refHigh,
+      value_raw: optionalNumber(r.value_raw),
+      unit_raw: unitRaw,
+      lab_reference_low: optionalNumber(r.lab_reference_low),
+      lab_reference_high: optionalNumber(r.lab_reference_high),
     });
   }
 
