@@ -62,16 +62,27 @@ export async function GET(request: Request) {
       .order("created_at", { ascending: true })
       .limit(MAX_PANELS);
 
+    // A trend needs two distinct time points, not two panel rows. Re-uploading
+    // the same report (same test date) is one point in time — collapse duplicate
+    // dates to the most recent save so a repeated upload doesn't look like change.
+    type PanelRow = { id: string; test_date: string | null; created_at: string };
+    const dateKey = (p: PanelRow) => (p.test_date ?? p.created_at).slice(0, 10);
+    const byDate = new Map<string, PanelRow>();
+    for (const p of (panels ?? []) as PanelRow[]) byDate.set(dateKey(p), p); // ascending → keeps latest per date
+    const distinctPanels = [...byDate.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([, p]) => p);
+
     let biomarker = {
-      panelCount: panels?.length ?? 0,
+      panelCount: distinctPanels.length, // distinct time points, not raw rows
       baselineDate: null as string | null,
       latestDate: null as string | null,
       deltas: [] as ReturnType<typeof diffPanels>,
     };
 
-    if (panels && panels.length >= 2) {
-      const baselineP = panels[0];
-      const latestP = panels[panels.length - 1];
+    if (distinctPanels.length >= 2) {
+      const baselineP = distinctPanels[0];
+      const latestP = distinctPanels[distinctPanels.length - 1];
       const { data: rows } = await supabase
         .from("biomarker_readings")
         .select(
@@ -112,7 +123,7 @@ export async function GET(request: Request) {
         return score(a) - score(b);
       });
       biomarker = {
-        panelCount: panels.length,
+        panelCount: distinctPanels.length,
         baselineDate: baseline.date.slice(0, 10),
         latestDate: latest.date.slice(0, 10),
         deltas,
