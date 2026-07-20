@@ -296,6 +296,20 @@ function downloadBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/**
+ * jsPDF's built-in fonts only cover Latin-1, so characters like the en/em dash,
+ * ≥/≤, and → drop out. Map them to ASCII for the PDF (the on-screen preview keeps
+ * the nicer glyphs).
+ */
+function pdfText(s: string): string {
+  return s
+    .replace(/[–—]/g, "-")
+    .replace(/≥/g, ">=")
+    .replace(/≤/g, "<=")
+    .replace(/→/g, "->")
+    .replace(/•/g, "-");
+}
+
 /** Lay out the one-page summary. jsPDF is imported lazily by the caller. */
 function buildSummaryPdf(
   doc: import("jspdf").jsPDF,
@@ -310,7 +324,7 @@ function buildSummaryPdf(
     doc.setFont("helvetica", style);
     doc.setFontSize(size);
     doc.setTextColor(color);
-    doc.text(txt, M, y);
+    doc.text(pdfText(txt), M, y);
     y += size * 0.5;
   };
   const rule = () => {
@@ -324,7 +338,7 @@ function buildSummaryPdf(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.setTextColor(20);
-  doc.text("Ikigaro — Health Summary", M, y);
+  doc.text(pdfText("Ikigaro — Health Summary"), M, y);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(120);
@@ -359,9 +373,9 @@ function buildSummaryPdf(
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10);
         doc.setTextColor(30);
-        doc.text(m.name, M, y);
+        doc.text(pdfText(m.name), M, y);
         const rhs = `${m.value ?? "—"}${m.unit ? ` ${m.unit}` : ""}   (${rangeText(m.refLow, m.refHigh, m.unit)})   ${m.flag.toUpperCase()}`;
-        doc.text(rhs, right, y, { align: "right" });
+        doc.text(pdfText(rhs), right, y, { align: "right" });
         y += 5;
       }
     }
@@ -377,8 +391,8 @@ function buildSummaryPdf(
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.setTextColor(30);
-      doc.text(`${d.marker_name ?? d.marker_key}${d.improved ? "  (improved)" : ""}`, M, y);
-      doc.text(`${d.baseline_value} → ${d.latest_value}`, right, y, { align: "right" });
+      doc.text(pdfText(`${d.marker_name ?? d.marker_key}${d.improved ? "  (improved)" : ""}`), M, y);
+      doc.text(pdfText(`${d.baseline_value} → ${d.latest_value}`), right, y, { align: "right" });
       y += 5;
     }
     gap();
@@ -403,7 +417,7 @@ function buildSummaryPdf(
   doc.setFont("helvetica", "italic");
   doc.setFontSize(8);
   doc.setTextColor(130);
-  doc.text(DISCLAIMER, M, y);
+  doc.text(pdfText(DISCLAIMER), M, y);
 
   return doc.output("blob");
 }
