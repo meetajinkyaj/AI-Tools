@@ -12,7 +12,13 @@ import {
   loadReportCatalog,
   resolveReportUser,
 } from "@/lib/biomarker-report-data";
-import { POINTS_REASON, uploadEarn } from "@/lib/points";
+import {
+  POINTS_REASON,
+  isReplayUpload,
+  panelContentSignature,
+  uploadEarn,
+  type SignatureReading,
+} from "@/lib/points";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   computeOutcomeAwards,
@@ -90,6 +96,31 @@ async function awardPanelPoints(
       .order("test_date", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
     const prior = priorPanels ?? [];
+
+    // Anti-farm: the same report re-uploaded earns nothing, even if its
+    // (user-editable) test date was changed. The test date can't be trusted as
+    // the identity of a report, so match on content: if any prior panel has the
+    // exact same marker/value set, this is a replay — award zero and stop.
+    const priorIds = prior.map((p) => p.id);
+    if (priorIds.length > 0) {
+      const { data: priorReadings } = await supabase
+        .from("biomarker_readings")
+        .select("panel_id, marker_key, value, value_text")
+        .in("panel_id", priorIds);
+      if (priorReadings && priorReadings.length > 0) {
+        const byPanel = new Map<string, SignatureReading[]>();
+        for (const r of priorReadings as (SignatureReading & { panel_id: string })[]) {
+          const rows = byPanel.get(r.panel_id) ?? [];
+          rows.push(r);
+          byPanel.set(r.panel_id, rows);
+        }
+        const newSignature = panelContentSignature(newReadings);
+        const priorSignatures = [...byPanel.values()].map(panelContentSignature);
+        if (isReplayUpload(newSignature, priorSignatures)) {
+          return { bonuses: [], pointsAwarded: 0 };
+        }
+      }
+    }
 
     const txns: PointsTxn[] = [];
 

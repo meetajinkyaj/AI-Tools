@@ -60,3 +60,36 @@ export function uploadEarn(
   }
   return null; // duplicate date / undated re-save — no reward
 }
+
+/** A reading reduced to the fields that identify a report's content. */
+export interface SignatureReading {
+  marker_key: string;
+  value: number | null;
+  value_text?: string | null;
+}
+
+/**
+ * A stable content signature for a panel: the sorted set of marker=value pairs,
+ * independent of the test date or lab name. Two uploads of the *same* report
+ * produce the same signature even if the (user-editable) test-date field was
+ * changed — so the date-based earn can't be farmed by re-uploading one report
+ * under many dates. Pure, so it's unit-tested and reused on both sides of the
+ * comparison.
+ */
+export function panelContentSignature(readings: SignatureReading[]): string {
+  return readings
+    .map((r) => `${r.marker_key}=${r.value != null ? r.value : (r.value_text ?? "")}`)
+    .sort()
+    .join("|");
+}
+
+/**
+ * True when a new panel's content matches one already on file — i.e. the same
+ * report re-uploaded. Used to suppress the upload earn regardless of test date.
+ */
+export function isReplayUpload(
+  newSignature: string,
+  priorSignatures: string[],
+): boolean {
+  return priorSignatures.includes(newSignature);
+}
