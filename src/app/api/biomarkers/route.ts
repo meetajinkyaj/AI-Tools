@@ -12,6 +12,7 @@ import {
   loadReportCatalog,
   resolveReportUser,
 } from "@/lib/biomarker-report-data";
+import { POINTS_REASON, uploadEarn } from "@/lib/points";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   computeOutcomeAwards,
@@ -30,20 +31,45 @@ interface ReadingRowLite {
   reference_range_high: number | null;
 }
 
+/** A points_transactions row (earn). */
+type PointsTxn = Record<string, unknown>;
+
+/** Points txn for uploading this panel (see uploadEarn for the economy rules). */
+function computeUploadTxn(
+  userId: string,
+  profileId: string,
+  newPanel: { id: string; test_date: string | null },
+  priorPanels: { test_date: string | null }[],
+): PointsTxn | null {
+  const earn = uploadEarn(
+    newPanel.test_date,
+    priorPanels.map((p) => p.test_date),
+  );
+  if (!earn) return null;
+  return {
+    user_id: userId,
+    profile_id: profileId,
+    type: "earn",
+    reference_id: newPanel.id,
+    source_panel_id: newPanel.id,
+    amount: earn.amount,
+    reason: earn.reason,
+  };
+}
+
 /**
- * Reward the user for a marker that meaningfully improved in its healthy
- * direction since the previous panel (incl. continued improvement past the range
- * boundary). Best-effort: never fails the save. The anti-gaming guards (bi-weekly
- * interval, noise-floor %, cap) live in computeOutcomeAwards.
+ * Award panel points on save: the upload earn (first / re-test) plus any
+ * outcome-verified improvement, credited to the balance in one update. Best-effort
+ * — never fails the save. Returns the outcome bonuses and total points awarded.
  */
-async function awardOutcomeBonuses(
+async function awardPanelPoints(
   profileId: string,
   userId: string,
   newPanel: { id: string; test_date: string | null; created_at: string },
   newReadings: ReadingRowLite[],
   directionOf: Map<string, string>,
-): Promise<OutcomeAward[]> {
-  const toSnapshotReadings = (rows: ReadingRowLite[]): MarkerReading[] =>
+): Promise<{ bonuses: OutcomeAward[]; pointsAwarded: number }> {
+  const toSnapshot = (rows: ReadingRowLite[]): MarkerReading[] =>
     rows.map((r) => ({
       marker_key: r.marker_key,
       marker_name: r.marker_name ?? null,
@@ -56,69 +82,78 @@ async function awardOutcomeBonuses(
 
   try {
     const supabase = createSupabaseAdmin();
-    const { data: prevPanel } = await supabase
+    const { data: priorPanels } = await supabase
       .from("biomarker_panels")
       .select("id, test_date, created_at")
       .eq("profile_id", profileId)
       .neq("id", newPanel.id)
       .order("test_date", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (!prevPanel) return [];
+      .order("created_at", { ascending: false });
+    const prior = priorPanels ?? [];
 
-    const { data: prevReadings } = await supabase
-      .from("biomarker_readings")
-      .select("marker_key, marker_name, value, flag, reference_range_low, reference_range_high")
-      .eq("panel_id", prevPanel.id);
-    if (!prevReadings || prevReadings.length === 0) return [];
+    const txns: PointsTxn[] = [];
 
-    const previous: PanelSnapshot = {
-      date: prevPanel.test_date ?? prevPanel.created_at,
-      readings: toSnapshotReadings(prevReadings as ReadingRowLite[]),
-    };
-    const latest: PanelSnapshot = {
-      date: newPanel.test_date ?? newPanel.created_at,
-      readings: toSnapshotReadings(newReadings),
-    };
+    // 1. Upload earn.
+    const uploadTxn = computeUploadTxn(userId, profileId, newPanel, prior);
+    if (uploadTxn) txns.push(uploadTxn);
 
-    const awards = computeOutcomeAwards(previous, latest);
-    if (awards.length === 0) return [];
+    // 2. Outcome-verified improvement vs the previous panel.
+    const bonuses: OutcomeAward[] = [];
+    const prevPanel = prior[0];
+    if (prevPanel) {
+      const { data: prevReadings } = await supabase
+        .from("biomarker_readings")
+        .select("marker_key, marker_name, value, flag, reference_range_low, reference_range_high")
+        .eq("panel_id", prevPanel.id);
+      if (prevReadings && prevReadings.length > 0) {
+        const previous: PanelSnapshot = {
+          date: prevPanel.test_date ?? prevPanel.created_at,
+          readings: toSnapshot(prevReadings as ReadingRowLite[]),
+        };
+        const latest: PanelSnapshot = {
+          date: newPanel.test_date ?? newPanel.created_at,
+          readings: toSnapshot(newReadings),
+        };
+        for (const a of computeOutcomeAwards(previous, latest)) {
+          bonuses.push(a);
+          txns.push({
+            user_id: userId,
+            profile_id: profileId,
+            type: "earn",
+            amount: a.points,
+            reason: POINTS_REASON.outcomeBonus,
+            reference_id: newPanel.id,
+            source_panel_id: newPanel.id,
+            marker_key: a.marker_key,
+            delta_value: a.delta,
+            verified_at: new Date().toISOString(),
+          });
+        }
+      }
+    }
 
-    const earned = awards.reduce((sum, a) => sum + a.points, 0);
+    if (txns.length === 0) return { bonuses, pointsAwarded: 0 };
+
+    // Credit once.
+    const earned = txns.reduce((sum, t) => sum + (t.amount as number), 0);
     const { data: balanceRow } = await supabase
       .from("reward_points")
       .select("points_balance")
       .eq("profile_id", profileId)
       .maybeSingle();
     const priorBalance = balanceRow?.points_balance ?? 0;
-
     await supabase
       .from("reward_points")
       .upsert(
         { user_id: userId, profile_id: profileId, points_balance: priorBalance + earned },
         { onConflict: "profile_id" },
       );
+    await supabase.from("points_transactions").insert(txns);
 
-    await supabase.from("points_transactions").insert(
-      awards.map((a) => ({
-        user_id: userId,
-        profile_id: profileId,
-        type: "earn",
-        amount: a.points,
-        reason: "outcome_bonus",
-        reference_id: newPanel.id,
-        source_panel_id: newPanel.id,
-        marker_key: a.marker_key,
-        delta_value: a.delta,
-        verified_at: new Date().toISOString(),
-      })),
-    );
-
-    return awards;
+    return { bonuses, pointsAwarded: earned };
   } catch (err) {
-    console.error("Outcome bonus awarding failed (non-fatal):", err);
-    return [];
+    console.error("Panel points awarding failed (non-fatal):", err);
+    return { bonuses: [], pointsAwarded: 0 };
   }
 }
 
@@ -330,9 +365,9 @@ export async function POST(request: Request) {
       },
     });
 
-    // Reward genuine improvement since the previous panel (best-effort).
+    // Award upload + outcome points (best-effort).
     const directionOf = new Map(catalog.map((e) => [e.marker_key, e.direction]));
-    const bonuses = await awardOutcomeBonuses(
+    const { bonuses, pointsAwarded } = await awardPanelPoints(
       resolved.profileId,
       resolved.userId,
       panel,
@@ -340,7 +375,7 @@ export async function POST(request: Request) {
       directionOf,
     );
 
-    return NextResponse.json({ panel, readings: readings ?? [], bonuses });
+    return NextResponse.json({ panel, readings: readings ?? [], bonuses, pointsAwarded });
   } catch (err) {
     console.error("POST /api/biomarkers failed:", err);
     return NextResponse.json({ error: "Failed to save report" }, { status: 500 });

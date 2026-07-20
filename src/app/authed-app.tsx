@@ -160,7 +160,12 @@ export function AuthedApp() {
           onCancel={() => setProfileMode("view")}
         />
       )}
-      {tab === "report" && <BiomarkerReport getToken={getAccessToken} />}
+      {tab === "report" && (
+        <BiomarkerReport
+          getToken={getAccessToken}
+          onExploreRewards={() => setTab("partners")}
+        />
+      )}
       {tab === "trends" && <TrendsView getToken={getAccessToken} />}
       {tab === "future" && (
         <ComingSoon

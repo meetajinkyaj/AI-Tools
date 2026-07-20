@@ -53,6 +53,18 @@ interface ReportData {
   latestPanel: { panel: PanelRow; readings: ReadingRow[] } | null;
 }
 
+/** One outcome-verified reward returned by the save route. */
+interface OutcomeBonus {
+  marker_name: string | null;
+  points: number;
+}
+
+/** What the user earned by saving a panel — surfaced as a note after saving. */
+interface AwardNote {
+  pointsAwarded: number;
+  bonuses: OutcomeBonus[];
+}
+
 type Mode = "report" | "upload" | "review" | "entry";
 
 /** A reading in the shape POST /api/biomarkers expects. */
@@ -221,13 +233,17 @@ function groupByCategoryOrder<T extends { category: string }>(
 
 export function BiomarkerReport({
   getToken,
+  onExploreRewards,
 }: {
   getToken: () => Promise<string | null>;
+  /** Navigate to the Partners/redemption tab (from the "you earned" note). */
+  onExploreRewards?: () => void;
 }) {
   const [data, setData] = useState<ReportData | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [mode, setMode] = useState<Mode>("report");
   const [showSummary, setShowSummary] = useState(false);
+  const [awardNote, setAwardNote] = useState<AwardNote | null>(null);
 
   // Manual-entry state (fallback path).
   const [values, setValues] = useState<Record<string, string>>({});
@@ -302,6 +318,8 @@ export function BiomarkerReport({
       const result = (await res.json()) as {
         panel?: PanelRow;
         readings?: ReadingRow[];
+        bonuses?: OutcomeBonus[];
+        pointsAwarded?: number;
         error?: string;
       };
       if (!res.ok || !result.panel || !result.readings) {
@@ -312,6 +330,11 @@ export function BiomarkerReport({
         catalog: prev?.catalog ?? [],
         latestPanel: { panel: result.panel!, readings: result.readings! },
       }));
+      setAwardNote(
+        result.pointsAwarded && result.pointsAwarded > 0
+          ? { pointsAwarded: result.pointsAwarded, bonuses: result.bonuses ?? [] }
+          : null,
+      );
       setMode("report");
       return true;
     } catch (err) {
@@ -846,6 +869,53 @@ export function BiomarkerReport({
           </button>
         </div>
       </div>
+
+      {awardNote && (
+        <Card className="flex flex-col gap-4 border-accent/20 bg-accent/5 p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 flex-col gap-1">
+              <Eyebrow>You earned</Eyebrow>
+              <p className="font-display text-2xl font-medium text-foreground">
+                +{awardNote.pointsAwarded}
+                <span className="ml-2 font-body text-sm text-muted">iki points</span>
+              </p>
+              {awardNote.bonuses.length > 0 && (
+                <p className="font-body text-xs text-muted">
+                  Includes an improvement bonus for{" "}
+                  {awardNote.bonuses
+                    .map((b) => b.marker_name)
+                    .filter((n): n is string => !!n)
+                    .join(", ")}
+                  . Keep the streak going.
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setAwardNote(null)}
+              aria-label="Dismiss"
+              className="shrink-0 rounded-full px-2 py-1 font-body text-xs text-muted hover:text-foreground"
+            >
+              Dismiss
+            </button>
+          </div>
+          <div className="flex flex-col gap-3 border-t border-accent/15 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="font-body text-sm text-foreground/80">
+              Spend them with our Partners, or keep accumulating for better
+              redemptions.
+            </p>
+            {onExploreRewards && (
+              <button
+                type="button"
+                onClick={onExploreRewards}
+                className={`${secondaryButtonClass} shrink-0`}
+              >
+                Explore Partners
+              </button>
+            )}
+          </div>
+        </Card>
+      )}
 
       <Card className="flex flex-col gap-1 p-6">
         <Eyebrow>Summary</Eyebrow>
