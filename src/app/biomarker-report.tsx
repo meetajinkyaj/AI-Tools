@@ -244,6 +244,9 @@ export function BiomarkerReport({
   const [mode, setMode] = useState<Mode>("report");
   const [showSummary, setShowSummary] = useState(false);
   const [awardNote, setAwardNote] = useState<AwardNote | null>(null);
+  // The full per-marker breakdown is heavy; keep it collapsed so the report
+  // leads with what needs attention and reveals the rest on demand.
+  const [showAll, setShowAll] = useState(false);
 
   // Manual-entry state (fallback path).
   const [values, setValues] = useState<Record<string, string>>({});
@@ -840,6 +843,7 @@ export function BiomarkerReport({
   const outOfRange = readings.filter((r) =>
     isNoteworthy(readingStatus(r, bandOf(r)).severity),
   );
+  const inRangeCount = readings.length - outOfRange.length;
 
   if (showSummary) {
     return <DoctorSummary getToken={getToken} onBack={() => setShowSummary(false)} />;
@@ -919,12 +923,26 @@ export function BiomarkerReport({
 
       <Card className="flex flex-col gap-1 p-6">
         <Eyebrow>Summary</Eyebrow>
-        <p className="font-display text-2xl font-medium text-foreground">
-          {outOfRange.length} of {readings.length}
-          <span className="ml-2 font-body text-sm text-muted">
-            {outOfRange.length === 1 ? "marker" : "markers"} to review
-          </span>
-        </p>
+        {outOfRange.length > 0 ? (
+          <>
+            <p className="font-display text-2xl font-medium text-foreground">
+              {outOfRange.length} of {readings.length}
+              <span className="ml-2 font-body text-sm text-muted">
+                {outOfRange.length === 1 ? "marker" : "markers"} to review
+              </span>
+            </p>
+            {inRangeCount > 0 && (
+              <p className="font-body text-sm text-muted">
+                The other {inRangeCount} are in a healthy range.
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="font-display text-2xl font-medium text-foreground">
+            All {readings.length} in range
+            <span className="ml-2 font-body text-sm text-muted">nothing to review</span>
+          </p>
+        )}
       </Card>
 
       {outOfRange.length > 0 && (
@@ -945,51 +963,65 @@ export function BiomarkerReport({
         </Card>
       )}
 
-      {readingGroups.map((group) => (
-        <Card key={group.category} className="flex flex-col divide-y divide-border">
-          <div className="px-5 pt-4 pb-2">
-            <Eyebrow>{categoryLabel(group.category)}</Eyebrow>
-          </div>
-          {group.readings.map((r) => {
-            const qualitative = r.result_kind === "qualitative";
-            const status = readingStatus(r, bandOf(r));
-            return (
-              <div
-                key={r.id}
-                className="flex items-center justify-between gap-3 px-5 py-3"
-              >
-                <div className="flex min-w-0 flex-col">
-                  <span className="truncate font-body text-sm text-foreground">
-                    {r.marker_name}
-                  </span>
-                  <span className="font-body text-xs text-muted">
-                    {qualitative
-                      ? "Screening"
-                      : rangeText(r.reference_range_low, r.reference_range_high, r.unit)}
-                  </span>
+      {readings.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          aria-expanded={showAll}
+          className={`${secondaryButtonClass} w-full justify-center`}
+        >
+          {showAll
+            ? "Hide the full breakdown"
+            : `See all ${readings.length} markers in detail`}
+        </button>
+      )}
+
+      {showAll &&
+        readingGroups.map((group) => (
+          <Card key={group.category} className="flex flex-col divide-y divide-border">
+            <div className="px-5 pt-4 pb-2">
+              <Eyebrow>{categoryLabel(group.category)}</Eyebrow>
+            </div>
+            {group.readings.map((r) => {
+              const qualitative = r.result_kind === "qualitative";
+              const status = readingStatus(r, bandOf(r));
+              return (
+                <div
+                  key={r.id}
+                  className="flex items-center justify-between gap-3 px-5 py-3"
+                >
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate font-body text-sm text-foreground">
+                      {r.marker_name}
+                    </span>
+                    <span className="font-body text-xs text-muted">
+                      {qualitative
+                        ? "Screening"
+                        : rangeText(r.reference_range_low, r.reference_range_high, r.unit)}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="font-body text-sm font-medium text-foreground">
+                      {qualitative ? (
+                        r.value_text
+                      ) : (
+                        <>
+                          {r.value}
+                          {r.unit ? (
+                            <span className="ml-1 text-xs font-normal text-muted">
+                              {r.unit}
+                            </span>
+                          ) : null}
+                        </>
+                      )}
+                    </span>
+                    <StatusPill severity={status.severity} label={status.label} />
+                  </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="font-body text-sm font-medium text-foreground">
-                    {qualitative ? (
-                      r.value_text
-                    ) : (
-                      <>
-                        {r.value}
-                        {r.unit ? (
-                          <span className="ml-1 text-xs font-normal text-muted">
-                            {r.unit}
-                          </span>
-                        ) : null}
-                      </>
-                    )}
-                  </span>
-                  <StatusPill severity={status.severity} label={status.label} />
-                </div>
-              </div>
-            );
-          })}
-        </Card>
-      ))}
+              );
+            })}
+          </Card>
+        ))}
 
       <p className="font-body text-xs text-muted">{DISCLAIMER}</p>
     </div>
