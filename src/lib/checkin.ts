@@ -5,13 +5,16 @@
  */
 
 import { type ExerciseEntry, validateExercises } from "./exercises";
+import { POINTS } from "./points";
 
+// Point values live in src/lib/points.ts (single source of truth); these are
+// aliases so the check-in economy reads from there.
 /** iki-points awarded for the day's first check-in. */
-export const CHECKIN_POINTS = 10;
+export const CHECKIN_POINTS = POINTS.checkin;
 /** One-time bonus when a streak reaches 7 days. */
-export const STREAK_7_BONUS = 50;
+export const STREAK_7_BONUS = POINTS.streak7Bonus;
 /** One-time bonus when a streak reaches 30 days. */
-export const STREAK_30_BONUS = 250;
+export const STREAK_30_BONUS = POINTS.streak30Bonus;
 
 export const MIN_ENERGY = 1;
 export const MAX_ENERGY = 5;

@@ -12,10 +12,13 @@
  *      panels are months apart; check-ins and wearables are daily).
  */
 
+import { POINTS } from "./points";
+
 // ---- Outcome reward config (tunable) --------------------------------------
 
-/** Points for one marker that meaningfully improved between panels. */
-export const OUTCOME_BONUS_POINTS = 250;
+/** Points for one marker that meaningfully improved between panels.
+ * (Value lives in src/lib/points.ts — the single source of truth.) */
+export const OUTCOME_BONUS_POINTS = POINTS.outcomeBonusPerMarker;
 /** Max markers rewarded from a single new panel (bounds cost + gaming). */
 export const OUTCOME_MAX_MARKERS = 3;
 /** Panels closer than this are still accepted and shown in trends (critical
