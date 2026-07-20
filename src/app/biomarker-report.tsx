@@ -17,6 +17,7 @@ import {
   severityFromBand,
 } from "@/lib/biomarkers";
 import type { ExtractedReading, ExtractionResult } from "@/lib/extraction";
+import { DoctorSummary } from "./doctor-summary";
 import {
   Card,
   Eyebrow,
@@ -226,6 +227,7 @@ export function BiomarkerReport({
   const [data, setData] = useState<ReportData | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [mode, setMode] = useState<Mode>("report");
+  const [showSummary, setShowSummary] = useState(false);
 
   // Manual-entry state (fallback path).
   const [values, setValues] = useState<Record<string, string>>({});
@@ -816,6 +818,10 @@ export function BiomarkerReport({
     isNoteworthy(readingStatus(r, bandOf(r)).severity),
   );
 
+  if (showSummary) {
+    return <DoctorSummary getToken={getToken} onBack={() => setShowSummary(false)} />;
+  }
+
   return (
     <div className="flex w-full max-w-xl flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
@@ -824,16 +830,21 @@ export function BiomarkerReport({
           title="Your baseline"
           subtitle={panelSubtitle(latestPanel?.panel)}
         />
-        <button
-          onClick={() => {
-            setError(null);
-            setFile(null);
-            setMode("upload");
-          }}
-          className={`${secondaryButtonClass} shrink-0`}
-        >
-          Add panel
-        </button>
+        <div className="flex shrink-0 flex-col gap-2">
+          <button
+            onClick={() => {
+              setError(null);
+              setFile(null);
+              setMode("upload");
+            }}
+            className={secondaryButtonClass}
+          >
+            Add panel
+          </button>
+          <button onClick={() => setShowSummary(true)} className={secondaryButtonClass}>
+            For your doctor
+          </button>
+        </div>
       </div>
 
       <Card className="flex flex-col gap-1 p-6">
