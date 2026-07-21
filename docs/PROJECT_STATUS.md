@@ -138,3 +138,17 @@ defaults, (d) connection/idle timeouts, (e) DB CHECK constraints.
   caching, batch API, async queue, cost guardrails — see `docs/SCALING.md`.
 - **Next feature candidates:** Trends over time (recommended), HealthKit sync,
   Partners/redemption, Predictions.
+- **Personalized recommendation loop (planned — lives under Partners, NOT the
+  Report):** derive interventions from a user's flagged markers + trends (e.g.
+  low magnesium → magnesium Partner products + magnesium-rich foods) and surface
+  them as a personalized product list on the **Partners** tab, not as upsells
+  inside the clinical Report. Design notes when we build it:
+  - **Deterministic marker→intervention catalog**, not freeform LLM — a curated
+    mapping (`low_magnesium → [product_keys], [foods]`) the model *presents*, so
+    it can't hallucinate an unsafe suggestion. Add an `interventions` field to
+    the biomarker catalog now so the data is ready when Partners onboard.
+  - **Safety framing stays** "Educational, not a diagnosis"; conservative,
+    doctor-deferring copy.
+  - **Conflict-of-interest transparency:** show unmonetized food suggestions
+    alongside the (monetized) Partner products so it reads as guidance, not an ad.
+  - Blocked on the Partner catalog actually existing (still "coming soon").
