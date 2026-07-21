@@ -64,6 +64,60 @@ function computeUploadTxn(
 }
 
 /**
+ * If a panel with this exact content signature already exists for the profile,
+ * return it (with its full readings). Used to avoid inserting a duplicate panel
+ * row when the same report is saved again — the app inserts a new row on every
+ * save, so without this an identical re-upload leaves a duplicate baseline row.
+ */
+async function findDuplicatePanel(
+  supabase: ReturnType<typeof createSupabaseAdmin>,
+  profileId: string,
+  signature: string,
+): Promise<{ panel: Record<string, unknown>; readings: Record<string, unknown>[] } | null> {
+  const { data: panels } = await supabase
+    .from("biomarker_panels")
+    .select("id")
+    .eq("profile_id", profileId);
+  if (!panels || panels.length === 0) return null;
+
+  const { data: readings } = await supabase
+    .from("biomarker_readings")
+    .select("panel_id, marker_key, value, value_text")
+    .in(
+      "panel_id",
+      panels.map((p) => p.id),
+    );
+  if (!readings || readings.length === 0) return null;
+
+  const byPanel = new Map<string, SignatureReading[]>();
+  for (const r of readings as (SignatureReading & { panel_id: string })[]) {
+    const rows = byPanel.get(r.panel_id) ?? [];
+    rows.push(r);
+    byPanel.set(r.panel_id, rows);
+  }
+  let dupId: string | null = null;
+  for (const [pid, rows] of byPanel) {
+    if (panelContentSignature(rows) === signature) {
+      dupId = pid;
+      break;
+    }
+  }
+  if (!dupId) return null;
+
+  const { data: panel } = await supabase
+    .from("biomarker_panels")
+    .select("*")
+    .eq("id", dupId)
+    .single();
+  if (!panel) return null;
+  const { data: fullReadings } = await supabase
+    .from("biomarker_readings")
+    .select("*")
+    .eq("panel_id", dupId);
+  return { panel, readings: fullReadings ?? [] };
+}
+
+/**
  * Award panel points on save: the upload earn (first / re-test) plus any
  * outcome-verified improvement, credited to the balance in one update. Best-effort
  * — never fails the save. Returns the outcome bonuses and total points awarded.
@@ -282,6 +336,45 @@ export async function POST(request: Request) {
       }
     }
 
+    // Canonicalized numeric values + derived markers, computed once up front so
+    // both the dedup check below and the reading rows use the same values.
+    const enteredNumeric = new Map<string, number>();
+    for (const r of validation.value.readings) {
+      if (r.value != null) {
+        enteredNumeric.set(r.marker_key, canonicalizeCount(r.marker_key, r.value));
+      }
+    }
+    const derived = computeDerived(enteredNumeric).filter((d) => byKey.has(d.marker_key));
+
+    // Dedup: the app inserts a panel row on every save, so re-saving the same
+    // report would leave duplicate panel rows (points are deduped separately,
+    // but the row was not). If this exact content already exists for the
+    // profile, return that panel instead of inserting a duplicate. A same-date
+    // *correction* (genuinely different values) has a different signature and
+    // still saves — only exact replays are collapsed.
+    const newSignature = panelContentSignature([
+      ...validation.value.readings.map((r): SignatureReading =>
+        byKey.get(r.marker_key)!.result_kind === "qualitative"
+          ? { marker_key: r.marker_key, value: null, value_text: r.value_text ?? null }
+          : { marker_key: r.marker_key, value: canonicalizeCount(r.marker_key, r.value as number) },
+      ),
+      ...derived.map((d): SignatureReading => ({ marker_key: d.marker_key, value: d.value })),
+    ]);
+    const duplicate = await findDuplicatePanel(
+      supabase,
+      resolved.profileId,
+      newSignature,
+    );
+    if (duplicate) {
+      return NextResponse.json({
+        panel: duplicate.panel,
+        readings: duplicate.readings,
+        bonuses: [],
+        pointsAwarded: 0,
+        duplicate: true,
+      });
+    }
+
     // The biomarker_panels.source CHECK allows 'manual' | 'pdf_upload' | 'lab_api'.
     // The client sends "pdf" for the extraction flow — map it to "pdf_upload".
     const rawSource = (rawBody as Record<string, unknown>).source;
@@ -350,33 +443,25 @@ export async function POST(request: Request) {
       };
     });
 
-    // Derive markers (Non-HDL, ratios, eAG…) from the entered numeric values.
-    const enteredNumeric = new Map<string, number>();
-    for (const r of validation.value.readings) {
-      if (r.value != null) {
-        enteredNumeric.set(r.marker_key, canonicalizeCount(r.marker_key, r.value));
-      }
-    }
-    const derivedRows = computeDerived(enteredNumeric)
-      .filter((d) => byKey.has(d.marker_key))
-      .map((d) => {
-        const entry = byKey.get(d.marker_key)!;
-        return {
-          panel_id: panel.id,
-          user_id: resolved.userId,
-          profile_id: resolved.profileId,
-          marker_key: d.marker_key,
-          marker_name: entry.display_name,
-          unit: entry.unit,
-          value: d.value,
-          value_text: null,
-          result_kind: "numeric",
-          reference_range_low: entry.ref_low,
-          reference_range_high: entry.ref_high,
-          range_source: "catalog",
-          flag: computeFlag(d.value, entry.ref_low, entry.ref_high),
-        };
-      });
+    // Derived markers (Non-HDL, ratios, eAG…) — computed up front, mapped here.
+    const derivedRows = derived.map((d) => {
+      const entry = byKey.get(d.marker_key)!;
+      return {
+        panel_id: panel.id,
+        user_id: resolved.userId,
+        profile_id: resolved.profileId,
+        marker_key: d.marker_key,
+        marker_name: entry.display_name,
+        unit: entry.unit,
+        value: d.value,
+        value_text: null,
+        result_kind: "numeric",
+        reference_range_low: entry.ref_low,
+        reference_range_high: entry.ref_high,
+        range_source: "catalog",
+        flag: computeFlag(d.value, entry.ref_low, entry.ref_high),
+      };
+    });
 
     const { data: readings, error: readingsError } = await supabase
       .from("biomarker_readings")
