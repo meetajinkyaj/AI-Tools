@@ -149,6 +149,7 @@ export function AuthedApp() {
         <ProfileView
           profile={profile as ProfileRow}
           onEdit={() => setProfileMode("edit")}
+          getToken={getAccessToken}
         />
       )}
       {tab === "profile" && profileMode === "edit" && (

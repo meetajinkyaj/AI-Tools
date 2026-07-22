@@ -1,0 +1,41 @@
+name: Daily reminders
+
+# Sends the daily check-in push reminder. Runs at 12:30 UTC = 18:00 IST (the
+# India-first beta window). Web push is sent from Node here — not the Worker —
+# because the push-payload crypto isn't a good fit for the Workers runtime.
+#
+# Required repo secrets:
+#   CRON_SECRET        - shared with the Worker's CRON_SECRET; authorizes the
+#                        /api/cron/due-reminders call.
+#   VAPID_PUBLIC_KEY   - the public VAPID key (also committed for the client).
+#   VAPID_PRIVATE_KEY  - the secret VAPID key; lives ONLY here.
+# Optional repo variable:
+#   APP_URL            - defaults to https://app.ikigaro.com
+
+on:
+  schedule:
+    - cron: "30 12 * * *" # 18:00 IST
+  workflow_dispatch: {} # allow a manual test run
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # web-push is only needed by this job — install it ad hoc so it never
+      # enters the app's dependency tree or the Worker bundle.
+      - run: npm install --no-save web-push@^3
+
+      - name: Send reminders
+        run: node scripts/send-reminders.mjs
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://app.ikigaro.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: mailto:hello@ikigaro.com

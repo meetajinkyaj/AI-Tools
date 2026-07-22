@@ -7,6 +7,7 @@ import {
   type ProfileRow,
 } from "@/lib/profile";
 import { EXERCISE_TYPE_LABELS, isExerciseType } from "@/lib/exercises";
+import { NotificationSettings } from "./notification-settings";
 import { Card, Eyebrow, secondaryButtonClass } from "./ui";
 
 /**
@@ -16,9 +17,11 @@ import { Card, Eyebrow, secondaryButtonClass } from "./ui";
 export function ProfileView({
   profile,
   onEdit,
+  getToken,
 }: {
   profile: ProfileRow;
   onEdit: () => void;
+  getToken: () => Promise<string | null>;
 }) {
   const rows: { label: string; value: string }[] = [
     { label: "Full name", value: profile.full_name },
@@ -69,6 +72,8 @@ export function ProfileView({
           </div>
         ))}
       </Card>
+
+      <NotificationSettings getToken={getToken} />
     </div>
   );
 }
