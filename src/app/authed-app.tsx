@@ -8,6 +8,7 @@ import { AppShell, type NavKey } from "./app-shell";
 import { BiomarkerReport } from "./biomarker-report";
 import { CheckinForm } from "./checkin-form";
 import { Dashboard } from "./dashboard";
+import { InstallPrompt } from "./install-prompt";
 import { InterventionLog } from "./intervention-log";
 import { OnboardingForm } from "./onboarding-form";
 import { PartnersView } from "./partners-view";
@@ -127,6 +128,7 @@ export function AuthedApp() {
     <AppShell active={tab} onNavigate={navigate} onLogout={() => void logout()}>
       {tab === "home" && (
         <div className="flex w-full max-w-xl flex-col gap-6">
+          <InstallPrompt />
           <Dashboard
             profile={profile as ProfileRow}
             getToken={getAccessToken}
