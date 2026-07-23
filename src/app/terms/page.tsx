@@ -187,7 +187,70 @@ export default function TermsPage() {
         users.
       </p>
 
-      <h2>14. Changes to these Terms</h2>
+      <h2 id="rewards">14. Rewards, iki points &amp; partners</h2>
+      <p>
+        Ikigaro includes a rewards programme where you earn <strong>iki points</strong>
+        {" "}for engagement (for example daily check-ins, uploading a lab panel, or a
+        data-verified improvement) and can redeem them for partner vouchers.
+      </p>
+      <h3>iki points</h3>
+      <ul>
+        <li>
+          iki points are a loyalty and engagement feature. They have{" "}
+          <strong>no cash value</strong>, are not money or a stored-value
+          instrument, and cannot be sold, transferred, or exchanged for cash.
+        </li>
+        <li>
+          Point values, earning rules, and redemption prices are set by us and{" "}
+          <strong>may change</strong> at any time as we tune the programme.
+        </li>
+        <li>
+          Points may be <strong>withheld, reduced, or reversed</strong> if we
+          reasonably believe they were obtained through error, abuse, or gaming
+          of the system, or if your account is closed or found to violate these
+          Terms.
+        </li>
+      </ul>
+      <h3>Vouchers</h3>
+      <ul>
+        <li>
+          Vouchers are <strong>single-use</strong> and may carry an expiry,
+          minimum spend, or other conditions, which are shown on the voucher at
+          redemption.
+        </li>
+        <li>
+          Voucher goods and services are provided by the{" "}
+          <strong>partner, not by Ikigaro</strong>, and are subject to that
+          partner&rsquo;s own terms. We are not responsible for a partner&rsquo;s
+          products, fulfilment, or availability.
+        </li>
+        <li>
+          Once a code is issued the points are spent. If a voucher fails through
+          no fault of yours, contact us and we&rsquo;ll try to help.
+        </li>
+      </ul>
+      <h3>Affiliate links</h3>
+      <p>
+        Some products in Rewards are <strong>affiliate links</strong>. If you buy
+        through them we may earn a commission, at no extra cost to you. These are
+        products we think are worth knowing about — they are{" "}
+        <strong>not medical advice or an endorsement</strong>, and no points are
+        spent to use them.
+      </p>
+      <h3>Your data and partners</h3>
+      <p>
+        Redeeming a reward shares only what a partner needs to fulfil it. We{" "}
+        <strong>do not sell your health data</strong> to insurers or advertisers;
+        a reward you consent to redeem is not a sale of your data. Everything in
+        Ikigaro is <strong>educational, not a diagnosis — please consult a
+        doctor.</strong>
+      </p>
+      <p>
+        We may change, suspend, or discontinue the rewards programme, or any
+        item in it, at any time.
+      </p>
+
+      <h2>15. Changes to these Terms</h2>
       <p>
         We may update these Terms from time to time. Material changes take
         effect when we update the effective date above and, where appropriate,
@@ -195,7 +258,7 @@ export default function TermsPage() {
         them.
       </p>
 
-      <h2>15. Governing law</h2>
+      <h2>16. Governing law</h2>
       <p>
         These Terms are governed by the laws of{" "}
         <strong>Pune, Maharashtra, India</strong>, without regard to
@@ -203,7 +266,7 @@ export default function TermsPage() {
         jurisdiction of the courts of Pune, Maharashtra, India.
       </p>
 
-      <h2>16. Contact</h2>
+      <h2>17. Contact</h2>
       <p>
         Questions about these Terms: <a href="mailto:hello@ikigaro.com">hello@ikigaro.com</a>.
       </p>
