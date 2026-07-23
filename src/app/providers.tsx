@@ -3,6 +3,7 @@
 import { PrivyProvider } from "@privy-io/react-auth";
 
 import { PRIVY_APP_ID } from "@/lib/privy-app-id";
+import { Telemetry } from "./telemetry";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -15,6 +16,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       }}
     >
+      <Telemetry />
       {children}
     </PrivyProvider>
   );

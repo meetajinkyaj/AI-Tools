@@ -15,7 +15,7 @@ import {
 } from "./ui";
 
 type Authz = "checking" | "ok" | "denied";
-type Tab = "vouchers" | "users";
+type Tab = "analytics" | "vouchers" | "users";
 
 /**
  * Internal admin console (gated by the ADMIN_EMAILS allow-list server-side, and
@@ -27,7 +27,7 @@ export function AdminView() {
   const { ready, authenticated, getAccessToken, login } = usePrivy();
   const [authz, setAuthz] = useState<Authz>("checking");
   const [email, setEmail] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("vouchers");
+  const [tab, setTab] = useState<Tab>("analytics");
   const checkedRef = useRef(false);
 
   useEffect(() => {
@@ -76,6 +76,9 @@ export function AdminView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageHeader eyebrow="Admin" title="Console" subtitle={email ?? undefined} />
         <div className="flex gap-2">
+          <TabButton active={tab === "analytics"} onClick={() => setTab("analytics")}>
+            Analytics
+          </TabButton>
           <TabButton active={tab === "vouchers"} onClick={() => setTab("vouchers")}>
             Rewards
           </TabButton>
@@ -84,11 +87,9 @@ export function AdminView() {
           </TabButton>
         </div>
       </div>
-      {tab === "vouchers" ? (
-        <VoucherManager getToken={getAccessToken} />
-      ) : (
-        <UserRoster getToken={getAccessToken} />
-      )}
+      {tab === "analytics" && <AnalyticsPanel getToken={getAccessToken} />}
+      {tab === "vouchers" && <VoucherManager getToken={getAccessToken} />}
+      {tab === "users" && <UserRoster getToken={getAccessToken} />}
     </div>
   );
 }
@@ -111,6 +112,239 @@ function TabButton({
     >
       {children}
     </button>
+  );
+}
+
+// ----------------------------------------------------------------- Analytics
+
+interface AnalyticsData {
+  funnel: { users: number; onboarded: number; activated: number; retested: number };
+  retention: { day: number; eligible: number; retained: number; rate: number | null }[];
+  active: { dau: number; wau: number; mau: number };
+  streaks: { none: number; short: number; week: number; month: number };
+  checkinSeries: { date: string; count: number }[];
+  pushOptIns: number;
+  redemptions: number;
+  errors: {
+    recent: {
+      id: string;
+      user_id: string | null;
+      message: string;
+      url: string | null;
+      created_at: string;
+    }[];
+    count7d: number;
+  };
+}
+
+function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }) {
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const startedRef = useRef(false);
+
+  const load = useCallback(async () => {
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/admin/analytics", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return setStatus("error");
+      setData((await res.json()) as AnalyticsData);
+      setStatus("ready");
+    } catch {
+      setStatus("error");
+    }
+  }, [getToken]);
+
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    void load();
+  }, [load]);
+
+  if (status === "loading") return <CenteredMessage>Loading analytics…</CenteredMessage>;
+  if (status === "error" || !data)
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="font-body text-sm text-muted">Couldn&rsquo;t load analytics.</p>
+        <button
+          onClick={() => {
+            setStatus("loading");
+            void load();
+          }}
+          className={secondaryButtonClass}
+        >
+          Retry
+        </button>
+      </div>
+    );
+
+  const f = data.funnel;
+  const pct = (n: number, of: number) => (of > 0 ? `${Math.round((n / of) * 100)}%` : "—");
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Funnel — the checklist's core conversion metrics */}
+      <section className="flex flex-col gap-3">
+        <Eyebrow>Funnel</Eyebrow>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile label="Signups" value={String(f.users)} sub="total accounts" />
+          <StatTile
+            label="Onboarded"
+            value={String(f.onboarded)}
+            sub={`${pct(f.onboarded, f.users)} of signups`}
+          />
+          <StatTile
+            label="First panel"
+            value={String(f.activated)}
+            sub={`${pct(f.activated, f.onboarded)} of onboarded`}
+          />
+          <StatTile
+            label="Re-tested"
+            value={String(f.retested)}
+            sub={`${pct(f.retested, f.activated)} of activated`}
+          />
+        </div>
+      </section>
+
+      {/* Engagement */}
+      <section className="flex flex-col gap-3">
+        <Eyebrow>Engagement</Eyebrow>
+        <div className="grid grid-cols-3 gap-3">
+          <StatTile label="Today" value={String(data.active.dau)} sub="active users" />
+          <StatTile label="7 days" value={String(data.active.wau)} sub="active users" />
+          <StatTile label="30 days" value={String(data.active.mau)} sub="active users" />
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {data.retention.map((r) => (
+            <StatTile
+              key={r.day}
+              label={`Day ${r.day} retention`}
+              value={r.rate != null ? `${Math.round(r.rate * 100)}%` : "—"}
+              sub={r.eligible > 0 ? `${r.retained} of ${r.eligible} eligible` : "no cohort yet"}
+            />
+          ))}
+        </div>
+        <Card className="flex flex-col gap-3 p-5">
+          <div className="flex items-baseline justify-between">
+            <span className="font-body text-sm font-medium text-foreground">
+              Check-ins · last 14 days
+            </span>
+            <span className="font-body text-xs text-muted">
+              {data.checkinSeries.reduce((a, b) => a + b.count, 0)} total
+            </span>
+          </div>
+          <CheckinBars series={data.checkinSeries} />
+        </Card>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile label="No streak" value={String(data.streaks.none)} sub="users" />
+          <StatTile label="1–6 days" value={String(data.streaks.short)} sub="live streaks" />
+          <StatTile label="7–29 days" value={String(data.streaks.week)} sub="live streaks" />
+          <StatTile label="30+ days" value={String(data.streaks.month)} sub="live streaks" />
+        </div>
+      </section>
+
+      {/* Economy & reach */}
+      <section className="flex flex-col gap-3">
+        <Eyebrow>Economy &amp; reach</Eyebrow>
+        <div className="grid grid-cols-2 gap-3">
+          <StatTile label="Push opt-ins" value={String(data.pushOptIns)} sub="devices subscribed" />
+          <StatTile label="Redemptions" value={String(data.redemptions)} sub="vouchers issued" />
+        </div>
+      </section>
+
+      {/* Errors */}
+      <section className="flex flex-col gap-3">
+        <Eyebrow>Client errors · {data.errors.count7d} in the last 7 days</Eyebrow>
+        {data.errors.recent.length === 0 ? (
+          <Card className="p-5">
+            <p className="font-body text-sm text-muted">No client errors recorded.</p>
+          </Card>
+        ) : (
+          <Card className="overflow-x-auto p-0">
+            <table className="w-full min-w-[32rem] text-left">
+              <thead>
+                <tr className="border-b border-border font-body text-xs text-muted">
+                  <th className="px-4 py-2 font-medium">When</th>
+                  <th className="px-4 py-2 font-medium">Message</th>
+                  <th className="px-4 py-2 font-medium">Where</th>
+                  <th className="px-4 py-2 font-medium">User</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.errors.recent.map((e) => (
+                  <tr key={e.id} className="border-b border-border/60 font-body text-sm">
+                    <td className="whitespace-nowrap px-4 py-2 text-muted">
+                      {new Date(e.created_at).toLocaleString()}
+                    </td>
+                    <td className="max-w-[20rem] truncate px-4 py-2 text-foreground" title={e.message}>
+                      {e.message}
+                    </td>
+                    <td className="px-4 py-2 text-muted">{e.url ?? "—"}</td>
+                    <td className="px-4 py-2 text-muted">{e.user_id ? "signed in" : "pre-auth"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+      </section>
+
+      <p className="font-body text-xs text-muted">
+        Retention counts activity as a check-in or an app open; app-open data
+        accrues from the day this instrumentation deployed.
+      </p>
+    </div>
+  );
+}
+
+function StatTile({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <Card className="flex flex-col gap-0.5 p-4">
+      <span className="font-body text-[10px] uppercase tracking-wide text-muted">{label}</span>
+      <span className="font-display text-2xl font-medium text-foreground">{value}</span>
+      <span className="font-body text-[11px] text-muted">{sub}</span>
+    </Card>
+  );
+}
+
+/** Single-series bar chart (brand accent), per-bar native tooltip, no legend. */
+function CheckinBars({ series }: { series: { date: string; count: number }[] }) {
+  const max = Math.max(1, ...series.map((s) => s.count));
+  const W = 280;
+  const H = 64;
+  const gap = 2;
+  const barW = (W - gap * (series.length - 1)) / series.length;
+  return (
+    <div className="flex flex-col gap-1">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="h-16 w-full"
+        role="img"
+        aria-label="Check-ins per day, last 14 days"
+      >
+        {series.map((s, i) => {
+          const h = s.count === 0 ? 2 : Math.max(4, (s.count / max) * (H - 4));
+          return (
+            <rect
+              key={s.date}
+              x={i * (barW + gap)}
+              y={H - h}
+              width={barW}
+              height={h}
+              rx={2}
+              className={s.count === 0 ? "fill-border" : "fill-accent"}
+            >
+              <title>{`${s.date}: ${s.count} check-in${s.count === 1 ? "" : "s"}`}</title>
+            </rect>
+          );
+        })}
+      </svg>
+      <div className="flex justify-between font-body text-[10px] text-muted">
+        <span>{series[0]?.date.slice(5)}</span>
+        <span>{series[series.length - 1]?.date.slice(5)}</span>
+      </div>
+    </div>
   );
 }
 
