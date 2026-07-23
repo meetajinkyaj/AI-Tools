@@ -258,6 +258,10 @@ export function PartnersView({
       {affiliates.length > 0 && (
         <section className="flex flex-col gap-4">
           <Eyebrow>Shop our picks</Eyebrow>
+          <p className="font-body text-xs text-muted">
+            Affiliate links — we may earn a commission, at no extra cost to you.
+            Not medical advice.
+          </p>
           <div className="grid gap-4 sm:grid-cols-2">
             {affiliates.map((item) => (
               <AffiliateCard key={item.id} item={item} onOpen={() => openAffiliate(item)} />
@@ -292,6 +296,14 @@ export function PartnersView({
           </Card>
         </section>
       )}
+
+      <p className="font-body text-xs text-muted">
+        iki points have no cash value. See the{" "}
+        <a href="/terms#rewards" className="text-accent underline">
+          rewards terms
+        </a>
+        .
+      </p>
 
       {confirming && (
         <ConfirmRedeem

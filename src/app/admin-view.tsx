@@ -130,6 +130,75 @@ interface AdminItem {
 
 const INVENTORY_OPTIONS = ["in_stock", "out_of_stock", "coming_soon"];
 
+// Reusable copy so admins pick a template instead of retyping the same lines.
+const REDEEM_PRESETS: { label: string; text: string }[] = [
+  {
+    label: "Online — paste at checkout",
+    text: "Enter this code at the partner's checkout to apply your discount. One use per code.",
+  },
+  {
+    label: "In-store — show at counter",
+    text: "Show this code at the partner's store counter to redeem. One use per code.",
+  },
+  {
+    label: "Link + code",
+    text: "Open the partner's link, then enter this code at checkout to redeem. One use per code.",
+  },
+];
+const TERMS_PRESETS: { label: string; text: string }[] = [
+  {
+    label: "Standard (90 days, no cash value)",
+    text: "Single-use. Valid 90 days from issue. No cash value and non-transferable. Cannot be combined with other offers.",
+  },
+  {
+    label: "Minimum spend",
+    text: "Single-use. Valid 90 days from issue. Minimum order value may apply. No cash value; non-transferable.",
+  },
+];
+
+/** A textarea with a "insert a template" preset picker above it. */
+function PresetField({
+  label,
+  field,
+  presets,
+  value,
+  onSet,
+}: {
+  label: string;
+  field: string;
+  presets: { label: string; text: string }[];
+  value: string;
+  onSet: (k: string, v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 sm:col-span-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-body text-sm font-medium text-foreground/80">{label}</span>
+        <select
+          className="rounded-control border border-border bg-surface px-2 py-1 font-body text-xs text-muted"
+          value=""
+          onChange={(e) => {
+            const p = presets.find((x) => x.label === e.target.value);
+            if (p) onSet(field, p.text);
+          }}
+        >
+          <option value="">Insert a template…</option>
+          {presets.map((p) => (
+            <option key={p.label} value={p.label}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <textarea
+        className={`${fieldClass} h-16 py-2`}
+        value={value}
+        onChange={(e) => onSet(field, e.target.value)}
+      />
+    </div>
+  );
+}
+
 function VoucherManager({ getToken }: { getToken: () => Promise<string | null> }) {
   const [items, setItems] = useState<AdminItem[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -341,14 +410,20 @@ function AddItemForm({ authFetch, onDone }: { authFetch: AuthFetch; onDone: () =
         </label>
         {kind === "voucher" && (
           <>
-            <label className={`${labelClass} sm:col-span-2`}>
-              How to redeem
-              <input className={fieldClass} value={f.redeem_instructions ?? ""} onChange={(e) => set("redeem_instructions", e.target.value)} />
-            </label>
-            <label className={`${labelClass} sm:col-span-2`}>
-              Terms
-              <input className={fieldClass} value={f.terms ?? ""} onChange={(e) => set("terms", e.target.value)} />
-            </label>
+            <PresetField
+              label="How to redeem"
+              field="redeem_instructions"
+              presets={REDEEM_PRESETS}
+              value={f.redeem_instructions ?? ""}
+              onSet={set}
+            />
+            <PresetField
+              label="Terms"
+              field="terms"
+              presets={TERMS_PRESETS}
+              value={f.terms ?? ""}
+              onSet={set}
+            />
           </>
         )}
       </div>
