@@ -64,6 +64,33 @@ function itemOf(row: HistoryRow) {
   return Array.isArray(row.item) ? (row.item[0] ?? null) : row.item;
 }
 
+/** A voucher code the user can tap to copy, with brief "Copied" feedback. */
+function CopyableCode({ code, className = "" }: { code: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard may be unavailable; the code is visible regardless */
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      aria-label={`Copy code ${code}`}
+      className={`inline-flex items-center gap-2 rounded-control bg-surface-2 px-2.5 py-1 transition-colors hover:bg-border ${className}`}
+    >
+      <code className="font-mono text-xs text-foreground">{code}</code>
+      <span className="font-body text-[10px] uppercase tracking-wide text-accent">
+        {copied ? "Copied" : "Copy"}
+      </span>
+    </button>
+  );
+}
+
 export function PartnersView({
   getToken,
 }: {
@@ -257,9 +284,7 @@ export function PartnersView({
                     </span>
                   </div>
                   {row.discount_code && (
-                    <code className="shrink-0 rounded-control bg-surface-2 px-2.5 py-1 font-mono text-xs text-foreground">
-                      {row.discount_code}
-                    </code>
+                    <CopyableCode code={row.discount_code} className="shrink-0" />
                   )}
                 </div>
               );
