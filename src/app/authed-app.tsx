@@ -15,7 +15,8 @@ import { PartnersView } from "./partners-view";
 import { ProfileEditForm } from "./profile-edit-form";
 import { ProfileView } from "./profile-view";
 import { TrendsView } from "./trends-view";
-import { CenteredMessage, ComingSoon, primaryButtonClass, Screen } from "./ui";
+import { FutureView } from "./future-view";
+import { CenteredMessage, primaryButtonClass, Screen } from "./ui";
 
 type Status = "loading" | "onboarding" | "ready" | "error";
 
@@ -171,10 +172,10 @@ export function AuthedApp() {
       )}
       {tab === "trends" && <TrendsView getToken={getAccessToken} />}
       {tab === "future" && (
-        <ComingSoon
-          eyebrow="Coming soon"
-          title="Future You"
-          note="A directional six-month projection for each marker — motivational, not diagnostic — is coming soon."
+        <FutureView
+          getToken={getAccessToken}
+          onCheckIn={() => setTab("checkin")}
+          onUploadPanel={() => setTab("report")}
         />
       )}
       {tab === "partners" && <PartnersView getToken={getAccessToken} />}
