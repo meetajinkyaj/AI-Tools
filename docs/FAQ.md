@@ -56,3 +56,23 @@ your own data.
 No. Everything in Ikigaro is **educational, not a diagnosis — please consult a
 doctor.** Rewards are for engagement and genuine self-improvement, not a medical
 claim or an inducement.
+
+## How do I redeem my iki points?
+
+Spend points in **Rewards** (the Partners tab):
+
+- **Vouchers** — redeem points for a partner voucher and the code appears
+  **instantly**. Copy it, and it's also saved in your **Redemption history** so
+  you can come back to it anytime. Follow the short redemption steps shown with
+  the code (usually: paste it at the partner's checkout).
+- **Shop our picks** — curated products we'd use ourselves. These are free to
+  open; no points are spent.
+
+Vouchers are single-use and may carry an expiry or minimum spend — check the
+terms shown on each voucher before you redeem.
+
+## What happens to points when I redeem?
+
+They're deducted from your balance the moment a voucher code is issued, and the
+redemption is logged in your history. If a voucher is sold out or you don't have
+enough points, nothing is deducted.
