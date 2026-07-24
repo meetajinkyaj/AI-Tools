@@ -60,7 +60,7 @@ export async function GET(request: Request) {
         supabase
           .from("redemption_transactions")
           .select(
-            "id, points_spent, status, discount_code, redeemed_at, created_at, item:redemption_items(name, partner, redeem_instructions)",
+            "id, points_spent, status, discount_code, redeemed_at, created_at, item_name, item:redemption_items(name, partner, redeem_instructions)",
           )
           .eq("profile_id", resolved.profileId)
           .order("created_at", { ascending: false })

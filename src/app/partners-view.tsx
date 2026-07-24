@@ -42,6 +42,8 @@ interface HistoryRow {
   discount_code: string | null;
   redeemed_at: string | null;
   created_at: string;
+  /** Snapshot taken at redemption — survives the catalog item being deleted. */
+  item_name: string | null;
   item:
     | { name: string; partner: string | null; redeem_instructions: string | null }
     | { name: string; partner: string | null; redeem_instructions: string | null }[]
@@ -103,7 +105,21 @@ export function PartnersView({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFaq, setShowFaq] = useState(false);
+  // Users can tuck their redemption history away; remembered per device.
+  const [showHistory, setShowHistory] = useState(
+    () =>
+      typeof window === "undefined" ||
+      localStorage.getItem("ikigaro.rewards.hideHistory") !== "1",
+  );
   const startedRef = useRef(false);
+
+  const toggleHistory = () => {
+    setShowHistory((v) => {
+      const next = !v;
+      localStorage.setItem("ikigaro.rewards.hideHistory", next ? "0" : "1");
+      return next;
+    });
+  };
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -272,28 +288,39 @@ export function PartnersView({
 
       {history.length > 0 && (
         <section className="flex flex-col gap-3">
-          <Eyebrow>Redemption history</Eyebrow>
-          <Card className="flex flex-col divide-y divide-border">
-            {history.map((row) => {
-              const it = itemOf(row);
-              return (
-                <div key={row.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate font-body text-sm text-foreground">
-                      {it?.name ?? "Reward"}
-                    </span>
-                    <span className="font-body text-xs text-muted">
-                      {new Date(row.redeemed_at ?? row.created_at).toLocaleDateString()} ·{" "}
-                      {row.points_spent} points
-                    </span>
+          <div className="flex items-center justify-between">
+            <Eyebrow>Redemption history{showHistory ? "" : ` · ${history.length}`}</Eyebrow>
+            <button
+              type="button"
+              onClick={toggleHistory}
+              className="font-body text-xs text-muted underline underline-offset-4 hover:text-foreground"
+            >
+              {showHistory ? "Hide" : "Show"}
+            </button>
+          </div>
+          {showHistory && (
+            <Card className="flex flex-col divide-y divide-border">
+              {history.map((row) => {
+                const it = itemOf(row);
+                return (
+                  <div key={row.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate font-body text-sm text-foreground">
+                        {row.item_name ?? it?.name ?? "Reward"}
+                      </span>
+                      <span className="font-body text-xs text-muted">
+                        {new Date(row.redeemed_at ?? row.created_at).toLocaleDateString()} ·{" "}
+                        {row.points_spent} points
+                      </span>
+                    </div>
+                    {row.discount_code && (
+                      <CopyableCode code={row.discount_code} className="shrink-0" />
+                    )}
                   </div>
-                  {row.discount_code && (
-                    <CopyableCode code={row.discount_code} className="shrink-0" />
-                  )}
-                </div>
-              );
-            })}
-          </Card>
+                );
+              })}
+            </Card>
+          )}
         </section>
       )}
 

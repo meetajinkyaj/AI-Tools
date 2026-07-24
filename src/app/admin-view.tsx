@@ -480,8 +480,12 @@ function VoucherManager({ getToken }: { getToken: () => Promise<string | null> }
     void load();
   };
 
-  const remove = async (id: string) => {
-    const res = await authFetch(`/api/admin/vouchers?id=${encodeURIComponent(id)}`, {
+  const remove = async (item: AdminItem) => {
+    const ok = window.confirm(
+      `Delete “${item.name}”? It disappears from the catalog and its unused codes are discarded. Users who already redeemed it keep their history and codes.`,
+    );
+    if (!ok) return;
+    const res = await authFetch(`/api/admin/vouchers?id=${encodeURIComponent(item.id)}`, {
       method: "DELETE",
     });
     if (!res.ok) setMsg(((await res.json()) as { error?: string }).error ?? "Couldn't delete.");
@@ -552,7 +556,7 @@ function VoucherManager({ getToken }: { getToken: () => Promise<string | null> }
                   ))}
                 </select>
                 <button
-                  onClick={() => void remove(it.id)}
+                  onClick={() => void remove(it)}
                   className="rounded-control px-2 py-1 font-body text-xs text-muted hover:text-accent"
                 >
                   Delete

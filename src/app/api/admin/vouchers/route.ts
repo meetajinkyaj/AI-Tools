@@ -127,17 +127,13 @@ export async function DELETE(request: Request) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const supabase = createSupabaseAdmin();
+  // Hard delete. Users' redemption history survives — each transaction keeps a
+  // snapshot of the item's name (migration 0011) and its issued code; unredeemed
+  // codes cascade away with the item.
   const { error } = await supabase.from("redemption_items").delete().eq("id", id);
   if (error) {
-    // redemption_transactions references items ON DELETE RESTRICT — a redeemed
-    // item can't be deleted. Steer the admin to "out of stock" instead.
-    return NextResponse.json(
-      {
-        error:
-          "This item has been redeemed by users, so it can't be deleted. Set it to “out of stock” instead.",
-      },
-      { status: 409 },
-    );
+    console.error("admin item delete failed:", error);
+    return NextResponse.json({ error: "Couldn't delete item" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }
