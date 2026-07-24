@@ -358,7 +358,8 @@ interface ReferralInfo {
   link: string;
   joined: number;
   completed: number;
-  pointsPerReferral: number;
+  tiers: { onboard: number; streak: number; panel: number; panelWindowDays: number };
+  maxTotal: number;
 }
 
 /** Invite friends — share your referral link, earn when they finish onboarding. */
@@ -416,12 +417,27 @@ function InviteCard({ getToken }: { getToken: () => Promise<string | null> }) {
         )}
       </div>
       <p className="font-body text-sm text-foreground/80">
-        Share your link — when a friend joins and completes onboarding, you earn{" "}
+        Share your link — earn up to{" "}
         <span className="font-medium text-foreground">
-          +{info.pointsPerReferral} iki points
-        </span>
-        .
+          +{info.maxTotal} iki points
+        </span>{" "}
+        per friend:
       </p>
+      <ul className="flex flex-col gap-1 font-body text-xs text-muted">
+        <li>
+          <span className="font-medium text-foreground">+{info.tiers.onboard}</span>{" "}
+          when they join and complete onboarding
+        </li>
+        <li>
+          <span className="font-medium text-foreground">+{info.tiers.streak}</span>{" "}
+          when they build a daily habit (their first 7-day check-in streak)
+        </li>
+        <li>
+          <span className="font-medium text-foreground">+{info.tiers.panel}</span>{" "}
+          when they upload their first blood report within{" "}
+          {info.tiers.panelWindowDays} days of joining
+        </li>
+      </ul>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <button
           type="button"

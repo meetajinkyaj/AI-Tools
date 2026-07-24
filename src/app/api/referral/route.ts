@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
 import { resolveApprovedUserId } from "@/lib/app-user";
-import { POINTS } from "@/lib/points";
+import { POINTS, POINTS_REASON, REFERRAL_MAX_TOTAL, REFERRAL_PANEL_WINDOW_DAYS } from "@/lib/points";
 import { generateReferralCode, referralLink } from "@/lib/referral";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
         .from("points_transactions")
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
-        .eq("reason", "referral"),
+        .eq("reason", POINTS_REASON.referralOnboard),
     ]);
 
     return NextResponse.json({
@@ -72,7 +72,13 @@ export async function GET(request: Request) {
       link: referralLink(code),
       joined: joined ?? 0,
       completed: completed ?? 0,
-      pointsPerReferral: POINTS.referral,
+      tiers: {
+        onboard: POINTS.referralOnboard,
+        streak: POINTS.referralStreak,
+        panel: POINTS.referralPanel,
+        panelWindowDays: REFERRAL_PANEL_WINDOW_DAYS,
+      },
+      maxTotal: REFERRAL_MAX_TOTAL,
     });
   } catch (err) {
     console.error("GET /api/referral failed:", err);

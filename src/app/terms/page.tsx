@@ -231,6 +231,22 @@ export default function TermsPage() {
           no fault of yours, contact us and we&rsquo;ll try to help.
         </li>
       </ul>
+      <h3>Referrals</h3>
+      <ul>
+        <li>
+          Referral rewards are <strong>milestone-based</strong>: points are
+          earned as the person you invited reaches milestones (for example
+          completing onboarding, building a check-in habit, or uploading their
+          first report within a set window). The current milestones and values
+          are shown on the invite card in the app and may change.
+        </li>
+        <li>
+          Each milestone pays <strong>once per referred person</strong>.
+          Referrals of accounts we reasonably believe to be duplicates, created
+          in bulk, or otherwise gaming the programme may be{" "}
+          <strong>reversed or withheld</strong>.
+        </li>
+      </ul>
       <h3>Affiliate links</h3>
       <p>
         Some products in Rewards are <strong>affiliate links</strong>. If you buy

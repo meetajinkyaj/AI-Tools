@@ -16,8 +16,12 @@ export const POINTS = {
   firstPanelUpload: 200,
   /** A genuinely new dated panel after the first (a re-test). */
   reTestUpload: 150,
-  /** Referral: a friend signs up and completes onboarding. (Flow pending.) */
-  referral: 150,
+  /** Referral tier 1: the friend signs up and completes onboarding. */
+  referralOnboard: 100,
+  /** Referral tier 2: the friend builds the habit (first 7-day streak). */
+  referralStreak: 50,
+  /** Referral tier 3: the friend uploads their first panel within 30 days. */
+  referralPanel: 150,
   /** Per marker that meaningfully improved between panels. */
   outcomeBonusPerMarker: 250,
 } as const;
@@ -29,9 +33,19 @@ export const POINTS_REASON = {
   streak30: "streak_30_bonus",
   panelUpload: "panel_upload",
   reTest: "retest_upload",
-  referral: "referral",
+  // Referral milestones (each pays the REFERRER once per referred friend;
+  // reference_id on the txn is the referred user's id).
+  referralOnboard: "referral",
+  referralStreak: "referral_streak",
+  referralPanel: "referral_panel",
   outcomeBonus: "outcome_bonus",
 } as const;
+
+/** Max a referrer can earn from one friend (shown in the invite card). */
+export const REFERRAL_MAX_TOTAL =
+  POINTS.referralOnboard + POINTS.referralStreak + POINTS.referralPanel;
+/** The friend's first panel must land within this many days of joining. */
+export const REFERRAL_PANEL_WINDOW_DAYS = 30;
 
 /** The earn (amount + reason) for uploading a panel, or null for no reward. */
 export interface UploadEarn {

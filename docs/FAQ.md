@@ -76,3 +76,18 @@ terms shown on each voucher before you redeem.
 They're deducted from your balance the moment a voucher code is issued, and the
 redemption is logged in your history. If a voucher is sold out or you don't have
 enough points, nothing is deducted.
+
+## How do referrals work?
+
+Share your invite link from **Rewards → Invite friends**. You can earn up to
+**300 iki points per friend**, paid as they hit real milestones:
+
+- **+100** when they join through your link and complete onboarding.
+- **+50** when they build the daily habit — their first 7-day check-in streak.
+- **+150** when they upload their first blood report within **30 days** of
+  joining.
+
+Each milestone pays **once per friend**. Signups alone earn nothing — the
+rewards follow genuine engagement, so the programme can't be farmed with
+throwaway accounts. Values may be tuned over time; the invite card always
+shows the current ones.

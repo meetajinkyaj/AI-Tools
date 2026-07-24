@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
 import { resolveApprovedUserId } from "@/lib/app-user";
+import { POINTS, POINTS_REASON } from "@/lib/points";
+import { awardReferralMilestone } from "@/lib/referral-award";
 import {
   computeAwards,
   computeStreak,
@@ -177,6 +179,12 @@ export async function POST(request: Request) {
       .single();
     if (insertError || !created) {
       throw new Error(`daily_checkins insert failed: ${insertError?.message ?? "no row"}`);
+    }
+
+    // Referral tier 2: the friend built the habit — their first 7-day streak
+    // pays their referrer. Once ever (ledger-checked); best-effort.
+    if (streak === 7) {
+      await awardReferralMilestone(userId, POINTS_REASON.referralStreak, POINTS.referralStreak);
     }
 
     // Award points: base + any streak bonus, to the ledger and the balance.
