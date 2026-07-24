@@ -55,13 +55,21 @@ export function AuthedApp() {
         return;
       }
 
+      // Pass along a remembered invite code (attributed server-side only on
+      // first-ever signup; harmless for existing accounts).
+      let ref: string | null = null;
+      try {
+        ref = localStorage.getItem("ikigaro.ref");
+      } catch {
+        /* best-effort */
+      }
       const syncRes = await fetch("/api/auth/sync", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, ...(ref ? { ref } : {}) }),
       });
       if (!syncRes.ok) {
         setStatus("error");

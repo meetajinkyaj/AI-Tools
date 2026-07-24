@@ -244,6 +244,8 @@ export function PartnersView({
 
       {showFaq && <HowToRedeem />}
 
+      <InviteCard getToken={getToken} />
+
       {items.length === 0 && (
         <Card className="p-6">
           <p className="font-body text-sm text-muted">
@@ -348,6 +350,91 @@ export function PartnersView({
 
       {issued && <VoucherIssued issued={issued} onClose={() => setIssued(null)} />}
     </div>
+  );
+}
+
+interface ReferralInfo {
+  code: string;
+  link: string;
+  joined: number;
+  completed: number;
+  pointsPerReferral: number;
+}
+
+/** Invite friends — share your referral link, earn when they finish onboarding. */
+function InviteCard({ getToken }: { getToken: () => Promise<string | null> }) {
+  const [info, setInfo] = useState<ReferralInfo | null>(null);
+  const [copied, setCopied] = useState(false);
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    void (async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await fetch("/api/referral", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) setInfo((await res.json()) as ReferralInfo);
+      } catch {
+        /* the card just doesn't render */
+      }
+    })();
+  }, [getToken]);
+
+  if (!info) return null;
+
+  const share = async () => {
+    const text = `Join me on Ikigaro — upload your blood work and it shows you what actually matters. ${info.link}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Ikigaro", text, url: info.link });
+        return;
+      }
+    } catch {
+      /* user cancelled the sheet — fall through to copy */
+    }
+    try {
+      await navigator.clipboard.writeText(info.link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* the link is visible below regardless */
+    }
+  };
+
+  return (
+    <Card className="flex flex-col gap-3 p-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <Eyebrow>Invite friends</Eyebrow>
+        {info.completed > 0 && (
+          <span className="font-body text-xs text-muted">
+            {info.completed} joined &amp; onboarded
+          </span>
+        )}
+      </div>
+      <p className="font-body text-sm text-foreground/80">
+        Share your link — when a friend joins and completes onboarding, you earn{" "}
+        <span className="font-medium text-foreground">
+          +{info.pointsPerReferral} iki points
+        </span>
+        .
+      </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <button
+          type="button"
+          onClick={() => void share()}
+          className={`${primaryButtonClass} shrink-0`}
+        >
+          {copied ? "Link copied" : "Share your link"}
+        </button>
+        <code className="truncate rounded-control bg-surface-2 px-3 py-2 font-mono text-xs text-muted">
+          {info.link}
+        </code>
+      </div>
+    </Card>
   );
 }
 
