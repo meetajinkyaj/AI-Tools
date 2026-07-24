@@ -365,7 +365,8 @@ interface ReferralInfo {
 /** Invite friends — share your referral link, earn when they finish onboarding. */
 function InviteCard({ getToken }: { getToken: () => Promise<string | null> }) {
   const [info, setInfo] = useState<ReferralInfo | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false); // Share button's fallback feedback
+  const [linkCopied, setLinkCopied] = useState(false); // Copy button's feedback
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -406,6 +407,17 @@ function InviteCard({ getToken }: { getToken: () => Promise<string | null> }) {
     }
   };
 
+  // Always-available copy — on desktop the share sheet is awkward or absent.
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(info.link);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable — the link is visible beside the buttons */
+    }
+  };
+
   return (
     <Card className="flex flex-col gap-3 p-6">
       <div className="flex items-baseline justify-between gap-3">
@@ -438,7 +450,7 @@ function InviteCard({ getToken }: { getToken: () => Promise<string | null> }) {
           {info.tiers.panelWindowDays} days of joining
         </li>
       </ul>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <button
           type="button"
           onClick={() => void share()}
@@ -446,7 +458,14 @@ function InviteCard({ getToken }: { getToken: () => Promise<string | null> }) {
         >
           {copied ? "Link copied" : "Share your link"}
         </button>
-        <code className="truncate rounded-control bg-surface-2 px-3 py-2 font-mono text-xs text-muted">
+        <button
+          type="button"
+          onClick={() => void copyLink()}
+          className={`${secondaryButtonClass} shrink-0`}
+        >
+          {linkCopied ? "Copied" : "Copy link"}
+        </button>
+        <code className="min-w-0 truncate rounded-control bg-surface-2 px-3 py-2 font-mono text-xs text-muted">
           {info.link}
         </code>
       </div>
