@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isValidDateOfBirth, validateProfileInput } from "./profile";
+import { dateOfBirthError, isValidDateOfBirth, validateProfileInput } from "./profile";
 
 function validBody(overrides: Record<string, unknown> = {}) {
   return {
@@ -134,5 +134,35 @@ describe("isValidDateOfBirth", () => {
     const tooYoung = new Date().getUTCFullYear() - 5;
     expect(isValidDateOfBirth(`${tooYoung}-01-01`)).toBe(false);
     expect(isValidDateOfBirth("1850-01-01")).toBe(false);
+  });
+});
+
+describe("dateOfBirthError", () => {
+  it("returns null for an adult", () => {
+    expect(dateOfBirthError("1985-01-01")).toBeNull();
+  });
+
+  it("names the 18+ requirement for a minor (valid date, too young)", () => {
+    // e.g. the 2015-08-05 case from beta testing — a real date, an under-18 age.
+    const minorYear = new Date().getUTCFullYear() - 10;
+    const err = dateOfBirthError(`${minorYear}-08-05`);
+    expect(err).toContain("at least 18");
+  });
+
+  it("rejects a 17-year-old (the Terms line is 18, not 13)", () => {
+    const seventeen = new Date().getUTCFullYear() - 17;
+    expect(dateOfBirthError(`${seventeen}-01-01`)).toContain("at least 18");
+  });
+
+  it("keeps the generic message for malformed or impossible dates", () => {
+    expect(dateOfBirthError("20-05-1990")).toBe("A valid date of birth is required");
+    expect(dateOfBirthError("1990-02-31")).toBe("A valid date of birth is required");
+  });
+
+  it("surfaces the under-18 message through validateProfileInput", () => {
+    const minorYear = new Date().getUTCFullYear() - 10;
+    const result = validateProfileInput(validBody({ date_of_birth: `${minorYear}-08-05` }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("at least 18");
   });
 });

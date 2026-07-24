@@ -85,7 +85,8 @@ export type ValidationResult =
   | { ok: false; error: string };
 
 const MAX_NAME_LENGTH = 120;
-const MIN_AGE_YEARS = 13;
+/** The Terms of Service require users to be 18+ — the validator enforces it. */
+export const MIN_AGE_YEARS = 18;
 const MAX_AGE_YEARS = 120;
 const MAX_CONDITIONS_LENGTH = 2000;
 const MAX_LOCATION_LENGTH = 120;
@@ -108,8 +109,12 @@ export function validateProfileInput(body: unknown): ValidationResult {
     return { ok: false, error: "Full name is too long" };
   }
 
-  if (typeof b.date_of_birth !== "string" || !isValidDateOfBirth(b.date_of_birth)) {
+  if (typeof b.date_of_birth !== "string") {
     return { ok: false, error: "A valid date of birth is required" };
+  }
+  const dobError = dateOfBirthError(b.date_of_birth);
+  if (dobError) {
+    return { ok: false, error: dobError };
   }
 
   if (!isOneOf(b.biological_sex, BIOLOGICAL_SEX)) {
@@ -171,10 +176,15 @@ function isOneOf<T extends readonly string[]>(
   return typeof value === "string" && (allowed as readonly string[]).includes(value);
 }
 
-/** Accepts a YYYY-MM-DD date that is a real calendar date and a plausible age. */
-export function isValidDateOfBirth(value: string): boolean {
+/**
+ * Validate a date of birth and say WHY it fails — the under-18 case gets its
+ * own message so a valid-but-too-young date never reads as "invalid date".
+ * Returns null when acceptable.
+ */
+export function dateOfBirthError(value: string): string | null {
+  const invalid = "A valid date of birth is required";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
+    return invalid;
   }
   const [year, month, day] = value.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -184,14 +194,25 @@ export function isValidDateOfBirth(value: string): boolean {
     date.getUTCMonth() !== month - 1 ||
     date.getUTCDate() !== day
   ) {
-    return false;
+    return invalid;
   }
   const now = new Date();
   if (date.getTime() > now.getTime()) {
-    return false;
+    return invalid;
   }
   const age = ageInYears(date, now);
-  return age >= MIN_AGE_YEARS && age <= MAX_AGE_YEARS;
+  if (age < MIN_AGE_YEARS) {
+    return `Ikigaro is for adults — you must be at least ${MIN_AGE_YEARS} to sign up (see our Terms).`;
+  }
+  if (age > MAX_AGE_YEARS) {
+    return "That date of birth doesn't look right — please check the year.";
+  }
+  return null;
+}
+
+/** Accepts a YYYY-MM-DD date that is a real calendar date and an adult age. */
+export function isValidDateOfBirth(value: string): boolean {
+  return dateOfBirthError(value) === null;
 }
 
 function ageInYears(birth: Date, now: Date): number {
