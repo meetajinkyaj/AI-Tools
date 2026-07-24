@@ -1,6 +1,6 @@
 # Ikigaro — Project & Session Reference
 
-_Last updated: 2026-07-25_
+_Last updated: 2026-07-26_
 
 A living reference for the Ikigaro app: architecture, what's built, how to
 operate it, and the known follow-ups. Update this as work lands.
@@ -89,6 +89,15 @@ operate it, and the known follow-ups. Update this as work lands.
     parent/guardian consent (Terms §1); onboarding shows the consent note.
     Rewards/points terms live in Terms §14 (`/terms#rewards`, draft pending
     counsel's wording pass).
+16. **Referrals** — name-based codes (`?ref=AJINKYA`; numbered on collision,
+    random fallback, generated lazily) + admin-assigned vanity codes ("FITTR",
+    inline editor in the Users tab with live normalize/preview). Attribution
+    at signup only (`referred_by`); **tiered milestone earns** to the referrer
+    via one shared `awardReferralMilestone` (at-most-once per milestone+friend,
+    best-effort): +100 friend onboards (`referral`), +50 first 7-day streak
+    (`referral_streak`), +150 first panel within 30 days (`referral_panel`) —
+    max 300 (`REFERRAL_MAX_TOTAL`). Invite card (Share + Copy) on Partners;
+    Terms §14 referral clause keeps values out of legal text.
 
 ## 3. Key architecture decisions
 
@@ -204,8 +213,10 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
 
 ## 8. Known follow-ups / deferred
 
-- **Referral flow** — the last unwired earn (`POINTS.referral = 150`): needs
-  referral codes + attribution at signup. Next feature before beta invites.
+- **Referral +150 panel tier** — verified by design + unit-level only (testing
+  it live needs real blood data on a throwaway account — declined). It verifies
+  organically: when the first referred beta tester uploads a panel, glance at
+  the ledger for the `referral_panel` entry.
 - **Family vault / multi-profile UI** — schema-ready since 0005; the add-on
   that serves under-18s via guardian accounts and aging-parent care.
 - **Lawyer pass** — rewards terms (§14), eligibility wording (§1), privacy

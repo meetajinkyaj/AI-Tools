@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { POINTS, REFERRAL_MAX_TOTAL } from "@/lib/points";
 import type { CheckinTrend, MarkerDelta } from "@/lib/trends";
 import { Card, Eyebrow, PageHeader, primaryButtonClass } from "./ui";
 
@@ -29,11 +30,12 @@ interface TrendsData {
 
 const DISCLAIMER = "Educational, not a diagnosis — please consult a doctor.";
 
-/** Kept in sync with docs/FAQ.md. */
+/** Kept in sync with docs/FAQ.md; values come from the POINTS table so this
+ * copy can never drift from the live economy. */
 const FAQ: { q: string; a: string }[] = [
   {
     q: "How do I earn iki points?",
-    a: "10 points for your first daily check-in, streak bonuses (50 at 7 days, 250 at 30), and points when a marker genuinely improves between two lab panels.",
+    a: `${POINTS.checkin} points for your first daily check-in, streak bonuses (${POINTS.streak7Bonus} at 7 days, ${POINTS.streak30Bonus} at 30), ${POINTS.firstPanelUpload} for your first lab panel and ${POINTS.reTestUpload} per genuine re-test, points when a marker genuinely improves between panels, and up to ${REFERRAL_MAX_TOTAL} per friend you refer (see Rewards → Invite friends).`,
   },
   {
     q: "What is an outcome-verified reward?",

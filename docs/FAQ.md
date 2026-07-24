@@ -8,8 +8,14 @@ the two in sync when either changes.
 
 - **Daily check-in** — 10 points for your first check-in each day.
 - **Streak bonuses** — 50 points at a 7-day streak, 250 at 30 days.
+- **First lab panel** — 200 points for uploading your first blood report (the
+  most valuable thing you can do for your baseline).
+- **Re-test** — 150 points for each genuinely new panel after that
+  (re-uploading the same report earns nothing).
 - **Outcome-verified improvement** — points when a health marker genuinely
   improves between two lab panels (see below).
+- **Referrals** — up to 300 points per friend, milestone by milestone (see
+  "How do referrals work?" below).
 
 ## What is an "outcome-verified" reward?
 
