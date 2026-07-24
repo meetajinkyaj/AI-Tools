@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
+import { normalizeReferralCode } from "@/lib/referral";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
@@ -32,13 +33,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 
-  // 2. Email comes from the request body (see note above).
+  // 2. Email comes from the request body (see note above). An optional ref
+  //    code (from a ?ref invite link) attributes the referrer — on account
+  //    CREATION only, never retroactively.
   let email: string | null = null;
+  let refCode: string | null = null;
   try {
-    const body = (await request.json()) as { email?: unknown };
+    const body = (await request.json()) as { email?: unknown; ref?: unknown };
     if (typeof body.email === "string" && body.email.includes("@")) {
       email = body.email.trim().toLowerCase();
     }
+    refCode = normalizeReferralCode(body.ref);
   } catch {
     // fall through to the missing-email response below
   }
@@ -73,9 +78,20 @@ export async function POST(request: Request) {
     let accessStatus: string;
 
     if (!existing) {
+      // Resolve the referrer (if any) before creating the row. A bad or
+      // unknown code silently skips attribution — it must never block signup.
+      let referredBy: string | null = null;
+      if (refCode) {
+        const { data: referrer } = await supabase
+          .from("users")
+          .select("id")
+          .eq("referral_code", refCode)
+          .maybeSingle();
+        referredBy = referrer?.id ?? null;
+      }
       const { data, error } = await supabase
         .from("users")
-        .insert({ privy_user_id: userId, email })
+        .insert({ privy_user_id: userId, email, referred_by: referredBy })
         .select("id, access_status")
         .single();
 
