@@ -14,7 +14,11 @@ name: Daily reminders
 
 on:
   schedule:
-    - cron: "30 12 * * *" # 18:00 IST
+    - cron: "30 12 * * *" # 18:00 IST (primary)
+    # Backup: GitHub load-sheds schedule events sometimes (Jul 24 was silently
+    # skipped). The due-reminders endpoint is idempotent per day, so this run
+    # no-ops (0 due) whenever the primary already fired.
+    - cron: "5 13 * * *" # 18:35 IST
   workflow_dispatch: {} # allow a manual test run
 
 jobs:

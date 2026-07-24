@@ -3,6 +3,8 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ConfirmDialog, type ConfirmRequest } from "./confirm-dialog";
+
 import {
   Card,
   CenteredMessage,
@@ -438,6 +440,8 @@ function VoucherManager({ getToken }: { getToken: () => Promise<string | null> }
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [showAdd, setShowAdd] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const startedRef = useRef(false);
 
   const authFetch = useCallback(
@@ -472,25 +476,65 @@ function VoucherManager({ getToken }: { getToken: () => Promise<string | null> }
     void load();
   }, [load]);
 
-  const setInventory = async (id: string, inventory_status: string) => {
-    await authFetch("/api/admin/vouchers", {
-      method: "PATCH",
-      body: JSON.stringify({ id, inventory_status }),
+  /** Run a destructive action behind the in-app confirm dialog. */
+  const withConfirm = (
+    title: string,
+    body: string,
+    confirmLabel: string,
+    action: () => Promise<void>,
+  ) =>
+    setConfirm({
+      title,
+      body,
+      confirmLabel,
+      onConfirm: async () => {
+        setConfirmBusy(true);
+        try {
+          await action();
+        } finally {
+          setConfirmBusy(false);
+          setConfirm(null);
+        }
+      },
     });
-    void load();
+
+  const INVENTORY_CONSEQUENCE: Record<string, string> = {
+    in_stock: "It becomes live and redeemable in users' Rewards immediately.",
+    out_of_stock: "It disappears from users' Rewards immediately.",
+    coming_soon: "It will show as “Coming soon” and can't be redeemed.",
   };
 
-  const remove = async (item: AdminItem) => {
-    const ok = window.confirm(
-      `Delete “${item.name}”? It disappears from the catalog and its unused codes are discarded. Users who already redeemed it keep their history and codes.`,
+  const setInventory = (item: AdminItem, inventory_status: string) => {
+    if (inventory_status === item.inventory_status) return;
+    withConfirm(
+      `Set “${item.name}” to ${inventory_status.replace(/_/g, " ")}?`,
+      INVENTORY_CONSEQUENCE[inventory_status] ?? "This changes what users see.",
+      "Change status",
+      async () => {
+        await authFetch("/api/admin/vouchers", {
+          method: "PATCH",
+          body: JSON.stringify({ id: item.id, inventory_status }),
+        });
+        void load();
+      },
     );
-    if (!ok) return;
-    const res = await authFetch(`/api/admin/vouchers?id=${encodeURIComponent(item.id)}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) setMsg(((await res.json()) as { error?: string }).error ?? "Couldn't delete.");
-    void load();
   };
+
+  const remove = (item: AdminItem) =>
+    withConfirm(
+      `Delete “${item.name}”?`,
+      "It disappears from the catalog and its unused codes are discarded. Users who already redeemed it keep their history and codes.",
+      "Delete",
+      async () => {
+        const res = await authFetch(`/api/admin/vouchers?id=${encodeURIComponent(item.id)}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          setMsg(((await res.json()) as { error?: string }).error ?? "Couldn't delete.");
+        }
+        void load();
+      },
+    );
 
   if (status === "loading") return <CenteredMessage>Loading catalog…</CenteredMessage>;
   if (status === "error")
@@ -547,7 +591,7 @@ function VoucherManager({ getToken }: { getToken: () => Promise<string | null> }
                 <select
                   className={`${fieldClass} w-36`}
                   value={it.inventory_status}
-                  onChange={(e) => void setInventory(it.id, e.target.value)}
+                  onChange={(e) => setInventory(it, e.target.value)}
                 >
                   {INVENTORY_OPTIONS.map((o) => (
                     <option key={o} value={o}>
@@ -556,7 +600,7 @@ function VoucherManager({ getToken }: { getToken: () => Promise<string | null> }
                   ))}
                 </select>
                 <button
-                  onClick={() => void remove(it)}
+                  onClick={() => remove(it)}
                   className="rounded-control px-2 py-1 font-body text-xs text-muted hover:text-accent"
                 >
                   Delete
@@ -567,6 +611,14 @@ function VoucherManager({ getToken }: { getToken: () => Promise<string | null> }
           </Card>
         ))}
       </div>
+
+      {confirm && (
+        <ConfirmDialog
+          request={confirm}
+          busy={confirmBusy}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
     </div>
   );
 }
@@ -754,6 +806,8 @@ interface RosterUser {
 function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
   const [users, setUsers] = useState<RosterUser[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const startedRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -784,6 +838,28 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
       body: JSON.stringify({ id, access_status }),
     });
     void load();
+  };
+
+  // Approve is one-click (non-destructive); Revoke goes through the dialog.
+  const requestAccessChange = (u: RosterUser) => {
+    if (u.access_status !== "approved") {
+      void setAccess(u.id, "approved");
+      return;
+    }
+    setConfirm({
+      title: `Revoke access for ${u.email}?`,
+      body: "They'll be sent back to the waitlist and lose app access until you re-approve them. Their data is untouched.",
+      confirmLabel: "Revoke access",
+      onConfirm: async () => {
+        setConfirmBusy(true);
+        try {
+          await setAccess(u.id, "waitlisted");
+        } finally {
+          setConfirmBusy(false);
+          setConfirm(null);
+        }
+      },
+    });
   };
 
   if (status === "loading") return <CenteredMessage>Loading users…</CenteredMessage>;
@@ -846,12 +922,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                       {u.access_status === "approved" ? "Approved" : "Waitlisted"}
                     </span>
                     <button
-                      onClick={() =>
-                        void setAccess(
-                          u.id,
-                          u.access_status === "approved" ? "waitlisted" : "approved",
-                        )
-                      }
+                      onClick={() => requestAccessChange(u)}
                       className="font-body text-xs text-accent underline underline-offset-2"
                     >
                       {u.access_status === "approved" ? "Revoke" : "Approve"}
@@ -870,6 +941,14 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
           </tbody>
         </table>
       </Card>
+
+      {confirm && (
+        <ConfirmDialog
+          request={confirm}
+          busy={confirmBusy}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
     </div>
   );
 }

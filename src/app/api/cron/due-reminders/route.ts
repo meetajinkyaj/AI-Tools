@@ -42,14 +42,36 @@ export async function GET(request: Request) {
       return NextResponse.json({ date: today, count: 0, subscriptions: [] });
     }
 
-    const { data: checkins, error: checkinError } = await supabase
-      .from("daily_checkins")
-      .select("user_id")
-      .eq("checkin_date", today);
+    const todayStart = `${today}T00:00:00Z`;
+    const [{ data: checkins, error: checkinError }, { data: reminded, error: remindedError }] =
+      await Promise.all([
+        supabase.from("daily_checkins").select("user_id").eq("checkin_date", today),
+        // Idempotency: users already handed to a sender today are excluded, so
+        // a backup/manual run can never double-ping anyone.
+        supabase
+          .from("events")
+          .select("user_id")
+          .eq("type", "reminder_sent")
+          .gte("created_at", todayStart),
+      ]);
     if (checkinError) throw new Error(`daily_checkins select failed: ${checkinError.message}`);
+    if (remindedError) throw new Error(`events select failed: ${remindedError.message}`);
 
-    const checkedIn = new Set((checkins ?? []).map((c) => c.user_id as string));
-    const subscriptions = subscriptionsToNotify(subs as PushSub[], checkedIn);
+    const skip = new Set([
+      ...(checkins ?? []).map((c) => c.user_id as string),
+      ...(reminded ?? []).map((r) => r.user_id as string),
+    ]);
+    const dueSubs = (subs as PushSub[]).filter((s) => !skip.has(s.user_id));
+    const subscriptions = subscriptionsToNotify(dueSubs, new Set());
+
+    // Mark BEFORE the sender pushes (at-most-once): if the sender then fails,
+    // users miss one nudge rather than risk being pinged twice.
+    const dueUserIds = [...new Set(dueSubs.map((s) => s.user_id))];
+    if (dueUserIds.length > 0) {
+      await supabase
+        .from("events")
+        .insert(dueUserIds.map((user_id) => ({ user_id, type: "reminder_sent" })));
+    }
 
     return NextResponse.json({ date: today, count: subscriptions.length, subscriptions });
   } catch (err) {
