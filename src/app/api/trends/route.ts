@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
+import { resolveApprovedUserId } from "@/lib/app-user";
 import { getOrCreateSelfProfileId } from "@/lib/profiles";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -35,13 +36,10 @@ export async function GET(request: Request) {
 
   try {
     const supabase = createSupabaseAdmin();
-    const { data: user } = await supabase
-      .from("users")
-      .select("id")
-      .eq("privy_user_id", privyUserId)
-      .maybeSingle();
-    if (!user) return NextResponse.json(emptyTrends());
-    const profileId = await getOrCreateSelfProfileId(user.id);
+    // Beta gate: unapproved users resolve to null (see app-user.ts).
+    const userId = await resolveApprovedUserId(privyUserId);
+    if (!userId) return NextResponse.json(emptyTrends());
+    const profileId = await getOrCreateSelfProfileId(userId);
 
     // --- Check-in trend (energy / sleep) ---
     const { data: checkins } = await supabase

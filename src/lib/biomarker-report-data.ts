@@ -1,5 +1,6 @@
 import "server-only";
 
+import { resolveApprovedUserId } from "./app-user";
 import { type CatalogEntry, dedupeCatalogForSex } from "./biomarkers";
 import { getOrCreateSelfProfileId } from "./profiles";
 import { createSupabaseAdmin } from "./supabase-admin";
@@ -15,15 +16,11 @@ export async function resolveReportUser(
   privyUserId: string,
 ): Promise<{ userId: string; profileId: string; sex: string } | null> {
   const supabase = createSupabaseAdmin();
-  const { data: user, error } = await supabase
-    .from("users")
-    .select("id")
-    .eq("privy_user_id", privyUserId)
-    .maybeSingle();
-  if (error) throw new Error(`users lookup failed: ${error.message}`);
-  if (!user) return null;
+  // Beta gate: unapproved users resolve to null (see app-user.ts).
+  const userId = await resolveApprovedUserId(privyUserId);
+  if (!userId) return null;
 
-  const profileId = await getOrCreateSelfProfileId(user.id);
+  const profileId = await getOrCreateSelfProfileId(userId);
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
@@ -32,7 +29,7 @@ export async function resolveReportUser(
     .maybeSingle();
   if (profileError) throw new Error(`profiles lookup failed: ${profileError.message}`);
 
-  return { userId: user.id, profileId, sex: profile?.biological_sex ?? "any" };
+  return { userId, profileId, sex: profile?.biological_sex ?? "any" };
 }
 
 export async function loadReportCatalog(sex: string): Promise<CatalogEntry[]> {

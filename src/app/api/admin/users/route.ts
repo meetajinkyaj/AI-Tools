@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     await Promise.all([
       supabase
         .from("users")
-        .select("id, email, created_at, deleted_at")
+        .select("id, email, created_at, deleted_at, access_status")
         .order("created_at", { ascending: false })
         .limit(1000),
       supabase.from("reward_points").select("user_id, points_balance"),
@@ -52,6 +52,7 @@ export async function GET(request: Request) {
       email: u.email,
       created_at: u.created_at,
       deleted: u.deleted_at != null,
+      access_status: u.access_status,
       points: pointsByUser.get(u.id) ?? 0,
       panels: panelsByUser.get(u.id) ?? 0,
       last_checkin: last?.date ?? null,
@@ -60,4 +61,42 @@ export async function GET(request: Request) {
   });
 
   return NextResponse.json({ users: roster, count: roster.length });
+}
+
+/** PATCH /api/admin/users — approve or re-waitlist a user (the beta gate). */
+export async function PATCH(request: Request) {
+  const admin = await requireAdmin(request);
+  if (!admin) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+
+  let b: Record<string, unknown>;
+  try {
+    b = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+  const id = typeof b.id === "string" ? b.id : null;
+  const access_status =
+    b.access_status === "approved" || b.access_status === "waitlisted"
+      ? b.access_status
+      : null;
+  if (!id || !access_status) {
+    return NextResponse.json({ error: "id and access_status required" }, { status: 400 });
+  }
+
+  const supabase = createSupabaseAdmin();
+  const { error } = await supabase
+    .from("users")
+    .update({ access_status })
+    .eq("id", id);
+  if (error) {
+    console.error("admin access update failed:", error);
+    return NextResponse.json({ error: "Couldn't update access" }, { status: 500 });
+  }
+  // Audit trail in the event stream.
+  await supabase.from("events").insert({
+    user_id: id,
+    type: access_status === "approved" ? "beta_approved" : "beta_waitlisted",
+    metadata: { by: admin.email },
+  });
+  return NextResponse.json({ ok: true });
 }

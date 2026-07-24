@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     // First-time login or returning user?
     const { data: existing, error: selectError } = await supabase
       .from("users")
-      .select("id, email")
+      .select("id, email, access_status")
       .eq("privy_user_id", userId)
       .maybeSingle();
 
@@ -68,18 +68,22 @@ export async function POST(request: Request) {
 
     let userRow: { id: string };
     let eventType: string;
+    // Beta gate: new signups start waitlisted (DB default); pre-gate users were
+    // backfilled to approved. The client routes on this value.
+    let accessStatus: string;
 
     if (!existing) {
       const { data, error } = await supabase
         .from("users")
         .insert({ privy_user_id: userId, email })
-        .select("id")
+        .select("id, access_status")
         .single();
 
       if (error || !data) {
         throw new Error(`users insert failed: ${error?.message ?? "no row"}`);
       }
       userRow = data;
+      accessStatus = data.access_status;
       eventType = "user_created";
     } else {
       // Keep email in sync if it changed at Privy; touch updated_at via trigger.
@@ -94,6 +98,7 @@ export async function POST(request: Request) {
         }
       }
       userRow = { id: existing.id };
+      accessStatus = existing.access_status;
       eventType = "user_signed_in";
     }
 
@@ -105,6 +110,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       user: { id: userRow.id, email },
       created: eventType === "user_created",
+      access_status: accessStatus,
     });
   } catch (err) {
     console.error("auth/sync failed:", err);

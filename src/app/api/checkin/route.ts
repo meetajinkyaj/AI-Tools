@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
+import { resolveApprovedUserId } from "@/lib/app-user";
 import {
   computeAwards,
   computeStreak,
@@ -24,14 +25,8 @@ import { createSupabaseAdmin } from "@/lib/supabase-admin";
  */
 
 async function resolveUserId(privyUserId: string): Promise<string | null> {
-  const supabase = createSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("users")
-    .select("id")
-    .eq("privy_user_id", privyUserId)
-    .maybeSingle();
-  if (error) throw new Error(`users lookup failed: ${error.message}`);
-  return data?.id ?? null;
+  // Beta gate: unapproved users resolve to null (see app-user.ts).
+  return resolveApprovedUserId(privyUserId);
 }
 
 async function getPointsBalance(profileId: string): Promise<number> {
