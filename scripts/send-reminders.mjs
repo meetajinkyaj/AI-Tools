@@ -34,26 +34,14 @@ const PAYLOAD = JSON.stringify({
   tag: "daily-checkin",
 });
 
-async function main() {
-  const res = await fetch(`${APP_URL}/api/cron/due-reminders`, {
-    headers: { Authorization: `Bearer ${CRON_SECRET}` },
-  });
-  if (!res.ok) {
-    console.error(`due-reminders failed: HTTP ${res.status} ${await res.text()}`);
-    process.exit(1);
-  }
-  const { subscriptions = [], date } = await res.json();
-  console.log(`Due for ${date}: ${subscriptions.length} subscription(s).`);
-
+/** Push one payload to a list; returns { sent, expired, failed }. */
+async function pushAll(subscriptions, payload) {
   let sent = 0;
   let expired = 0;
   let failed = 0;
   for (const sub of subscriptions) {
     try {
-      await webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: sub.keys },
-        PAYLOAD,
-      );
+      await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payload);
       sent++;
     } catch (err) {
       const code = err && err.statusCode;
@@ -64,9 +52,36 @@ async function main() {
       }
     }
   }
+  return { sent, expired, failed };
+}
+
+async function main() {
+  const res = await fetch(`${APP_URL}/api/cron/due-reminders`, {
+    headers: { Authorization: `Bearer ${CRON_SECRET}` },
+  });
+  if (!res.ok) {
+    console.error(`due-reminders failed: HTTP ${res.status} ${await res.text()}`);
+    process.exit(1);
+  }
+  const { subscriptions = [], retest = null, date } = await res.json();
+  console.log(
+    `Due for ${date}: ${subscriptions.length} check-in nudge(s), ${retest?.subscriptions?.length ?? 0} re-test push(es).`,
+  );
+
+  const daily = await pushAll(subscriptions, PAYLOAD);
+  // Panel-day pushes: the payload comes from the server, so the points value
+  // and copy live in the app, not this script.
+  const retestResult = retest?.subscriptions?.length
+    ? await pushAll(retest.subscriptions, JSON.stringify(retest.payload))
+    : { sent: 0, expired: 0, failed: 0 };
+
+  const sent = daily.sent + retestResult.sent;
+  const expired = daily.expired + retestResult.expired;
+  const failed = daily.failed + retestResult.failed;
+  const total = subscriptions.length + (retest?.subscriptions?.length ?? 0);
   console.log(`Reminders: ${sent} sent, ${expired} expired, ${failed} failed.`);
   // A few dead endpoints are normal; only hard-fail if everything errored.
-  if (subscriptions.length > 0 && sent === 0 && failed > 0) process.exit(1);
+  if (total > 0 && sent === 0 && failed > 0) process.exit(1);
 }
 
 main().catch((err) => {

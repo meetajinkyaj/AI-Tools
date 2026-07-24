@@ -42,3 +42,28 @@ export function safeEqual(a: string, b: string): boolean {
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
+
+// ---- Panel-day ("your re-test window is open") ----------------------------
+
+/**
+ * Whether a user is due the once-per-cycle re-test notification:
+ * their last panel is at least `afterDays` old, and they haven't been sent a
+ * re-test reminder SINCE that panel (a new panel starts a new cycle, so the
+ * guard is "reminded after the last panel", not "ever reminded").
+ */
+export function retestDue(
+  lastPanelDate: string, // YYYY-MM-DD
+  lastRetestReminderAt: string | null, // ISO timestamp of the last reminder, if any
+  today: string, // YYYY-MM-DD
+  afterDays: number,
+): boolean {
+  const dueMs = Date.parse(lastPanelDate) + afterDays * 86_400_000;
+  if (Date.parse(today) < dueMs) return false;
+  if (
+    lastRetestReminderAt != null &&
+    Date.parse(lastRetestReminderAt) > Date.parse(lastPanelDate)
+  ) {
+    return false; // already nudged for this cycle
+  }
+  return true;
+}
