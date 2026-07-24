@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 import { AuthedApp } from "./authed-app";
 import { Landing } from "./landing";
-import { CenteredMessage } from "./ui";
+import { Splash } from "./ui";
 
 /** Remember an invite code from a ?ref link so signup can attribute it. */
 function captureReferral() {
@@ -29,7 +29,7 @@ export function HomeView() {
   }, []);
 
   if (!ready) {
-    return <CenteredMessage>Loading…</CenteredMessage>;
+    return <Splash />;
   }
   if (!authenticated) {
     return <Landing />;

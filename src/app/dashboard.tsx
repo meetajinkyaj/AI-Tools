@@ -11,6 +11,11 @@ interface Summary {
   checkedInToday: boolean;
 }
 
+/** Shimmer stand-in for a stat value while the summary loads — never a fake 0. */
+function StatPlaceholder() {
+  return <div className="h-8 w-16 animate-pulse rounded bg-surface-2" />;
+}
+
 /**
  * Home tab. Rendered inside the AppShell, so it returns content only. Pulls the
  * check-in summary (streak, points, today's status) from GET /api/checkin and
@@ -73,41 +78,59 @@ export function Dashboard({
 
         <Card className="flex flex-col gap-2 p-6">
           <Eyebrow>Streak</Eyebrow>
-          <p className="font-display text-2xl font-medium text-foreground">
-            {summary?.streak ?? 0}
-            <span className="ml-1 font-body text-sm text-muted">
-              {summary?.streak === 1 ? "day" : "days"}
-            </span>
-          </p>
+          {summary ? (
+            <p className="font-display text-2xl font-medium text-foreground">
+              {summary.streak}
+              <span className="ml-1 font-body text-sm text-muted">
+                {summary.streak === 1 ? "day" : "days"}
+              </span>
+            </p>
+          ) : (
+            <StatPlaceholder />
+          )}
         </Card>
 
         <Card className="flex flex-col gap-2 p-6">
           <Eyebrow>iki points</Eyebrow>
-          <p className="font-display text-2xl font-medium text-foreground">
-            {summary?.pointsBalance ?? 0}
-          </p>
+          {summary ? (
+            <p className="font-display text-2xl font-medium text-foreground">
+              {summary.pointsBalance}
+            </p>
+          ) : (
+            <StatPlaceholder />
+          )}
         </Card>
       </div>
 
-      <Card className="flex flex-col gap-4 p-6">
-        <div className="flex flex-col gap-1">
-          <p className="font-body text-sm font-medium text-foreground">
-            {checkedInToday
-              ? "You've checked in today. Nice work."
-              : "Ready for today's check-in?"}
-          </p>
-          <p className="font-body text-sm text-muted">
-            {checkedInToday
-              ? "Come back tomorrow to keep your streak alive."
-              : "A 30-second check-in earns iki points and grows your streak."}
-          </p>
-        </div>
-        <div>
-          <button onClick={onCheckIn} className={primaryButtonClass}>
-            {checkedInToday ? "View check-in" : "Check in"}
-          </button>
-        </div>
-      </Card>
+      {summary ? (
+        <Card className="flex flex-col gap-4 p-6">
+          <div className="flex flex-col gap-1">
+            <p className="font-body text-sm font-medium text-foreground">
+              {checkedInToday
+                ? "You've checked in today. Nice work."
+                : "Ready for today's check-in?"}
+            </p>
+            <p className="font-body text-sm text-muted">
+              {checkedInToday
+                ? "Come back tomorrow to keep your streak alive."
+                : "A 30-second check-in earns iki points and grows your streak."}
+            </p>
+          </div>
+          <div>
+            <button onClick={onCheckIn} className={primaryButtonClass}>
+              {checkedInToday ? "View check-in" : "Check in"}
+            </button>
+          </div>
+        </Card>
+      ) : (
+        <Card className="flex flex-col gap-4 p-6">
+          <div className="flex animate-pulse flex-col gap-2">
+            <div className="h-4 w-48 rounded bg-surface-2" />
+            <div className="h-4 w-64 max-w-full rounded bg-surface-2" />
+          </div>
+          <div className="h-11 w-32 animate-pulse rounded-control bg-surface-2" />
+        </Card>
+      )}
     </div>
   );
 }
