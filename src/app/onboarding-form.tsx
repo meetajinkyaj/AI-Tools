@@ -11,7 +11,6 @@ import {
   PRIMARY_GOAL,
   PRIMARY_GOAL_LABELS,
   type ProfileRow,
-  MIN_AGE_YEARS,
 } from "@/lib/profile";
 import { ActivityChips } from "./activity-chips";
 import {
@@ -40,9 +39,6 @@ export function OnboardingForm({
   const [error, setError] = useState<string | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
-  // Terms require 18+ — cap the picker at the newest eligible birth date so an
-  // under-age date can't even be selected (the server validates it regardless).
-  const latestAdultDob = `${Number(today.slice(0, 4)) - MIN_AGE_YEARS}${today.slice(4)}`;
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -118,10 +114,11 @@ export function OnboardingForm({
               value={dateOfBirth}
               onChange={(e) => setDateOfBirth(e.target.value)}
               required
-              max={latestAdultDob}
+              max={today}
             />
             <span className="font-body text-xs font-normal text-muted">
-              You must be {MIN_AGE_YEARS} or older to use Ikigaro.
+              Under 18? You&rsquo;ll need a parent or guardian&rsquo;s consent to
+              use Ikigaro.
             </span>
           </label>
 

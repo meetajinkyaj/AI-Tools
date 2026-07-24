@@ -24,9 +24,11 @@ export default function TermsPage() {
 
       <h2>1. Eligibility</h2>
       <p>
-        You must be at least 18 years old, or the age of majority in your
-        jurisdiction, to use the Service. By using it, you confirm that you meet
-        this requirement and that the information you provide is accurate.
+        Anyone may use the Service. If you are under 18 (or the age of majority
+        in your jurisdiction), you may use it only with the consent of your
+        parent or legal guardian, who accepts these Terms on your behalf and is
+        responsible for your use of the Service. By using the Service, you
+        confirm this and that the information you provide is accurate.
       </p>
 
       <h2>2. Wellness, not medical care</h2>

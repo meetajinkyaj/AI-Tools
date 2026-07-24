@@ -85,8 +85,8 @@ export type ValidationResult =
   | { ok: false; error: string };
 
 const MAX_NAME_LENGTH = 120;
-/** The Terms of Service require users to be 18+ — the validator enforces it. */
-export const MIN_AGE_YEARS = 18;
+// No minimum age: per legal review, minors may use Ikigaro (with guardian
+// consent per the Terms), so the validator only rejects impossible dates.
 const MAX_AGE_YEARS = 120;
 const MAX_CONDITIONS_LENGTH = 2000;
 const MAX_LOCATION_LENGTH = 120;
@@ -177,8 +177,9 @@ function isOneOf<T extends readonly string[]>(
 }
 
 /**
- * Validate a date of birth and say WHY it fails — the under-18 case gets its
- * own message so a valid-but-too-young date never reads as "invalid date".
+ * Validate a date of birth and say WHY it fails. Any real, non-future date is
+ * accepted regardless of age (minors are welcome per the Terms); only
+ * malformed, impossible, future, or >120-year dates are rejected.
  * Returns null when acceptable.
  */
 export function dateOfBirthError(value: string): string | null {
@@ -200,17 +201,13 @@ export function dateOfBirthError(value: string): string | null {
   if (date.getTime() > now.getTime()) {
     return invalid;
   }
-  const age = ageInYears(date, now);
-  if (age < MIN_AGE_YEARS) {
-    return `Ikigaro is for adults — you must be at least ${MIN_AGE_YEARS} to sign up (see our Terms).`;
-  }
-  if (age > MAX_AGE_YEARS) {
+  if (ageInYears(date, now) > MAX_AGE_YEARS) {
     return "That date of birth doesn't look right — please check the year.";
   }
   return null;
 }
 
-/** Accepts a YYYY-MM-DD date that is a real calendar date and an adult age. */
+/** Accepts a YYYY-MM-DD date that is a real, non-future calendar date. */
 export function isValidDateOfBirth(value: string): boolean {
   return dateOfBirthError(value) === null;
 }
