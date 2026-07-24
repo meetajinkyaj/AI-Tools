@@ -13,12 +13,15 @@ import {
   resolveReportUser,
 } from "@/lib/biomarker-report-data";
 import {
+  POINTS,
   POINTS_REASON,
+  REFERRAL_PANEL_WINDOW_DAYS,
   isReplayUpload,
   panelContentSignature,
   uploadEarn,
   type SignatureReading,
 } from "@/lib/points";
+import { awardReferralMilestone } from "@/lib/referral-award";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   computeOutcomeAwards,
@@ -181,6 +184,14 @@ async function awardPanelPoints(
     // 1. Upload earn.
     const uploadTxn = computeUploadTxn(userId, profileId, newPanel, prior);
     if (uploadTxn) txns.push(uploadTxn);
+
+    // Referral tier 3: the friend's FIRST panel, within the signup window,
+    // pays their referrer. Once ever (ledger-checked); best-effort.
+    if (prior.length === 0) {
+      await awardReferralMilestone(userId, POINTS_REASON.referralPanel, POINTS.referralPanel, {
+        withinDaysOfSignup: REFERRAL_PANEL_WINDOW_DAYS,
+      });
+    }
 
     // 2. Outcome-verified improvement vs the previous panel.
     const bonuses: OutcomeAward[] = [];

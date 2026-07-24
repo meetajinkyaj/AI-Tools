@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getPrivyUserId } from "@/lib/api-auth";
 import { resolveApprovedUserId } from "@/lib/app-user";
 import { POINTS, POINTS_REASON } from "@/lib/points";
+import { awardReferralMilestone } from "@/lib/referral-award";
 import { validateProfileInput } from "@/lib/profile";
 import { getOrCreateSelfProfileId } from "@/lib/profiles";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
@@ -49,58 +50,6 @@ export async function GET(request: Request) {
   } catch (err) {
     console.error("GET /api/profile failed:", err);
     return NextResponse.json({ error: "Failed to load profile" }, { status: 500 });
-  }
-}
-
-/**
- * Pay the referrer their bonus when a referred user completes onboarding for
- * the first time. At-most-once per referred user (ledger reference check);
- * never throws — a referral hiccup must not fail onboarding.
- */
-async function awardReferrer(referredUserId: string): Promise<void> {
-  try {
-    const supabase = createSupabaseAdmin();
-    const { data: referred } = await supabase
-      .from("users")
-      .select("referred_by")
-      .eq("id", referredUserId)
-      .maybeSingle();
-    const referrerId = referred?.referred_by as string | null;
-    if (!referrerId) return;
-
-    // Already awarded for this referred user?
-    const { data: existing } = await supabase
-      .from("points_transactions")
-      .select("id")
-      .eq("reason", POINTS_REASON.referral)
-      .eq("reference_id", referredUserId)
-      .limit(1);
-    if (existing && existing.length > 0) return;
-
-    const referrerProfileId = await getOrCreateSelfProfileId(referrerId);
-    const { data: balanceRow } = await supabase
-      .from("reward_points")
-      .select("points_balance")
-      .eq("profile_id", referrerProfileId)
-      .maybeSingle();
-    await supabase.from("reward_points").upsert(
-      {
-        user_id: referrerId,
-        profile_id: referrerProfileId,
-        points_balance: (balanceRow?.points_balance ?? 0) + POINTS.referral,
-      },
-      { onConflict: "profile_id" },
-    );
-    await supabase.from("points_transactions").insert({
-      user_id: referrerId,
-      profile_id: referrerProfileId,
-      type: "earn",
-      amount: POINTS.referral,
-      reason: POINTS_REASON.referral,
-      reference_id: referredUserId,
-    });
-  } catch (err) {
-    console.error("Referral award failed (non-fatal):", err);
   }
 }
 
@@ -161,11 +110,10 @@ export async function POST(request: Request) {
       type: wasSetUp ? "profile_updated" : "profile_created",
     });
 
-    // Referral earn: the FIRST onboarding completion pays the referrer
-    // (signup alone earns nothing). Best-effort and idempotent — the ledger is
-    // checked for an existing award referencing this referred user.
+    // Referral tier 1: the FIRST onboarding completion pays the referrer
+    // (signup alone earns nothing). Idempotent + best-effort (see referral-award).
     if (!wasSetUp) {
-      await awardReferrer(userId);
+      await awardReferralMilestone(userId, POINTS_REASON.referralOnboard, POINTS.referralOnboard);
     }
 
     return NextResponse.json({ profile });
