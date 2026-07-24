@@ -49,14 +49,23 @@ export function nameBasedCode(
 }
 
 /**
+ * The character rule, on its own: uppercase and strip everything outside
+ * A–Z/0–9. Used as-you-type in the admin vanity editor so the field always
+ * shows exactly what would be saved; length is enforced separately by
+ * normalizeReferralCode.
+ */
+export function cleanReferralInput(raw: string): string {
+  return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+/**
  * Normalize a code from untrusted input (?ref param, admin vanity editor):
- * uppercase, strip everything outside A–Z/0–9, enforce length bounds.
- * Returns null when it can't be a real code — attribution silently skips
- * rather than erroring a signup.
+ * the character rule plus length bounds. Returns null when it can't be a real
+ * code — attribution silently skips rather than erroring a signup.
  */
 export function normalizeReferralCode(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
-  const cleaned = raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const cleaned = cleanReferralInput(raw);
   if (cleaned.length < CODE_MIN_LENGTH || cleaned.length > CODE_MAX_LENGTH) {
     return null;
   }

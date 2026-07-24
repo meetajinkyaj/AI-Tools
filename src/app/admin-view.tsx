@@ -3,6 +3,7 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { cleanReferralInput, normalizeReferralCode } from "@/lib/referral";
 import { ConfirmDialog, type ConfirmRequest } from "./confirm-dialog";
 
 import {
@@ -810,8 +811,10 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   // Inline vanity-code editor ("FITTR" for partners/influencers).
-  const [editingCode, setEditingCode] = useState<{ id: string; draft: string } | null>(null);
-  const [codeMsg, setCodeMsg] = useState<string | null>(null);
+  const [editingCode, setEditingCode] = useState<
+    { id: string; email: string; draft: string } | null
+  >(null);
+  const [codeMsg, setCodeMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const startedRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -846,17 +849,24 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
 
   const saveCode = async () => {
     if (!editingCode) return;
+    const normalized = normalizeReferralCode(editingCode.draft);
+    if (!normalized) return; // Save is disabled in this state; belt and braces
     setCodeMsg(null);
     const token = await getToken();
     const res = await fetch("/api/admin/users", {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ id: editingCode.id, referral_code: editingCode.draft }),
+      body: JSON.stringify({ id: editingCode.id, referral_code: normalized }),
     });
     if (!res.ok) {
-      setCodeMsg(((await res.json()) as { error?: string }).error ?? "Couldn't set code.");
+      setCodeMsg({
+        text: ((await res.json()) as { error?: string }).error ?? "Couldn't set code.",
+        ok: false,
+      });
       return;
     }
+    const saved = ((await res.json()) as { code?: string }).code ?? normalized;
+    setCodeMsg({ text: `Saved ${saved} for ${editingCode.email}.`, ok: true });
     setEditingCode(null);
     void load();
   };
@@ -911,7 +921,14 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
       <Eyebrow>
         {users.length} users{waiting > 0 ? ` · ${waiting} waiting for approval` : ""}
       </Eyebrow>
-      {codeMsg && <p className="font-body text-sm text-accent-hover">{codeMsg}</p>}
+      {codeMsg && (
+        <p
+          className={`font-body text-sm ${codeMsg.ok ? "text-foreground/80" : "text-accent-hover"}`}
+        >
+          {codeMsg.ok ? "✓ " : ""}
+          {codeMsg.text}
+        </p>
+      )}
       <Card className="overflow-x-auto p-0">
         <table className="w-full min-w-[42rem] text-left">
           <thead>
@@ -954,41 +971,72 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                 </td>
                 <td className="px-4 py-2">
                   {editingCode?.id === u.id ? (
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        className={`${fieldClass} h-8 w-28 font-mono text-xs uppercase`}
-                        value={editingCode.draft}
-                        onChange={(e) =>
-                          setEditingCode({ id: u.id, draft: e.target.value })
-                        }
-                        placeholder="FITTR"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => void saveCode()}
-                        className="font-body text-xs text-accent underline underline-offset-2"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingCode(null);
-                          setCodeMsg(null);
-                        }}
-                        className="font-body text-xs text-muted"
-                      >
-                        Cancel
-                      </button>
-                    </div>
+                    (() => {
+                      const normalized = normalizeReferralCode(editingCode.draft);
+                      return (
+                        <div className="flex flex-col gap-1">
+                          <span className="font-body text-[11px] text-muted">
+                            Current:{" "}
+                            <code className="font-mono">{u.referral_code ?? "none"}</code>
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              className={`${fieldClass} h-8 w-28 font-mono text-xs`}
+                              value={editingCode.draft}
+                              onChange={(e) =>
+                                // Same char rule the server applies — the field
+                                // always shows exactly what will be saved.
+                                setEditingCode({
+                                  ...editingCode,
+                                  draft: cleanReferralInput(e.target.value),
+                                })
+                              }
+                              placeholder="FITTR"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => void saveCode()}
+                              disabled={!normalized}
+                              className="font-body text-xs text-accent underline underline-offset-2 disabled:cursor-not-allowed disabled:text-muted disabled:no-underline"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingCode(null);
+                                setCodeMsg(null);
+                              }}
+                              className="font-body text-xs text-muted"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                          <span className="font-body text-[11px] text-muted">
+                            {normalized ? (
+                              <>
+                                Will save as: <code className="font-mono">{normalized}</code>
+                              </>
+                            ) : (
+                              "3–16 letters/numbers"
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })()
                   ) : (
                     <div className="flex items-center gap-2">
                       <code className="font-mono text-xs text-foreground">
                         {u.referral_code ?? "—"}
                       </code>
                       <button
-                        onClick={() =>
-                          setEditingCode({ id: u.id, draft: u.referral_code ?? "" })
-                        }
+                        onClick={() => {
+                          setCodeMsg(null);
+                          setEditingCode({
+                            id: u.id,
+                            email: u.email,
+                            draft: u.referral_code ?? "",
+                          });
+                        }}
                         className="font-body text-xs text-accent underline underline-offset-2"
                       >
                         {u.referral_code ? "Edit" : "Set"}

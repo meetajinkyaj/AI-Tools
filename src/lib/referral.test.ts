@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  cleanReferralInput,
   generateReferralCode,
   nameBasedCode,
   normalizeReferralCode,
@@ -43,6 +44,14 @@ describe("nameBasedCode", () => {
     expect(nameBasedCode("李 明")).toBeNull(); // no A-Z0-9 chars
     expect(nameBasedCode(null)).toBeNull();
     expect(nameBasedCode("")).toBeNull();
+  });
+});
+
+describe("cleanReferralInput", () => {
+  it("uppercases and strips invalid characters, keeping any length", () => {
+    expect(cleanReferralInput(" fit-tr! ")).toBe("FITTR");
+    expect(cleanReferralInput("ab")).toBe("AB"); // too short for a code, but shown as typed
+    expect(cleanReferralInput("A".repeat(20))).toBe("A".repeat(20)); // length guarded elsewhere
   });
 });
 
