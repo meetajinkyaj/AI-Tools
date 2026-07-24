@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type PushSub, safeEqual, subscriptionsToNotify } from "./reminders";
+import { type PushSub, retestDue, safeEqual, subscriptionsToNotify } from "./reminders";
 
 const sub = (user_id: string, endpoint: string): PushSub => ({
   user_id,
@@ -30,6 +30,32 @@ describe("subscriptionsToNotify", () => {
 
   it("handles an empty subscription list", () => {
     expect(subscriptionsToNotify([], new Set())).toEqual([]);
+  });
+});
+
+describe("retestDue", () => {
+  const AFTER = 182;
+
+  it("is due once the window opens and no reminder was sent this cycle", () => {
+    expect(retestDue("2026-01-01", null, "2026-07-15", AFTER)).toBe(true);
+  });
+
+  it("is not due before the window opens", () => {
+    expect(retestDue("2026-01-01", null, "2026-06-01", AFTER)).toBe(false);
+  });
+
+  it("is not due again after a reminder in this cycle", () => {
+    expect(
+      retestDue("2026-01-01", "2026-07-03T12:35:00Z", "2026-07-15", AFTER),
+    ).toBe(false);
+  });
+
+  it("a NEW panel resets the cycle: old reminder no longer blocks", () => {
+    // Reminded in July for the January panel; user re-tested in August; the
+    // next window (Feb) is due again despite the old reminder.
+    expect(
+      retestDue("2026-08-10", "2026-07-03T12:35:00Z", "2027-02-15", AFTER),
+    ).toBe(true);
   });
 });
 
