@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getPrivyUserId } from "@/lib/api-auth";
 import { resolveApprovedUserId } from "@/lib/app-user";
 import { POINTS, POINTS_REASON, REFERRAL_MAX_TOTAL, REFERRAL_PANEL_WINDOW_DAYS } from "@/lib/points";
-import { generateReferralCode, referralLink } from "@/lib/referral";
+import { generateReferralCode, nameBasedCode, referralLink } from "@/lib/referral";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
@@ -34,10 +34,21 @@ export async function GET(request: Request) {
 
     let code = me.referral_code as string | null;
     if (!code) {
-      // Lazy generation; the unique index arbitrates collisions — retry a few
-      // times on conflict (collision odds are tiny with a 31^8 space).
-      for (let attempt = 0; attempt < 5 && !code; attempt++) {
-        const candidate = generateReferralCode();
+      // Lazy generation, name-first: "AJINKYA", then "AJINKYA2"… on collision
+      // (the unique index arbitrates), with a random code as the final
+      // fallback. The sender shares the link knowingly, so a readable,
+      // name-based code is friendlier and less scammy-looking than random.
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("user_id", userId)
+        .eq("relationship", "self")
+        .maybeSingle();
+      const fullName = (profile?.full_name as string | null) ?? null;
+
+      for (let attempt = 0; attempt < 6 && !code; attempt++) {
+        const candidate =
+          nameBasedCode(fullName, attempt) ?? generateReferralCode();
         const { error } = await supabase
           .from("users")
           .update({ referral_code: candidate })
@@ -51,6 +62,7 @@ export async function GET(request: Request) {
             .single();
           code = (after?.referral_code as string | null) ?? null;
         }
+        // On a unique-violation error, loop: the next attempt tries "NAME2" etc.
       }
       if (!code) throw new Error("could not assign a referral code");
     }
