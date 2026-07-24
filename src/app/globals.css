@@ -61,6 +61,17 @@
   --radius-card: 14px;
 }
 
+/*
+ * The ground must exist before any component CSS or JS: without it, the
+ * browser paints its own default during startup and reloads — black in dark
+ * mode, white in light mode — which reads as a broken flash on mobile.
+ * The app is light-only; color-scheme keeps dark-mode UAs from second-guessing.
+ */
+html {
+  background: var(--onsen-linen);
+  color-scheme: light;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

@@ -22,9 +22,23 @@ export function Landing() {
         <p className="font-display text-2xl font-medium leading-snug text-linen/90">
           The operating system for performance, recovery &amp; longevity.
         </p>
-        <button onClick={login} className={primaryButtonClass}>
-          Sign in
-        </button>
+        {/* Both buttons open the same Privy email-OTP flow (it creates the
+            account when the email is new), but new and returning users each
+            get an entry that reads as theirs. */}
+        <div className="flex w-full max-w-xs flex-col items-stretch gap-3">
+          <button onClick={login} className={primaryButtonClass}>
+            Sign up
+          </button>
+          <button
+            onClick={login}
+            className="inline-flex h-11 items-center justify-center rounded-control border border-linen/30 bg-transparent px-6 font-body text-sm font-medium text-linen transition-colors hover:border-linen/60 hover:bg-linen/5"
+          >
+            Log in
+          </button>
+          <p className="font-body text-xs text-tan">
+            Just your email — no password needed.
+          </p>
+        </div>
 
         <nav className="mt-4 flex gap-5 font-body text-xs uppercase tracking-[0.18em] text-tan">
           <Link href="/privacy" className="transition-colors hover:text-linen">

@@ -33,6 +33,26 @@ export function CenteredMessage({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Branded startup screen. Every pre-app wait (Privy init, account sync) shows
+ * this same screen so startup reads as one continuous moment instead of a
+ * sequence of unrelated loading messages. The wordmark sits at a fixed
+ * position; only the small caption below it changes between phases.
+ */
+export function Splash({ caption }: { caption?: string }) {
+  return (
+    <Screen>
+      <div className="flex flex-col items-center gap-5">
+        <Wordmark className="animate-pulse text-5xl text-foreground" />
+        <p className="font-label text-[0.7rem] uppercase tracking-[0.34em] text-muted">
+          Performance · Recovery · Longevity
+        </p>
+        <p className="min-h-5 font-body text-sm text-muted">{caption ?? ""}</p>
+      </div>
+    </Screen>
+  );
+}
+
+/**
  * The Ikigaro wordmark: lowercase "ikigaro" in Cormorant Garamond with the
  * tittle of the "i" rendered in terracotta — the brand's single mandatory
  * accent. Size it by setting a font-size on `className` (e.g. `text-2xl`).

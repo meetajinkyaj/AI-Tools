@@ -16,7 +16,7 @@ import { ProfileEditForm } from "./profile-edit-form";
 import { ProfileView } from "./profile-view";
 import { TrendsView } from "./trends-view";
 import { FutureView } from "./future-view";
-import { CenteredMessage, primaryButtonClass, Screen } from "./ui";
+import { primaryButtonClass, Screen, Splash } from "./ui";
 import { WaitlistScreen } from "./waitlist-screen";
 
 type Status = "loading" | "waitlisted" | "onboarding" | "ready" | "error";
@@ -110,7 +110,7 @@ export function AuthedApp() {
   }, [load]);
 
   if (status === "loading") {
-    return <CenteredMessage>Setting up your account…</CenteredMessage>;
+    return <Splash caption="Setting up your account…" />;
   }
 
   if (status === "waitlisted") {
