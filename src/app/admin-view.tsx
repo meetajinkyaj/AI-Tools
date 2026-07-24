@@ -797,6 +797,7 @@ interface RosterUser {
   created_at: string;
   deleted: boolean;
   access_status: string; // 'waitlisted' | 'approved'
+  referral_code: string | null;
   points: number;
   panels: number;
   last_checkin: string | null;
@@ -808,6 +809,9 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  // Inline vanity-code editor ("FITTR" for partners/influencers).
+  const [editingCode, setEditingCode] = useState<{ id: string; draft: string } | null>(null);
+  const [codeMsg, setCodeMsg] = useState<string | null>(null);
   const startedRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -837,6 +841,23 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ id, access_status }),
     });
+    void load();
+  };
+
+  const saveCode = async () => {
+    if (!editingCode) return;
+    setCodeMsg(null);
+    const token = await getToken();
+    const res = await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ id: editingCode.id, referral_code: editingCode.draft }),
+    });
+    if (!res.ok) {
+      setCodeMsg(((await res.json()) as { error?: string }).error ?? "Couldn't set code.");
+      return;
+    }
+    setEditingCode(null);
     void load();
   };
 
@@ -890,12 +911,14 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
       <Eyebrow>
         {users.length} users{waiting > 0 ? ` · ${waiting} waiting for approval` : ""}
       </Eyebrow>
+      {codeMsg && <p className="font-body text-sm text-accent-hover">{codeMsg}</p>}
       <Card className="overflow-x-auto p-0">
         <table className="w-full min-w-[42rem] text-left">
           <thead>
             <tr className="border-b border-border font-body text-xs text-muted">
               <th className="px-4 py-2 font-medium">Email</th>
               <th className="px-4 py-2 font-medium">Access</th>
+              <th className="px-4 py-2 font-medium">Invite code</th>
               <th className="px-4 py-2 font-medium">Joined</th>
               <th className="px-4 py-2 font-medium">Points</th>
               <th className="px-4 py-2 font-medium">Panels</th>
@@ -928,6 +951,50 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                       {u.access_status === "approved" ? "Revoke" : "Approve"}
                     </button>
                   </div>
+                </td>
+                <td className="px-4 py-2">
+                  {editingCode?.id === u.id ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        className={`${fieldClass} h-8 w-28 font-mono text-xs uppercase`}
+                        value={editingCode.draft}
+                        onChange={(e) =>
+                          setEditingCode({ id: u.id, draft: e.target.value })
+                        }
+                        placeholder="FITTR"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => void saveCode()}
+                        className="font-body text-xs text-accent underline underline-offset-2"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingCode(null);
+                          setCodeMsg(null);
+                        }}
+                        className="font-body text-xs text-muted"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <code className="font-mono text-xs text-foreground">
+                        {u.referral_code ?? "—"}
+                      </code>
+                      <button
+                        onClick={() =>
+                          setEditingCode({ id: u.id, draft: u.referral_code ?? "" })
+                        }
+                        className="font-body text-xs text-accent underline underline-offset-2"
+                      >
+                        {u.referral_code ? "Edit" : "Set"}
+                      </button>
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-2 text-muted">
                   {new Date(u.created_at).toLocaleDateString()}

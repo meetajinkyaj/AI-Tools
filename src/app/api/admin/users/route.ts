@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/admin-auth";
+import { normalizeReferralCode } from "@/lib/referral";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
     await Promise.all([
       supabase
         .from("users")
-        .select("id, email, created_at, deleted_at, access_status")
+        .select("id, email, created_at, deleted_at, access_status, referral_code")
         .order("created_at", { ascending: false })
         .limit(1000),
       supabase.from("reward_points").select("user_id, points_balance"),
@@ -53,6 +54,7 @@ export async function GET(request: Request) {
       created_at: u.created_at,
       deleted: u.deleted_at != null,
       access_status: u.access_status,
+      referral_code: u.referral_code ?? null,
       points: pointsByUser.get(u.id) ?? 0,
       panels: panelsByUser.get(u.id) ?? 0,
       last_checkin: last?.date ?? null,
@@ -63,7 +65,13 @@ export async function GET(request: Request) {
   return NextResponse.json({ users: roster, count: roster.length });
 }
 
-/** PATCH /api/admin/users — approve or re-waitlist a user (the beta gate). */
+/**
+ * PATCH /api/admin/users — one of:
+ *   { id, access_status }  approve / re-waitlist a user (the beta gate);
+ *   { id, referral_code }  assign a vanity invite code ("FITTR") for
+ *                          partners/influencers — normalized, unique-index
+ *                          arbitrated (409 when taken).
+ */
 export async function PATCH(request: Request) {
   const admin = await requireAdmin(request);
   if (!admin) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
@@ -75,15 +83,50 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
   const id = typeof b.id === "string" ? b.id : null;
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  const supabase = createSupabaseAdmin();
+
+  if (b.referral_code !== undefined) {
+    const code = normalizeReferralCode(b.referral_code);
+    if (!code) {
+      return NextResponse.json(
+        { error: "Codes are 3–16 letters/numbers." },
+        { status: 400 },
+      );
+    }
+    const { error } = await supabase
+      .from("users")
+      .update({ referral_code: code })
+      .eq("id", id);
+    if (error) {
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { error: `“${code}” is already taken.` },
+          { status: 409 },
+        );
+      }
+      console.error("admin referral-code update failed:", error);
+      return NextResponse.json({ error: "Couldn't set code" }, { status: 500 });
+    }
+    await supabase.from("events").insert({
+      user_id: id,
+      type: "referral_code_set",
+      metadata: { by: admin.email, code },
+    });
+    return NextResponse.json({ ok: true, code });
+  }
+
   const access_status =
     b.access_status === "approved" || b.access_status === "waitlisted"
       ? b.access_status
       : null;
-  if (!id || !access_status) {
-    return NextResponse.json({ error: "id and access_status required" }, { status: 400 });
+  if (!access_status) {
+    return NextResponse.json(
+      { error: "access_status or referral_code required" },
+      { status: 400 },
+    );
   }
 
-  const supabase = createSupabaseAdmin();
   const { error } = await supabase
     .from("users")
     .update({ access_status })
