@@ -8,6 +8,13 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // Plaintext vars are REPLACED by this file on every `wrangler deploy` —
+  // dashboard-set vars get wiped, so any non-secret var MUST live here.
+  // (Secrets set via `wrangler secret put` survive deploys and stay out of git.)
+  "vars": {
+    // Admin allow-list for /admin (comma-separated, case-insensitive).
+    "ADMIN_EMAILS": "meetajinkyaj@gmail.com"
+  },
   "observability": {
     "enabled": true
   }
