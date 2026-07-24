@@ -118,25 +118,6 @@ export function Card({
   );
 }
 
-/** Placeholder pane for sections not yet built, so nav is real end-to-end. */
-export function ComingSoon({
-  eyebrow,
-  title,
-  note,
-}: {
-  eyebrow: string;
-  title: string;
-  note: string;
-}) {
-  return (
-    <div className="flex flex-col gap-6">
-      <PageHeader eyebrow={eyebrow} title={title} />
-      <Card className="p-8">
-        <p className="font-body text-sm text-muted">{note}</p>
-      </Card>
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /* Shared class strings — kept so form fields stay consistent app-wide */
