@@ -130,9 +130,7 @@ describe("isValidDateOfBirth", () => {
     expect(isValidDateOfBirth(`${nextYear}-01-01`)).toBe(false);
   });
 
-  it("rejects implausible ages", () => {
-    const tooYoung = new Date().getUTCFullYear() - 5;
-    expect(isValidDateOfBirth(`${tooYoung}-01-01`)).toBe(false);
+  it("rejects only impossible ages (120+), not young ones", () => {
     expect(isValidDateOfBirth("1850-01-01")).toBe(false);
   });
 });
@@ -142,16 +140,12 @@ describe("dateOfBirthError", () => {
     expect(dateOfBirthError("1985-01-01")).toBeNull();
   });
 
-  it("names the 18+ requirement for a minor (valid date, too young)", () => {
-    // e.g. the 2015-08-05 case from beta testing — a real date, an under-18 age.
+  it("accepts minors — no minimum age (per legal review + Terms)", () => {
+    // The 2015-08-05 beta case: a real date, an under-18 age — now accepted.
     const minorYear = new Date().getUTCFullYear() - 10;
-    const err = dateOfBirthError(`${minorYear}-08-05`);
-    expect(err).toContain("at least 18");
-  });
-
-  it("rejects a 17-year-old (the Terms line is 18, not 13)", () => {
+    expect(dateOfBirthError(`${minorYear}-08-05`)).toBeNull();
     const seventeen = new Date().getUTCFullYear() - 17;
-    expect(dateOfBirthError(`${seventeen}-01-01`)).toContain("at least 18");
+    expect(dateOfBirthError(`${seventeen}-01-01`)).toBeNull();
   });
 
   it("keeps the generic message for malformed or impossible dates", () => {
@@ -159,10 +153,13 @@ describe("dateOfBirthError", () => {
     expect(dateOfBirthError("1990-02-31")).toBe("A valid date of birth is required");
   });
 
-  it("surfaces the under-18 message through validateProfileInput", () => {
+  it("flags a 120+ year age as a likely typo", () => {
+    expect(dateOfBirthError("1850-01-01")).toContain("check the year");
+  });
+
+  it("accepts a minor through validateProfileInput end to end", () => {
     const minorYear = new Date().getUTCFullYear() - 10;
     const result = validateProfileInput(validBody({ date_of_birth: `${minorYear}-08-05` }));
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("at least 18");
+    expect(result.ok).toBe(true);
   });
 });
