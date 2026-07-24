@@ -37,12 +37,16 @@ export async function POST(request: Request) {
 
     if (body.kind === "open") {
       if (!privyUserId) return NextResponse.json({ ok: true });
+      // Only approved users count toward DAU/retention — waitlisted logins
+      // seeing the waitlist screen aren't product activity.
       const { data: user } = await supabase
         .from("users")
-        .select("id")
+        .select("id, access_status")
         .eq("privy_user_id", privyUserId)
         .maybeSingle();
-      if (!user) return NextResponse.json({ ok: true });
+      if (!user || user.access_status !== "approved") {
+        return NextResponse.json({ ok: true });
+      }
 
       // One app_opened per UTC day keeps retention queries trivial.
       const todayStart = `${todayUTC()}T00:00:00Z`;

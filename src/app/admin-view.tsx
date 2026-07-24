@@ -740,6 +740,7 @@ interface RosterUser {
   email: string;
   created_at: string;
   deleted: boolean;
+  access_status: string; // 'waitlisted' | 'approved'
   points: number;
   panels: number;
   last_checkin: string | null;
@@ -771,6 +772,16 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
     void load();
   }, [load]);
 
+  const setAccess = async (id: string, access_status: "approved" | "waitlisted") => {
+    const token = await getToken();
+    await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ id, access_status }),
+    });
+    void load();
+  };
+
   if (status === "loading") return <CenteredMessage>Loading users…</CenteredMessage>;
   if (status === "error")
     return (
@@ -788,14 +799,23 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
       </div>
     );
 
+  // Pending approvals first — that's the queue this table exists to serve.
+  const sorted = [...users].sort((a, b) =>
+    a.access_status === b.access_status ? 0 : a.access_status === "waitlisted" ? -1 : 1,
+  );
+  const waiting = users.filter((u) => u.access_status === "waitlisted").length;
+
   return (
     <div className="flex flex-col gap-3">
-      <Eyebrow>{users.length} users</Eyebrow>
+      <Eyebrow>
+        {users.length} users{waiting > 0 ? ` · ${waiting} waiting for approval` : ""}
+      </Eyebrow>
       <Card className="overflow-x-auto p-0">
-        <table className="w-full min-w-[36rem] text-left">
+        <table className="w-full min-w-[42rem] text-left">
           <thead>
             <tr className="border-b border-border font-body text-xs text-muted">
               <th className="px-4 py-2 font-medium">Email</th>
+              <th className="px-4 py-2 font-medium">Access</th>
               <th className="px-4 py-2 font-medium">Joined</th>
               <th className="px-4 py-2 font-medium">Points</th>
               <th className="px-4 py-2 font-medium">Panels</th>
@@ -804,11 +824,35 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
+            {sorted.map((u) => (
               <tr key={u.id} className="border-b border-border/60 font-body text-sm text-foreground">
                 <td className="px-4 py-2">
                   {u.email}
                   {u.deleted && <span className="ml-1 text-xs text-muted">(deleted)</span>}
+                </td>
+                <td className="px-4 py-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-body text-xs font-medium ${
+                        u.access_status === "approved"
+                          ? "bg-surface-2 text-muted"
+                          : "bg-accent/10 text-accent"
+                      }`}
+                    >
+                      {u.access_status === "approved" ? "Approved" : "Waitlisted"}
+                    </span>
+                    <button
+                      onClick={() =>
+                        void setAccess(
+                          u.id,
+                          u.access_status === "approved" ? "waitlisted" : "approved",
+                        )
+                      }
+                      className="font-body text-xs text-accent underline underline-offset-2"
+                    >
+                      {u.access_status === "approved" ? "Revoke" : "Approve"}
+                    </button>
+                  </div>
                 </td>
                 <td className="px-4 py-2 text-muted">
                   {new Date(u.created_at).toLocaleDateString()}

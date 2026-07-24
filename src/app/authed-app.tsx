@@ -17,8 +17,9 @@ import { ProfileView } from "./profile-view";
 import { TrendsView } from "./trends-view";
 import { FutureView } from "./future-view";
 import { CenteredMessage, primaryButtonClass, Screen } from "./ui";
+import { WaitlistScreen } from "./waitlist-screen";
 
-type Status = "loading" | "onboarding" | "ready" | "error";
+type Status = "loading" | "waitlisted" | "onboarding" | "ready" | "error";
 
 /**
  * Orchestrates the authenticated experience:
@@ -66,6 +67,12 @@ export function AuthedApp() {
         setStatus("error");
         return;
       }
+      // Beta gate: waitlisted users see the waitlist screen, nothing else.
+      const sync = (await syncRes.json()) as { access_status?: string };
+      if (sync.access_status && sync.access_status !== "approved") {
+        setStatus("waitlisted");
+        return;
+      }
 
       const profileRes = await fetch("/api/profile", {
         headers: { Authorization: `Bearer ${token}` },
@@ -96,6 +103,17 @@ export function AuthedApp() {
 
   if (status === "loading") {
     return <CenteredMessage>Setting up your account…</CenteredMessage>;
+  }
+
+  if (status === "waitlisted") {
+    return (
+      <WaitlistScreen
+        email={user?.email?.address ?? null}
+        onRefresh={() => void load()}
+        onLogout={() => void logout()}
+        checking={false}
+      />
+    );
   }
 
   if (status === "error") {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
+import { resolveApprovedUserId } from "@/lib/app-user";
 import { displayStreak, todayUTC } from "@/lib/checkin";
 import { getOrCreateSelfProfileId } from "@/lib/profiles";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
@@ -28,13 +29,10 @@ export async function GET(request: Request) {
 
   try {
     const supabase = createSupabaseAdmin();
-    const { data: user } = await supabase
-      .from("users")
-      .select("id")
-      .eq("privy_user_id", privyUserId)
-      .maybeSingle();
-    if (!user) return NextResponse.json({ error: "User not found" }, { status: 409 });
-    const profileId = await getOrCreateSelfProfileId(user.id);
+    // Beta gate: unapproved users resolve to null (see app-user.ts).
+    const userId = await resolveApprovedUserId(privyUserId);
+    if (!userId) return NextResponse.json({ error: "User not found" }, { status: 409 });
+    const profileId = await getOrCreateSelfProfileId(userId);
 
     const { data: profile } = await supabase
       .from("profiles")
