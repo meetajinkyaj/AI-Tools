@@ -17,7 +17,7 @@ real deployment before they reach the live app.
 | | Production | Staging |
 |---|---|---|
 | Worker | `ai-tools` | `ai-tools-staging` |
-| URL | app.ikigaro.com | *(fill in after setup — §1.6)* |
+| URL | app.ikigaro.com | https://ai-tools-staging.meetajinkyaj.workers.dev |
 | Database | production Supabase (`xaygldulkjjofxohescm`) | `ikigaro-staging` (`albhabiyfaqvpnxilovf`) |
 | Deploys on | push to `main` | every pull request |
 | Data | real users | throwaway |
@@ -111,15 +111,15 @@ Staging shares the production Privy app, so the same email works on both. That
 is safe — identity is shared, **data is not**, because the databases are
 separate. Split them later if you ever want staging logins fully isolated.
 
-### 1.6 First deploy, and record the URL
+### 1.6 First deploy
 
-Open any pull request. CI builds it and deploys to staging; the run prints the
-`ai-tools-staging.<your-subdomain>.workers.dev` URL. **Put that URL in the table
-at the top of this file** so nobody has to dig through logs again.
+✅ **Done** — the Worker exists and every PR redeploys it:
+
+    https://ai-tools-staging.meetajinkyaj.workers.dev
 
 Optional: add a `staging.ikigaro.com` custom domain in Cloudflare → Workers →
 `ai-tools-staging` → Settings → Domains & Routes, then add that hostname to
-Privy (1.5) too.
+Privy (1.5) too and update the URL above.
 
 ---
 
@@ -136,7 +136,7 @@ Privy (1.5) too.
 
 **Approve yourself on staging:** staging starts with an empty database, so your
 first signup lands on the waitlist like any other. Open
-`ai-tools-staging.<...>.workers.dev/admin` and approve yourself. (The
+`https://ai-tools-staging.meetajinkyaj.workers.dev/admin` and approve yourself. (The
 `app.ikigaro.com/admin` → `admin.ikigaro.com` redirect only applies to the
 production hostname, so admin works directly on staging.)
 

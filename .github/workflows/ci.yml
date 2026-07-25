@@ -69,7 +69,9 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "This PR is now live on the staging app. Test it there before merging." >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Staging URL: see \`docs/STAGING.md\` (fixed URL — it does not change per PR)." >> "$GITHUB_STEP_SUMMARY"
+          echo "**https://ai-tools-staging.meetajinkyaj.workers.dev**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Fixed URL — it does not change per PR. Look for the \"Staging · not live data\" badge." >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     # Auto-deploy to Cloudflare on every push to main, once CI passes.
