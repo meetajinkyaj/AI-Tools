@@ -153,7 +153,12 @@ operate it, and the known follow-ups. Update this as work lands.
   `--env staging`); **pushes to `main`** deploy to production
   (`npm run cf:deploy`). Repo secrets: `CLOUDFLARE_API_TOKEN`,
   `CLOUDFLARE_ACCOUNT_ID`.
-- **Staging (`docs/STAGING.md`):** separate Worker + separate Supabase project;
+- **Staging (`docs/STAGING.md`, live since 2026-07-25):** `ai-tools-staging` at
+  `ai-tools-staging.meetajinkyaj.workers.dev`, backed by the `ikigaro-staging`
+  Supabase project (`albhabiyfaqvpnxilovf`) with its own Anthropic key. Shares
+  the production Privy app — identity shared, data not; verified by a signup
+  landing only in staging while production's user count stayed put. Separate
+  Worker + separate Supabase project;
   `APP_ENV=staging` var. `assertNotProductionDatabase` refuses to boot if a
   non-production env would reach the production DB (the URL default falls back
   to prod, so a forgotten var would otherwise be silent). Build-time
