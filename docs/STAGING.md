@@ -18,7 +18,7 @@ real deployment before they reach the live app.
 |---|---|---|
 | Worker | `ai-tools` | `ai-tools-staging` |
 | URL | app.ikigaro.com | *(fill in after setup — §1.6)* |
-| Database | production Supabase | **its own** Supabase project |
+| Database | production Supabase (`xaygldulkjjofxohescm`) | `ikigaro-staging` (`albhabiyfaqvpnxilovf`) |
 | Deploys on | push to `main` | every pull request |
 | Data | real users | throwaway |
 | Badge | none | "Staging · not live data" |
@@ -60,24 +60,32 @@ In the staging project's SQL editor, run every file in
 `supabase/migrations/` **in filename order**, `0001` through `0012`. They are
 idempotent, so a re-run is harmless.
 
-Then confirm: `select count(*) from biomarker_catalog;` should return ~83.
+Then confirm:
+
+```sql
+select count(*) from biomarker_catalog;                 -- 91 rows
+select count(distinct marker_key) from biomarker_catalog; -- 83 markers
+select count(*) from users;                             -- 0 (wrong project if not)
+```
+
+Both catalog numbers are correct and neither is a mistake: the product has ~83
+*markers*, but the unique key is `(marker_key, sex)`, so sex-split markers like
+`hdl_c` legitimately occupy two rows — 91 rows, 83 distinct markers.
+
+**Supabase may show a "Run without RLS" / "Run and enable RLS" dialog** on
+migrations 0007 and 0008, which create tables without enabling RLS in the same
+statement. Choose **"Run without RLS"** — 0009 enables it on those tables a few
+files later, and picking the other option deviates from the migration. (All 18
+tables end up with RLS enabled; nothing is left uncovered.)
 
 > Keep this in sync going forward. When you add a migration, run it on staging
 > first — that's the rehearsal that makes the production run safe.
 
 ### 1.3 Point the staging Worker at that database
 
-In `wrangler.jsonc`, fill in the empty `SUPABASE_URL` under `env.staging.vars`:
-
-```jsonc
-"staging": {
-  "vars": {
-    "SUPABASE_URL": "https://YOUR-STAGING-PROJECT.supabase.co"
-  }
-}
-```
-
-Commit it — the URL is public, and plaintext vars **must** live in this file
+✅ **Done** — `env.staging.vars.SUPABASE_URL` in `wrangler.jsonc` points at
+`ikigaro-staging`. If you ever rebuild the staging project, update it there and
+commit: the URL is public, and plaintext vars **must** live in that file
 (anything set in the Cloudflare dashboard is wiped on the next deploy).
 
 ### 1.4 Set the staging Worker's secrets
