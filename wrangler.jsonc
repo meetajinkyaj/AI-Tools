@@ -11,11 +11,40 @@
   // Plaintext vars are REPLACED by this file on every `wrangler deploy` —
   // dashboard-set vars get wiped, so any non-secret var MUST live here.
   // (Secrets set via `wrangler secret put` survive deploys and stay out of git.)
+  //
+  // NOTE: `vars` is NOT inherited by named environments. The staging block
+  // below repeats every var it needs on purpose — omitting one there does not
+  // fall back to these values.
   "vars": {
     // Admin allow-list for /admin (comma-separated, case-insensitive).
-    "ADMIN_EMAILS": "meetajinkyaj@gmail.com"
+    "ADMIN_EMAILS": "meetajinkyaj@gmail.com",
+    // Runtime environment marker. Guards the production database against
+    // non-production deploys (src/lib/supabase-admin.ts).
+    "APP_ENV": "production"
   },
   "observability": {
     "enabled": true
+  },
+  "env": {
+    // Staging: a separate Worker with its own database, deployed from every
+    // pull request so changes can be exercised before they reach the live app.
+    // One-time setup is documented in docs/STAGING.md.
+    "staging": {
+      "name": "ai-tools-staging",
+      "workers_dev": true,
+      "vars": {
+        "ADMIN_EMAILS": "meetajinkyaj@gmail.com",
+        "APP_ENV": "staging",
+        // The staging Supabase project's URL. Public, so it belongs here
+        // rather than in secrets. MUST be filled in before staging works:
+        // while it is empty the app falls back to the production URL, which
+        // the APP_ENV guard rejects — staging fails loudly instead of quietly
+        // reading and writing real user data.
+        "SUPABASE_URL": ""
+      },
+      "observability": {
+        "enabled": true
+      }
+    }
   }
 }

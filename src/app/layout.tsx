@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Hanken_Grotesk, Marcellus } from "next/font/google";
 import "./globals.css";
+import { EnvBanner } from "./env-banner";
 import { ServiceWorkerRegistrar } from "./service-worker-registrar";
 
 // Three brand voices (Ikigaro Brand Guidelines §9):
@@ -54,6 +55,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ServiceWorkerRegistrar />
+        <EnvBanner />
         {children}
       </body>
     </html>

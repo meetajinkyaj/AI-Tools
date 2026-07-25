@@ -15,9 +15,14 @@ New here? Read [`HANDOVER.md`](./HANDOVER.md) first.
 **Normal path — you never deploy by hand.**
 
 ```
-open a PR → CI runs (lint, typecheck, test, build) → merge to main
-                                                   → CI deploys to Cloudflare
+open a PR → CI (lint, typecheck, test, build) → deploy to STAGING → you test it
+                                                                        │
+         merge to main → CI → deploy to PRODUCTION ◄─────────────────────┘
 ```
+
+Every pull request deploys to a staging Worker with its own database, so changes
+can be exercised before they reach the live app. Setup and daily use:
+[`STAGING.md`](./STAGING.md).
 
 `.github/workflows/ci.yml` runs both jobs; the deploy job only fires on a push to
 `main` after the build job passes. Watch it in the repo's Actions tab. A merge
@@ -71,9 +76,11 @@ for every user. There is no partial failure here.
 1. Write the migration idempotently (`IF NOT EXISTS`, guarded backfills).
 2. Rehearse it on a throwaway Postgres — including running it **twice** to prove
    idempotency, and against a copy with realistic rows if it backfills.
-3. Apply to production via the Supabase SQL editor.
-4. Verify (`select` the new column/table).
-5. *Then* merge the code that depends on it.
+3. Apply it to the **staging** database and exercise the PR there. This is the
+   real rehearsal: same SQL, same code path, no production risk.
+4. Apply to production via the Supabase SQL editor.
+5. Verify (`select` the new column/table).
+6. *Then* merge the code that depends on it.
 
 **Reference-range changes** (biomarker bands, catalog values) are data, not
 schema: ship an idempotent `UPDATE biomarker_catalog …` migration, no code change
@@ -91,7 +98,7 @@ Three separate stores. Putting a value in the wrong one is a common failure.
 | Store | Set with | Survives deploy? | What's there |
 |---|---|---|---|
 | **Worker secrets** | `npx wrangler secret put NAME` | Yes | `ANTHROPIC_API_KEY`, `PRIVY_APP_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` |
-| **Worker vars** (plaintext) | committed in `wrangler.jsonc` `vars` | Replaced by this file every deploy | `ADMIN_EMAILS` |
+| **Worker vars** (plaintext) | committed in `wrangler.jsonc` `vars` | Replaced by this file every deploy | `ADMIN_EMAILS`, `APP_ENV` |
 | **GitHub Actions secrets** | repo Settings → Secrets | n/a | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CRON_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` |
 
 **Never set a plaintext var in the Cloudflare dashboard.** `wrangler deploy`
@@ -100,6 +107,11 @@ dashboard-set `ADMIN_EMAILS` was silently wiped this way, locking admin out.
 
 `CRON_SECRET` exists in **two** stores and the values must match. Changing one
 without the other silently breaks daily reminders (the Worker rejects the caller).
+
+**Environments have separate secrets.** Staging inherits nothing — set its
+values with `--env staging` (see [`STAGING.md`](./STAGING.md) §1.4). Staging vars
+also don't inherit from the top-level `vars` block; `env.staging.vars` repeats
+everything it needs.
 
 ---
 

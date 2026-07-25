@@ -24,9 +24,10 @@ In this order:
 | 2 | [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) | The living system-of-record: every feature, architecture decision, incident, and key file | 20 min |
 | 3 | [`../README.md`](../README.md) | Get it running locally | 15 min |
 | 4 | [`RUNBOOK.md`](./RUNBOOK.md) | How to deploy, migrate, rotate secrets, respond to incidents | 10 min |
-| 5 | [`SCALING.md`](./SCALING.md) | Deliberately deferred optimizations + the trigger for each | skim |
-| 6 | [`REFERENCE_DATA.md`](./REFERENCE_DATA.md) | How clinical reference ranges are stored and changed | skim |
-| 7 | [`FAQ.md`](./FAQ.md) | The user-facing answers (canonical copy for points/redemption) | skim |
+| 5 | [`STAGING.md`](./STAGING.md) | The staging environment and how changes reach production | 5 min |
+| 6 | [`SCALING.md`](./SCALING.md) | Deliberately deferred optimizations + the trigger for each | skim |
+| 7 | [`REFERENCE_DATA.md`](./REFERENCE_DATA.md) | How clinical reference ranges are stored and changed | skim |
+| 8 | [`FAQ.md`](./FAQ.md) | The user-facing answers (canonical copy for points/redemption) | skim |
 
 Then do the day-one checklist in §5.
 
@@ -89,11 +90,13 @@ Web Push sent from GitHub Actions · Tailwind v4 · Vitest (155 tests).
 
 **Real debt, sized:**
 - **No E2E test suite.** Domain logic is well covered; the flows through the UI
-  are verified by hand. First serious hire-time investment: Playwright covering
-  signup → onboarding → upload → confirm → save → check-in → redeem.
-- **No staging environment.** `main` deploys straight to production. This was the
-  right call for a solo pre-beta build and is the wrong call the moment a second
-  engineer joins. See §8, item 1.
+  are verified by hand — now against staging rather than production, but still by
+  hand. First serious hire-time investment: Playwright covering signup →
+  onboarding → upload → confirm → save → check-in → redeem. See §8, item 1.
+- **Staging exists but is single-slot.** Every PR deploys to one shared staging
+  Worker, so concurrent PRs overwrite each other (deploys are serialized, last
+  one wins). Fine for one or two people; past that, move to per-PR preview URLs
+  (`wrangler versions upload`). See [`STAGING.md`](./STAGING.md) §3.
 - **The marketing site is a 12.4MB machine-generated snapshot** that compiles JSX
   in the browser via Babel. It works and it looks good, but it is unmaintainable
   by hand and slow on mobile. A rebuild is scoped and deferred (§8, item 5).
@@ -261,13 +264,14 @@ constraints, (g) Cloudflare zone features (Access, Bot Fight Mode) in the path.
 Ordered by what I'd actually do first, with the reasoning — disagree freely once
 you have your own read.
 
-**1. Staging environment + E2E tests.** *(Do this before your first feature.)*
-`main` currently deploys straight to production with no browser-level safety net.
-That is survivable for one person who tests by hand and fatal for a team. A
-second Worker + Supabase project, plus Playwright over the critical path
-(signup → onboarding → upload → confirm → save → check-in → redeem), converts
-every future change from "carefully verified by hand" to "verified by CI." Every
-item below is cheaper and safer once this exists.
+**1. E2E tests on top of staging.** *(Do this before your first feature.)*
+Staging is now built: every PR deploys to `ai-tools-staging`, which has its own
+Supabase project and cannot reach production data ([`STAGING.md`](./STAGING.md)).
+What's still missing is the automation — changes are exercised there **by hand**.
+Playwright over the critical path (signup → onboarding → upload → confirm → save
+→ check-in → redeem), run against the staging deploy in CI, converts every future
+change from "carefully verified by a human who remembered to look" to "verified
+by CI." Every item below is cheaper and safer once this exists.
 
 **2. Verify the backup/restore path.** Confirm the Supabase PITR tier, then
 actually perform a restore into a scratch project. An unrehearsed backup is a

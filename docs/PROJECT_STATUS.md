@@ -148,9 +148,17 @@ operate it, and the known follow-ups. Update this as work lands.
 
 ## 4. Infrastructure, secrets & schedules
 
-- **CI (`.github/workflows/ci.yml`):** push to `main` → lint → typecheck →
-  test → build → deploy (`npm run cf:deploy`). Repo secrets:
-  `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+- **CI (`.github/workflows/ci.yml`):** lint → typecheck → test → build on every
+  PR and push. **Pull requests** then deploy to staging (`ai-tools-staging`,
+  `--env staging`); **pushes to `main`** deploy to production
+  (`npm run cf:deploy`). Repo secrets: `CLOUDFLARE_API_TOKEN`,
+  `CLOUDFLARE_ACCOUNT_ID`.
+- **Staging (`docs/STAGING.md`):** separate Worker + separate Supabase project;
+  `APP_ENV=staging` var. `assertNotProductionDatabase` refuses to boot if a
+  non-production env would reach the production DB (the URL default falls back
+  to prod, so a forgotten var would otherwise be silent). Build-time
+  `NEXT_PUBLIC_APP_ENV=staging` renders the "Staging · not live data" badge.
+  Single-slot: concurrent PRs overwrite (serialized by a CI concurrency group).
 - **Reminders (`.github/workflows/reminders.yml`):** cron 12:30 UTC + 13:05
   backup + manual dispatch → `scripts/send-reminders.mjs`. Repo secrets:
   `CRON_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`.
@@ -250,9 +258,9 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
 - **Beta prep:** recruit 20–50 (India-first cohort), feedback channel; delete
   the leftover secrets file if not yet done; `+beta1` is the standing QA
   account.
-- **No staging environment and no E2E tests** — `main` deploys straight to prod
-  and UI flows are hand-verified. The first infrastructure investment when a
-  second engineer joins (`HANDOVER.md` §8, item 1).
+- **No E2E tests** — staging now exists (every PR deploys to it), but flows are
+  still exercised there by hand. Playwright over the critical path, run against
+  the staging deploy, is the next infrastructure step (`HANDOVER.md` §8, item 1).
 - **Supabase backup/restore posture unverified** — confirm the PITR tier and
   rehearse a restore. Highest-severity unknown: the DB is the only
   irreplaceable asset.
