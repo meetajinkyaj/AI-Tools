@@ -30,6 +30,47 @@ jobs:
       - name: Build
         run: npm run build
 
+  deploy-staging:
+    # Deploy every pull request to the staging Worker once CI passes, so changes
+    # can be exercised against a real deployment BEFORE they reach the live app.
+    # Staging has its own Supabase project — it cannot touch production data
+    # (src/lib/supabase-admin.ts refuses to start if it would). See docs/STAGING.md.
+    needs: build
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # One staging environment, so deploys queue rather than race. Never cancel a
+    # half-finished deploy: that would leave staging in an in-between state.
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Deploy to staging
+        run: npm run cf:deploy:staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Build-time marker → renders the "Staging" badge. Must be set here
+          # rather than in the Worker config: `/` is statically prerendered, so
+          # this value is baked in during the build.
+          NEXT_PUBLIC_APP_ENV: staging
+
+      - name: Where to test
+        run: |
+          echo "### Staging deployed :rocket:" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "This PR is now live on the staging app. Test it there before merging." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Staging URL: see \`docs/STAGING.md\` (fixed URL — it does not change per PR)." >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     # Auto-deploy to Cloudflare on every push to main, once CI passes.
     # Requires repo secrets CLOUDFLARE_API_TOKEN (Workers Scripts: Edit) and

@@ -38,6 +38,9 @@ npm run cf:build     # OpenNext/Workers build — catches Workers-only failures
 npm run cf:preview   # build + run the worker locally in workerd
 npm run cf:deploy    # build + deploy to Cloudflare (CI does this; rarely manual)
 
+# staging (CI deploys this from every PR; manual form shown for reference)
+NEXT_PUBLIC_APP_ENV=staging npm run cf:deploy:staging
+
 node --env-file=.env.local scripts/test-supabase.mjs   # check Supabase connectivity
 ```
 
@@ -158,6 +161,7 @@ or CLI. All are idempotent — safe to re-run.
 | [`docs/HANDOVER.md`](./docs/HANDOVER.md) | **Start here.** Orientation, access transfer, priorities, known traps |
 | [`docs/PROJECT_STATUS.md`](./docs/PROJECT_STATUS.md) | Living system-of-record: features, decisions, incidents, key files |
 | [`docs/RUNBOOK.md`](./docs/RUNBOOK.md) | Deploy, migrate, rotate secrets, incident response, admin tasks |
+| [`docs/STAGING.md`](./docs/STAGING.md) | The staging environment: setup, daily use, limitations |
 | [`docs/SCALING.md`](./docs/SCALING.md) | Deferred optimizations and the trigger for each |
 | [`docs/REFERENCE_DATA.md`](./docs/REFERENCE_DATA.md) | How clinical reference data is stored and changed |
 | [`docs/FAQ.md`](./docs/FAQ.md) | Canonical user-facing answers (points, redemption, referrals) |

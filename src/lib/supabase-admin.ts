@@ -2,6 +2,8 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 
+import { assertNotProductionDatabase, serverAppEnv } from "./app-env";
+
 /**
  * The project's Supabase URL. This is public (it ships in the client bundle and
  * every API request targets it), so it is safe to commit.
@@ -28,6 +30,11 @@ export function createSupabaseAdmin() {
   if (!serviceKey) {
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY in the environment.");
   }
+
+  // Fail-safe: `url` falls back to PRODUCTION when `SUPABASE_URL` is unset —
+  // right for the production Worker, catastrophic anywhere else. Rule and
+  // rationale live in `assertNotProductionDatabase`.
+  assertNotProductionDatabase(url, DEFAULT_SUPABASE_URL, serverAppEnv());
 
   return createClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
