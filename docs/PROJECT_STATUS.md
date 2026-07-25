@@ -1,9 +1,13 @@
 # Ikigaro — Project & Session Reference
 
-_Last updated: 2026-07-26_
+_Last updated: 2026-07-25_
 
 A living reference for the Ikigaro app: architecture, what's built, how to
 operate it, and the known follow-ups. Update this as work lands.
+
+> **New to the project?** Read [`HANDOVER.md`](./HANDOVER.md) first — it orients
+> you and links every doc in reading order. Operational procedures (deploy,
+> migrate, rotate secrets, incident response) live in [`RUNBOOK.md`](./RUNBOOK.md).
 
 ## 1. Project snapshot
 
@@ -19,7 +23,7 @@ operate it, and the known follow-ups. Update this as work lands.
   **Supabase Postgres** (RLS enabled everywhere, *no* policies; service-role
   key server-only) · **Privy** email-OTP auth (hand-rolled token verification
   via `crypto.subtle`, not the Privy SDK, so it runs on Workers) · Tailwind v4
-  · Vitest (140+ tests) · Web Push (VAPID) sent from GitHub Actions.
+  · Vitest (155 tests) · Web Push (VAPID) sent from GitHub Actions.
 - **Key non-sensitive IDs:** Worker name `ai-tools` · Cloudflare account
   `21510d84b951ec23fc0b34eb316e6546` · Privy app ID `cmr7snzr8003e0ejvn5y0sppr`
   (public; hardcoded default in `src/lib/privy-app-id.ts`) · VAPID public key
@@ -98,6 +102,20 @@ operate it, and the known follow-ups. Update this as work lands.
     (`referral_streak`), +150 first panel within 30 days (`referral_panel`) —
     max 300 (`REFERRAL_MAX_TOTAL`). Invite card (Share + Copy) on Partners;
     Terms §14 referral clause keeps values out of legal text.
+17. **Startup & entry polish** — landing offers **Sign up** (primary) and **Log
+    in** (secondary), both opening the same Privy OTP flow (it creates the
+    account when the email is new). One branded `Splash` covers every pre-app
+    wait, so startup reads as a single moment. `html` carries the linen ground +
+    `color-scheme: light` (without it, dark-mode phones painted a black first
+    frame and reloads flashed white). Home shows shimmer placeholders instead of
+    fake zeros while the summary loads.
+18. **Marketing site** (`ikigaro-os`) — the Notion-backed waitlist is retired;
+    every "Join the waitlist" CTA points at `app.ikigaro.com`, and the bottom
+    email form is replaced by a signup button. `POST /api/waitlist` answers 410
+    for stale cached pages. The landing snapshot's bootstrap **replaces the whole
+    document** as it renders (it was silently destroying the edge-injected legal
+    footer), so the Worker patches the rendered DOM via a persistent idempotent
+    interval. The vestigial `src/` TanStack app was deleted (69 deps → 0).
 
 ## 3. Key architecture decisions
 
@@ -144,9 +162,12 @@ operate it, and the known follow-ups. Update this as work lands.
   **Bot Fight Mode OFF** (it 403'd our own cron caller; endpoints carry their
   own auth). Workers Builds git integration disconnected — CI is the only
   deploy path.
-- **Schema:** `supabase/migrations/0001–0011` (idempotent; run on prod
+- **Schema:** `supabase/migrations/0001–0012` (idempotent; run on prod
   Supabase BEFORE merging code that depends on them). Seed template:
   `supabase/seed_redemption_catalog.sql`.
+- **Marketing Worker:** `ikigaro-os` serves `public/index.html` + edge-injected
+  legal footer and CTA retargeting. No secrets needed since the Notion waitlist
+  was retired (`NOTION_API_KEY` can be deleted from that Worker).
 
 ## 5. Incident log & learnings
 
@@ -188,8 +209,10 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
 | Report / Trends / Future / Partners / Admin UIs | `src/app/biomarker-report.tsx`, `trends-view.tsx`, `future-view.tsx`, `partners-view.tsx`, `admin-view.tsx` |
 | PWA (manifest, SW, install) / push client / telemetry | `src/app/manifest.ts`, `public/sw.js`, `install-prompt.tsx`, `push-client.ts`, `telemetry.tsx` |
 | Waitlist / confirm dialog | `src/app/waitlist-screen.tsx`, `confirm-dialog.tsx` |
-| Schema | `supabase/migrations/0001–0011` |
-| Docs | `docs/REFERENCE_DATA.md`, `docs/SCALING.md`, `docs/FAQ.md` |
+| Referrals (codes, milestone awards, invite API) | `src/lib/referral.ts`, `referral-award.ts`, `src/app/api/referral/route.ts` |
+| Landing / splash / startup states | `src/app/landing.tsx`, `ui.tsx` (`Splash`), `home-view.tsx`, `globals.css` |
+| Schema | `supabase/migrations/0001–0012` |
+| Docs | `docs/HANDOVER.md`, `RUNBOOK.md`, `REFERENCE_DATA.md`, `SCALING.md`, `FAQ.md` |
 
 ## 7. Operational recipes
 
@@ -227,6 +250,12 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
 - **Beta prep:** recruit 20–50 (India-first cohort), feedback channel; delete
   the leftover secrets file if not yet done; `+beta1` is the standing QA
   account.
+- **No staging environment and no E2E tests** — `main` deploys straight to prod
+  and UI flows are hand-verified. The first infrastructure investment when a
+  second engineer joins (`HANDOVER.md` §8, item 1).
+- **Supabase backup/restore posture unverified** — confirm the PITR tier and
+  rehearse a restore. Highest-severity unknown: the DB is the only
+  irreplaceable asset.
 - **Scaling levers** (~10k users): OCR vendor, prompt caching, batch API,
   async queue — `docs/SCALING.md`.
 - **Catalog range tuning** (BUN, Estradiol, Cortisol, MCV, MCH) via the
