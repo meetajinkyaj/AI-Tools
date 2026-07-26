@@ -11,7 +11,7 @@ Two suites, deliberately separate.
 | Tests | pure domain logic | a running deployment in a real browser |
 | Needs | nothing | an app to point at |
 | Count | 162 | 49 × 2 viewports |
-| Runs in CI | every push and PR | every PR, against staging |
+| Runs in CI | every push and PR | every PR against staging, plus every ~30 min against production |
 
 They are kept apart on purpose: Vitest's default patterns would otherwise try
 to run the Playwright specs and fail confusingly, so `vitest.config.ts` scopes
@@ -34,10 +34,10 @@ npx vitest            # watch mode
 ## End-to-end tests
 
 ```bash
-npm run e2e                 # against a local production build (auto-started)
-npm run e2e:staging         # against the deployed staging app — what CI runs
-E2E_TARGET=production npm run e2e   # smoke-check the live app
-npm run e2e:ui              # interactive debugging
+npm run e2e             # against a local production build (auto-started)
+npm run e2e:staging     # against the deployed staging app — what PR CI runs
+npm run e2e:production  # against the live app — what the smoke monitor runs
+npm run e2e:ui          # interactive debugging
 ```
 
 ### The one rule: every E2E test is read-only
@@ -130,3 +130,25 @@ screenshots — is uploaded as a workflow artifact for 7 days.
 
 E2E does **not** run on pushes to `main`, because staging is not redeployed
 there; the PR run is the gate.
+
+## The production smoke monitor
+
+`.github/workflows/smoke.yml` runs the same suite against **app.ikigaro.com**
+roughly every 30 minutes (plus on demand via *Run workflow*).
+
+It exists because **CI only tests staging, so production can break with every
+check green**. That is not hypothetical: a Privy allowed-domains edit dropped
+`app.ikigaro.com`, every visitor got an endless splash screen, and it went
+unnoticed for a day. Nothing in the code was wrong — which is the point. The
+app is only healthy if its configuration is healthy too, and configuration is
+what nothing else watches.
+
+Its failure summary lists the likeliest causes in order, starting with the
+Privy allowed-domains list. GitHub emails the repo owner when a scheduled
+workflow fails; a red run means the **live app is broken right now**.
+
+Two behavioural differences on the production target:
+- The admin UI tests skip — production serves `/admin` only on the Cloudflare
+  Access-gated host, which the runner has no credentials for.
+- Instead, one test asserts `app.ikigaro.com/admin` returns a real **307** to
+  that host, without following it.

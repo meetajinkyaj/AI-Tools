@@ -137,8 +137,19 @@ Privy dashboard → your app → allowed domains → add the staging origin as a
 https://ai-tools-staging.meetajinkyaj.workers.dev
 ```
 
-A bare hostname is rejected — the field validates as a URL. Leave the production
-domain in place. Without this, login on staging fails with a domain error.
+A bare hostname is rejected — the field validates as a URL.
+
+> **The rule: this list needs one entry per hostname that runs the app** —
+> `app.ikigaro.com`, `admin.ikigaro.com`, the staging URL, and localhost for
+> dev. **Add, never replace.** A missing entry doesn't degrade gracefully: Privy
+> refuses to initialize and the app hangs on the startup splash forever, for
+> everyone on that hostname.
+>
+> This has bitten once. Adding staging replaced both production entries, and
+> app.ikigaro.com and admin.ikigaro.com were down for a day with CI fully green
+> — CI only tests staging. The production smoke monitor
+> ([`TESTING.md`](./TESTING.md)) now catches this within ~30 minutes. **After
+> editing this list, re-read it and confirm every hostname is still present.**
 
 Staging shares the production Privy app, so the same email works on both. That
 is safe — identity is shared, **data is not**, because the databases are
