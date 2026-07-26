@@ -7,11 +7,15 @@ pull request deploys to automatically, so changes can be exercised against a
 real deployment before they reach the live app.
 
 ```
-   PR opened/updated ──► CI (lint, typecheck, test, build) ──► deploy to STAGING
-                                                                     │
-                                                            you test it here
-                                                                     │
-   merge to main ─────► CI ─────────────────────────────────► deploy to PRODUCTION
+   PR opened/updated ──► CI (lint, typecheck, unit tests, build)
+                              │
+                              ├──► deploy to STAGING
+                              │         │
+                              │         └──► E2E suite runs against it
+                              │                    │
+                              │           you test anything it can't (docs/TESTING.md)
+                              │
+   merge to main ─────► CI ───┴──────────────────► deploy to PRODUCTION
 ```
 
 | | Production | Staging |

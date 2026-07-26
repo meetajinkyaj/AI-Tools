@@ -42,6 +42,10 @@ npm run cf:build   # OpenNext/Workers build — catches Workers-only failures
 The last one matters: code can build fine under Next and still fail on Workers
 (anything reaching for a Node runtime API).
 
+CI additionally deploys the PR to staging and runs the Playwright suite against
+it — see [`TESTING.md`](./TESTING.md). A red **e2e** check means the deployed
+app misbehaved, not just that a unit test failed.
+
 **Emergency manual deploy** (CI is down and you must ship):
 
 ```bash
