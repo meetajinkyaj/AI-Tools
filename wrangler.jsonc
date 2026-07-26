@@ -35,12 +35,12 @@
       "vars": {
         "ADMIN_EMAILS": "meetajinkyaj@gmail.com",
         "APP_ENV": "staging",
-        // The staging Supabase project's URL. Public, so it belongs here
-        // rather than in secrets. MUST be filled in before staging works:
-        // while it is empty the app falls back to the production URL, which
-        // the APP_ENV guard rejects — staging fails loudly instead of quietly
+        // The staging Supabase project's URL (project `ikigaro-staging`).
+        // Public, so it belongs here rather than in secrets. If this is ever
+        // emptied, the app falls back to the production URL, which the
+        // APP_ENV guard rejects — staging fails loudly instead of quietly
         // reading and writing real user data.
-        "SUPABASE_URL": ""
+        "SUPABASE_URL": "https://albhabiyfaqvpnxilovf.supabase.co"
       },
       "observability": {
         "enabled": true
