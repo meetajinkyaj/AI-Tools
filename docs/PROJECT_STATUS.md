@@ -180,8 +180,9 @@ operate it, and the known follow-ups. Update this as work lands.
   `NEXT_PUBLIC_APP_ENV=staging` renders the "Staging · not live data" badge.
   Single-slot: concurrent PRs overwrite (serialized by a CI concurrency group).
 - **Reminders:** primary is the **`ikigaro-reminders` Worker**
-  (`workers/reminders`, Cloudflare cron `30 12 * * *`), deployed by CI alongside
-  the app. Its secrets (`CRON_SECRET`, `VAPID_PRIVATE_KEY`) are per-Worker and
+  (`workers/reminders`, Cloudflare cron `30 12 * * *`, live at
+  `ikigaro-reminders.meetajinkyaj.workers.dev`), deployed by CI alongside the
+  app. Its secrets (`CRON_SECRET`, `VAPID_PRIVATE_KEY`) are per-Worker and
   inherit nothing. `.github/workflows/reminders.yml` remains as a late backup /
   break-glass manual sender.
 - **Worker secrets:** `ANTHROPIC_API_KEY`, `PRIVY_APP_SECRET`,

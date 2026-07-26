@@ -1,5 +1,9 @@
 name = "ikigaro-reminders"
 main = "src/index.ts"
+# Explicit rather than relying on the default: the only route is the manual
+# trigger (CRON_SECRET-authenticated), which is how the pipeline gets tested
+# without waiting for 6 PM.
+workers_dev = true
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
 
