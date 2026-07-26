@@ -101,7 +101,7 @@ Three separate stores. Putting a value in the wrong one is a common failure.
 
 | Store | Set with | Survives deploy? | What's there |
 |---|---|---|---|
-| **Worker secrets** | `npx wrangler secret put NAME` | Yes | `ANTHROPIC_API_KEY`, `PRIVY_APP_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` |
+| **Worker secrets** | `npx wrangler secret put NAME` | Yes | `ai-tools`: `ANTHROPIC_API_KEY`, `PRIVY_APP_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` · `ikigaro-reminders`: `CRON_SECRET`, `VAPID_PRIVATE_KEY` |
 | **Worker vars** (plaintext) | committed in `wrangler.jsonc` `vars` | Replaced by this file every deploy | `ADMIN_EMAILS`, `APP_ENV` |
 | **GitHub Actions secrets** | repo Settings → Secrets | n/a | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CRON_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` |
 
@@ -109,8 +109,10 @@ Three separate stores. Putting a value in the wrong one is a common failure.
 replaces the whole plaintext var set from `wrangler.jsonc` on every deploy — a
 dashboard-set `ADMIN_EMAILS` was silently wiped this way, locking admin out.
 
-`CRON_SECRET` exists in **two** stores and the values must match. Changing one
-without the other silently breaks daily reminders (the Worker rejects the caller).
+`CRON_SECRET` now exists in **three** places and all must match:
+the `ai-tools` Worker, the `ikigaro-reminders` Worker, and the GitHub Actions
+secret. Change one without the others and reminders fail with
+`due-reminders failed: HTTP 401` — loudly, at least, not silently.
 
 **Environments have separate secrets.** Staging inherits nothing — set its
 values with `--env staging` (see [`STAGING.md`](./STAGING.md) §1.4). Staging vars
@@ -142,12 +144,15 @@ npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 `npx wrangler secret put PRIVY_APP_SECRET`. Verify by signing in with a fresh
 email OTP.
 
-**`CRON_SECRET`** — must change in both places, close together:
+**`CRON_SECRET`** — must change in all three places, close together:
 ```bash
-npx wrangler secret put CRON_SECRET          # Worker
+npx wrangler secret put CRON_SECRET                                        # app Worker
+npx wrangler secret put CRON_SECRET --config workers/reminders/wrangler.toml  # reminders Worker
 # then set the identical value in GitHub repo secrets → CRON_SECRET
 ```
-Verify: Actions → "Daily reminders" → Run workflow. A mismatch shows as 401.
+Verify with the reminders Worker's manual trigger (§5) — a mismatch between the
+reminders Worker and the app shows as `due-reminders failed: HTTP 401`; a
+mismatch in what you send shows as `Unauthorized`.
 
 **VAPID keys** — avoid rotating unless compromised. Changing them **invalidates
 every existing push subscription**; users must re-opt-in. If you must: generate a
@@ -178,6 +183,16 @@ turning a 6 PM nudge into a 7:40 PM one. `.github/workflows/reminders.yml` is
 still there as a **backup and break-glass manual sender** — when it fires late
 it simply finds 0 due and does nothing.
 
+**Why keep the backup running rather than retiring it?** Two senders sounds
+untidy, but sends are at-most-once and Cloudflare always fires first, so the
+GitHub run is a no-op on a normal day. Its value is on an abnormal one: nothing
+currently *alerts* if the Worker's cron stops firing, so the backup is the only
+thing that would still get a (late) reminder out. Retire it once either (a) the
+Worker has a week of confirmed on-time delivery and you accept the risk, or
+(b) something actually monitors the reminder pipeline. When you do, prefer
+removing just its `schedule:` and keeping `workflow_dispatch` as a manual
+escape hatch.
+
 **Secrets** (set once on the reminders Worker; they persist across deploys):
 
 ```bash
@@ -200,6 +215,11 @@ must match `src/lib/vapid-public-key.ts`.
    It replies with a summary line: `<date>: N check-in nudge(s), M re-test
    push(es) — sent X, expired Y, failed Z`.
 3. Or use the backup: Actions → "Daily reminders (backup)" → Run workflow.
+
+**Did it run at all?** Cloudflare → Workers & Pages → `ikigaro-reminders` →
+**Cron Triggers** shows the schedule (`30 12 * * *`) and the last run; **Logs**
+shows each run's summary line. Nothing alerts on a *missed* run, which is the
+main reason the GitHub backup is still enabled — see below.
 
 **"The reminder didn't arrive" — triage in this order:**
 
