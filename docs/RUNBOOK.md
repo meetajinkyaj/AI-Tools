@@ -219,6 +219,11 @@ work" is "the fix never shipped."
 or thinking defaults → idle/connection timeouts → DB CHECK constraints →
 Cloudflare zone features (Access, Bot Fight Mode) sitting in the request path.
 
+**Is production actually up?** The smoke monitor answers this without guessing:
+Actions → **Production smoke** → Run workflow (or check the last scheduled run).
+It exercises the live app read-only and its failure summary names the likeliest
+causes. See [`TESTING.md`](./TESTING.md).
+
 **Where to look:**
 - **Server errors:** Cloudflare dashboard → Workers → `ai-tools` → Logs
   (observability is enabled in `wrangler.jsonc`).
@@ -237,6 +242,8 @@ Cloudflare zone features (Access, Bot Fight Mode) sitting in the request path.
 | Reminders stopped | GitHub skipped the run, `CRON_SECRET` mismatch, or Bot Fight Mode |
 | Trends show impossible jumps | Duplicate same-date panels (now prevented by content-signature dedup) |
 | A destructive admin action fired with no dialog | Browser suppressed `window.confirm` — must use `ConfirmDialog` |
+| The app hangs forever on the startup splash | The hostname is missing from **Privy's allowed domains** — add it back (`STAGING.md` §1.5). Affects everyone on that host. |
+| `app.ikigaro.com/admin` serves a page instead of redirecting | The `next.config.ts` host redirect stopped matching. `redirect()` in the page cannot replace it — it only emits a client-side redirect. |
 
 **If user data is at risk, stop and get help before writing.** Reads are free;
 writes against production are not reversible without a restore. Prod data is

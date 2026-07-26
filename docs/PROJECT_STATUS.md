@@ -155,6 +155,9 @@ operate it, and the known follow-ups. Update this as work lands.
   against that deployment; **pushes to `main`** deploy to production
   (`npm run cf:deploy`). Repo secrets: `CLOUDFLARE_API_TOKEN`,
   `CLOUDFLARE_ACCOUNT_ID`.
+- **Production smoke (`smoke.yml`):** the same E2E suite against
+  `app.ikigaro.com` every ~30 min + on demand. Exists because CI only tests
+  staging, so production can break with every check green.
 - **E2E (`docs/TESTING.md`):** read-only by design — no signup, no writes — so
   it is safe against any target. Covers the landing render (the white-screen
   class of bug), every API route rejecting anonymous callers, the admin gate,
@@ -208,6 +211,23 @@ operate it, and the known follow-ups. Update this as work lands.
   returns `true` → in-app `ConfirmDialog` for all destructive admin actions.
 - Under-18 signup showed a generic error while Terms said 18+ and code said 13
   → aligned (now: no minimum, guardian-consent framing, per legal).
+- **Privy allowed domains got REPLACED, not appended**, when the staging origin
+  was added → `app.ikigaro.com` and `admin.ikigaro.com` both dropped out, Privy
+  refused to initialize, and every user saw an endless startup splash for a day
+  **with CI green** (CI only tests staging). Fixes: the add-never-replace rule
+  in `STAGING.md` §1.5, and a **production smoke monitor** (`smoke.yml`, ~every
+  30 min) so config-level breakage surfaces in minutes.
+- **`redirect()` in a streaming Server Component does not emit an HTTP
+  redirect** — Next inserts a client-side `NEXT_REDIRECT` instruction, so
+  `app.ikigaro.com/admin` returned 200 to anything that doesn't run React. Moved
+  to a `next.config.ts` host-scoped redirect (a real 307), asserted by E2E.
+  (No admin UI was ever rendered on the app host; authorization never depended
+  on this redirect.)
+- **Investigated and dismissed:** `/offline.html` 307s to `/offline` (Cloudflare
+  Assets drops `.html`), which looked like it would break the service worker's
+  `cache.addAll` precache. Tested in a browser: `addAll` follows the redirect,
+  caches under the original key, and `caches.match` finds it. Not a bug — noted
+  so it isn't re-investigated.
 
 **Debugging order when something works locally but fails live:** (a) is it
 actually deployed, (b) build-time env vars, (c) migration applied?, (d)

@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 
 import { AdminView } from "@/app/admin-view";
 
@@ -9,18 +7,21 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// The admin console has a single front door: the gated admin.ikigaro.com
-// subdomain (behind Cloudflare Access). If someone reaches /admin on the main
-// app domain, send them there. Localhost/preview hosts fall through so /admin
-// still works in development. (Done here in the page rather than in middleware
-// because the Workers runtime doesn't run Node-runtime proxy/middleware.)
-const MAIN_HOST = "app.ikigaro.com";
-const ADMIN_URL = "https://admin.ikigaro.com/admin";
-
-export default async function AdminPage() {
-  const host = (await headers()).get("host");
-  if (host === MAIN_HOST) {
-    redirect(ADMIN_URL);
-  }
+/**
+ * The admin console.
+ *
+ * The host split — app.ikigaro.com/admin → the Cloudflare Access-gated
+ * admin.ikigaro.com — is a **config redirect** (`next.config.ts`), not a
+ * `redirect()` call here. Doing it in the page does not work: this page
+ * streams, and in a streaming context Next emits a client-side redirect
+ * instruction rather than an HTTP one, so the response is a 200 that only a
+ * React-running browser acts on. The config redirect returns a real 307 before
+ * rendering, and an E2E test asserts it against production.
+ *
+ * Authorization never depended on that redirect: `requireAdmin` (ADMIN_EMAILS,
+ * fail-closed) gates every admin API server-side, so reaching this page on any
+ * host yields a sign-in wall and nothing more.
+ */
+export default function AdminPage() {
   return <AdminView />;
 }
