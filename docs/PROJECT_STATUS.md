@@ -23,7 +23,8 @@ operate it, and the known follow-ups. Update this as work lands.
   **Supabase Postgres** (RLS enabled everywhere, *no* policies; service-role
   key server-only) · **Privy** email-OTP auth (hand-rolled token verification
   via `crypto.subtle`, not the Privy SDK, so it runs on Workers) · Tailwind v4
-  · Vitest (155 tests) · Web Push (VAPID) sent from GitHub Actions.
+  · Vitest (162 unit tests) + Playwright E2E · Web Push (VAPID) from GitHub
+  Actions.
 - **Key non-sensitive IDs:** Worker name `ai-tools` · Cloudflare account
   `21510d84b951ec23fc0b34eb316e6546` · Privy app ID `cmr7snzr8003e0ejvn5y0sppr`
   (public; hardcoded default in `src/lib/privy-app-id.ts`) · VAPID public key
@@ -148,11 +149,17 @@ operate it, and the known follow-ups. Update this as work lands.
 
 ## 4. Infrastructure, secrets & schedules
 
-- **CI (`.github/workflows/ci.yml`):** lint → typecheck → test → build on every
-  PR and push. **Pull requests** then deploy to staging (`ai-tools-staging`,
-  `--env staging`); **pushes to `main`** deploy to production
+- **CI (`.github/workflows/ci.yml`):** lint → typecheck → unit tests → build on
+  every PR and push. **Pull requests** then deploy to staging
+  (`ai-tools-staging`, `--env staging`) and run the **Playwright E2E suite**
+  against that deployment; **pushes to `main`** deploy to production
   (`npm run cf:deploy`). Repo secrets: `CLOUDFLARE_API_TOKEN`,
   `CLOUDFLARE_ACCOUNT_ID`.
+- **E2E (`docs/TESTING.md`):** read-only by design — no signup, no writes — so
+  it is safe against any target. Covers the landing render (the white-screen
+  class of bug), every API route rejecting anonymous callers, the admin gate,
+  legal pages, and PWA assets. Authenticated flows remain hand-verified;
+  Privy's email-OTP login needs a test mailbox to automate.
 - **Staging (`docs/STAGING.md`, live since 2026-07-25):** `ai-tools-staging` at
   `ai-tools-staging.meetajinkyaj.workers.dev`, backed by the `ikigaro-staging`
   Supabase project (`albhabiyfaqvpnxilovf`) with its own Anthropic key. Shares
@@ -225,7 +232,8 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
 | Referrals (codes, milestone awards, invite API) | `src/lib/referral.ts`, `referral-award.ts`, `src/app/api/referral/route.ts` |
 | Landing / splash / startup states | `src/app/landing.tsx`, `ui.tsx` (`Splash`), `home-view.tsx`, `globals.css` |
 | Schema | `supabase/migrations/0001–0012` |
-| Docs | `docs/HANDOVER.md`, `RUNBOOK.md`, `REFERENCE_DATA.md`, `SCALING.md`, `FAQ.md` |
+| E2E suite / config | `e2e/*.spec.ts`, `playwright.config.ts`, `vitest.config.ts` |
+| Docs | `docs/HANDOVER.md`, `RUNBOOK.md`, `STAGING.md`, `TESTING.md`, `REFERENCE_DATA.md`, `SCALING.md`, `FAQ.md` |
 
 ## 7. Operational recipes
 
@@ -263,9 +271,10 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
 - **Beta prep:** recruit 20–50 (India-first cohort), feedback channel; delete
   the leftover secrets file if not yet done; `+beta1` is the standing QA
   account.
-- **No E2E tests** — staging now exists (every PR deploys to it), but flows are
-  still exercised there by hand. Playwright over the critical path, run against
-  the staging deploy, is the next infrastructure step (`HANDOVER.md` §8, item 1).
+- **E2E covers the signed-out surface only** — the authenticated critical path
+  (onboarding → upload → confirm → check-in → redeem) is still hand-verified on
+  staging. Automating it needs a test mailbox to read Privy OTPs; a test-only
+  auth bypass was considered and rejected (`docs/TESTING.md`).
 - **Supabase backup/restore posture unverified** — confirm the PITR tier and
   rehearse a restore. Highest-severity unknown: the DB is the only
   irreplaceable asset.

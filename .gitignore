@@ -46,3 +46,9 @@ next-env.d.ts
 /.wrangler/
 cloudflare-env.d.ts
 .dev.vars
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright/

@@ -33,7 +33,10 @@ npm run dev                        # http://localhost:3000
 npm run dev          # local dev server
 npm run build        # next build
 npm run lint         # eslint
-npm test             # vitest (155 tests)
+npm test             # vitest unit tests (162)
+npm run e2e          # playwright end-to-end, against a local build
+npm run e2e:staging  # playwright against the deployed staging app (what CI runs)
+
 npm run cf:build     # OpenNext/Workers build — catches Workers-only failures
 npm run cf:preview   # build + run the worker locally in workerd
 npm run cf:deploy    # build + deploy to Cloudflare (CI does this; rarely manual)
@@ -162,6 +165,7 @@ or CLI. All are idempotent — safe to re-run.
 | [`docs/PROJECT_STATUS.md`](./docs/PROJECT_STATUS.md) | Living system-of-record: features, decisions, incidents, key files |
 | [`docs/RUNBOOK.md`](./docs/RUNBOOK.md) | Deploy, migrate, rotate secrets, incident response, admin tasks |
 | [`docs/STAGING.md`](./docs/STAGING.md) | The staging environment: setup, daily use, limitations |
+| [`docs/TESTING.md`](./docs/TESTING.md) | Unit vs E2E suites, what's covered, and what isn't |
 | [`docs/SCALING.md`](./docs/SCALING.md) | Deferred optimizations and the trigger for each |
 | [`docs/REFERENCE_DATA.md`](./docs/REFERENCE_DATA.md) | How clinical reference data is stored and changed |
 | [`docs/FAQ.md`](./docs/FAQ.md) | Canonical user-facing answers (points, redemption, referrals) |
