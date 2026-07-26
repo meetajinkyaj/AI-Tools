@@ -69,8 +69,8 @@ nothing until an admin approves them.
 
 **Stack in one line:** Next.js 16 App Router → Cloudflare Workers (via OpenNext)
 · Supabase Postgres · Privy email-OTP auth · Anthropic Claude for extraction ·
-Web Push sent from GitHub Actions · Tailwind v4 · Vitest (162 unit tests) +
-Playwright (E2E against staging).
+Web Push from a dedicated Cloudflare cron Worker · Tailwind v4 · Vitest (173 unit tests) +
+Playwright (E2E against staging, plus a production smoke monitor).
 
 ---
 
@@ -88,7 +88,7 @@ Playwright (E2E against staging).
   no double-spend or double-issue is possible under concurrency).
 - Every push send is at-most-once by construction, so retries and manual runs
   cannot double-notify users.
-- 162 unit tests covering the domain logic (biomarkers, points, trends, future,
+- 173 unit tests covering the domain logic (biomarkers, points, trends, future,
   check-ins, referrals, reminders, analytics, token verification), plus a
   Playwright suite that exercises the deployed staging app on every PR.
 
@@ -126,13 +126,13 @@ Legend: **P0** = you cannot operate without it · **P1** = needed within week on
 | # | System | What it controls | Transfer action | Pri |
 |---|--------|------------------|-----------------|-----|
 | 1 | **GitHub** — `meetajinkyaj/AI-Tools`, `meetajinkyaj/ikigaro-os` | Source of truth; CI deploys from `main` | Add as admin. Longer term move both repos to a **GitHub organization** so ownership isn't a personal account. | P0 |
-| 2 | **Cloudflare** (account `21510d84b951ec23fc0b34eb316e6546`) | Worker `ai-tools` (app+admin), Worker `ikigaro-os`, DNS for all three hostnames, Cloudflare Access on admin | Invite as account member with Workers + DNS + Access admin. | P0 |
+| 2 | **Cloudflare** (account `21510d84b951ec23fc0b34eb316e6546`) | Workers `ai-tools` (app+admin), `ai-tools-staging`, `ikigaro-reminders` (daily push cron), `ikigaro-os`; DNS for all hostnames; Cloudflare Access on admin | Invite as account member with Workers + DNS + Access admin. | P0 |
 | 3 | **Supabase** | The entire database — all user and health data | Add as project owner/admin. Confirm **PITR/backup posture** while you're in there (see §7). | P0 |
 | 4 | **Privy** | Auth. If this is lost, nobody can log in | Add to the Privy app team. App ID `cmr7snzr8003e0ejvn5y0sppr` is public; the **app secret** is a Worker secret. | P0 |
 | 5 | **Anthropic Console** | The extraction API key; the billing that stops report uploads when exhausted | Add to the org; set a **spend alert** — there is none today. | P0 |
 | 6 | **Domain registrar** (ikigaro.com) | Everything, ultimately | Confirm who holds it; add access or transfer to a company account. | P0 |
 | 7 | **GitHub Actions secrets** | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CRON_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Repo admin (#1) gives you write access. Values are not readable — rotate rather than retrieve (RUNBOOK §4). | P1 |
-| 8 | **Worker secrets** | `ANTHROPIC_API_KEY`, `PRIVY_APP_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` | Set via `npx wrangler secret put`. Not readable after being set — rotate to take ownership. | P1 |
+| 8 | **Worker secrets** | `ANTHROPIC_API_KEY`, `PRIVY_APP_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` on `ai-tools`; `CRON_SECRET` + `VAPID_PRIVATE_KEY` on `ikigaro-reminders` | Set via `npx wrangler secret put`. Not readable after being set — rotate to take ownership. | P1 |
 | 9 | **`ADMIN_EMAILS`** in `wrangler.jsonc` | Who can open the admin console | Add your email, commit, deploy. It is a committed plaintext var **on purpose** (§7, item 3). | P1 |
 | 10 | **Cloudflare Access** on `admin.ikigaro.com` | Second gate in front of admin | Add your email to the Access policy — separate from #9; both must allow you. | P1 |
 | 11 | **Email** — `hello@ikigaro.com` | User-facing contact on the app, marketing site, and legal pages | Get a mailbox/alias. | P1 |
@@ -200,10 +200,12 @@ and GitHub secret) or daily reminders stop.
                                                      sends Web Push itself
 ```
 
-**Why push crypto lives in GitHub Actions:** Web Push signing doesn't fit the
-Workers runtime. The Worker owns subscriptions and the "who is due" logic; the
-Action does the crypto and sending. Sends are marked **before** hand-off, so a
-duplicate run can never double-notify.
+**Why reminders are their own Worker:** the app decides *who* is due and *what*
+to say; a separate `ikigaro-reminders` Worker on a Cloudflare cron trigger does
+the scheduling and sending. It used to be GitHub Actions, until GitHub's
+scheduler proved to run it 90–110 minutes late every day. Sends are marked
+**before** hand-off, so a duplicate run can never double-notify — which is what
+makes keeping the GitHub workflow as a late backup safe.
 
 **Auth flow:** Privy issues an email-OTP token → client sends it to
 `POST /api/auth/sync` → the Worker verifies it locally with `crypto.subtle`
@@ -242,10 +244,10 @@ handover.
    white screen — which happened. That's why the Supabase URL, Privy app ID, and
    VAPID public key are hardcoded defaults in `src/lib/*`. They are public values;
    this is deliberate, not sloppiness.
-5. **GitHub's cron is not reliable.** A scheduled run was silently skipped
-   entirely (no run in history) on 2026-07-24. Hence two schedules 35 minutes
-   apart plus idempotent sends. If you move reminders to a real scheduler, keep
-   the idempotency.
+5. **GitHub's cron is not reliable** — in two distinct ways. It silently skipped
+   a scheduled run entirely (2026-07-24), and it ran the same job 90–110 minutes
+   late every day thereafter. Reminders now run on a Cloudflare cron Worker;
+   GitHub is only a backup. Don't move anything time-sensitive back onto it.
 6. **Cloudflare Bot Fight Mode is off on purpose.** It served a managed challenge
    to our own GitHub Actions cron caller and 403'd it. Every endpoint carries its
    own auth. If someone turns BFM on, reminders break silently.
