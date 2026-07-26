@@ -127,3 +127,12 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Separate Worker, separate deploy. Its secrets (CRON_SECRET,
+      # VAPID_PRIVATE_KEY) are set once with `wrangler secret put` and persist
+      # across deploys — this step never touches them.
+      - name: Deploy the reminders Worker
+        run: npm run cf:deploy:reminders
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

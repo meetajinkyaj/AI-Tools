@@ -1,0 +1,23 @@
+name = "ikigaro-reminders"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 12:30 UTC = 18:00 IST. Cloudflare cron triggers fire on time — this exists
+# because GitHub Actions' scheduler was running the same job 90–110 minutes
+# late every day.
+[triggers]
+crons = ["30 12 * * *"]
+
+# Plaintext vars are REPLACED from this file on every deploy — never set them
+# in the dashboard. Secrets (`wrangler secret put --config <this file>`)
+# persist: CRON_SECRET, VAPID_PRIVATE_KEY.
+[vars]
+APP_URL = "https://app.ikigaro.com"
+VAPID_SUBJECT = "mailto:hello@ikigaro.com"
+# Public half of the VAPID pair; safe to commit (it ships in the client bundle
+# too, see src/lib/vapid-public-key.ts) and must match it.
+VAPID_PUBLIC_KEY = "BO0_4R3vGWEJE8aBprqv7itcTFbC-SlJp5nlRxE5iyPoHrNPefYHrFkMReEV5maL2QIh2VuXlfy1OraFTVzuTnU"
+
+[observability.logs]
+enabled = true

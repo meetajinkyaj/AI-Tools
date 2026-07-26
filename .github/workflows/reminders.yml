@@ -1,8 +1,15 @@
-name: Daily reminders
+name: Daily reminders (backup)
 
-# Sends the daily check-in push reminder. Runs at 12:30 UTC = 18:00 IST (the
-# India-first beta window). Web push is sent from Node here — not the Worker —
-# because the push-payload crypto isn't a good fit for the Workers runtime.
+# BACKUP SENDER. The primary is now the `ikigaro-reminders` Cloudflare Worker
+# (workers/reminders), on a Cloudflare cron trigger that actually fires on time.
+# GitHub's scheduler was running this job 90-110 minutes late every single day
+# — measured, not suspected — which turned a "6 PM check-in nudge" into a
+# 7:40 PM one.
+#
+# This is kept because sends are at-most-once (the app marks people notified
+# BEFORE returning them), so a late second run is harmless: it finds 0 due and
+# does nothing. That makes it a free safety net if the Worker ever fails, and
+# a break-glass manual sender via "Run workflow".
 #
 # Required repo secrets:
 #   CRON_SECRET        - shared with the Worker's CRON_SECRET; authorizes the
@@ -14,12 +21,12 @@ name: Daily reminders
 
 on:
   schedule:
-    - cron: "30 12 * * *" # 18:00 IST (primary)
-    # Backup: GitHub load-sheds schedule events sometimes (Jul 24 was silently
-    # skipped). The due-reminders endpoint is idempotent per day, so this run
-    # no-ops (0 due) whenever the primary already fired.
-    - cron: "5 13 * * *" # 18:35 IST
-  workflow_dispatch: {} # allow a manual test run
+    # Nominally 18:00 IST; in practice GitHub delivers this 1.5-2 hours late,
+    # which is exactly why it is no longer the primary. Left enabled so that if
+    # the Worker ever stops firing, users still get a late nudge rather than
+    # none at all.
+    - cron: "30 12 * * *"
+  workflow_dispatch: {} # break-glass manual send
 
 jobs:
   send:

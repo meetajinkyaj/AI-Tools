@@ -23,8 +23,8 @@ operate it, and the known follow-ups. Update this as work lands.
   **Supabase Postgres** (RLS enabled everywhere, *no* policies; service-role
   key server-only) · **Privy** email-OTP auth (hand-rolled token verification
   via `crypto.subtle`, not the Privy SDK, so it runs on Workers) · Tailwind v4
-  · Vitest (162 unit tests) + Playwright E2E · Web Push (VAPID) from GitHub
-  Actions.
+  · Vitest (173 unit tests) + Playwright E2E · Web Push (VAPID) from a
+  dedicated Cloudflare cron Worker.
 - **Key non-sensitive IDs:** Worker name `ai-tools` · Cloudflare account
   `21510d84b951ec23fc0b34eb316e6546` · Privy app ID `cmr7snzr8003e0ejvn5y0sppr`
   (public; hardcoded default in `src/lib/privy-app-id.ts`) · VAPID public key
@@ -59,9 +59,13 @@ operate it, and the known follow-ups. Update this as work lands.
    worker (offline fallback only; no app/API caching), install prompt
    (Chromium button / iOS share-sheet hint).
 8. **Daily reminders** — opt-in Web Push ("Daily reminders" toggle in
-   Settings). Cron: GitHub Actions at 12:30 UTC (18:00 IST) + 13:05 backup;
-   `/api/cron/due-reminders` (CRON_SECRET) returns who's due; sends are
-   **idempotent per day** (`reminder_sent` events, at-most-once).
+   Settings). Sent by the **`ikigaro-reminders` Cloudflare Worker**
+   (`workers/reminders`) on a Cloudflare cron trigger at 12:30 UTC (18:00 IST);
+   `/api/cron/due-reminders` (CRON_SECRET) returns who's due and marks them
+   before returning, so sends are **at-most-once**. Web Push crypto is
+   hand-rolled on Web Crypto (`src/lib/web-push.ts`, RFC 8291/8292) and verified
+   against the official RFC 8291 §5 test vector. GitHub Actions is now only a
+   late backup / break-glass sender.
 9. **Panel-day push** — once per panel cycle, when the ~6-month re-test window
    opens: "Your re-test window is open… earns +150 iki points". Same pipeline;
    `retest_reminder_sent` guard; replaces that day's check-in nudge.
@@ -128,11 +132,12 @@ operate it, and the known follow-ups. Update this as work lands.
 - **Single sources of truth:** point values (`src/lib/points.ts`), "same
   report" identity (`panelContentSignature` — shared by points anti-farm and
   panel dedup), beta gate (`resolveApprovedUserId`).
-- **Push architecture:** subscriptions + due-logic on the Worker; the actual
-  web-push crypto runs in **GitHub Actions (Node)** — not a Workers fit. All
-  sends are **at-most-once** (marked at hand-off), so backup/manual runs can
-  never double-ping. GH cron is unreliable (silently skipped 2026-07-24) —
-  hence the backup schedule.
+- **Push architecture:** the app owns who-is-due and the payload copy; a
+  separate `ikigaro-reminders` Worker owns scheduling and delivery. All sends
+  are **at-most-once** (marked at hand-off), so backup/manual runs can never
+  double-ping. Web Push crypto was assumed to be a poor Workers fit and lived in
+  GitHub Actions; it turned out to be entirely doable on Web Crypto, and moving
+  it removed GitHub from a core product loop.
 - **Next 16 quirks:** `middleware` is deprecated → `proxy`, and proxy runs on
   the Node runtime which **OpenNext/Workers cannot run** — host-based redirects
   live in server components instead (see `(app)/admin/page.tsx`). Read
@@ -174,9 +179,11 @@ operate it, and the known follow-ups. Update this as work lands.
   to prod, so a forgotten var would otherwise be silent). Build-time
   `NEXT_PUBLIC_APP_ENV=staging` renders the "Staging · not live data" badge.
   Single-slot: concurrent PRs overwrite (serialized by a CI concurrency group).
-- **Reminders (`.github/workflows/reminders.yml`):** cron 12:30 UTC + 13:05
-  backup + manual dispatch → `scripts/send-reminders.mjs`. Repo secrets:
-  `CRON_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`.
+- **Reminders:** primary is the **`ikigaro-reminders` Worker**
+  (`workers/reminders`, Cloudflare cron `30 12 * * *`), deployed by CI alongside
+  the app. Its secrets (`CRON_SECRET`, `VAPID_PRIVATE_KEY`) are per-Worker and
+  inherit nothing. `.github/workflows/reminders.yml` remains as a late backup /
+  break-glass manual sender.
 - **Worker secrets:** `ANTHROPIC_API_KEY`, `PRIVY_APP_SECRET`,
   `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` (must equal the GH value).
 - **Worker vars (committed):** `ADMIN_EMAILS` in `wrangler.jsonc`.
@@ -207,6 +214,10 @@ operate it, and the known follow-ups. Update this as work lands.
   pinned in `wrangler.jsonc`.
 - **GitHub silently skipped a scheduled run** (no run at all on 2026-07-24) →
   idempotent sends + backup cron.
+- **GitHub's scheduler then ran reminders 90–110 minutes late every day**
+  (14:08/14:19/14:39 UTC against a 12:30 schedule) → 6 PM nudges arriving at
+  7:40 PM. Moved scheduling *and* sending to a Cloudflare cron Worker; GitHub
+  kept as a late backup, which is harmless because sends are at-most-once.
 - **`window.confirm` can be suppressed by the browser** and then silently
   returns `true` → in-app `ConfirmDialog` for all destructive admin actions.
 - Under-18 signup showed a generic error while Terms said 18+ and code said 13

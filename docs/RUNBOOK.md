@@ -162,31 +162,62 @@ update the GitHub secret, delete the old token.
 
 ## 5. Daily reminders pipeline
 
-**How it works:** GitHub Actions (12:30 UTC = 18:00 IST, plus a 13:05 UTC backup)
-calls `GET /api/cron/due-reminders` with the `CRON_SECRET` bearer. The Worker
-returns who is due (daily check-in nudges + panel-day re-test pushes) and marks
-them as sent **before** returning. The Action then does the Web Push crypto and
-sends. Marking before sending is what makes duplicate runs harmless.
+**How it works.** The `ikigaro-reminders` Cloudflare Worker (`workers/reminders`)
+fires on a Cloudflare cron trigger at 12:30 UTC (18:00 IST). It calls
+`GET /api/cron/due-reminders` on the app with the `CRON_SECRET` bearer; the app
+returns who is due — daily check-in nudges plus panel-day re-test pushes — and
+marks them notified **before** returning. The Worker then sends the Web Push
+itself (`src/lib/web-push.ts`, RFC 8291/8292 on Web Crypto).
 
-**Test it end to end:**
-1. On a device, opt in via Settings → "Daily reminders".
-2. Don't check in today.
-3. Actions → "Daily reminders" → Run workflow.
-4. The log shows `N check-in nudge(s), M re-test push(es)`.
+Marking before sending is what makes every send **at-most-once**: a retry, a
+manual run, or the backup workflow can never double-notify anyone.
+
+**Why not GitHub Actions any more.** It was the sender until GitHub's scheduler
+proved to run it 90–110 minutes late *every day* (measured across four days),
+turning a 6 PM nudge into a 7:40 PM one. `.github/workflows/reminders.yml` is
+still there as a **backup and break-glass manual sender** — when it fires late
+it simply finds 0 due and does nothing.
+
+**Secrets** (set once on the reminders Worker; they persist across deploys):
+
+```bash
+npx wrangler secret put CRON_SECRET       --config workers/reminders/wrangler.toml
+npx wrangler secret put VAPID_PRIVATE_KEY --config workers/reminders/wrangler.toml
+```
+
+`CRON_SECRET` must equal the app Worker's value, or every run 401s. The VAPID
+public key is a committed plaintext var in that Worker's `wrangler.toml` and
+must match `src/lib/vapid-public-key.ts`.
+
+**Test it end to end without waiting for 6 PM:**
+
+1. On a device, opt in via Settings → "Daily reminders", and don't check in.
+2. Trigger the Worker directly:
+   ```bash
+   curl -X POST https://ikigaro-reminders.<your-subdomain>.workers.dev \
+     -H "Authorization: Bearer $CRON_SECRET"
+   ```
+   It replies with a summary line: `<date>: N check-in nudge(s), M re-test
+   push(es) — sent X, expired Y, failed Z`.
+3. Or use the backup: Actions → "Daily reminders (backup)" → Run workflow.
 
 **"The reminder didn't arrive" — triage in this order:**
-1. **Did the workflow run at all?** Check Actions history. GitHub silently skips
-   scheduled runs — this is why there's a backup schedule. If neither ran, that's
-   the answer.
-2. **401 in the log?** `CRON_SECRET` mismatch between the Worker and GitHub (§4).
-3. **403 / "Just a moment…" HTML in the log?** Cloudflare Bot Fight Mode is on and
-   is challenging our own caller. Turn it off — endpoints carry their own auth.
-4. **Ran clean, said 0 due?** Expected if the user already checked in, or was
-   already marked sent today (at-most-once is working as designed).
-5. **Said it sent, but no notification?** Device-side: the subscription may be
-   expired, or notification permission was revoked. Have the user re-opt-in.
 
----
+1. **Did the Worker run?** Cloudflare dashboard → Workers → `ikigaro-reminders`
+   → Logs. Each run logs the summary line above.
+2. **Summary says 0 due?** Working as designed — that user already checked in,
+   or was already marked notified today.
+3. **`due-reminders failed: HTTP 401`?** `CRON_SECRET` differs between the app
+   Worker and the reminders Worker (§4).
+4. **`Missing CRON_SECRET or VAPID_PRIVATE_KEY`?** Secrets were never set on the
+   reminders Worker — they are per-Worker and inherit nothing.
+5. **Says sent, but nothing on the phone?** Device-side: subscription expired
+   (it would be counted as `expired`), or notification permission revoked. Have
+   the user toggle the setting off and on to re-subscribe.
+6. **`failed` count > 0?** The push service rejected it. A 401/403 there means
+   the VAPID keypair doesn't match what the browser subscribed with — check the
+   public key in `workers/reminders/wrangler.toml` against
+   `src/lib/vapid-public-key.ts`.
 
 ## 6. Routine admin tasks
 
