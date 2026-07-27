@@ -309,11 +309,14 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   (onboarding → upload → confirm → check-in → redeem) is still hand-verified on
   staging. Automating it needs a test mailbox to read Privy OTPs; a test-only
   auth bypass was considered and rejected (`docs/TESTING.md`).
-- **🔴 THERE ARE NO DATABASE BACKUPS.** Verified 2026-07-27, not assumed: the
-  Supabase project is on the Free plan, which includes no backups and no PITR.
-  If the database is lost, everything is lost — every user, panel, reading and
-  points transaction, permanently. No longer the highest-severity *unknown*;
-  it is the highest-severity *known*. Fix is $25/mo (Supabase Pro → daily
+- **🔴 THERE ARE NO DATABASE BACKUPS — accepted risk, expires at ~20 testers.**
+  Verified 2026-07-27, not assumed: the Supabase project is on the Free plan,
+  which includes no backups and no PITR. If the database is lost, everything is
+  lost — every user, panel, reading and points transaction, permanently.
+  Founder's decision is to stay on Free while user count is single-digit and
+  revisit at ~20 testers, which is a reasonable trade at this size. **That
+  threshold is the whole safety margin**: past it, losing the data ends the
+  beta rather than inconveniencing it. Fix is $25/mo (Supabase Pro → daily
   backups, 7-day retention). See `RUNBOOK.md` §2b.
 - **Scaling levers** (~10k users): OCR vendor, prompt caching, batch API,
   async queue — `docs/SCALING.md`.

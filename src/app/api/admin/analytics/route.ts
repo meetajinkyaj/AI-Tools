@@ -10,6 +10,7 @@ import {
   dailySeries,
   type UserRow,
 } from "@/lib/analytics";
+import { assessBackupRisk, declaredBackupPosture } from "@/lib/backup-risk";
 import { todayUTC } from "@/lib/checkin";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -104,8 +105,16 @@ export async function GET(request: Request) {
       markActive(o.user_id as string, (o.created_at as string).slice(0, 10));
     }
 
+    const funnel = computeFunnel(userRows, onboarded, panelDatesByUser);
+
     return NextResponse.json({
-      funnel: computeFunnel(userRows, onboarded, panelDatesByUser),
+      funnel,
+      // The tripwire on the "no backups until ~20 testers" decision. Computed
+      // here rather than left to a doc note, because a note cannot notice.
+      backupRisk: assessBackupRisk(
+        funnel.users,
+        declaredBackupPosture(process.env.DB_BACKUPS),
+      ),
       retention: computeRetention(userRows, activeDatesByUser, today),
       active: computeActive(activeDatesByUser, today),
       streaks: computeStreakBuckets(latestCheckinByUser, today),
