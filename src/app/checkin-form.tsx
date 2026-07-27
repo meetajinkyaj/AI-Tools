@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { ShareCheckinCard } from "./share-card";
 
 import {
   type CheckinRow,
@@ -27,6 +29,7 @@ import {
   labelClass,
   PageHeader,
   primaryButtonClass,
+  secondaryButtonClass,
 } from "./ui";
 
 interface CheckinState {
@@ -66,6 +69,8 @@ export function CheckinForm({
   const [error, setError] = useState<string | null>(null);
   const [earned, setEarned] = useState<number | null>(null);
   const [justSaved, setJustSaved] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [inviteCode, setInviteCode] = useState("");
   const startedRef = useRef(false);
 
   // Any edit after a save clears the "Done" confirmation so the button invites
@@ -190,6 +195,60 @@ export function CheckinForm({
     }
   }
 
+  /**
+   * The invite code that rides on every shared card. Fetched only when the
+   * share sheet is opened — most check-ins never open it, and a card without
+   * a code still works (it just shows the bare link).
+   */
+  const loadInviteCode = useCallback(async () => {
+    if (inviteCode) return;
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch("/api/referral", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { code?: string };
+      if (data.code) setInviteCode(data.code);
+    } catch {
+      /* the card is still shareable without it */
+    }
+  }, [getToken, inviteCode]);
+
+  const shareInput = useMemo(
+    () => ({
+      streak: state?.streak ?? 0,
+      pointsBalance: state?.pointsBalance ?? 0,
+      pointsEarned: earned ?? 0,
+      trainingLogged,
+      // Human labels only — the card never prints internal type keys.
+      activities: exercises.map((e) =>
+        e.type === OTHER_TYPE
+          ? e.label || "Other"
+          : isExerciseType(e.type)
+            ? EXERCISE_TYPE_LABELS[e.type]
+            : e.type,
+      ),
+      // Type keys, for choosing the default backdrop. Never drawn.
+      exerciseTypes: exercises.map((e) => e.type),
+      energy,
+      sleepHours: sleepHours === "" ? null : Number(sleepHours),
+      inviteCode,
+      date: new Date(),
+    }),
+    [
+      state?.streak,
+      state?.pointsBalance,
+      earned,
+      trainingLogged,
+      exercises,
+      energy,
+      sleepHours,
+      inviteCode,
+    ],
+  );
+
   if (status === "loading") {
     return <p className="font-body text-sm text-muted">Loading your check-in…</p>;
   }
@@ -249,12 +308,40 @@ export function CheckinForm({
       </div>
 
       {justSaved && (
-        <Card className="border-accent/40 bg-surface-2 p-4">
+        <Card className="flex flex-col gap-4 border-accent/40 bg-surface-2 p-4">
           <p className="font-body text-sm font-medium text-foreground">
             {earned && earned > 0
               ? `Done ✓ You're checked in for today and earned ${earned} iki points.`
               : "Done ✓ Your check-in has been updated."}
           </p>
+
+          {/* Offered at the moment of the win, which is the only time anyone
+              wants to post about it. */}
+          {showShare ? (
+            <ShareCheckinCard
+              input={shareInput}
+              onClose={() => setShowShare(false)}
+            />
+          ) : (
+            <div className="flex flex-col gap-1">
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowShare(true);
+                    void loadInviteCode();
+                  }}
+                  className={secondaryButtonClass}
+                >
+                  Share your streak
+                </button>
+              </div>
+              <p className="font-body text-xs text-muted">
+                Make an image for Instagram or WhatsApp — add your own photo if
+                you like.
+              </p>
+            </div>
+          )}
         </Card>
       )}
 
