@@ -10,12 +10,17 @@ Two suites, deliberately separate.
 | Lives in | `src/**/*.test.ts` | `e2e/**/*.spec.ts` |
 | Tests | pure domain logic | a running deployment in a real browser |
 | Needs | nothing | an app to point at |
-| Count | 217 | 49 × 2 viewports |
+| Count | 217 | 51 × 2 viewports |
 | Runs in CI | every push and PR | every PR against staging, plus every ~30 min against production |
 
 They are kept apart on purpose: Vitest's default patterns would otherwise try
 to run the Playwright specs and fail confusingly, so `vitest.config.ts` scopes
 Vitest to `src/`.
+
+Counts go stale every time anyone adds a test, so this is the only file that
+quotes them. Check rather than trust: `npm test` and
+`npx playwright test --list` both print a total. (The E2E total is doubled —
+every spec runs at a desktop and a mobile viewport.)
 
 ---
 
