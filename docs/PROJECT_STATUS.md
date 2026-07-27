@@ -23,7 +23,7 @@ operate it, and the known follow-ups. Update this as work lands.
   **Supabase Postgres** (RLS enabled everywhere, *no* policies; service-role
   key server-only) · **Privy** email-OTP auth (hand-rolled token verification
   via `crypto.subtle`, not the Privy SDK, so it runs on Workers) · Tailwind v4
-  · Vitest (173 unit tests) + Playwright E2E · Web Push (VAPID) from a
+  · Vitest unit tests + Playwright E2E · Web Push (VAPID) from a
   dedicated Cloudflare cron Worker.
 - **Key non-sensitive IDs:** Worker name `ai-tools` · Cloudflare account
   `21510d84b951ec23fc0b34eb316e6546` · Privy app ID `cmr7snzr8003e0ejvn5y0sppr`
@@ -55,7 +55,9 @@ operate it, and the known follow-ups. Update this as work lands.
    content-signature replay guard (same report never earns twice).
 6. **Doctor-Ready PDF** — client-side jsPDF (lazy-loaded), Web Share API to
    WhatsApp/Telegram, Latin-1 glyph sanitizer.
-7. **PWA** — installable (manifest + branded icons), conservative service
+7. **PWA** — installable (manifest + brand icons generated from
+   `brand/ikigaro-app-icon-512.png` by `npm run icons` — never hand-edit
+   `public/`), conservative service
    worker (offline fallback only; no app/API caching), install prompt
    (Chromium button / iOS share-sheet hint).
 8. **Daily reminders** — opt-in Web Push ("Daily reminders" toggle in

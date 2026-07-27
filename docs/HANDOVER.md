@@ -69,7 +69,7 @@ nothing until an admin approves them.
 
 **Stack in one line:** Next.js 16 App Router → Cloudflare Workers (via OpenNext)
 · Supabase Postgres · Privy email-OTP auth · Anthropic Claude for extraction ·
-Web Push from a dedicated Cloudflare cron Worker · Tailwind v4 · Vitest (173 unit tests) +
+Web Push from a dedicated Cloudflare cron Worker · Tailwind v4 · Vitest unit tests +
 Playwright (E2E against staging, plus a production smoke monitor).
 
 ---
@@ -88,9 +88,10 @@ Playwright (E2E against staging, plus a production smoke monitor).
   no double-spend or double-issue is possible under concurrency).
 - Every push send is at-most-once by construction, so retries and manual runs
   cannot double-notify users.
-- 173 unit tests covering the domain logic (biomarkers, points, trends, future,
+- Unit tests covering the domain logic (biomarkers, points, trends, future,
   check-ins, referrals, reminders, analytics, token verification), plus a
   Playwright suite that exercises the deployed staging app on every PR.
+  `npm test` for the current count — see `docs/TESTING.md`.
 
 **Real debt, sized:**
 - **E2E covers the signed-out surface only.** Playwright runs against staging on
