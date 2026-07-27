@@ -1,6 +1,6 @@
 # CTO Handover — Ikigaro
 
-_Last updated: 2026-07-25_
+_Last updated: 2026-07-27_
 
 **If you are the incoming CTO, start here.** This document is the entry point to
 everything: what the product is, what exists, what you own on day one, what will
@@ -256,10 +256,12 @@ handover.
    — a user clicked delete, saw no dialog, and the delete went through. All
    destructive admin actions go through the in-app `ConfirmDialog`. Never
    reintroduce `window.confirm`.
-8. **Check the Supabase backup posture before you need it.** I have not verified
-   what point-in-time-recovery tier this project is on. Do this in week one — it
-   is the single highest-severity unknown in the system, because the database is
-   the only irreplaceable asset.
+8. **There are no database backups.** Checked on 2026-07-27: the Supabase
+   project is on the Free plan, which includes none, and PITR is off. If the
+   database is lost, everything is lost. This is the single largest risk in the
+   system and the cheapest to fix — $25/mo for Supabase Pro. `RUNBOOK.md` §2b
+   has the detail, the manual stopgap, and the restore drill to run once
+   backups exist.
 
 **Debugging order when something works locally but fails in production:**
 (a) is it actually deployed? (b) build-time env vars, (c) did the migration run?
@@ -283,9 +285,11 @@ inbox); the tempting fix, a test-only auth bypass, would be a permanent backdoor
 in an app holding health data and should be refused. Do this before the critical
 path gets more complex.
 
-**2. Verify the backup/restore path.** Confirm the Supabase PITR tier, then
-actually perform a restore into a scratch project. An unrehearsed backup is a
-hope, not a backup. Half a day; removes the biggest single-point risk.
+**2. Turn on database backups — there are none.** Already verified (see trap
+8), so this is not an investigation: it is a $25/mo billing change to Supabase
+Pro. Then actually rehearse a restore into a scratch project, because an
+unrehearsed backup is a hope, not a backup. Half a day; removes the biggest
+single-point risk in the system.
 
 **3. Get real beta signal.** ~20–30 testers are the immediate plan. The admin
 Analytics tab already tracks the funnel, D1/7/30 retention, and DAU/WAU/MAU.

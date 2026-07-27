@@ -52,3 +52,15 @@ cloudflare-env.d.ts
 /playwright-report/
 /blob-report/
 /.playwright/
+
+# Database dumps — a pg_dump of production is a complete copy of every user's
+# health data. Committing one would publish it irreversibly (git history keeps
+# it even after a later delete). Migrations live in supabase/migrations/ and are
+# re-included below, since those are schema, not data.
+*.sql
+*.dump
+*.sql.gz
+*.sql.age
+*.sql.gpg
+!supabase/migrations/*.sql
+!supabase/seed_redemption_catalog.sql
