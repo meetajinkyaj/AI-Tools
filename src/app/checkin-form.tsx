@@ -222,7 +222,7 @@ export function CheckinForm({
       pointsBalance: state?.pointsBalance ?? 0,
       pointsEarned: earned ?? 0,
       trainingLogged,
-      // Human labels only — the card never carries internal type keys.
+      // Human labels only — the card never prints internal type keys.
       activities: exercises.map((e) =>
         e.type === OTHER_TYPE
           ? e.label || "Other"
@@ -230,6 +230,8 @@ export function CheckinForm({
             ? EXERCISE_TYPE_LABELS[e.type]
             : e.type,
       ),
+      // Type keys, for choosing the default backdrop. Never drawn.
+      exerciseTypes: exercises.map((e) => e.type),
       energy,
       sleepHours: sleepHours === "" ? null : Number(sleepHours),
       inviteCode,

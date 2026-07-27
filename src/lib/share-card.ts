@@ -77,8 +77,14 @@ export interface ShareCardInput {
   pointsBalance: number;
   pointsEarned: number;
   trainingLogged: boolean;
-  /** Human labels, e.g. ["Running", "Gym"]. */
+  /** Human labels, e.g. ["Running", "Gym"]. What the card prints. */
   activities: string[];
+  /**
+   * The same activities as internal type keys, e.g. ["running", "gym"]. Used
+   * only to pick which tonal backdrop the picker opens on — never rendered, so
+   * that the card can't leak an internal identifier onto someone's timeline.
+   */
+  exerciseTypes: string[];
   /** 1–5, or null if not recorded. */
   energy: number | null;
   /** Hours, or null. */

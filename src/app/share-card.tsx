@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  BACKDROPS,
+  defaultBackdrop,
+  type BackdropId,
+} from "@/lib/share-backdrop";
 import {
   DEFAULT_FIELDS,
   DEFAULT_FORMAT,
@@ -14,7 +19,7 @@ import {
   type ShareFields,
   type TemplateId,
 } from "@/lib/share-card";
-import { drawShareCard } from "./share-card-render";
+import { drawBackdrop, drawShareCard } from "./share-card-render";
 
 /**
  * The share sheet — "the screen that makes the card", per the Claude Design
@@ -62,6 +67,50 @@ function Toggle({
   );
 }
 
+/**
+ * A live preview of the backdrop itself, drawn by the same function that draws
+ * the card. A swatch of flat colour would misrepresent all three of the
+ * gradient, the motif and the vignette.
+ */
+function BackdropSwatch({
+  id,
+  name,
+  selected,
+  onClick,
+}: {
+  id: BackdropId;
+  name: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const ref = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = ref.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    // Render at the card's own aspect so the thumbnail is a true miniature.
+    canvas.width = 128;
+    canvas.height = 160;
+    drawBackdrop(ctx, id, canvas.width, canvas.height);
+  }, [id]);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      title={name}
+      className={`overflow-hidden rounded-control border transition-colors ${
+        selected ? "border-accent" : "border-border hover:border-accent/50"
+      }`}
+    >
+      <canvas ref={ref} aria-hidden className="block h-16 w-[3.2rem]" />
+      <span className="sr-only">{name}</span>
+    </button>
+  );
+}
+
 /** Small pill used for template and format choices. */
 function Choice({
   selected,
@@ -105,6 +154,14 @@ export function ShareCheckinCard({
   const [photo, setPhoto] = useState<HTMLImageElement | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
+  // Open on whatever the user logged today, so the picker feels like it
+  // already knows. Most people will never change it.
+  const suggested = useMemo(
+    () => defaultBackdrop(input.trainingLogged, input.exerciseTypes),
+    [input.trainingLogged, input.exerciseTypes],
+  );
+  const [backdrop, setBackdrop] = useState<BackdropId | null>(suggested);
+
   const { w, h } = formatSize(format);
 
   // Redraw on any change. Fonts must be ready first, or the canvas silently
@@ -128,13 +185,14 @@ export function ShareCheckinCard({
         width: w,
         height: h,
         photo,
+        backdrop,
       });
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [input, fields, template, w, h, photo]);
+  }, [input, fields, template, w, h, photo, backdrop]);
 
   function onPickPhoto(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -247,20 +305,39 @@ export function ShareCheckinCard({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setPhoto(null)}
-            aria-pressed={photo === null}
-            className={`h-16 w-16 rounded-control border font-label text-[0.5rem] uppercase tracking-[0.14em] transition-colors ${
-              photo === null
+            onClick={() => {
+              setPhoto(null);
+              setBackdrop(null);
+            }}
+            aria-pressed={photo === null && backdrop === null}
+            className={`h-16 w-[3.2rem] rounded-control border font-label text-[0.5rem] uppercase tracking-[0.14em] transition-colors ${
+              photo === null && backdrop === null
                 ? "border-accent bg-surface-2 text-foreground"
                 : "border-border bg-surface text-muted"
             }`}
           >
             None
           </button>
+
+          {BACKDROPS.map((b) => (
+            <BackdropSwatch
+              key={b.id}
+              id={b.id}
+              name={`${b.name} — ${b.note}`}
+              // A photo covers the backdrop, so nothing is selected while one
+              // is loaded, however the state underneath reads.
+              selected={photo === null && backdrop === b.id}
+              onClick={() => {
+                setBackdrop(b.id);
+                setPhoto(null);
+              }}
+            />
+          ))}
+
           <button
             type="button"
             onClick={() => uploadRef.current?.click()}
-            className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-control border border-dashed border-border-strong bg-surface-2 font-label text-[0.5rem] uppercase tracking-[0.14em] text-muted"
+            className="flex h-16 w-[3.2rem] flex-col items-center justify-center gap-1 rounded-control border border-dashed border-border-strong bg-surface-2 font-label text-[0.5rem] uppercase tracking-[0.14em] text-muted"
           >
             <span className="text-base leading-none">+</span>
             Upload
@@ -268,7 +345,7 @@ export function ShareCheckinCard({
           <button
             type="button"
             onClick={() => cameraRef.current?.click()}
-            className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-control border border-dashed border-border-strong bg-surface-2 font-label text-[0.5rem] uppercase tracking-[0.14em] text-muted"
+            className="flex h-16 w-[3.2rem] flex-col items-center justify-center gap-1 rounded-control border border-dashed border-border-strong bg-surface-2 font-label text-[0.5rem] uppercase tracking-[0.14em] text-muted"
           >
             <span className="text-sm leading-none">◉</span>
             Camera

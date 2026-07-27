@@ -22,6 +22,7 @@ const base: ShareCardInput = {
   pointsEarned: 10,
   trainingLogged: true,
   activities: ["Running"],
+  exerciseTypes: ["running"],
   energy: 4,
   sleepHours: 7.5,
   inviteCode: "AJINKYA",

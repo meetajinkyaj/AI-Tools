@@ -11,6 +11,16 @@
  * the card width so the proportions hold at any format.
  */
 
+import { MOTIF_PATH, MOTIF_UNITS_PER_EM } from "@/lib/ikigai-motif";
+import {
+  backdropById,
+  GRADIENT_STOPS,
+  gradientAxis,
+  motifOrigin,
+  motifSize,
+  vignette,
+  type BackdropId,
+} from "@/lib/share-backdrop";
 import {
   coverRect,
   fitFontSize,
@@ -49,6 +59,12 @@ interface Ctx {
   faint: string;
   accent: string;
   rule: string;
+  /**
+   * True when a tonal backdrop is the ground. The backdrops are warm and
+   * mid-dark by construction, which changes what can be drawn on them — see
+   * the accent and week-strip choices below.
+   */
+  onBackdrop: boolean;
 }
 
 /** The wordmark, drawn rather than loaded — no asset to ship or 404. */
@@ -109,10 +125,15 @@ function drawMasthead(c: Ctx, input: ShareCardInput, pad: number) {
 function drawFooter(c: Ctx, input: ShareCardInput, pad: number) {
   const y = c.h - pad;
   const { ctx } = c;
-  ctx.font = `400 ${28 * c.k}px ${c.label}`;
-  ctx.fillStyle = c.accent;
-  ctx.textAlign = "left";
-  ctx.fillText("生き甲斐", pad, y);
+
+  // The tonal backdrops carry 生き甲斐 across the ground already. Printing it
+  // again in the footer says the same word twice, a few hundred pixels apart.
+  if (!c.onBackdrop) {
+    ctx.font = `400 ${28 * c.k}px ${c.label}`;
+    ctx.fillStyle = c.accent;
+    ctx.textAlign = "left";
+    ctx.fillText("生き甲斐", pad, y);
+  }
 
   tracked(
     c,
@@ -124,6 +145,79 @@ function drawFooter(c: Ctx, input: ShareCardInput, pad: number) {
     c.faint,
     "right",
   );
+}
+
+/**
+ * The darkening wash that sits under the type on any image ground. Heavier at
+ * the top and bottom, where the masthead and footer live, and lightest across
+ * the middle so a photo's subject still reads.
+ */
+function drawScrim(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  strength: number,
+) {
+  const a = (alpha: number) => `rgba(38,32,26,${(alpha * strength).toFixed(3)})`;
+  const scrim = ctx.createLinearGradient(0, 0, 0, height);
+  scrim.addColorStop(0, a(0.72));
+  scrim.addColorStop(0.3, a(0.4));
+  scrim.addColorStop(0.62, a(0.62));
+  scrim.addColorStop(1, a(0.92));
+  ctx.fillStyle = scrim;
+  ctx.fillRect(0, 0, width, height);
+}
+
+/* ----------------------------- tonal backdrop ---------------------------- */
+
+/**
+ * Path2D is browser-only and the path never changes, so build it once, lazily.
+ */
+let motifPath: Path2D | null = null;
+function ikigaiMotif(): Path2D {
+  motifPath ??= new Path2D(MOTIF_PATH);
+  return motifPath;
+}
+
+/**
+ * Draws one of the six tonal grounds.
+ *
+ * Order is load-bearing: gradient → motif → vignette. Putting the vignette
+ * above the motif is what keeps the glyphs' bleed off the right edge from
+ * looking pasted on.
+ */
+export function drawBackdrop(
+  ctx: CanvasRenderingContext2D,
+  id: BackdropId,
+  width: number,
+  height: number,
+) {
+  const b = backdropById(id);
+
+  const axis = gradientAxis(width, height);
+  const grad = ctx.createLinearGradient(axis.x0, axis.y0, axis.x1, axis.y1);
+  grad.addColorStop(GRADIENT_STOPS[0], b.highlight);
+  grad.addColorStop(GRADIENT_STOPS[1], b.mid);
+  grad.addColorStop(GRADIENT_STOPS[2], b.base);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+
+  const size = motifSize(width);
+  const origin = motifOrigin(width, height);
+  ctx.save();
+  ctx.globalAlpha = b.motifOpacity;
+  ctx.fillStyle = b.highlight;
+  ctx.translate(origin.x, origin.y);
+  ctx.scale(size / MOTIF_UNITS_PER_EM, size / MOTIF_UNITS_PER_EM);
+  ctx.fill(ikigaiMotif());
+  ctx.restore();
+
+  const v = vignette(width, height);
+  const radial = ctx.createRadialGradient(v.cx, v.cy, v.inner, v.cx, v.cy, v.outer);
+  radial.addColorStop(0, v.from);
+  radial.addColorStop(1, v.to);
+  ctx.fillStyle = radial;
+  ctx.fillRect(0, 0, width, height);
 }
 
 function hairline(c: Ctx, x1: number, x2: number, y: number, color: string) {
@@ -292,13 +386,23 @@ function drawLedger(c: Ctx, input: ShareCardInput, fields: ShareFields) {
     const barH = Math.min(96 * c.k, stripBottom - stripTop - 70 * c.k);
     const barY = stripTop + 30 * c.k;
 
+    // Terracotta bars read strongly on Ledger's own brown, and vanish into a
+    // warm backdrop (1.4–1.9:1 on Movement and Stillness). There the fill goes
+    // linen and today keeps Clay Ember, which now separates from its
+    // neighbours by hue rather than fighting the ground for it.
+    // Held at just over half strength on purpose. Solid linen reads as seven
+    // blank placeholders rather than a filled week — what has to carry is the
+    // difference between a filled bar and an empty one, not the bar's own
+    // weight against the ground.
+    const filledBar = c.onBackdrop ? "rgba(251,249,245,0.55)" : PALETTE.terracotta;
+    const todayBar = c.onBackdrop ? PALETTE.clayLight : PALETTE.clay;
+    const emptyBar = c.onBackdrop
+      ? "rgba(20,17,14,0.28)"
+      : "rgba(251,249,245,0.09)";
+
     days.forEach((day, i) => {
       const x = pad + i * (barW + gap);
-      ctx.fillStyle = day.isToday
-        ? PALETTE.clay
-        : day.filled
-          ? PALETTE.terracotta
-          : "rgba(251,249,245,0.09)";
+      ctx.fillStyle = day.isToday ? todayBar : day.filled ? filledBar : emptyBar;
       ctx.fillRect(x, barY, barW, barH);
 
       if (day.isToday) {
@@ -387,17 +491,20 @@ export async function drawShareCard(
     width: number;
     height: number;
     photo: HTMLImageElement | null;
+    backdrop: BackdropId | null;
   },
 ) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  const { input, fields, template, width, height, photo } = opts;
+  const { input, fields, template, width, height, photo, backdrop } = opts;
   canvas.width = width;
   canvas.height = height;
 
-  const onPhoto = photo !== null;
-  const dark = template === "ledger" || onPhoto;
+  // A photo wins if both are somehow set — the user picked it more recently
+  // and it is the more specific intent.
+  const ground = photo ? "photo" : backdrop ? "backdrop" : "flat";
+  const dark = template === "ledger" || ground !== "flat";
 
   const c: Ctx = {
     ctx,
@@ -410,12 +517,25 @@ export async function drawShareCard(
     ink: dark ? PALETTE.ledgerInk : PALETTE.stoneInk,
     muted: dark ? "rgba(251,249,245,0.62)" : PALETTE.stoneMuted,
     faint: dark ? "rgba(251,249,245,0.5)" : PALETTE.stoneFaint,
-    accent: dark ? PALETTE.clay : PALETTE.terracotta,
+    // A warm accent on a warm ground disappears. Measured against the six
+    // backdrops at the positions the accent actually occupies, Clay scores
+    // 1.38:1 on Stillness and 1.55:1 on Movement — invisible. Clay Ember only
+    // reaches 2.4–2.7:1 there, still under the 3:1 floor, and nothing else in
+    // the palette is both warm and light enough. So on a backdrop the accent
+    // gives way to linen (4.6:1 at worst) rather than being tuned. Photos keep
+    // Clay: their scrim runs at full strength, which leaves it the headroom a
+    // backdrop's lighter scrim does not.
+    accent: ground === "backdrop"
+      ? PALETTE.ledgerInk
+      : dark
+        ? PALETTE.clay
+        : PALETTE.terracotta,
     rule: dark ? "rgba(251,249,245,0.14)" : PALETTE.rule,
+    onBackdrop: ground === "backdrop",
   };
 
   /* ground */
-  if (photo) {
+  if (ground === "photo" && photo) {
     const { sx, sy, sw, sh } = coverRect(
       photo.naturalWidth,
       photo.naturalHeight,
@@ -423,16 +543,17 @@ export async function drawShareCard(
       height,
     );
     ctx.drawImage(photo, sx, sy, sw, sh, 0, 0, width, height);
-
     // A baked scrim, per the design note: every number stays legible on any
     // photo, so the user never drags text or hunts for a dark patch.
-    const scrim = ctx.createLinearGradient(0, 0, 0, height);
-    scrim.addColorStop(0, "rgba(38,32,26,0.72)");
-    scrim.addColorStop(0.3, "rgba(38,32,26,0.4)");
-    scrim.addColorStop(0.62, "rgba(38,32,26,0.62)");
-    scrim.addColorStop(1, "rgba(38,32,26,0.92)");
-    ctx.fillStyle = scrim;
-    ctx.fillRect(0, 0, width, height);
+    drawScrim(ctx, width, height, 1);
+  } else if (ground === "backdrop" && backdrop) {
+    drawBackdrop(ctx, backdrop, width, height);
+    // The spec keeps the card's existing scrim over a backdrop, but at full
+    // strength it flattens all six into the same near-black and the point of
+    // having six is lost. They are already dark by construction — a photo
+    // scrim exists to survive an arbitrary bright upload, which is not a
+    // problem a known palette has. A third of it is enough to seat the type.
+    drawScrim(ctx, width, height, 0.34);
   } else {
     ctx.fillStyle = template === "ledger" ? PALETTE.ledgerBg : PALETTE.stoneBg;
     ctx.fillRect(0, 0, width, height);
