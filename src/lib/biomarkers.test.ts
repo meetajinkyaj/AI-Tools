@@ -12,6 +12,7 @@ import {
   isEnterableNumeric,
   isNoteworthy,
   isValidDate,
+  type Severity,
   qualitativeFlag,
   qualitativeOptions,
   severityFromBand,
@@ -183,8 +184,15 @@ describe("severityFromBand", () => {
 
 describe("isNoteworthy", () => {
   it("surfaces low/high/borderline, not optimal/in_range/unknown", () => {
-    expect(["low", "high", "borderline"].every(isNoteworthy)).toBe(true);
-    expect(["optimal", "in_range", "unknown"].some(isNoteworthy)).toBe(false);
+    // Typed, not inferred: a bare literal widens to string[], and the mismatch
+    // against Severity is exactly what tells us a case has been renamed.
+    const noteworthy: Severity[] = ["low", "high", "borderline"];
+    const quiet: Severity[] = ["optimal", "in_range", "unknown"];
+    expect(noteworthy.every(isNoteworthy)).toBe(true);
+    expect(quiet.some(isNoteworthy)).toBe(false);
+    // Together these cover the whole union, so adding a severity without
+    // deciding whether it is noteworthy fails here.
+    expect(noteworthy.length + quiet.length).toBe(6);
   });
 });
 

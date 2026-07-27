@@ -5,6 +5,7 @@ import {
   POINTS_REASON,
   isReplayUpload,
   panelContentSignature,
+  type SignatureReading,
   uploadEarn,
 } from "./points";
 
