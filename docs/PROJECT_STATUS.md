@@ -1,6 +1,6 @@
 # Ikigaro — Project & Session Reference
 
-_Last updated: 2026-07-25_
+_Last updated: 2026-07-27_
 
 A living reference for the Ikigaro app: architecture, what's built, how to
 operate it, and the known follow-ups. Update this as work lands.
@@ -309,9 +309,12 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   (onboarding → upload → confirm → check-in → redeem) is still hand-verified on
   staging. Automating it needs a test mailbox to read Privy OTPs; a test-only
   auth bypass was considered and rejected (`docs/TESTING.md`).
-- **Supabase backup/restore posture unverified** — confirm the PITR tier and
-  rehearse a restore. Highest-severity unknown: the DB is the only
-  irreplaceable asset.
+- **🔴 THERE ARE NO DATABASE BACKUPS.** Verified 2026-07-27, not assumed: the
+  Supabase project is on the Free plan, which includes no backups and no PITR.
+  If the database is lost, everything is lost — every user, panel, reading and
+  points transaction, permanently. No longer the highest-severity *unknown*;
+  it is the highest-severity *known*. Fix is $25/mo (Supabase Pro → daily
+  backups, 7-day retention). See `RUNBOOK.md` §2b.
 - **Scaling levers** (~10k users): OCR vendor, prompt caching, batch API,
   async queue — `docs/SCALING.md`.
 - **Catalog range tuning** (BUN, Estradiol, Cortisol, MCV, MCH) via the

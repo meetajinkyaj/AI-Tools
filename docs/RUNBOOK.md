@@ -1,6 +1,6 @@
 # Runbook — Ikigaro Operations
 
-_Last updated: 2026-07-25_
+_Last updated: 2026-07-27_
 
 Procedures for running Ikigaro in production: deploying, migrating, rotating
 secrets, responding to incidents, and the routine admin tasks. Written so
@@ -92,6 +92,100 @@ and no deploy needed. See [`REFERENCE_DATA.md`](./REFERENCE_DATA.md).
 
 **Seeding rewards:** `supabase/seed_redemption_catalog.sql` is a template, not
 something to run blindly against production. Prefer the admin console (§6).
+
+---
+
+## 2b. Backups — READ THIS BEFORE YOU NEED IT
+
+> ### ⚠️ As of 2026-07-27 there are NO backups of the production database.
+>
+> Verified in the Supabase dashboard, not assumed: project
+> `xaygldulkjjofxohescm` is on the **Free plan**, which states plainly that it
+> *"does not include project backups."* No daily snapshots, no retention window,
+> no Point-in-Time Recovery.
+>
+> **If the database is lost today, everything is lost.** Every user, profile,
+> check-in, blood panel, reading and points transaction — permanently, with no
+> recovery path. Not "up to 24 hours of data". All of it.
+>
+> The dashboard's **"Restore to new project"** button does not help. It restores
+> *from a scheduled backup*, and there are none. The one obvious recovery button
+> in the UI does nothing for us — do not be reassured by its presence.
+
+Everything else in this system is disposable. The app, the Workers, the DNS, the
+CI pipeline — all rebuildable from this repo in an afternoon. The database is the
+only thing that cannot be rebuilt from anything.
+
+### Fixing it (in order)
+
+| Step | What it buys | Cost |
+|---|---|---|
+| 1. Manual `pg_dump` (below) | One snapshot, right now. Ends the zero-backup state today. | Free |
+| 2. **Supabase Pro** | Automatic daily backups, 7-day retention. Worst-case loss drops from *everything* to *~24 hours*. | $25/mo |
+| 3. Off-site copy | Survives loss of the Supabase account itself — see the caveat below. | ~free |
+| 4. PITR add-on | Rewind to any second in the last 7 days. Worst case ~minutes. | +$100/mo |
+
+**Step 2 is the one that matters.** Step 4 is not worth it until user volume is
+much higher.
+
+**The caveat on step 3:** Pro's backups live *inside the same Supabase account as
+the database they protect*. That is a correlated failure — an account
+suspension, a billing lapse or a compromised login takes the database and its
+backups together. An off-site copy is the only thing that survives that class of
+failure, which is why it is on this list even though Pro covers the common case.
+
+### The manual snapshot
+
+Run from a machine that can reach the internet — not from CI, and not from an
+agent sandbox:
+
+```bash
+# Connection string: Supabase dashboard → Project Settings → Database → URI
+pg_dump "postgresql://postgres:[PASSWORD]@db.xaygldulkjjofxohescm.supabase.co:5432/postgres" \
+  --no-owner --no-privileges \
+  -f "ikigaro-$(date +%Y-%m-%d).sql"
+```
+
+**The dump file is a complete copy of every user's health data.** Treat it as
+such:
+
+- Encrypt it if it is going to sit anywhere (`age`, `gpg`, or an encrypted disk
+  image). An unencrypted copy in `~/Downloads` is a data breach waiting for a
+  lost laptop.
+- Do not put it in Dropbox/Drive/iCloud unencrypted, and do not email it.
+- Do not commit it. `.gitignore` now covers `*.sql`, `*.dump` and the encrypted
+  variants, re-including only `supabase/migrations/` and the seed template — so
+  a dump dropped anywhere in the repo, including inside `supabase/`, is ignored.
+  Git history is forever: a dump committed once and deleted later is still
+  published.
+- Delete it once a real backup mechanism exists.
+
+A manual dump is a **snapshot, not a backup**. It captures one moment and will
+never run again unless a human remembers. It buys time to do step 2; it is not
+step 2.
+
+### Verifying a restore actually works
+
+Once backups exist, rehearse the restore — an unrehearsed backup is a hope, not a
+backup. The drill:
+
+1. Restore the latest backup into a **new, throwaway** project. Never onto
+   production (`xaygldulkjjofxohescm`) or staging (`albhabiyfaqvpnxilovf`) — a
+   restore *overwrites*.
+2. Time it. That number is how long Ikigaro is down in a real outage.
+3. Compare against production: row counts for all 18 tables, and
+   `select tablename, rowsecurity from pg_tables where schemaname='public'` —
+   all 18 must still show `true`. A restore that silently drops RLS is a
+   security regression, not a successful recovery.
+4. `biomarker_catalog` should show **91 rows / 83 distinct `marker_key`s**. The
+   gap is markers split by sex and is correct — not a partial restore.
+5. Delete the throwaway project. It holds real health data.
+
+Expect fast-moving tables (`daily_checkins`, `events`, `client_errors`,
+`points_transactions`) to be slightly behind production. That gap *is* the
+data-loss window, measured rather than guessed. A gap in slow-moving tables
+(`users`, `biomarker_catalog`, `redemption_items`) is not expected and needs
+investigating.
 
 ---
 
