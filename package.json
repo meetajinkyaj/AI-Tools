@@ -17,7 +17,8 @@
     "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf:deploy:staging": "opennextjs-cloudflare build && opennextjs-cloudflare deploy --env staging",
     "cf:deploy:reminders": "wrangler deploy --config workers/reminders/wrangler.toml",
-    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@privy-io/react-auth": "^3.33.1",
@@ -39,6 +40,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10",

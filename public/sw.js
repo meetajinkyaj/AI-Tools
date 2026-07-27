@@ -6,7 +6,10 @@
 // a static offline page + icons and serves that page when a navigation fails
 // because the device is offline. Everything else goes straight to the network.
 
-const CACHE = "ikigaro-shell-v1";
+// Bump on any change to PRECACHE's *contents* — the icons were regenerated
+// from the brand pack, and a service worker only re-runs install when its own
+// bytes change.
+const CACHE = "ikigaro-shell-v2";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE = [OFFLINE_URL, "/icon-192.png", "/icon-512.png"];
 
