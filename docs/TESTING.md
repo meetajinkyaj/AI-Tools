@@ -1,6 +1,6 @@
 # Testing
 
-_Last updated: 2026-07-25_
+_Last updated: 2026-07-27_
 
 Two suites, deliberately separate.
 
@@ -10,7 +10,7 @@ Two suites, deliberately separate.
 | Lives in | `src/**/*.test.ts` | `e2e/**/*.spec.ts` |
 | Tests | pure domain logic | a running deployment in a real browser |
 | Needs | nothing | an app to point at |
-| Count | 162 | 49 × 2 viewports |
+| Count | 217 | 49 × 2 viewports |
 | Runs in CI | every push and PR | every PR against staging, plus every ~30 min against production |
 
 They are kept apart on purpose: Vitest's default patterns would otherwise try
@@ -30,6 +30,21 @@ due-logic, Privy token verification, and the production-database guard.
 npm test              # once
 npx vitest            # watch mode
 ```
+
+### Test files are typechecked too
+
+`tsconfig.json` used to exclude `**/*.test.ts`, so `tsc` never looked at them.
+That is a worse gap than it sounds: a test's fixtures are usually typed as the
+very interface under test, and when the interface gains a required field the
+fixture silently stops satisfying it. The tests keep passing — they exercise
+real behaviour against a stale shape — and nothing reports it. Removing the
+exclusion immediately surfaced two such defects that had been sitting in the
+suite.
+
+The rule that follows: **type your fixtures, and don't reach for `as` to
+quiet an error.** A literal like `["low", "high"]` widens to `string[]` and
+will accept a value the union no longer contains, which is exactly the drift
+this is meant to catch.
 
 ## End-to-end tests
 
