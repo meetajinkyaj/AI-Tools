@@ -63,6 +63,34 @@ test.describe("PWA", () => {
     }
   });
 
+  test("the maskable icon is its own full-bleed file", async ({ request }) => {
+    // Android crops maskable icons to its own shape. Pointing this entry at the
+    // rounded art double-rounds the corners — a subtle wrong that survives code
+    // review because the manifest still validates and the file still loads.
+    const manifest = (await (await request.get("/manifest.webmanifest")).json()) as {
+      icons: { src: string; purpose?: string }[];
+    };
+    const maskable = manifest.icons.filter((i) => i.purpose?.includes("maskable"));
+    expect(maskable.length, "no maskable icon declared").toBeGreaterThan(0);
+
+    const any = manifest.icons
+      .filter((i) => i.purpose === "any")
+      .map((i) => i.src);
+    for (const icon of maskable) {
+      expect(any, `${icon.src} is doing double duty as "any" and "maskable"`).not.toContain(
+        icon.src,
+      );
+    }
+  });
+
+  test("the apple touch icon is served", async ({ request }) => {
+    // iOS reads this from the <link> tag, not the manifest, so nothing else in
+    // this file would catch it going missing.
+    const res = await request.get("/apple-touch-icon.png");
+    expect(res.status()).toBe(200);
+    expect(res.headers()["content-type"]).toContain("image");
+  });
+
   test("serves the service worker and its offline fallback", async ({ request }) => {
     const sw = await request.get("/sw.js");
     expect(sw.status()).toBe(200);
