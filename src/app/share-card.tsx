@@ -3,213 +3,112 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
-  CARD_HEIGHT,
-  CARD_WIDTH,
-  coverRect,
-  fitFontSize,
-  shareCardCopy,
+  DEFAULT_FIELDS,
+  DEFAULT_FORMAT,
+  FORMATS,
+  formatSize,
   shareFileName,
+  TEMPLATES,
+  type FormatId,
   type ShareCardInput,
+  type ShareFields,
+  type TemplateId,
 } from "@/lib/share-card";
-import { secondaryButtonClass } from "./ui";
+import { drawShareCard } from "./share-card-render";
 
 /**
- * "Share your check-in" — the Strava-style image, rendered on a canvas in the
- * browser.
+ * The share sheet — "the screen that makes the card", per the Claude Design
+ * spec. Template → backdrop → what to show → format → share.
  *
- * Nothing is uploaded. The photo a user picks is read into a canvas and stays
- * on their device; we never see it, which is the only responsible default for
- * a health app and also means there is no image service to run.
- *
- * What the card may show is decided in `share-card.ts` — habit data only, never
- * health readings. Read the note there before adding a field.
+ * Nothing is uploaded. The photo is read into a canvas and stays on the
+ * device; we never see it, so there is no image service to run and no new
+ * processor handling personal data.
  */
 
-/* Brand colours, duplicated here because canvas can't read Tailwind tokens. */
-const LINEN = "#F1E9DC";
-const OBSIDIAN = "#1B1815";
-const TERRACOTTA = "#B5562D";
-const MUTED_ON_LINEN = "#6E645B";
-const MUTED_ON_PHOTO = "rgba(241,233,220,0.82)";
-/* Clay Ember — the brand's accent for use ON charcoal. Terracotta is tuned for
-   the linen ground and goes muddy over a mid-tone photo. */
-const CLAY = "#CD7144";
+const FIELD_ROWS: { key: keyof ShareFields; label: string; note?: string }[] = [
+  { key: "streak", label: "Streak" },
+  { key: "training", label: "Training" },
+  { key: "points", label: "Iki points" },
+  { key: "energy", label: "Energy", note: "off by default" },
+  { key: "sleep", label: "Sleep hours", note: "off by default" },
+];
 
-/** next/font generates hashed family names, so read them off the document. */
-function brandFont(variable: string, fallback: string): string {
-  if (typeof window === "undefined") return fallback;
-  const value = getComputedStyle(document.documentElement)
-    .getPropertyValue(variable)
-    .trim();
-  return value || fallback;
-}
-
-/** The wordmark: lowercase "ikigaro" with a terracotta tittle over the i. */
-function drawWordmark(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number,
-  color: string,
-  accent: string,
-) {
-  const display = brandFont("--font-cormorant", "Georgia, serif");
-  ctx.font = `500 ${size}px ${display}`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-
-  // "ı" is dotless, so the tittle can be placed (and coloured) precisely.
-  const dotless = "ı";
-  ctx.fillStyle = color;
-  ctx.fillText(dotless, x, y);
-  const iWidth = ctx.measureText(dotless).width;
-  ctx.fillText("kigaro", x + iWidth, y);
-
-  const r = size * 0.065;
-  ctx.beginPath();
-  ctx.arc(x + iWidth / 2, y - size * 0.72, r, 0, Math.PI * 2);
-  ctx.fillStyle = accent;
-  ctx.fill();
-}
-
-async function drawCard(
-  canvas: HTMLCanvasElement,
-  input: ShareCardInput,
-  photo: HTMLImageElement | null,
-) {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  canvas.width = CARD_WIDTH;
-  canvas.height = CARD_HEIGHT;
-  const copy = shareCardCopy(input);
-  const onPhoto = photo !== null;
-
-  const display = brandFont("--font-cormorant", "Georgia, serif");
-  const label = brandFont("--font-marcellus", "Georgia, serif");
-  const body = brandFont("--font-hanken", "system-ui, sans-serif");
-
-  /* --- ground ------------------------------------------------------------ */
-  if (photo) {
-    const { sx, sy, sw, sh } = coverRect(
-      photo.naturalWidth,
-      photo.naturalHeight,
-      CARD_WIDTH,
-      CARD_HEIGHT,
-    );
-    ctx.drawImage(photo, sx, sy, sw, sh, 0, 0, CARD_WIDTH, CARD_HEIGHT);
-
-    // Scrim: text has to stay legible over an unknown photo. Darkest at the
-    // bottom where the stats sit, with a lighter wash up top for the wordmark.
-    const scrim = ctx.createLinearGradient(0, 0, 0, CARD_HEIGHT);
-    scrim.addColorStop(0, "rgba(27,24,21,0.74)");
-    scrim.addColorStop(0.3, "rgba(27,24,21,0.42)");
-    scrim.addColorStop(0.62, "rgba(27,24,21,0.6)");
-    scrim.addColorStop(1, "rgba(27,24,21,0.94)");
-    ctx.fillStyle = scrim;
-    ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
-  } else {
-    ctx.fillStyle = LINEN;
-    ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
-  }
-
-  const ink = onPhoto ? LINEN : OBSIDIAN;
-  const quiet = onPhoto ? MUTED_ON_PHOTO : MUTED_ON_LINEN;
-  const accent = onPhoto ? CLAY : TERRACOTTA;
-  const margin = 96;
-
-  const contentWidth = CARD_WIDTH - margin * 2;
-
-  /* --- masthead ---------------------------------------------------------- */
-  drawWordmark(ctx, margin, margin + 56, 64, ink, accent);
-
-  ctx.font = `400 22px ${label}`;
-  ctx.fillStyle = quiet;
-  ctx.textAlign = "left";
-  ctx.letterSpacing = "6px";
-  ctx.fillText("PERFORMANCE · RECOVERY · LONGEVITY", margin, margin + 108);
-  ctx.letterSpacing = "0px";
-
-  // Rule under the masthead, so the space below reads as composition rather
-  // than as something that failed to load.
-  const rule = onPhoto ? "rgba(241,233,220,0.28)" : "rgba(27,24,21,0.14)";
-  ctx.strokeStyle = rule;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(margin, margin + 160);
-  ctx.lineTo(CARD_WIDTH - margin, margin + 160);
-  ctx.stroke();
-
-  /* --- hero -------------------------------------------------------------- */
-  // The number is set in Marcellus, NOT the display serif: Cormorant Garamond
-  // uses old-style figures, where "1" is a Roman "I" — so a 1-day streak read
-  // as the letter I on a card whose entire job is showing a number.
-  const heroBaseline = CARD_HEIGHT * 0.52;
-  ctx.textAlign = "left";
-  const heroSize = fitFontSize(
-    (size) => {
-      ctx.font = `400 ${size}px ${label}`;
-      return ctx.measureText(copy.headline).width;
-    },
-    contentWidth,
-    340,
+function Toggle({
+  on,
+  onClick,
+  label,
+}: {
+  on: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={onClick}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+        on ? "bg-accent" : "bg-border-strong/40"
+      }`}
+    >
+      <span
+        className={`absolute top-[3px] h-[18px] w-[18px] rounded-full bg-surface transition-all ${
+          on ? "right-[3px]" : "left-[3px]"
+        }`}
+      />
+    </button>
   );
-  ctx.font = `400 ${heroSize}px ${label}`;
-  ctx.fillStyle = ink;
-  ctx.fillText(copy.headline, margin, heroBaseline);
-
-  ctx.font = `400 38px ${label}`;
-  ctx.fillStyle = accent;
-  ctx.letterSpacing = "10px";
-  ctx.fillText(copy.headlineLabel.toUpperCase(), margin + 6, heroBaseline + 72);
-  ctx.letterSpacing = "0px";
-
-  /* --- today ------------------------------------------------------------- */
-  let y = heroBaseline + 180;
-  if (copy.activityLine) {
-    ctx.font = `500 46px ${body}`;
-    ctx.fillStyle = ink;
-    ctx.fillText(copy.activityLine, margin, y);
-    y += 70;
-  }
-  if (copy.pointsLine) {
-    ctx.font = `600 40px ${body}`;
-    ctx.fillStyle = accent;
-    ctx.fillText(copy.pointsLine, margin, y);
-  }
-
-  /* --- footer ------------------------------------------------------------ */
-  const footerY = CARD_HEIGHT - margin;
-  ctx.font = `400 30px ${body}`;
-  ctx.fillStyle = quiet;
-  ctx.textAlign = "left";
-  ctx.fillText(copy.dateLine, margin, footerY);
-
-  ctx.textAlign = "right";
-  ctx.fillStyle = onPhoto ? LINEN : OBSIDIAN;
-  ctx.fillText(copy.footer, CARD_WIDTH - margin, footerY);
-
-  // Hairline above the footer, mirroring the masthead rule.
-  ctx.strokeStyle = rule;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(margin, footerY - 52);
-  ctx.lineTo(CARD_WIDTH - margin, footerY - 52);
-  ctx.stroke();
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
-  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+/** Small pill used for template and format choices. */
+function Choice({
+  selected,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`flex-1 rounded-control border px-2 py-3 font-label text-[0.65rem] uppercase tracking-[0.16em] transition-colors ${
+        selected
+          ? "border-accent bg-accent text-accent-contrast"
+          : "border-border bg-surface text-muted hover:border-accent/50"
+      }`}
+    >
+      {children}
+    </button>
+  );
 }
 
-export function ShareCheckinCard({ input }: { input: ShareCardInput }) {
+export function ShareCheckinCard({
+  input,
+  onClose,
+}: {
+  input: ShareCardInput;
+  onClose?: () => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+
+  const [template, setTemplate] = useState<TemplateId>("stone");
+  const [format, setFormat] = useState<FormatId>(DEFAULT_FORMAT);
+  const [fields, setFields] = useState<ShareFields>(DEFAULT_FIELDS);
   const [photo, setPhoto] = useState<HTMLImageElement | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
-  // Redraw whenever the photo or the check-in data changes. Fonts must be
-  // ready first, or the canvas silently falls back to a system serif.
+  const { w, h } = formatSize(format);
+
+  // Redraw on any change. Fonts must be ready first, or the canvas silently
+  // falls back to a system serif.
   useEffect(() => {
     let cancelled = false;
     const canvas = canvasRef.current;
@@ -221,16 +120,25 @@ export function ShareCheckinCard({ input }: { input: ShareCardInput }) {
       } catch {
         /* draw with whatever is available */
       }
-      if (!cancelled) await drawCard(canvas, input, photo);
+      if (cancelled) return;
+      await drawShareCard(canvas, {
+        input,
+        fields,
+        template,
+        width: w,
+        height: h,
+        photo,
+      });
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [input, photo]);
+  }, [input, fields, template, w, h, photo]);
 
   function onPickPhoto(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    event.target.value = ""; // let the same file be re-picked
     if (!file) return;
 
     const url = URL.createObjectURL(file);
@@ -247,83 +155,209 @@ export function ShareCheckinCard({ input }: { input: ShareCardInput }) {
     img.src = url;
   }
 
-  async function onShare() {
+  function canvasBlob(): Promise<Blob | null> {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    setStatus(null);
+    if (!canvas) return Promise.resolve(null);
+    return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  }
 
-    const blob = await canvasToBlob(canvas);
+  async function onShare() {
+    setStatus(null);
+    const blob = await canvasBlob();
     if (!blob) {
       setStatus("Couldn't create the image. Please try again.");
       return;
     }
+    const file = new File([blob], shareFileName(input.date, template), {
+      type: "image/png",
+    });
 
-    const file = new File([blob], shareFileName(input.date), { type: "image/png" });
-
-    // Native share sheet where it exists (every modern phone); a download
-    // otherwise, which is what desktop browsers get.
     if (navigator.canShare?.({ files: [file] })) {
       try {
         await navigator.share({ files: [file] });
         return;
       } catch (err) {
-        // Cancelling the sheet throws AbortError — not an error worth showing.
+        // Dismissing the sheet throws AbortError — not worth surfacing.
         if (err instanceof Error && err.name === "AbortError") return;
       }
     }
+    await onSave();
+  }
 
+  async function onSave() {
+    const blob = await canvasBlob();
+    if (!blob) return;
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = file.name;
+    a.download = shareFileName(input.date, template);
     a.click();
     URL.revokeObjectURL(url);
     setStatus("Saved to your downloads.");
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex w-full flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <p className="font-label text-[0.65rem] uppercase tracking-[0.3em] text-accent">
+          Share check-in
+        </p>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close share"
+            className="px-2 font-body text-lg leading-none text-muted"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
       <canvas
         ref={canvasRef}
         aria-label="Your shareable check-in card"
         className="w-full rounded-card border border-border"
-        style={{ aspectRatio: `${CARD_WIDTH} / ${CARD_HEIGHT}` }}
+        style={{ aspectRatio: `${w} / ${h}` }}
       />
 
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => void onShare()} className={secondaryButtonClass}>
+      {/* Template */}
+      <div className="flex flex-col gap-3">
+        <p className="font-label text-[0.6rem] uppercase tracking-[0.28em] text-muted">
+          Template
+        </p>
+        <div className="flex gap-2">
+          {TEMPLATES.map((t) => (
+            <Choice
+              key={t.id}
+              selected={template === t.id}
+              onClick={() => setTemplate(t.id)}
+            >
+              {t.name}
+            </Choice>
+          ))}
+        </div>
+      </div>
+
+      {/* Backdrop */}
+      <div className="flex flex-col gap-3">
+        <p className="font-label text-[0.6rem] uppercase tracking-[0.28em] text-muted">
+          Backdrop
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setPhoto(null)}
+            aria-pressed={photo === null}
+            className={`h-16 w-16 rounded-control border font-label text-[0.5rem] uppercase tracking-[0.14em] transition-colors ${
+              photo === null
+                ? "border-accent bg-surface-2 text-foreground"
+                : "border-border bg-surface text-muted"
+            }`}
+          >
+            None
+          </button>
+          <button
+            type="button"
+            onClick={() => uploadRef.current?.click()}
+            className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-control border border-dashed border-border-strong bg-surface-2 font-label text-[0.5rem] uppercase tracking-[0.14em] text-muted"
+          >
+            <span className="text-base leading-none">+</span>
+            Upload
+          </button>
+          <button
+            type="button"
+            onClick={() => cameraRef.current?.click()}
+            className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-control border border-dashed border-border-strong bg-surface-2 font-label text-[0.5rem] uppercase tracking-[0.14em] text-muted"
+          >
+            <span className="text-sm leading-none">◉</span>
+            Camera
+          </button>
+
+          <input
+            ref={uploadRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={onPickPhoto}
+          />
+          {/* `capture` opens the camera directly on a phone. */}
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={onPickPhoto}
+          />
+        </div>
+      </div>
+
+      {/* What to show */}
+      <div className="flex flex-col gap-1">
+        <p className="pb-2 font-label text-[0.6rem] uppercase tracking-[0.28em] text-muted">
+          What to show
+        </p>
+        {FIELD_ROWS.map((row) => (
+          <div
+            key={row.key}
+            className="flex items-center justify-between border-t border-border py-3"
+          >
+            <span className="font-body text-sm text-foreground">
+              {row.label}
+              {row.note && (
+                <span className="ml-2 font-body text-xs text-muted">{row.note}</span>
+              )}
+            </span>
+            <Toggle
+              label={row.label}
+              on={fields[row.key]}
+              onClick={() =>
+                setFields((f) => ({ ...f, [row.key]: !f[row.key] }))
+              }
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Format */}
+      <div className="flex flex-col gap-3">
+        <p className="font-label text-[0.6rem] uppercase tracking-[0.28em] text-muted">
+          Format
+        </p>
+        <div className="flex gap-2">
+          {FORMATS.map((f) => (
+            <Choice key={f.id} selected={format === f.id} onClick={() => setFormat(f.id)}>
+              {f.name}
+            </Choice>
+          ))}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => void onShare()}
+          className="inline-flex h-12 items-center justify-center rounded-control bg-accent px-6 font-body text-sm font-medium text-accent-contrast transition-colors hover:bg-accent-hover"
+        >
           Share
         </button>
         <button
           type="button"
-          onClick={() => fileRef.current?.click()}
-          className={secondaryButtonClass}
+          onClick={() => void onSave()}
+          className="inline-flex h-12 items-center justify-center rounded-control border border-border-strong bg-transparent px-6 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-2"
         >
-          {photo ? "Change photo" : "Add photo"}
+          Save to photos
         </button>
-        {photo && (
-          <button
-            type="button"
-            onClick={() => setPhoto(null)}
-            className={secondaryButtonClass}
-          >
-            Remove photo
-          </button>
-        )}
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={onPickPhoto}
-        />
+        <p className="font-body text-xs text-muted">
+          {input.inviteCode
+            ? `Your invite code ${input.inviteCode} travels on every card.`
+            : "Every card carries a link back to Ikigaro."}{" "}
+          Your photo stays on your device.
+        </p>
+        {status && <p className="font-body text-xs text-muted">{status}</p>}
       </div>
-
-      <p className="font-body text-xs text-muted">
-        Your photo stays on your device — we never upload it. The card shows your
-        streak and training only, never health readings.
-      </p>
-      {status && <p className="font-body text-xs text-muted">{status}</p>}
     </div>
   );
 }

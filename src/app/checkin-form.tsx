@@ -70,6 +70,7 @@ export function CheckinForm({
   const [earned, setEarned] = useState<number | null>(null);
   const [justSaved, setJustSaved] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [inviteCode, setInviteCode] = useState("");
   const startedRef = useRef(false);
 
   // Any edit after a save clears the "Done" confirmation so the button invites
@@ -194,9 +195,31 @@ export function CheckinForm({
     }
   }
 
+  /**
+   * The invite code that rides on every shared card. Fetched only when the
+   * share sheet is opened — most check-ins never open it, and a card without
+   * a code still works (it just shows the bare link).
+   */
+  const loadInviteCode = useCallback(async () => {
+    if (inviteCode) return;
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch("/api/referral", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { code?: string };
+      if (data.code) setInviteCode(data.code);
+    } catch {
+      /* the card is still shareable without it */
+    }
+  }, [getToken, inviteCode]);
+
   const shareInput = useMemo(
     () => ({
       streak: state?.streak ?? 0,
+      pointsBalance: state?.pointsBalance ?? 0,
       pointsEarned: earned ?? 0,
       trainingLogged,
       // Human labels only — the card never carries internal type keys.
@@ -207,9 +230,21 @@ export function CheckinForm({
             ? EXERCISE_TYPE_LABELS[e.type]
             : e.type,
       ),
+      energy,
+      sleepHours: sleepHours === "" ? null : Number(sleepHours),
+      inviteCode,
       date: new Date(),
     }),
-    [state?.streak, earned, trainingLogged, exercises],
+    [
+      state?.streak,
+      state?.pointsBalance,
+      earned,
+      trainingLogged,
+      exercises,
+      energy,
+      sleepHours,
+      inviteCode,
+    ],
   );
 
   if (status === "loading") {
@@ -281,13 +316,19 @@ export function CheckinForm({
           {/* Offered at the moment of the win, which is the only time anyone
               wants to post about it. */}
           {showShare ? (
-            <ShareCheckinCard input={shareInput} />
+            <ShareCheckinCard
+              input={shareInput}
+              onClose={() => setShowShare(false)}
+            />
           ) : (
             <div className="flex flex-col gap-1">
               <div>
                 <button
                   type="button"
-                  onClick={() => setShowShare(true)}
+                  onClick={() => {
+                    setShowShare(true);
+                    void loadInviteCode();
+                  }}
                   className={secondaryButtonClass}
                 >
                   Share your streak
