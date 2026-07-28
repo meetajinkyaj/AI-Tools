@@ -186,6 +186,12 @@ export function CheckinForm({
       });
       setEarned(data.pointsAwarded ?? 0);
       setJustSaved(true);
+      // Open the share sheet on the win itself, rather than behind a button
+      // someone has to notice. Done here rather than in an effect on
+      // `justSaved`: `loadInviteCode` changes identity once it sets the code,
+      // so an effect would re-fire and re-open a sheet the user had closed.
+      setShowShare(true);
+      void loadInviteCode();
       onChange?.();
     } catch (err) {
       console.error("Check-in submit failed:", err);
@@ -307,16 +313,25 @@ export function CheckinForm({
         </Card>
       </div>
 
-      {justSaved && (
-        <Card className="flex flex-col gap-4 border-accent/40 bg-surface-2 p-4">
-          <p className="font-body text-sm font-medium text-foreground">
-            {earned && earned > 0
-              ? `Done ✓ You're checked in for today and earned ${earned} iki points.`
-              : "Done ✓ Your check-in has been updated."}
-          </p>
+      {/*
+        Sharing is available for as long as today's check-in exists — not only
+        in the seconds after saving.
 
-          {/* Offered at the moment of the win, which is the only time anyone
-              wants to post about it. */}
+        It used to hang entirely off `justSaved`, which is component state: it
+        vanished on reload, on navigating away and back, and the moment any
+        field was edited. Anyone who checked in and returned later had no way
+        into the share sheet at all, which is most people most of the time.
+      */}
+      {(justSaved || checkedInToday) && (
+        <Card className="flex flex-col gap-4 border-accent/40 bg-surface-2 p-4">
+          {justSaved && (
+            <p className="font-body text-sm font-medium text-foreground">
+              {earned && earned > 0
+                ? `Done ✓ You're checked in for today and earned ${earned} iki points.`
+                : "Done ✓ Your check-in has been updated."}
+            </p>
+          )}
+
           {showShare ? (
             <ShareCheckinCard
               input={shareInput}
@@ -331,7 +346,7 @@ export function CheckinForm({
                     setShowShare(true);
                     void loadInviteCode();
                   }}
-                  className={secondaryButtonClass}
+                  className={justSaved ? primaryButtonClass : secondaryButtonClass}
                 >
                   Share your streak
                 </button>
