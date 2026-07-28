@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
 import { resolveReportUser } from "@/lib/biomarker-report-data";
+import { effectiveMultiplier } from "@/lib/accelerated-points";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
@@ -78,8 +79,17 @@ export async function GET(request: Request) {
       available_codes: it.kind === "voucher" ? (stock.get(it.id) ?? 0) : null,
     }));
 
+    // Accelerated Points: tell the user their rate, so a balance climbing
+    // twice as fast is explained rather than mysterious.
+    const { data: earner } = await supabase
+      .from("users")
+      .select("points_multiplier, multiplier_expires_at")
+      .eq("id", resolved.userId)
+      .maybeSingle();
+
     return NextResponse.json({
       balance: balanceRow?.points_balance ?? 0,
+      multiplier: effectiveMultiplier(earner),
       items: catalog,
       history: history ?? [],
     });

@@ -52,6 +52,8 @@ interface HistoryRow {
 
 interface RewardsData {
   balance: number;
+  /** Accelerated Points rate; 1 for everyone who didn't join via a partner. */
+  multiplier?: number;
   items: CatalogItem[];
   history: HistoryRow[];
 }
@@ -215,6 +217,7 @@ export function PartnersView({
   }
 
   const balance = data?.balance ?? 0;
+  const multiplier = data?.multiplier ?? 1;
   const items = data?.items ?? [];
   const vouchers = items.filter((i) => i.kind === "voucher");
   const affiliates = items.filter((i) => i.kind === "affiliate");
@@ -232,6 +235,13 @@ export function PartnersView({
         <div className="flex flex-col gap-1">
           <Eyebrow>Your iki points</Eyebrow>
           <p className="font-display text-3xl font-medium text-foreground">{balance}</p>
+          {/* Accelerated Points: a balance climbing twice as fast should say
+              why, rather than looking like a bug. */}
+          {multiplier > 1 && (
+            <p className="font-body text-xs text-accent">
+              Earning at {multiplier}× — you joined through a partner.
+            </p>
+          )}
         </div>
         <button
           type="button"

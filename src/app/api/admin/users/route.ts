@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     await Promise.all([
       supabase
         .from("users")
-        .select("id, email, created_at, deleted_at, access_status, referral_code")
+        .select("id, email, created_at, deleted_at, access_status, referral_code, accelerated_partner, points_multiplier")
         .order("created_at", { ascending: false })
         .limit(1000),
       supabase.from("reward_points").select("user_id, points_balance"),
@@ -55,6 +55,10 @@ export async function GET(request: Request) {
       deleted: u.deleted_at != null,
       access_status: u.access_status,
       referral_code: u.referral_code ?? null,
+      // Whether THIS user's code grants 2x to people who sign up through it.
+      accelerated_partner: u.accelerated_partner === true,
+      // What THIS user earns at, snapshotted when they signed up.
+      points_multiplier: Number(u.points_multiplier ?? 1),
       points: pointsByUser.get(u.id) ?? 0,
       panels: panelsByUser.get(u.id) ?? 0,
       last_checkin: last?.date ?? null,
@@ -70,7 +74,11 @@ export async function GET(request: Request) {
  *   { id, access_status }  approve / re-waitlist a user (the beta gate);
  *   { id, referral_code }  assign a vanity invite code ("FITTR") for
  *                          partners/influencers — normalized, unique-index
- *                          arbitrated (409 when taken).
+ *                          arbitrated (409 when taken);
+ *   { id, accelerated_partner }
+ *                          make that code an Accelerated Points code, so new
+ *                          signups through it earn at 2x. Affects future
+ *                          signups only — see the handler for why.
  */
 export async function PATCH(request: Request) {
   const admin = await requireAdmin(request);
@@ -116,13 +124,39 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true, code });
   }
 
+  // Accelerated Points: mark this user's code as a partner code.
+  //
+  // This governs FUTURE signups only. Everyone who already joined keeps the
+  // rate they were promised at signup, because it is stored on their own row
+  // (migration 0013) rather than read from here. Switching a partner off ends
+  // the deal for new joiners without quietly downgrading anyone already in it.
+  if (b.accelerated_partner !== undefined) {
+    const on = b.accelerated_partner === true;
+    const { data: target, error } = await supabase
+      .from("users")
+      .update({ accelerated_partner: on })
+      .eq("id", id)
+      .select("referral_code")
+      .single();
+    if (error) {
+      console.error("admin accelerated_partner update failed:", error);
+      return NextResponse.json({ error: "Couldn't update partner" }, { status: 500 });
+    }
+    await supabase.from("events").insert({
+      user_id: id,
+      type: on ? "ap_partner_enabled" : "ap_partner_disabled",
+      metadata: { by: admin.email, code: target?.referral_code ?? null },
+    });
+    return NextResponse.json({ ok: true, accelerated_partner: on });
+  }
+
   const access_status =
     b.access_status === "approved" || b.access_status === "waitlisted"
       ? b.access_status
       : null;
   if (!access_status) {
     return NextResponse.json(
-      { error: "access_status or referral_code required" },
+      { error: "access_status, referral_code or accelerated_partner required" },
       { status: 400 },
     );
   }

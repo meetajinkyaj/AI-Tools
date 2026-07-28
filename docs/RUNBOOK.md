@@ -404,10 +404,58 @@ Access policy on that hostname.
   snapshot and their code; unused codes are discarded.
 - **Set a vanity referral code:** Users tab → inline "Invite code" editor. Shows
   a live normalized preview; duplicates are rejected with a clear error.
+- **Run an Accelerated Points partnership:** give the partner a vanity code,
+  then hit the **AP partner** toggle under it. Anyone who signs up through that
+  code from then on earns at **2×** — see §6b below before switching one on.
 - **Retune the points economy:** edit `src/lib/points.ts` and deploy. That file
   is the only place values live — UI copy and the in-app FAQ interpolate from it.
 - **Read the beta's health:** Analytics tab (default) — funnel, D1/7/30
   retention, DAU/WAU/MAU, streaks, 14-day check-in chart, client errors.
+
+---
+
+## 6b. Accelerated Points — before you switch a partner on
+
+A partner code that grants 2× is a **real cost**, not a marketing setting.
+Points buy vouchers, vouchers cost money, so doubling the earn rate roughly
+halves the time to each redemption and doubles the reward spend per user for as
+long as they stay. That is the deal being bought — it should just be bought
+knowingly.
+
+**Two properties worth understanding before you negotiate one:**
+
+**The rate is a promise, and it is permanent by default.** It is snapshotted
+onto each user at signup (`users.points_multiplier`), not read from the partner
+at earn time. Switching the partner off stops NEW signups getting 2× and leaves
+everyone already in it untouched — deliberately, because silently downgrading
+someone who joined on that promise is worse than the cost. There is no "end the
+promotion for everyone" button, and that is the intended design.
+
+If a deal genuinely needs an end date, set it per user at signup time via
+`users.multiplier_expires_at`; the earn paths already honour it. Doing that
+retroactively to people who were promised otherwise is a decision to make on
+purpose, not a config change.
+
+**Referral milestones never accelerate.** Only what a user earns for their own
+actions is multiplied — check-ins, streak bonuses, panel uploads, outcome
+bonuses. Paying 2× for recruiting would reward farming signups rather than
+health, and hand partner users a permanently better rate at it than everyone
+else. The list lives in `src/lib/accelerated-points.ts`; a NEW earn reason is
+ineligible until someone adds it there on purpose.
+
+**The one to watch is the outcome bonus.** At 250 points per improved marker it
+is already the largest single earn in the economy; at 2× a single good re-test
+can pay 500 per marker. If partner cohorts start redeeming faster than the
+catalog can fund, that is the line to retune first (`src/lib/points.ts`).
+
+Every accelerated earn writes its multiplier to `points_transactions.multiplier`,
+so a balance can always be explained:
+
+```sql
+select reason, amount, multiplier, created_at
+from points_transactions
+where user_id = '<uuid>' order by created_at desc limit 20;
+```
 
 ---
 

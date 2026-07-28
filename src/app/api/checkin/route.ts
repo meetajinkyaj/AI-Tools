@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
 
+import {
+  accelerateAwards,
+  effectiveMultiplier,
+  totalAccelerated,
+} from "@/lib/accelerated-points";
 import { getPrivyUserId } from "@/lib/api-auth";
 import { resolveApprovedUserId } from "@/lib/app-user";
-import { POINTS, POINTS_REASON } from "@/lib/points";
-import { awardReferralMilestone } from "@/lib/referral-award";
 import {
   computeAwards,
   computeStreak,
   displayStreak,
   todayUTC,
-  totalAwarded,
   validateCheckinInput,
 } from "@/lib/checkin";
+import { POINTS, POINTS_REASON } from "@/lib/points";
+import { awardReferralMilestone } from "@/lib/referral-award";
 import { getOrCreateSelfProfileId } from "@/lib/profiles";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -188,8 +192,17 @@ export async function POST(request: Request) {
     }
 
     // Award points: base + any streak bonus, to the ledger and the balance.
-    const awards = computeAwards(streak);
-    const earned = totalAwarded(awards);
+    // Accelerated Points users (joined via a partner code) earn at their
+    // snapshotted multiplier — see src/lib/accelerated-points.ts.
+    const { data: earner } = await supabase
+      .from("users")
+      .select("points_multiplier, multiplier_expires_at")
+      .eq("id", userId)
+      .maybeSingle();
+    const multiplier = effectiveMultiplier(earner);
+
+    const awards = accelerateAwards(computeAwards(streak), multiplier);
+    const earned = totalAccelerated(awards);
 
     const priorBalance = await getPointsBalance(profileId);
     const { data: balanceRow, error: balanceError } = await supabase
@@ -213,6 +226,8 @@ export async function POST(request: Request) {
         amount: a.amount,
         reason: a.reason,
         reference_id: created.id,
+        // So a 20-point check-in beside a 10-point one is explainable.
+        multiplier: a.multiplier,
       })),
     );
 

@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 
+import {
+  applyMultiplier,
+  effectiveMultiplier,
+  isAcceleratedReason,
+} from "@/lib/accelerated-points";
 import { getPrivyUserId } from "@/lib/api-auth";
 import {
   canonicalizeCount,
@@ -229,6 +234,30 @@ async function awardPanelPoints(
     }
 
     if (txns.length === 0) return { bonuses, pointsAwarded: 0 };
+
+    // Accelerated Points: users who joined through a partner code earn at their
+    // snapshotted multiplier. Applied here, at the single point where every
+    // panel-related txn has been assembled, so the upload earn and each outcome
+    // bonus are treated identically and nothing can be missed.
+    const { data: earner } = await supabase
+      .from("users")
+      .select("points_multiplier, multiplier_expires_at")
+      .eq("id", userId)
+      .maybeSingle();
+    const multiplier = effectiveMultiplier(earner);
+    if (multiplier > 1) {
+      for (const txn of txns) {
+        const reason = txn.reason as string;
+        if (!isAcceleratedReason(reason)) continue;
+        txn.amount = applyMultiplier(txn.amount as number, multiplier);
+        txn.multiplier = multiplier;
+      }
+      // The user-facing bonus list must show what was actually credited, or
+      // the confirmation screen and the ledger disagree.
+      for (const b of bonuses) {
+        b.points = applyMultiplier(b.points, multiplier);
+      }
+    }
 
     // Credit once.
     const earned = txns.reduce((sum, t) => sum + (t.amount as number), 0);

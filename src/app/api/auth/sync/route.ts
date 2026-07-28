@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
+import { ACCELERATED_MULTIPLIER } from "@/lib/accelerated-points";
 import { normalizeReferralCode } from "@/lib/referral";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -81,17 +82,33 @@ export async function POST(request: Request) {
       // Resolve the referrer (if any) before creating the row. A bad or
       // unknown code silently skips attribution — it must never block signup.
       let referredBy: string | null = null;
+      // Accelerated Points: a partner's code grants a better earn rate, and it
+      // is SNAPSHOTTED here rather than read from the partner at earn time.
+      // Reading it live would make the rate retroactive both ways — switching
+      // a partner off would downgrade people who joined on the promise of 2x,
+      // and switching one on would hand 2x to everyone who ever used the code.
+      // A rate offered at signup is a commitment, so it is stored on the person
+      // it was offered to. See migration 0013.
+      let pointsMultiplier = 1;
       if (refCode) {
         const { data: referrer } = await supabase
           .from("users")
-          .select("id")
+          .select("id, accelerated_partner")
           .eq("referral_code", refCode)
           .maybeSingle();
         referredBy = referrer?.id ?? null;
+        if (referrer?.accelerated_partner === true) {
+          pointsMultiplier = ACCELERATED_MULTIPLIER;
+        }
       }
       const { data, error } = await supabase
         .from("users")
-        .insert({ privy_user_id: userId, email, referred_by: referredBy })
+        .insert({
+          privy_user_id: userId,
+          email,
+          referred_by: referredBy,
+          points_multiplier: pointsMultiplier,
+        })
         .select("id, access_status")
         .single();
 

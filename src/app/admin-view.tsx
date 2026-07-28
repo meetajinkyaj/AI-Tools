@@ -854,6 +854,10 @@ interface RosterUser {
   deleted: boolean;
   access_status: string; // 'waitlisted' | 'approved'
   referral_code: string | null;
+  /** This user's code grants 2x to people who sign up through it. */
+  accelerated_partner: boolean;
+  /** What this user earns at, snapshotted at their own signup. */
+  points_multiplier: number;
   points: number;
   panels: number;
   last_checkin: string | null;
@@ -870,6 +874,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
     { id: string; email: string; draft: string } | null
   >(null);
   const [codeMsg, setCodeMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [partnerBusy, setPartnerBusy] = useState<string | null>(null);
   const startedRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -900,6 +905,49 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
       body: JSON.stringify({ id, access_status }),
     });
     void load();
+  };
+
+  /**
+   * Turn a vanity code into an Accelerated Points code.
+   *
+   * Deliberately NOT behind ConfirmDialog: the action is reversible, affects
+   * only future signups, and is one an admin will flip while negotiating a
+   * partnership. The destructive-action dialog is reserved for things that
+   * destroy data.
+   */
+  const togglePartner = async (u: RosterUser) => {
+    setPartnerBusy(u.id);
+    setCodeMsg(null);
+    try {
+      const token = await getToken();
+      const next = !u.accelerated_partner;
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: u.id, accelerated_partner: next }),
+      });
+      if (!res.ok) {
+        setCodeMsg({ text: "Couldn't update the partner flag.", ok: false });
+        return;
+      }
+      // Update in place rather than refetching the whole roster.
+      setUsers((prev) =>
+        prev.map((x) => (x.id === u.id ? { ...x, accelerated_partner: next } : x)),
+      );
+      setCodeMsg({
+        text: next
+          ? `${u.referral_code} now grants 2x — to people who sign up from now on.`
+          : `${u.referral_code} is back to normal earning for new signups.`,
+        ok: true,
+      });
+    } catch {
+      setCodeMsg({ text: "Couldn't update the partner flag.", ok: false });
+    } finally {
+      setPartnerBusy(null);
+    }
   };
 
   const saveCode = async () => {
@@ -1079,23 +1127,47 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                       );
                     })()
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <code className="font-mono text-xs text-foreground">
-                        {u.referral_code ?? "—"}
-                      </code>
-                      <button
-                        onClick={() => {
-                          setCodeMsg(null);
-                          setEditingCode({
-                            id: u.id,
-                            email: u.email,
-                            draft: u.referral_code ?? "",
-                          });
-                        }}
-                        className="font-body text-xs text-accent underline underline-offset-2"
-                      >
-                        {u.referral_code ? "Edit" : "Set"}
-                      </button>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <code className="font-mono text-xs text-foreground">
+                          {u.referral_code ?? "—"}
+                        </code>
+                        <button
+                          onClick={() => {
+                            setCodeMsg(null);
+                            setEditingCode({
+                              id: u.id,
+                              email: u.email,
+                              draft: u.referral_code ?? "",
+                            });
+                          }}
+                          className="font-body text-xs text-accent underline underline-offset-2"
+                        >
+                          {u.referral_code ? "Edit" : "Set"}
+                        </button>
+                      </div>
+                      {/* Only meaningful once a code exists — a partner flag on
+                          a user with no code grants nothing to anyone. */}
+                      {u.referral_code && (
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={u.accelerated_partner}
+                          disabled={partnerBusy === u.id}
+                          onClick={() => void togglePartner(u)}
+                          className={`w-fit rounded-control border px-2 py-1 font-label text-[0.55rem] uppercase tracking-[0.14em] transition-colors ${
+                            u.accelerated_partner
+                              ? "border-accent bg-accent text-accent-contrast"
+                              : "border-border bg-surface text-muted hover:border-accent/50"
+                          }`}
+                        >
+                          {partnerBusy === u.id
+                            ? "…"
+                            : u.accelerated_partner
+                              ? "AP partner · 2×"
+                              : "AP partner off"}
+                        </button>
+                      )}
                     </div>
                   )}
                 </td>
