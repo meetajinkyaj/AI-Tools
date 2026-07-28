@@ -1,0 +1,31 @@
+-- 0014: Enable RLS on the two tables 0013 added.
+--
+-- 0013 shipped `partners` and `invite_codes` without RLS. Every other table in
+-- this database — all sixteen of them, since 0001 — enables it. Supabase's
+-- dashboard flagged the omission when 0013 was applied to production.
+--
+-- WHY THIS IS NOT COSMETIC. Supabase grants the `anon` and `authenticated`
+-- roles privileges on everything in the `public` schema, and the anon key ships
+-- in client JavaScript, so it is public by definition. RLS is the only thing
+-- standing between that key and the table. With it off, both tables were
+-- readable AND writable by anyone who opened the app and read the bundle:
+--
+--   partners      insert a row with multiplier 5 and welcome_grant 5000, sign
+--                 up through the code, mint points at will. Also read the
+--                 partner list and the commercial notes on each deal.
+--   invite_codes  read every user's referral code, or delete rows to break the
+--                 collision guarantee 0013 exists to provide, or squat a code
+--                 so a real user can never be assigned it.
+--
+-- The convention here is RLS enabled with NO policies. That denies anon and
+-- authenticated everything, which is correct because no browser ever touches
+-- these tables: `partners` is read and written only through
+-- `createSupabaseAdmin()` in the admin route and src/lib/partners.ts, and
+-- `invite_codes` is never touched by application code at all — the triggers in
+-- 0013 maintain it. The service role bypasses RLS, so every existing code path
+-- is unaffected.
+--
+-- Idempotent.
+
+alter table partners     enable row level security;
+alter table invite_codes enable row level security;
