@@ -185,26 +185,49 @@ export function statTiles(input: ShareCardInput, fields: ShareFields): StatTile[
   return tiles;
 }
 
+/* ------------------------- the closed-beta switch ------------------------ */
+
 /**
- * Bottom-right of every card — the reason sharing is worth building.
+ * OFF DURING CLOSED BETA — TURN BACK ON AT ~20 TESTERS.
  *
- * This prints the REAL invite link, from the same `referralLink()` the app
- * gives the user everywhere else. It used to print `ikigaro.com/join · CODE`,
- * a URL that does not exist and 404s: anyone who typed it in landed nowhere,
- * and the referral never attributed. The growth loop was quietly broken on
- * every card that had already been shared.
+ * Access is invite-only right now, so a card advertising a join link points
+ * strangers at a door that will not open: they would sign up, land on the
+ * waitlist screen, and go away with that as their first impression of the
+ * product. Better to spend that interest when it can actually be served.
+ *
+ * Nothing about the growth loop is deleted — `referralLink()`, code
+ * generation, attribution and the milestone rewards all still work, and the
+ * invite code remains visible inside the app for anyone who wants to pass it
+ * on deliberately. This flag only governs what a *shared image* broadcasts.
+ *
+ * Flipping this to `true` restores the link on the card and in the caption.
+ * Both states are covered by tests, so turning it back on is a one-line change
+ * that cannot silently regress. Same moment as `DB_BACKUPS` in RUNBOOK §2b:
+ * the beta stops being closed and the backup decision expires together.
+ */
+export const INVITE_LINK_ON_SHARED_CARDS = false;
+
+/**
+ * Bottom-right of the card — the reason sharing is worth building, when it is
+ * switched on. Empty string means "draw nothing", which is the closed-beta
+ * state; the wordmark in the masthead still identifies the card as Ikigaro.
+ *
+ * When enabled this prints the REAL invite link, from the same
+ * `referralLink()` the app gives the user everywhere else. It once printed
+ * `ikigaro.com/join · CODE`, a URL that does not exist and 404s: anyone who
+ * typed it in landed nowhere, and the referral never attributed.
  *
  * The scheme is dropped for legibility, but nothing else is reformatted —
- * see `HOST_PREFIX` for why the case matters.
+ * see the renderer for why the case matters.
  */
 const HOST_PREFIX = "https://";
+const APP_HOST = "app.ikigaro.com";
 
 export function inviteLine(inviteCode: string): string {
+  if (!INVITE_LINK_ON_SHARED_CARDS) return "";
   if (!inviteCode) return APP_HOST;
   return referralLink(inviteCode).slice(HOST_PREFIX.length);
 }
-
-const APP_HOST = "app.ikigaro.com";
 
 /**
  * The caption offered alongside the image, so the invite link arrives as
@@ -221,6 +244,11 @@ export function shareCaption(input: ShareCardInput): string {
     input.streak > 0
       ? `Day ${input.streak} of my Ikigaro streak.`
       : "Checked in on Ikigaro today.";
+
+  // Closed beta: the caption names the product but carries no way in. See
+  // INVITE_LINK_ON_SHARED_CARDS.
+  if (!INVITE_LINK_ON_SHARED_CARDS) return streak;
+
   const link = input.inviteCode
     ? referralLink(input.inviteCode)
     : `https://${APP_HOST}`;

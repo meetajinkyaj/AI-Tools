@@ -12,6 +12,7 @@ import {
   DEFAULT_FORMAT,
   FORMATS,
   formatSize,
+  INVITE_LINK_ON_SHARED_CARDS,
   shareCaption,
   shareFileName,
   TEMPLATES,
@@ -231,9 +232,9 @@ export function ShareCheckinCard({
       type: "image/png",
     });
 
-    // The caption carries the invite link as tappable text. Platforms decide
-    // whether to keep it — Instagram drops it, WhatsApp/Telegram/X/LinkedIn
-    // keep it — so the card still prints the link for everywhere else.
+    // Names the streak, and — once the beta opens — carries the invite link as
+    // tappable text. Platforms decide whether to keep `text`: Instagram drops
+    // it, WhatsApp/Telegram/X/LinkedIn keep it.
     const text = shareCaption(input);
 
     if (navigator.canShare?.({ files: [file] })) {
@@ -448,9 +449,13 @@ export function ShareCheckinCard({
           Save to photos
         </button>
         <p className="font-body text-xs text-muted">
-          {input.inviteCode
-            ? `Your invite code ${input.inviteCode} travels on every card.`
-            : "Every card carries a link back to Ikigaro."}{" "}
+          {/* Do not promise a link the card is not carrying — during the
+              closed beta it carries none. See INVITE_LINK_ON_SHARED_CARDS. */}
+          {INVITE_LINK_ON_SHARED_CARDS
+            ? input.inviteCode
+              ? `Your invite code ${input.inviteCode} travels on every card. `
+              : "Every card carries a link back to Ikigaro. "
+            : ""}
           Your photo stays on your device.
         </p>
         {status && <p className="font-body text-xs text-muted">{status}</p>}

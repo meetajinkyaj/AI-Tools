@@ -149,6 +149,22 @@ calculation inverts fast, for two reasons that compound:
 Anyone reading this after that threshold has passed: the decision above has
 expired. Turn on Pro.
 
+**Two switches flip at ~20 testers, and they are in different files.** Turning
+on backups is only half of it:
+
+| Switch | Where | Today | At ~20 testers |
+|---|---|---|---|
+| `DB_BACKUPS` | `wrangler.jsonc` (both envs) | `"none"` | `"protected"`, once a restore is rehearsed |
+| `INVITE_LINK_ON_SHARED_CARDS` | `src/lib/share-card.ts` | `false` | `true` |
+
+The second one hides the referral link on shared images while access is
+invite-only — a card advertising a join link points strangers at a door that
+does not open, and they leave with a waitlist screen as their first impression
+of the product. Nothing about the referral system is disabled: codes,
+attribution and rewards all still work, and the code stays visible in-app for
+anyone passing it on deliberately. Both enabled and disabled states are
+covered by tests, so flipping it back is a verified one-line change.
+
 **You will not have to remember this.** The threshold is enforced in code, not
 by this paragraph. `src/lib/backup-risk.ts` compares the live signup count
 against it, and the admin console's Analytics tab shows the result directly

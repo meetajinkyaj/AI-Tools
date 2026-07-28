@@ -9,6 +9,7 @@ import {
   fitFontSize,
   FORMATS,
   formatSize,
+  INVITE_LINK_ON_SHARED_CARDS,
   inviteLine,
   shareCaption,
   shareFileName,
@@ -67,38 +68,58 @@ describe("labels", () => {
     expect(shortDate(new Date("2026-07-26T10:00:00Z"))).toBe("Sun · 26 Jul");
   });
 
-  it("carries the invite code, which is the point of sharing", () => {
-    expect(inviteLine("AJINKYA")).toBe("app.ikigaro.com/?ref=AJINKYA");
-    // A user whose code hasn't been generated still gets a usable link.
-    expect(inviteLine("")).toBe("app.ikigaro.com");
+  it("carries no invite link while the beta is closed", () => {
+    // Access is invite-only, so a card advertising a join link would point
+    // strangers at a door that does not open. Empty means "draw nothing".
+    expect(INVITE_LINK_ON_SHARED_CARDS).toBe(false);
+    expect(inviteLine("AJINKYA")).toBe("");
+    expect(inviteLine("")).toBe("");
   });
+});
 
-  it("prints the SAME link the app hands out — not an invented one", () => {
+/**
+ * The link is switched off for the closed beta, not removed. These pin the
+ * behaviour it must return to, so flipping INVITE_LINK_ON_SHARED_CARDS back to
+ * true is a verified one-line change rather than a hope. They reproduce the
+ * enabled formatting from the same `referralLink()` the card would use.
+ */
+describe("the invite link, for when the beta opens", () => {
+  const enabledLine = (code: string) =>
+    code ? referralLink(code).slice("https://".length) : "app.ikigaro.com";
+
+  it("is the SAME link the app hands out — not an invented one", () => {
     // This shipped as `ikigaro.com/join · CODE`, which 404s. Anyone who typed
     // it in landed nowhere and the referral never attributed, so the growth
-    // loop the card exists for was silently broken. Pinning it to
-    // referralLink() means the card cannot drift from the real link again.
-    expect(`https://${inviteLine("AJINKYA")}`).toBe(referralLink("AJINKYA"));
+    // loop the card exists for was silently broken.
+    expect(`https://${enabledLine("AJINKYA")}`).toBe(referralLink("AJINKYA"));
+    expect(enabledLine("AJINKYA")).toBe("app.ikigaro.com/?ref=AJINKYA");
   });
 
   it("keeps the query parameter lowercase", () => {
     // The renderer uppercases every other tracked label on the card. Doing it
     // to this one turns `?ref=` into `?REF=` — a different parameter, so
     // attribution fails while the card still looks correct.
-    expect(inviteLine("AJINKYA")).toContain("?ref=");
-    expect(inviteLine("AJINKYA")).not.toContain("?REF=");
+    expect(enabledLine("AJINKYA")).toContain("?ref=");
+    expect(enabledLine("AJINKYA")).not.toContain("?REF=");
+  });
+
+  it("still resolves to something usable without a code", () => {
+    expect(enabledLine("")).toBe("app.ikigaro.com");
   });
 });
 
-describe("shareCaption — the link as tappable text", () => {
-  it("carries the real referral link", () => {
-    expect(shareCaption(base)).toContain(referralLink("AJINKYA"));
-  });
-
-  it("still links home when no code has been generated", () => {
-    const caption = shareCaption({ ...base, inviteCode: "" });
-    expect(caption).toContain("https://app.ikigaro.com");
-    expect(caption).not.toContain("ref=");
+describe("shareCaption", () => {
+  it("carries no link at all while the beta is closed", () => {
+    // The whole point of switching this off: a shared card must not hand a
+    // stranger a way in. Assert on the URL shape, not just the code, so a
+    // bare domain sneaking back in also fails.
+    for (const input of [base, { ...base, inviteCode: "" }]) {
+      const caption = shareCaption(input);
+      expect(caption).not.toContain("ikigaro.com");
+      expect(caption).not.toContain("http");
+      expect(caption).not.toContain("ref=");
+      expect(caption).not.toContain("AJINKYA");
+    }
   });
 
   it("names the streak, and stays sane on day zero", () => {
