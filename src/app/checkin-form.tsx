@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ShareCheckinCard } from "./share-card";
+import { ShareModal } from "./share-modal";
 
 import {
   type CheckinRow,
@@ -70,6 +71,9 @@ export function CheckinForm({
   const [earned, setEarned] = useState<number | null>(null);
   const [justSaved, setJustSaved] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  // The modal is the post-save interruption; `showShare` is the inline
+  // "come back later" path. Kept apart so dismissing one never hides the other.
+  const [shareModal, setShareModal] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
   const startedRef = useRef(false);
 
@@ -186,11 +190,11 @@ export function CheckinForm({
       });
       setEarned(data.pointsAwarded ?? 0);
       setJustSaved(true);
-      // Open the share sheet on the win itself, rather than behind a button
-      // someone has to notice. Done here rather than in an effect on
-      // `justSaved`: `loadInviteCode` changes identity once it sets the code,
-      // so an effect would re-fire and re-open a sheet the user had closed.
-      setShowShare(true);
+      // Offer the card on the win itself, as a modal — inline it sat below the
+      // fold of a long form and went unseen. Done here rather than in an effect
+      // on `justSaved`: `loadInviteCode` changes identity once it sets the
+      // code, so an effect would re-fire and re-open a sheet the user closed.
+      setShareModal(true);
       void loadInviteCode();
       onChange?.();
     } catch (err) {
@@ -543,6 +547,10 @@ export function CheckinForm({
                 : "Check in"}
         </button>
       </form>
+
+      {shareModal && (
+        <ShareModal input={shareInput} onClose={() => setShareModal(false)} />
+      )}
     </div>
   );
 }

@@ -135,16 +135,17 @@ function drawFooter(c: Ctx, input: ShareCardInput, pad: number) {
     ctx.fillText("生き甲斐", pad, y);
   }
 
-  tracked(
-    c,
-    inviteLine(input.inviteCode).toUpperCase(),
-    c.w - pad,
-    y,
-    20 * c.k,
-    0.24,
-    c.faint,
-    "right",
-  );
+  // NOT uppercased, unlike every other tracked label on the card. This is a
+  // URL: `?ref=` uppercased to `?REF=` is a different query parameter, so a
+  // card that looked fine would silently fail to attribute the referral. The
+  // code itself is already uppercase by construction (`cleanReferralInput`),
+  // so the line still reads as intended.
+  //
+  // Set in `muted` rather than `faint` — one step up from the quietest tone on
+  // the card. It shares the bottom-right corner with the backdrop motif, and
+  // this is the one line someone has to be able to read and type: a link they
+  // cannot make out is the same as no link.
+  tracked(c, inviteLine(input.inviteCode), c.w - pad, y, 20 * c.k, 0.2, c.muted, "right");
 }
 
 /**

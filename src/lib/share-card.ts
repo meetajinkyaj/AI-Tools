@@ -13,6 +13,8 @@
  * celebratory bits and default ON. Biomarker data is never eligible.
  */
 
+import { referralLink } from "./referral";
+
 /* ------------------------------ templates ------------------------------- */
 
 export type TemplateId = "stone" | "ledger";
@@ -40,10 +42,22 @@ export const PALETTE = {
 
 export type FormatId = "story" | "post" | "square";
 
-export const FORMATS: { id: FormatId; name: string; w: number; h: number }[] = [
-  { id: "story", name: "Story 9:16", w: 1080, h: 1920 },
-  { id: "post", name: "Post 4:5", w: 1080, h: 1350 },
-  { id: "square", name: "Square", w: 1080, h: 1080 },
+/**
+ * `where` names the platforms each ratio is actually right for. Nobody thinks
+ * in aspect ratios — they think "I want to put this on my story", and being
+ * made to guess which of 9:16 / 4:5 / 1:1 means that is friction at the exact
+ * moment we are asking someone to post.
+ */
+export const FORMATS: {
+  id: FormatId;
+  name: string;
+  where: string;
+  w: number;
+  h: number;
+}[] = [
+  { id: "story", name: "Story 9:16", where: "Instagram · WhatsApp", w: 1080, h: 1920 },
+  { id: "post", name: "Post 4:5", where: "Instagram feed", w: 1080, h: 1350 },
+  { id: "square", name: "Square", where: "LinkedIn · X", w: 1080, h: 1080 },
 ];
 
 export const DEFAULT_FORMAT: FormatId = "post";
@@ -171,9 +185,46 @@ export function statTiles(input: ShareCardInput, fields: ShareFields): StatTile[
   return tiles;
 }
 
-/** Bottom-right of every card — the reason sharing is worth building. */
+/**
+ * Bottom-right of every card — the reason sharing is worth building.
+ *
+ * This prints the REAL invite link, from the same `referralLink()` the app
+ * gives the user everywhere else. It used to print `ikigaro.com/join · CODE`,
+ * a URL that does not exist and 404s: anyone who typed it in landed nowhere,
+ * and the referral never attributed. The growth loop was quietly broken on
+ * every card that had already been shared.
+ *
+ * The scheme is dropped for legibility, but nothing else is reformatted —
+ * see `HOST_PREFIX` for why the case matters.
+ */
+const HOST_PREFIX = "https://";
+
 export function inviteLine(inviteCode: string): string {
-  return inviteCode ? `ikigaro.com/join · ${inviteCode}` : "ikigaro.com/join";
+  if (!inviteCode) return APP_HOST;
+  return referralLink(inviteCode).slice(HOST_PREFIX.length);
+}
+
+const APP_HOST = "app.ikigaro.com";
+
+/**
+ * The caption offered alongside the image, so the invite link arrives as
+ * tappable text rather than pixels someone has to retype.
+ *
+ * Worth being honest about the limits: platforms decide what to do with the
+ * `text` of a share, and the image-first ones (Instagram in particular) drop
+ * it. WhatsApp, Telegram, X, LinkedIn, Slack and email all keep it, which is
+ * where a link is worth the most anyway. The card still carries the printed
+ * link for everywhere else — this is an upgrade, not a replacement.
+ */
+export function shareCaption(input: ShareCardInput): string {
+  const streak =
+    input.streak > 0
+      ? `Day ${input.streak} of my Ikigaro streak.`
+      : "Checked in on Ikigaro today.";
+  const link = input.inviteCode
+    ? referralLink(input.inviteCode)
+    : `https://${APP_HOST}`;
+  return `${streak}\n\n${link}`;
 }
 
 export function shareFileName(date: Date, template: TemplateId): string {
