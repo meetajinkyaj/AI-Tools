@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Rank } from "@/lib/iki-rank";
-import { RankBadge, RankUpToast } from "./rank-badge";
+import { RankUpToast } from "./rank-badge";
 import { ShareCheckinCard } from "./share-card";
 import { ShareModal } from "./share-modal";
 
@@ -326,8 +326,6 @@ export function CheckinForm({
           </p>
         </Card>
       </div>
-
-      <RankBadge score={state?.ikiScore ?? 0} />
 
       {/*
         Sharing is available for as long as today's check-in exists — not only

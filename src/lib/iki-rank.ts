@@ -31,7 +31,20 @@ export interface Rank {
   id: RankId;
   /** Full name, always prefixed "Iki" so currency and status share a vocabulary. */
   name: string;
+  /**
+   * Kept for text-only surfaces — push notification bodies, the share caption,
+   * anywhere a glyph has to survive being copied as a plain string. The badge
+   * artwork uses the kanji seal instead; see rank-pin.ts.
+   */
   emoji: string;
+  /** The rank kanji, stamped in the hanko seal on the pin. */
+  kanji: string;
+  /**
+   * The scene on the pin. The five read as one journey in order — sprout,
+   * gate, forge, mountain, and the way past the peak — which is what makes the
+   * set feel like chapters rather than five unrelated trophies.
+   */
+  scene: string;
   /** Minimum lifetime iki score. */
   threshold: number;
   /** Light, slightly cheeky — the tone is "fun, not serious". */
@@ -50,36 +63,46 @@ export const RANKS: readonly Rank[] = [
     id: "rookie",
     name: "Iki Rookie",
     emoji: "🌱",
+    kanji: "芽",
+    scene: "The sprout",
     threshold: 0,
-    blurb: "Everyone starts here. The hard part is showing up twice.",
+    blurb: "Everything starts as a seed in the sun.",
   },
   {
     id: "apprentice",
     name: "Iki Apprentice",
     emoji: "🛠️",
+    kanji: "修",
+    scene: "The gate",
     threshold: 400,
-    blurb: "The habit is forming. You've stopped negotiating with yourself.",
+    blurb: "The gate is behind you. The path goes on.",
   },
   {
     id: "pro",
     name: "Iki Pro",
     emoji: "⚡",
+    kanji: "錬",
+    scene: "The forge",
     threshold: 2_000,
-    blurb: "A season of consistency. This is no longer a phase.",
+    blurb: "Tempered in the fire.",
   },
   {
     id: "sensei",
     name: "Iki Sensei",
     emoji: "🥋",
+    kanji: "師",
+    scene: "The mountain",
     threshold: 8_000,
-    blurb: "You've basically mastered the art of showing up.",
+    blurb: "The peak is in view.",
   },
   {
     id: "grandmaster",
     name: "Iki Grandmaster",
     emoji: "🏆",
+    kanji: "道",
+    scene: "The way",
     threshold: 25_000,
-    blurb: "Nobody told you this rank existed. Here you are anyway.",
+    blurb: "Past the peak, joined in gold.",
     secret: true,
   },
 ] as const;
