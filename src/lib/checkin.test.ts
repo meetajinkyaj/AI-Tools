@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CHECKIN_POINTS,
   computeAwards,
   STREAK_MILESTONES,
   computeStreak,
@@ -122,12 +123,13 @@ describe("computeAwards / totalAwarded", () => {
     expect(totalAwarded(a)).toBe(10);
   });
   it("pays a milestone the first time it is reached", () => {
-    // bestStreak 0 = never got there before.
-    expect(totalAwarded(computeAwards(7, 0))).toBe(60);
-    expect(totalAwarded(computeAwards(30, 29))).toBe(260);
-    expect(totalAwarded(computeAwards(90, 89))).toBe(510);
-    expect(totalAwarded(computeAwards(180, 179))).toBe(1010);
-    expect(totalAwarded(computeAwards(365, 364))).toBe(2510);
+    // Derived from POINTS, not hardcoded — the economy gets retuned, and a
+    // test that has to be edited on every reprice stops being a safety net.
+    for (const m of STREAK_MILESTONES) {
+      expect(totalAwarded(computeAwards(m.days, m.days - 1)), `day ${m.days}`).toBe(
+        CHECKIN_POINTS + m.amount,
+      );
+    }
   });
 
   it("never pays the same milestone twice", () => {
@@ -163,7 +165,9 @@ describe("computeAwards / totalAwarded", () => {
 
   it("catches up if several milestones are crossed at once", () => {
     // Cannot happen a day at a time, but can if a streak is ever backfilled.
-    expect(totalAwarded(computeAwards(100, 0))).toBe(10 + 50 + 250 + 500);
+    const upTo90 = STREAK_MILESTONES.filter((m) => m.days <= 100)
+      .reduce((sum, m) => sum + m.amount, 0);
+    expect(totalAwarded(computeAwards(100, 0))).toBe(CHECKIN_POINTS + upTo90);
   });
 
   it("rewards going long, which the old ladder stopped doing at 30", () => {

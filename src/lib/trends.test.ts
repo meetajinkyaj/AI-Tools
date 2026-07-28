@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { POINTS } from "./points";
+
 import {
   type CheckinPoint,
   computeOutcomeAwards,
@@ -38,7 +40,8 @@ describe("computeOutcomeAwards", () => {
     const awards = computeOutcomeAwards(prev, latest);
     // hba1c (5.9->5.4) and ldl (165->150) both improved >5%; hdl move is noise.
     expect(awards.map((a) => a.marker_key).sort()).toEqual(["hba1c", "ldl_c"]);
-    expect(awards.every((a) => a.points === 250)).toBe(true);
+    // From POINTS, so a reprice of the outcome bonus does not fail this test.
+    expect(awards.every((a) => a.points === POINTS.outcomeBonusPerMarker)).toBe(true);
   });
 
   it("keeps rewarding continued improvement past the range boundary (visceral fat 9→8→6.5)", () => {

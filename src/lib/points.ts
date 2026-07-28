@@ -13,10 +13,10 @@ export const POINTS = {
    * that streak length. See STREAK_MILESTONES for why "once ever" matters.
    */
   streak7Bonus: 50,
-  streak30Bonus: 250,
-  streak90Bonus: 500,
-  streak180Bonus: 1_000,
-  streak365Bonus: 2_500,
+  streak30Bonus: 150,
+  streak90Bonus: 250,
+  streak180Bonus: 500,
+  streak365Bonus: 1_000,
   /** First-ever lab panel uploaded — the most valuable data ask. */
   firstPanelUpload: 200,
   /** A genuinely new dated panel after the first (a re-test). */
@@ -33,9 +33,9 @@ export const POINTS = {
    * the same way the 7- and 30-day streak bonuses reward a habit over a day.
    */
   referrer7Friends: 50,
-  referrer30Friends: 250,
+  referrer30Friends: 150,
   /** Per marker that meaningfully improved between panels. */
-  outcomeBonusPerMarker: 250,
+  outcomeBonusPerMarker: 50,
 } as const;
 
 /** Ledger reason codes written to points_transactions.reason. */

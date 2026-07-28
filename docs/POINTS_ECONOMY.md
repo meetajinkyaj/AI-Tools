@@ -1,6 +1,6 @@
 # The iki points economy — every way to earn
 
-_Last updated: 2026-07-28. All values confirmed._
+_Last updated: 2026-07-28. Emissions revised down; all values confirmed._
 
 Two separate ledgers. This split is the load-bearing decision in the whole
 system:
@@ -30,10 +30,10 @@ the behaviour it exists to reward.
 |---|---|---|---|---|---|
 | 1 | Daily check-in | **10** | once per day | ✅ | ✅ |
 | 2 | 7-day streak | **50** | once ever, on personal best | ✅ | ✅ |
-| 3 | 30-day streak | **250** | once ever, on personal best | ✅ | ✅ |
-| 3b | 90-day streak | **500** | once ever, on personal best | ✅ | ✅ |
-| 3c | 180-day streak | **1,000** | once ever, on personal best | ✅ | ✅ |
-| 3d | 365-day streak | **2,500** | once ever, on personal best | ✅ | ✅ |
+| 3 | 30-day streak | **150** | once ever, on personal best | ✅ | ✅ |
+| 3b | 90-day streak | **250** | once ever, on personal best | ✅ | ✅ |
+| 3c | 180-day streak | **500** | once ever, on personal best | ✅ | ✅ |
+| 3d | 365-day streak | **1,000** | once ever, on personal best | ✅ | ✅ |
 
 ### Lab panels — the most valuable data ask
 
@@ -41,7 +41,7 @@ the behaviour it exists to reward.
 |---|---|---|---|---|---|
 | 4 | First panel ever uploaded | **200** | once, ever | ✅ | ✅ |
 | 5 | Re-test uploaded | **150** | per genuinely new *dated* panel | ✅ | ✅ |
-| 6 | Outcome bonus | **250 per marker** | per marker that measurably improved vs the previous panel | ✅ | ✅ |
+| 6 | Outcome bonus | **50 per marker** | per marker that measurably improved vs the previous panel | ✅ | ✅ |
 
 Re-uploading the same report earns nothing — panels are matched on content
 signature, not on the (user-editable) test date.
@@ -54,9 +54,11 @@ signature, not on the (user-editable) test date.
 | 8 | Friend reaches a 7-day streak | **50** | once per friend | ❌ | ✅ |
 | 9 | Friend uploads first panel within 30 days | **150** | once per friend | ❌ | ✅ |
 | 10 | **7 friends onboarded** 🆕 | **50** | once, ever | ❌ | ✅ |
-| 11 | **30 friends onboarded** 🆕 | **250** | once, ever | ❌ | ✅ |
+| 11 | **30 friends onboarded** 🆕 | **150** | once, ever | ❌ | ✅ |
 
-Maximum **300 per friend** (7 + 8 + 9), plus the milestones at 7 and 30.
+Maximum **300 per friend** (7 + 8 + 9), plus the milestones at 7 and 30. The
+milestone amounts mirror the check-in streak ladder, so tier 30 follows the
+30-day streak bonus down to 150.
 
 **Why referrals never boost:** these pay you for someone *else's* behaviour.
 Doubling them rewards recruiting over health, and hands partner-code users a
@@ -100,13 +102,48 @@ and never downgrades anyone already in.
 
 Driven by lifetime iki score.
 
-| Rank | Iki score | Roughly, for a committed user |
+### How long each rank takes
+
+Simulated day by day on the revised numbers, not estimated. **Consistent** =
+checks in daily, first panel at day 30, re-tests every 4 months (3 markers
+improving each time), refers 2 friends in year one. **Casual** = checks in twice
+a week, first panel at day 60, one re-test, 1 marker improving, no referrals.
+
+| Rank | Iki score | Consistent | Casual |
+|---|---|---|---|
+| Iki Rookie 🌱 | 0 | day 1 | day 1 |
+| Iki Apprentice 🛠️ | 400 | **day 30** | **2 months** |
+| Iki Pro ⚡ | 2,000 | **4 months** | **1.5 years** |
+| Iki Sensei 🥋 | 8,000 | **1.2 years** | **5.9 years** |
+| Iki Grandmaster 🏆 | 25,000 | **4.9 years** | not within 6 years |
+
+The gap is the point. A casual user still climbs — they reach Apprentice in
+their second month and Pro eventually — but Sensei is genuinely a marker of
+sustained consistency rather than of having been signed up a long time.
+
+---
+
+## What changed in the revision, and why it still works
+
+| Earn | Was | Now |
 |---|---|---|
-| Iki Rookie 🌱 | 0 | start |
-| Iki Apprentice 🛠️ | 400 | ~1 month |
-| Iki Pro ⚡ | 2,000 | ~5 months |
-| Iki Sensei 🥋 | 8,000 | ~14 months |
-| Iki Grandmaster 🏆 | 25,000 | ~4 years — hidden until reached |
+| 30-day streak | 250 | **150** |
+| 90-day streak | 500 | **250** |
+| 180-day streak | 1,000 | **500** |
+| 365-day streak | 2,500 | **1,000** |
+| Outcome bonus | 250/marker | **50/marker** |
+| 30 friends onboarded | 250 | **150** |
+
+The outcome bonus took the largest cut, 5×, and it is the right one to cut. At
+250 per marker a single good re-test improving six markers paid 1,500 — more
+than a fortnight of perfect check-ins, from one lab visit the user only
+partly controls. At 50 it is a meaningful nudge rather than the dominant
+earn.
+
+**Rank thresholds did not need moving.** Lower streak and outcome values are
+largely offset by the ladder now running to 365 days, so a consistent user
+still reaches Sensei in about 14 months — the pacing the thresholds were
+fitted to in the first place.
 
 ---
 
