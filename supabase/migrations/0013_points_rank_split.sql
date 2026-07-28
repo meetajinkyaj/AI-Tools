@@ -42,7 +42,12 @@ alter table users
   add column if not exists accelerated_partner boolean     not null default false,
   -- On the REFERRED USER: when their boost window opened.
   add column if not exists boost_started_at    timestamptz,
-  add column if not exists boost_floor_met     boolean;
+  add column if not exists boost_floor_met     boolean,
+  -- Longest streak ever reached. Streak milestones pay once ever, keyed off
+  -- this rather than off the current streak: the old rule fired whenever the
+  -- streak EQUALLED 7 or 30, which paid people to break the habit the app
+  -- exists to build (cycling 7-on/1-off beat a perfect year by 38%).
+  add column if not exists best_streak         integer     not null default 0;
 
 -- The ledger carries both numbers so a balance is always explainable and
 -- iki_score is always rebuildable from first principles if it ever drifts.
@@ -82,6 +87,18 @@ update users u
   from earned
  where earned.user_id = u.id
    and u.iki_score = 0;
+
+-- Seed best_streak from the check-in history, so nobody who has already built
+-- a long streak has to rebuild it to collect the milestones they earned.
+with peak as (
+  select user_id, max(streak_count)::int as best
+    from daily_checkins group by user_id
+)
+update users u
+   set best_streak = peak.best
+  from peak
+ where peak.user_id = u.id
+   and u.best_streak = 0;
 
 create index if not exists users_iki_score_idx on users (iki_score desc);
 

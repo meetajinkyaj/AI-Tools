@@ -8,10 +8,15 @@
 export const POINTS = {
   /** First check-in of the day. */
   checkin: 10,
-  /** One-time bonus at a 7-day streak. */
+  /**
+   * Streak milestones, each paid ONCE EVER — the first time a user reaches
+   * that streak length. See STREAK_MILESTONES for why "once ever" matters.
+   */
   streak7Bonus: 50,
-  /** One-time bonus at a 30-day streak. */
   streak30Bonus: 250,
+  streak90Bonus: 500,
+  streak180Bonus: 1_000,
+  streak365Bonus: 2_500,
   /** First-ever lab panel uploaded — the most valuable data ask. */
   firstPanelUpload: 200,
   /** A genuinely new dated panel after the first (a re-test). */
@@ -36,8 +41,11 @@ export const POINTS = {
 /** Ledger reason codes written to points_transactions.reason. */
 export const POINTS_REASON = {
   checkin: "checkin",
-  streak7: "streak_7_bonus",
-  streak30: "streak_30_bonus",
+  streak7: "streak_7",
+  streak30: "streak_30",
+  streak90: "streak_90",
+  streak180: "streak_180",
+  streak365: "streak_365",
   panelUpload: "panel_upload",
   reTest: "retest_upload",
   // Referral milestones (each pays the REFERRER once per referred friend;

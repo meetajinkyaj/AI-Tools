@@ -22,7 +22,13 @@ const MAX_SLEEP_HOURS = 24;
 const MAX_NOTE_LENGTH = 500;
 
 /** Ledger reason codes (subset of points_transactions.reason). */
-export type PointsReason = "checkin" | "streak_bonus";
+export type PointsReason =
+  | "checkin"
+  | "streak_7"
+  | "streak_30"
+  | "streak_90"
+  | "streak_180"
+  | "streak_365";
 
 export interface PointsAward {
   reason: PointsReason;
@@ -146,11 +152,46 @@ export function computeStreak(
   return 1;
 }
 
-/** The points awarded for the day's first check-in at the given streak. */
-export function computeAwards(newStreak: number): PointsAward[] {
+/**
+ * Streak milestones, each paid ONCE EVER — the first time a user reaches that
+ * length.
+ *
+ * The old rule fired whenever the streak equalled exactly 7 or 30, which paid
+ * people to break the habit the app exists to build: a perfect 365-day streak
+ * collected two bonuses, while cycling 7-days-on/1-day-off collected 50 every
+ * eight days forever. Past ~90 days the farmer was ahead; by a year, 38% ahead.
+ *
+ * Keying off the personal best kills that completely — a bonus already
+ * collected cannot be collected again, no matter how the streak is shaped. The
+ * ladder also runs to a year now, so someone 200 days deep still has something
+ * ahead of them, which under the old rule they did not.
+ */
+export const STREAK_MILESTONES: readonly { days: number; reason: PointsReason; amount: number }[] = [
+  { days: 7, reason: "streak_7", amount: STREAK_7_BONUS },
+  { days: 30, reason: "streak_30", amount: STREAK_30_BONUS },
+  { days: 90, reason: "streak_90", amount: POINTS.streak90Bonus },
+  { days: 180, reason: "streak_180", amount: POINTS.streak180Bonus },
+  { days: 365, reason: "streak_365", amount: POINTS.streak365Bonus },
+];
+
+/**
+ * The points awarded for the day's first check-in.
+ *
+ * `bestStreak` is the longest streak this user has EVER reached before today.
+ * Milestones strictly between it and the new streak are newly earned; anything
+ * at or below it has already been paid. Passing 0 replays the whole ladder,
+ * which is what a brand-new user should get.
+ */
+export function computeAwards(newStreak: number, bestStreak = 0): PointsAward[] {
   const awards: PointsAward[] = [{ reason: "checkin", amount: CHECKIN_POINTS }];
-  if (newStreak === 7) awards.push({ reason: "streak_bonus", amount: STREAK_7_BONUS });
-  if (newStreak === 30) awards.push({ reason: "streak_bonus", amount: STREAK_30_BONUS });
+  const best = Number.isFinite(bestStreak) ? Math.max(0, bestStreak) : 0;
+  for (const m of STREAK_MILESTONES) {
+    // Catches up correctly even if several are crossed at once — which cannot
+    // happen a day at a time, but can if a streak is ever backfilled.
+    if (newStreak >= m.days && best < m.days) {
+      awards.push({ reason: m.reason, amount: m.amount });
+    }
+  }
   return awards;
 }
 

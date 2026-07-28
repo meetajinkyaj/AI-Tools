@@ -29,8 +29,11 @@ the behaviour it exists to reward.
 | # | Earn | Points | How often | Boost? | Rank? |
 |---|---|---|---|---|---|
 | 1 | Daily check-in | **10** | once per day | ✅ | ✅ |
-| 2 | 7-day streak bonus | **50** | whenever the streak hits exactly 7 | ✅ | ✅ |
-| 3 | 30-day streak bonus | **250** | whenever the streak hits exactly 30 | ✅ | ✅ |
+| 2 | 7-day streak | **50** | once ever, on personal best | ✅ | ✅ |
+| 3 | 30-day streak | **250** | once ever, on personal best | ✅ | ✅ |
+| 3b | 90-day streak | **500** | once ever, on personal best | ✅ | ✅ |
+| 3c | 180-day streak | **1,000** | once ever, on personal best | ✅ | ✅ |
+| 3d | 365-day streak | **2,500** | once ever, on personal best | ✅ | ✅ |
 
 ### Lab panels — the most valuable data ask
 
@@ -102,48 +105,27 @@ Driven by lifetime iki score.
 
 ---
 
-## ⚠️ A discrepancy this review found
+## ✅ Fixed in this pass: the streak-farming hole
 
-**Breaking your streak on purpose currently earns more than keeping it.**
+Streak bonuses used to fire whenever the streak *equalled* exactly 7 or 30. A
+perfect 365-day streak collected two bonuses and nothing for the remaining 335
+days; cycling 7-on/1-off collected 50 every eight days forever. Past ~90 days
+the farmer was ahead — by a year, **38% ahead**.
 
-The streak bonus fires only when the streak equals *exactly* 7 or 30. Maintain a
-365-day streak and you collect the 7-day bonus once and the 30-day bonus once —
-nothing after that. Cycle 7 days on, 1 day off, and you collect 50 points every
-8 days, forever.
+Milestones now pay **once ever, keyed off the personal best** (`users.best_streak`).
+A bonus already collected cannot be collected again, whatever shape the streak
+takes, so farming stops working entirely. The ladder also runs to a year, so
+someone 200 days deep still has something ahead of them — under the old rule
+they had nothing after day 30.
 
-| Days | Perfect streak | 7-on-1-off cycler | Cycler ahead by |
-|---|---|---|---|
-| 30 | 600 | 420 | −180 |
-| 60 | 900 | 880 | −20 |
-| **90** | 1,200 | 1,340 | **+140** |
-| **180** | 2,100 | 2,680 | **+580** |
-| **365** | 3,950 | 5,450 | **+1,500 (38% more)** |
-
-Past about two months, the economy pays people to break the habit it exists to
-build. Nobody is doing this today — the app is too young — but it is worth
-fixing before it is discovered rather than after.
-
-**Recommended fix:** award each streak bonus **once ever, on personal best**,
-and extend the ladder so long streaks keep paying:
-
-| Streak reached (first time ever) | Points |
-|---|---|
-| 7 days | 50 |
-| 30 days | 250 |
-| 90 days | 500 |
-| 180 days | 1,000 |
-| 365 days | 2,500 |
-
-Farming stops working entirely (a bonus you have already collected can't be
-collected again), and someone 200 days deep still has something to climb toward
-— which today they do not.
+Existing users keep what they built: the migration seeds `best_streak` from
+check-in history rather than making anyone start again.
 
 ---
 
 ## Open questions
 
-1. **Activity floor** — how many check-ins in the first 90 days keep a partner
-   user at 1.5× instead of dropping to 1.25×? Currently assumed **45**.
-2. **Streak fix** — adopt the personal-best ladder above, or leave as-is?
+1. ~~Activity floor~~ — **confirmed: 45 check-ins in the first 90 days.**
+2. ~~Streak fix~~ — **confirmed: personal-best ladder, 7/30/90/180/365.**
 3. **Welcome grant** — 150 points, spendable only, not counted toward rank.
-   Confirm the amount.
+   Still assumed; confirm the amount when the first partner is signed.
