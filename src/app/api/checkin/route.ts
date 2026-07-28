@@ -56,6 +56,7 @@ export async function GET(request: Request) {
         checkedInToday: false,
         streak: 0,
         pointsBalance: 0,
+        ikiScore: 0,
       });
     }
     const profileId = await getOrCreateSelfProfileId(userId);
@@ -79,12 +80,18 @@ export async function GET(request: Request) {
       today,
     );
     const pointsBalance = await getPointsBalance(profileId);
+    const { data: scoreRow } = await supabase
+      .from("users")
+      .select("iki_score")
+      .eq("id", userId)
+      .maybeSingle();
 
     return NextResponse.json({
       checkin: checkedInToday ? recent : null,
       checkedInToday,
       streak,
       pointsBalance,
+      ikiScore: Number(scoreRow?.iki_score ?? 0),
     });
   } catch (err) {
     console.error("GET /api/checkin failed:", err);

@@ -109,9 +109,19 @@ export function nextRankAfter(score: number): Rank | null {
 
 export interface RankProgress {
   rank: Rank;
+  /**
+   * The next rank, or null at the top — AND null when the next one is secret.
+   *
+   * A secret rank must not be revealed by the very line that says how far away
+   * it is. Naming it there, with its exact threshold, would give the whole
+   * thing away to everyone one rung below, which is precisely the population
+   * it is meant to surprise.
+   */
   next: Rank | null;
+  /** True when a next rank exists but is being withheld. */
+  nextIsSecret: boolean;
   score: number;
-  /** Points still needed for the next rank; 0 at the top. */
+  /** Points still needed for the next rank; 0 at the top or when secret. */
   remaining: number;
   /** 0–1 through the CURRENT band, for a progress bar. 1 at the top. */
   fraction: number;
@@ -123,7 +133,11 @@ export function rankProgress(score: number): RankProgress {
   const next = nextRankAfter(s);
 
   if (!next) {
-    return { rank, next: null, score: s, remaining: 0, fraction: 1 };
+    return { rank, next: null, nextIsSecret: false, score: s, remaining: 0, fraction: 1 };
+  }
+
+  if (next.secret) {
+    return { rank, next: null, nextIsSecret: true, score: s, remaining: 0, fraction: 1 };
   }
 
   const band = next.threshold - rank.threshold;
@@ -131,6 +145,7 @@ export function rankProgress(score: number): RankProgress {
   return {
     rank,
     next,
+    nextIsSecret: false,
     score: s,
     remaining: next.threshold - s,
     // Guard the divide: a future edit making two thresholds equal would

@@ -18,7 +18,7 @@ import {
 } from "./ui";
 
 type Authz = "checking" | "ok" | "denied";
-type Tab = "analytics" | "vouchers" | "users";
+type Tab = "analytics" | "vouchers" | "users" | "partners";
 
 /**
  * Internal admin console (gated by the ADMIN_EMAILS allow-list server-side, and
@@ -88,11 +88,15 @@ export function AdminView() {
           <TabButton active={tab === "users"} onClick={() => setTab("users")}>
             Users
           </TabButton>
+          <TabButton active={tab === "partners"} onClick={() => setTab("partners")}>
+            Partners
+          </TabButton>
         </div>
       </div>
       {tab === "analytics" && <AnalyticsPanel getToken={getAccessToken} />}
       {tab === "vouchers" && <VoucherManager getToken={getAccessToken} />}
       {tab === "users" && <UserRoster getToken={getAccessToken} />}
+      {tab === "partners" && <PartnerManager getToken={getAccessToken} />}
     </div>
   );
 }
@@ -1119,6 +1123,271 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
           onCancel={() => setConfirm(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ Partners
+
+interface PartnerRow {
+  id: string;
+  name: string;
+  code: string;
+  multiplier: number;
+  welcome_grant: number;
+  active: boolean;
+  signups: number;
+  onboarded: number;
+  activated: number;
+  pointsIssued: number;
+  boostCost: number;
+  redemptions: number;
+  inBoostWindow: number;
+}
+
+interface PartnerMember {
+  id: string;
+  email: string;
+  joined: string;
+  access_status: string;
+  iki_score: number;
+  points: number;
+  checkins: number;
+  last_checkin: string | null;
+}
+
+/**
+ * Accelerated Points partners — create a code, watch its cohort.
+ *
+ * The numbers that matter for a partnership are not the ones on the Users tab.
+ * A partner conversation is about how many people a code brought, how many
+ * actually started, and what the boost cost — so those sit together here.
+ */
+function PartnerManager({ getToken }: { getToken: () => Promise<string | null> }) {
+  const [partners, setPartners] = useState<PartnerRow[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [draft, setDraft] = useState({ name: "", code: "" });
+  const [busy, setBusy] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [members, setMembers] = useState<PartnerMember[]>([]);
+  const startedRef = useRef(false);
+
+  const load = useCallback(async () => {
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/admin/partners", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return setStatus("error");
+      setPartners(((await res.json()) as { partners: PartnerRow[] }).partners);
+      setStatus("ready");
+    } catch {
+      setStatus("error");
+    }
+  }, [getToken]);
+
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    void load();
+  }, [load]);
+
+  const openRoster = async (id: string) => {
+    if (openId === id) return setOpenId(null);
+    setOpenId(id);
+    setMembers([]);
+    const token = await getToken();
+    const res = await fetch(`/api/admin/partners?id=${encodeURIComponent(id)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) setMembers(((await res.json()) as { members: PartnerMember[] }).members);
+  };
+
+  const create = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/admin/partners", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+      const body = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setMsg({ text: body.error ?? "Couldn't create partner.", ok: false });
+        return;
+      }
+      setDraft({ name: "", code: "" });
+      setMsg({ text: "Partner created. The code is live immediately.", ok: true });
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const setActive = async (p: PartnerRow, active: boolean) => {
+    const token = await getToken();
+    const res = await fetch("/api/admin/partners", {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ id: p.id, active }),
+    });
+    if (res.ok) {
+      setPartners((prev) => prev.map((x) => (x.id === p.id ? { ...x, active } : x)));
+      setMsg({
+        text: active
+          ? `${p.code} is live again for new signups.`
+          : `${p.code} is off for NEW signups. Everyone already in keeps their rate.`,
+        ok: true,
+      });
+    }
+  };
+
+  const preview = normalizeReferralCode(draft.code);
+
+  if (status === "loading") return <CenteredMessage>Loading partners…</CenteredMessage>;
+  if (status === "error") {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="font-body text-sm text-muted">Couldn&rsquo;t load partners.</p>
+        <button onClick={() => { setStatus("loading"); void load(); }} className={secondaryButtonClass}>
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Card className="flex flex-col gap-3 p-5">
+        <Eyebrow>New partner</Eyebrow>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <label className={`${labelClass} flex-1`}>
+            <span>Name</span>
+            <input
+              className={fieldClass}
+              value={draft.name}
+              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+              placeholder="Fittr Community"
+            />
+          </label>
+          <label className={`${labelClass} flex-1`}>
+            <span>Invite code</span>
+            <input
+              className={fieldClass}
+              value={draft.code}
+              onChange={(e) => setDraft((d) => ({ ...d, code: cleanReferralInput(e.target.value) }))}
+              placeholder="FITTR"
+            />
+          </label>
+        </div>
+        <p className="font-body text-xs text-muted">
+          {preview ? (
+            <>
+              Link: <code className="font-mono">app.ikigaro.com/?ref={preview}</code> — 2× for 90
+              days, then 1.5× or 1.25×, plus 150 welcome points.
+            </>
+          ) : (
+            "3–16 letters or numbers."
+          )}
+        </p>
+        <div>
+          <button
+            onClick={() => void create()}
+            disabled={busy || !draft.name.trim() || !preview}
+            className={primaryButtonClass}
+          >
+            {busy ? "Creating…" : "Create partner"}
+          </button>
+        </div>
+        {msg && (
+          <p className={`font-body text-xs ${msg.ok ? "text-muted" : "text-accent"}`}>{msg.text}</p>
+        )}
+      </Card>
+
+      {partners.length === 0 && (
+        <p className="font-body text-sm text-muted">
+          No partners yet. Create one above and share its link.
+        </p>
+      )}
+
+      {partners.map((p) => (
+        <Card key={p.id} className="flex flex-col gap-3 p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="flex items-baseline gap-3">
+              <p className="font-display text-lg font-medium text-foreground">{p.name}</p>
+              <code className="font-mono text-xs text-accent">{p.code}</code>
+              {!p.active && (
+                <span className="font-label text-[0.55rem] uppercase tracking-[0.14em] text-muted">
+                  inactive
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => void setActive(p, !p.active)}
+              className="font-body text-xs text-accent underline underline-offset-2"
+            >
+              {p.active ? "Deactivate" : "Reactivate"}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatTile label="Signups" value={String(p.signups)} sub={`${p.inBoostWindow} in boost`} />
+            <StatTile label="Onboarded" value={String(p.onboarded)} sub={`${p.activated} uploaded`} />
+            <StatTile label="Points issued" value={String(p.pointsIssued)} sub={`${p.boostCost} from boost`} />
+            <StatTile label="Redemptions" value={String(p.redemptions)} sub="vouchers claimed" />
+          </div>
+
+          <div>
+            <button
+              onClick={() => void openRoster(p.id)}
+              className="font-body text-xs text-accent underline underline-offset-2"
+            >
+              {openId === p.id ? "Hide members" : `Show members (${p.signups})`}
+            </button>
+          </div>
+
+          {openId === p.id && (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[36rem] text-left font-body text-xs">
+                <thead className="text-muted">
+                  <tr>
+                    <th className="px-3 py-2">Email</th>
+                    <th className="px-3 py-2">Joined</th>
+                    <th className="px-3 py-2">Iki score</th>
+                    <th className="px-3 py-2">Points</th>
+                    <th className="px-3 py-2">Check-ins</th>
+                    <th className="px-3 py-2">Last seen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.map((m) => (
+                    <tr key={m.id} className="border-t border-border">
+                      <td className="px-3 py-2 text-foreground">{m.email}</td>
+                      <td className="px-3 py-2 text-muted">
+                        {new Date(m.joined).toLocaleDateString()}
+                      </td>
+                      <td className="px-3 py-2">{m.iki_score}</td>
+                      <td className="px-3 py-2">{m.points}</td>
+                      <td className="px-3 py-2">{m.checkins}</td>
+                      <td className="px-3 py-2 text-muted">{m.last_checkin ?? "—"}</td>
+                    </tr>
+                  ))}
+                  {members.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-3 text-muted">
+                        Nobody has joined through this code yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      ))}
     </div>
   );
 }
