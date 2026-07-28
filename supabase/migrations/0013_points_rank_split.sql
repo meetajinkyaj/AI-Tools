@@ -139,10 +139,9 @@ create table if not exists partners (
   constraint partners_welcome_check    check (welcome_grant >= 0 and welcome_grant <= 5000)
 );
 
--- Codes must be unique among partners AND must not collide with a user's own
--- referral code, or a ?ref link would be ambiguous. Uniqueness within partners
--- is enforced here; the cross-table check lives in the admin route, which is
--- the only writer.
+-- Uniqueness within partners. The cross-table half — a partner code must not
+-- collide with a user's own referral code, or a ?ref link is ambiguous — is
+-- enforced by the invite_codes namespace below, not by application code.
 create unique index if not exists partners_code_key on partners (upper(code));
 
 alter table users
