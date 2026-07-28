@@ -1,17 +1,23 @@
 "use client";
 
 import { rankProgress, visibleRanks, type Rank } from "@/lib/iki-rank";
-import { RANK_ART, rankChipSvg, rankPinSvg, svgDataUri } from "@/lib/rank-pin";
+import { RANK_ART, rankChipSvg, rankPinSvg } from "@/lib/rank-pin";
 import { Card, Eyebrow } from "./ui";
 
 /**
  * The Iki rank badge, to Claude Design's "Iki Badges v3".
  *
- * SIZE PICKS THE ARTWORK, and that is a rule from the spec rather than a
- * preference: the full pin's scene turns to mud below about 120px, where a
- * muddy pin reads as a rendering bug rather than a small badge. So the rank
- * card, the ladder and any list row use the chip — rim, band, kanji — and the
- * full pin appears only at hero size: the level-up moment and the share card.
+ * SIZE PICKS THE ARTWORK. The full pin's scene turns to mud below about 120px,
+ * where it stops reading as a small badge and starts reading as a rendering
+ * bug, so anything under that threshold gets the chip instead — rim, band,
+ * kanji, no scene.
+ *
+ * The spec put the rank card itself on the chip side of that line. It is on
+ * the pin side here, deliberately: the pins are the reason the set exists, and
+ * reserving them for the level-up moment means a user sees their own badge a
+ * handful of times a year. The card is wide enough to carry one at full size,
+ * so it does. The ladder underneath keeps chips, because four pins across a
+ * phone-width card would be ~85px each — under the threshold, and muddy.
  *
  * All progress data still comes from `rankProgress()`; nothing about which rank
  * you are or how far you have to go is computed in the markup.
@@ -49,6 +55,22 @@ export function RankChip({
   );
 }
 
+/**
+ * The full enamel pin: scene, ring lettering, hanko seal.
+ *
+ * Keep `size` at 120 or above. Below that the scene collapses into noise and
+ * the chip is the correct component instead.
+ */
+export function RankPin({ rank, size = 132 }: { rank: Rank; size?: number }) {
+  return (
+    <Glyph
+      svg={rankPinSvg(rank.id, rank.name, { ringText: true, title: rank.name })}
+      size={size}
+      className="drop-shadow-[0_8px_18px_rgba(28,22,17,0.28)]"
+    />
+  );
+}
+
 export function RankBadge({
   score,
   size = "full",
@@ -75,28 +97,19 @@ export function RankBadge({
 
   return (
     <Card className="flex flex-col gap-4 p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <RankChip rank={rank} size={56} />
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <RankPin rank={rank} size={132} />
           <div className="flex flex-col gap-0.5">
             <Eyebrow>Your rank</Eyebrow>
             <p className="font-display text-2xl font-medium text-foreground">{rank.name}</p>
             <p className="font-label text-[0.55rem] uppercase tracking-[0.24em] text-accent">
-              {rank.kanji} · {rank.scene}
+              {rank.scene} · {score.toLocaleString()} iki
             </p>
+            <p className="mt-1 font-body text-xs text-muted">{rank.blurb}</p>
           </div>
         </div>
-        <div className="text-right">
-          <p className="font-display text-xl font-medium text-foreground">
-            {score.toLocaleString()}
-          </p>
-          <p className="font-label text-[0.55rem] uppercase tracking-[0.18em] text-muted">
-            iki score
-          </p>
-        </div>
       </div>
-
-      <p className="font-body text-xs text-muted">{rank.blurb}</p>
 
       {next ? (
         <div className="flex flex-col gap-2">
@@ -180,7 +193,7 @@ export function RankLadder({ score, current }: { score: number; current: Rank })
 }
 
 /**
- * The level-up moment — the one place the full pin appears in-app.
+ * The level-up moment.
  *
  * Shown once, right after the earn that crossed the boundary, with the share
  * sheet one tap away because that is the only moment the post writes itself.
@@ -206,13 +219,7 @@ export function RankUpToast({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-4">
-          <img
-            src={svgDataUri(rankPinSvg(rank.id, rank.name, { ringText: true }))}
-            alt=""
-            width={96}
-            height={96}
-            className="shrink-0"
-          />
+          <RankPin rank={rank} size={128} />
           <div className="flex flex-col gap-1">
             <p className="font-label text-[0.6rem] uppercase tracking-[0.28em] text-accent">
               New rank
