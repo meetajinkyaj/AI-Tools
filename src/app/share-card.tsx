@@ -12,6 +12,7 @@ import {
   DEFAULT_FORMAT,
   FORMATS,
   formatSize,
+  shareCaption,
   shareFileName,
   TEMPLATES,
   type FormatId,
@@ -230,13 +231,26 @@ export function ShareCheckinCard({
       type: "image/png",
     });
 
+    // The caption carries the invite link as tappable text. Platforms decide
+    // whether to keep it — Instagram drops it, WhatsApp/Telegram/X/LinkedIn
+    // keep it — so the card still prints the link for everywhere else.
+    const text = shareCaption(input);
+
     if (navigator.canShare?.({ files: [file] })) {
       try {
-        await navigator.share({ files: [file] });
+        await navigator.share({ files: [file], text });
         return;
       } catch (err) {
         // Dismissing the sheet throws AbortError — not worth surfacing.
         if (err instanceof Error && err.name === "AbortError") return;
+        // Some targets reject a files+text share outright. Retry with the
+        // image alone rather than dropping the user out to a download.
+        try {
+          await navigator.share({ files: [file] });
+          return;
+        } catch (retryErr) {
+          if (retryErr instanceof Error && retryErr.name === "AbortError") return;
+        }
       }
     }
     await onSave();
@@ -406,6 +420,12 @@ export function ShareCheckinCard({
           {FORMATS.map((f) => (
             <Choice key={f.id} selected={format === f.id} onClick={() => setFormat(f.id)}>
               {f.name}
+              {/* Nobody thinks in aspect ratios — they think "this goes on my
+                  story". Naming the platforms removes a guess at the exact
+                  moment we are asking someone to post. */}
+              <span className="mt-1 block font-body text-[0.6rem] normal-case tracking-normal opacity-70">
+                {f.where}
+              </span>
             </Choice>
           ))}
         </div>

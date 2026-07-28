@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 
+import { referralLink } from "./referral";
 import {
   activityLabel,
   coverRect,
   DEFAULT_FIELDS,
   energyLabel,
   fitFontSize,
+  FORMATS,
   formatSize,
   inviteLine,
+  shareCaption,
   shareFileName,
   shortDate,
   sleepLabel,
@@ -65,9 +68,59 @@ describe("labels", () => {
   });
 
   it("carries the invite code, which is the point of sharing", () => {
-    expect(inviteLine("AJINKYA")).toBe("ikigaro.com/join · AJINKYA");
+    expect(inviteLine("AJINKYA")).toBe("app.ikigaro.com/?ref=AJINKYA");
     // A user whose code hasn't been generated still gets a usable link.
-    expect(inviteLine("")).toBe("ikigaro.com/join");
+    expect(inviteLine("")).toBe("app.ikigaro.com");
+  });
+
+  it("prints the SAME link the app hands out — not an invented one", () => {
+    // This shipped as `ikigaro.com/join · CODE`, which 404s. Anyone who typed
+    // it in landed nowhere and the referral never attributed, so the growth
+    // loop the card exists for was silently broken. Pinning it to
+    // referralLink() means the card cannot drift from the real link again.
+    expect(`https://${inviteLine("AJINKYA")}`).toBe(referralLink("AJINKYA"));
+  });
+
+  it("keeps the query parameter lowercase", () => {
+    // The renderer uppercases every other tracked label on the card. Doing it
+    // to this one turns `?ref=` into `?REF=` — a different parameter, so
+    // attribution fails while the card still looks correct.
+    expect(inviteLine("AJINKYA")).toContain("?ref=");
+    expect(inviteLine("AJINKYA")).not.toContain("?REF=");
+  });
+});
+
+describe("shareCaption — the link as tappable text", () => {
+  it("carries the real referral link", () => {
+    expect(shareCaption(base)).toContain(referralLink("AJINKYA"));
+  });
+
+  it("still links home when no code has been generated", () => {
+    const caption = shareCaption({ ...base, inviteCode: "" });
+    expect(caption).toContain("https://app.ikigaro.com");
+    expect(caption).not.toContain("ref=");
+  });
+
+  it("names the streak, and stays sane on day zero", () => {
+    expect(shareCaption(base)).toContain("Day 12");
+    expect(shareCaption({ ...base, streak: 0 })).not.toContain("Day 0");
+  });
+
+  it("never carries anything about the body", () => {
+    // Same rule as the card itself: energy and sleep are not for a caption
+    // that lands on a public timeline.
+    const caption = shareCaption({ ...base, energy: 4, sleepHours: 7.5 });
+    expect(caption).not.toMatch(/energy|sleep|\bhours?\b/i);
+  });
+});
+
+describe("FORMATS", () => {
+  it("names the platforms each ratio is for", () => {
+    // Nobody thinks in aspect ratios; every option has to say where it goes.
+    for (const f of FORMATS) {
+      expect(f.where, f.id).toBeTruthy();
+    }
+    expect(FORMATS.find((f) => f.id === "story")?.where).toMatch(/instagram/i);
   });
 });
 
