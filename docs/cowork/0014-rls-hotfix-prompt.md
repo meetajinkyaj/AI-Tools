@@ -14,10 +14,14 @@ Supabase project for Ikigaro (`xaygldulkjjofxohescm`), using the SQL Editor.
 This is a two-line follow-up to 0013. When 0013 ran, the dashboard warned that
 `partners` and `invite_codes` were created without Row Level Security. That
 warning was right. Supabase grants the `anon` and `authenticated` roles
-privileges on everything in the `public` schema, and the anon key ships inside
-the client JavaScript bundle, so those two tables are currently readable and
-writable by anyone who opens the app. Every other table in this database has
-had RLS enabled since migration 0001.
+privileges on everything in the `public` schema, so RLS is the only thing
+standing between the project's anon key and those two tables. Every other table
+in this database has had RLS enabled since migration 0001.
+
+(This app publishes no anon key — there is no browser Supabase client — so the
+tables were not reachable straight from the bundle. Reaching them needed the key
+from elsewhere. Closing it anyway: an anon key is meant to be publishable, so
+its secrecy is not something to rely on.)
 
 Run it as one batch:
 
