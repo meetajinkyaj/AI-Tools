@@ -1,6 +1,6 @@
 # The iki points economy — every way to earn
 
-_Last updated: 2026-07-28. Under review — see "Open questions" at the bottom._
+_Last updated: 2026-07-28. All values confirmed._
 
 Two separate ledgers. This split is the load-bearing decision in the whole
 system:
@@ -72,6 +72,11 @@ tracks real people.
 |---|---|---|---|---|---|
 | 12 | Welcome grant | **150** | once, on signup via a partner code | n/a | ❌ |
 
+Granted the moment a partner-code signup completes, before the user has done
+anything. "Endowed progress": starting at zero is the most abandonable state
+there is, and a balance that is already moving is far more likely to be
+continued than one that has not started.
+
 **The only earn that doesn't count toward rank.** A gift isn't work — if it
 raised your score, a community code would buy status.
 
@@ -123,9 +128,15 @@ check-in history rather than making anyone start again.
 
 ---
 
-## Open questions
+## Settled
 
-1. ~~Activity floor~~ — **confirmed: 45 check-ins in the first 90 days.**
-2. ~~Streak fix~~ — **confirmed: personal-best ladder, 7/30/90/180/365.**
-3. **Welcome grant** — 150 points, spendable only, not counted toward rank.
-   Still assumed; confirm the amount when the first partner is signed.
+| Decision | Value |
+|---|---|
+| Activity floor (keeps 1.5× at day 90) | **45 check-ins in the first 90 days** |
+| Streak milestones | **Personal best — 7 / 30 / 90 / 180 / 365** |
+| Welcome grant | **150 points, spendable only, never toward rank** |
+| Rank thresholds | **0 / 400 / 2,000 / 8,000 / 25,000** |
+| Grandmaster | **Hidden until reached** |
+
+Every one of these is a single named constant. Retuning any of them is a
+one-line change plus a deploy — no migration, no backfill.
