@@ -2,13 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { rankFor } from "@/lib/iki-rank";
 import { PRIMARY_GOAL_LABELS, type ProfileRow } from "@/lib/profile";
+import type { RankCardInput } from "@/lib/rank-share-card";
+import { RankBadge } from "./rank-badge";
+import { RankShareModal } from "./rank-share-modal";
 import { Card, Eyebrow, PageHeader, primaryButtonClass } from "./ui";
 
 interface Summary {
   streak: number;
   pointsBalance: number;
   checkedInToday: boolean;
+  ikiScore: number;
 }
 
 /** Shimmer stand-in for a stat value while the summary loads — never a fake 0. */
@@ -34,6 +39,8 @@ export function Dashboard({
 }) {
   const firstName = profile.full_name.split(" ")[0] || profile.full_name;
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
   const loadedKey = useRef(-1);
 
   const load = useCallback(async () => {
@@ -58,6 +65,27 @@ export function Dashboard({
     void load();
   }, [load, refreshKey]);
 
+  /**
+   * The invite code is fetched only when the share sheet opens. Most visits to
+   * Home never open it, and the card renders fine without one.
+   */
+  const openShare = useCallback(async () => {
+    setShareOpen(true);
+    if (inviteCode) return;
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch("/api/referral", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { code?: string };
+      if (data.code) setInviteCode(data.code);
+    } catch {
+      /* the card is still shareable without it */
+    }
+  }, [getToken, inviteCode]);
+
   const checkedInToday = summary?.checkedInToday ?? false;
 
   return (
@@ -67,6 +95,16 @@ export function Dashboard({
         title={`Welcome, ${firstName}`}
         subtitle="Your baseline is set up. Check in daily to build your streak."
       />
+
+      {/*
+        The rank card leads Home. It used to sit on the Check-in tab, which
+        meant the one thing that shows a user how far they have come was behind
+        a tab they only opened to file today's entry — and invisible on the
+        days they did not check in at all.
+      */}
+      {summary && (
+        <RankBadge score={summary.ikiScore} onShare={() => void openShare()} />
+      )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="flex flex-col gap-2 p-6">
@@ -131,6 +169,31 @@ export function Dashboard({
           <div className="h-11 w-32 animate-pulse rounded-control bg-surface-2" />
         </Card>
       )}
+
+      {shareOpen && summary && (
+        <RankShareModal
+          input={
+            {
+              ...rankCardFields(rankFor(summary.ikiScore)),
+              ikiScore: summary.ikiScore,
+              streak: summary.streak,
+              date: new Date(),
+              referralCode: inviteCode,
+            } satisfies RankCardInput
+          }
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   );
+}
+
+/** The rank half of the card input, so the shape stays in one place. */
+function rankCardFields(rank: ReturnType<typeof rankFor>) {
+  return {
+    rankId: rank.id,
+    rankName: rank.name,
+    kanji: rank.kanji,
+    scene: rank.scene,
+  };
 }
