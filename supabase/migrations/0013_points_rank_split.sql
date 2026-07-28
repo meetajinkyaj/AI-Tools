@@ -150,3 +150,77 @@ alter table users
 
 create index if not exists users_partner_id_idx
   on users (partner_id) where partner_id is not null;
+
+-- ---------------------------------------------------------------------------
+-- ONE code namespace, enforced by the database.
+--
+-- A ?ref link carries a single code and is resolved against partners first, so
+-- a partner code and a user's invite code must never be the same string. Two
+-- separate unique indexes cannot express that — and the gap was not
+-- theoretical:
+--
+--   /api/referral generates a user's code from their NAME and retries on a
+--   unique violation. It only ever knew about users.referral_code. With a
+--   partner code "FITTR" already live, a user named Fittr would be assigned
+--   FITTR, the users index would raise nothing, and from then on their invite
+--   link would silently resolve to the partner — their referrals attributing
+--   to someone else, permanently, with no error anywhere.
+--
+-- So both tables now write into one keyed table. The primary key does the
+-- work: a colliding code fails the transaction that tried to take it. The
+-- retry loop in /api/referral then does the right thing without knowing why,
+-- because a unique violation is exactly what it already handles.
+-- ---------------------------------------------------------------------------
+create table if not exists invite_codes (
+  code     text primary key,
+  kind     text not null check (kind in ('user', 'partner')),
+  owner_id uuid not null,
+  unique (kind, owner_id)
+);
+
+create or replace function sync_invite_code() returns trigger
+language plpgsql as $$
+declare
+  k        text := tg_argv[0];
+  new_code text;
+begin
+  if tg_op = 'DELETE' then
+    delete from invite_codes where kind = k and owner_id = old.id;
+    return old;
+  end if;
+
+  -- Branch in plpgsql, NOT with a CASE expression: a CASE resolves field
+  -- references on BOTH arms against the record, so `new.referral_code` would
+  -- be evaluated for the partners trigger too and fail with "record new has no
+  -- field referral_code". An IF only touches the arm it takes.
+  if k = 'user' then
+    new_code := upper(new.referral_code);
+  else
+    new_code := upper(new.code);
+  end if;
+
+  -- Delete-then-insert rather than upsert: an upsert on a code owned by
+  -- someone else would silently do nothing, which is the failure we are here
+  -- to prevent. A plain insert raises, and the transaction rolls back.
+  delete from invite_codes where kind = k and owner_id = new.id;
+  if new_code is not null then
+    insert into invite_codes (code, kind, owner_id) values (new_code, k, new.id);
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists users_invite_code_sync on users;
+create trigger users_invite_code_sync
+  after insert or update of referral_code or delete on users
+  for each row execute function sync_invite_code('user');
+
+drop trigger if exists partners_invite_code_sync on partners;
+create trigger partners_invite_code_sync
+  after insert or update of code or delete on partners
+  for each row execute function sync_invite_code('partner');
+
+-- Adopt the codes that already exist.
+insert into invite_codes (code, kind, owner_id)
+select upper(referral_code), 'user', id
+  from users where referral_code is not null
+on conflict (code) do nothing;

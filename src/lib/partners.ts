@@ -43,10 +43,11 @@ export async function findActivePartnerByCode(
 /**
  * Is this code already taken, by either a partner or a user?
  *
- * A `?ref` link carries one code and is resolved against partners first, so a
- * collision would silently shadow a user's invite code with a partner's. The
- * unique index covers partner-vs-partner; this covers partner-vs-user, which
- * no constraint can express across two tables.
+ * This is for the ERROR MESSAGE, not for correctness. The guarantee lives in
+ * the database: both tables sync into `invite_codes`, whose primary key makes a
+ * collision impossible from either direction (migration 0013). Checking here
+ * first just turns a constraint violation into "FITTR is already a user's
+ * invite code" instead of an opaque 500.
  */
 export async function isCodeTaken(
   code: string,

@@ -95,9 +95,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // A ?ref link carries ONE code, resolved against partners first — so a
-  // partner code that collides with a user's invite code would silently
-  // shadow it. No constraint can express that across two tables.
+  // Pre-flight for a readable error. The real guarantee is the invite_codes
+  // primary key, which also covers the race this check cannot: two admins
+  // creating the same code at once, and — the case that actually mattered —
+  // /api/referral later generating that code for a user from their name.
   const taken = await isCodeTaken(code);
   if (taken) {
     return NextResponse.json(
@@ -125,6 +126,14 @@ export async function POST(request: Request) {
     .single();
 
   if (error || !data) {
+    // 23505 here means the invite_codes primary key caught a collision the
+    // pre-flight missed — a race, or a code taken between check and insert.
+    if (error?.code === "23505") {
+      return NextResponse.json(
+        { error: `“${code}” was just taken. Try another.` },
+        { status: 409 },
+      );
+    }
     console.error("partner create failed:", error);
     return NextResponse.json({ error: "Couldn't create partner" }, { status: 500 });
   }
