@@ -22,6 +22,13 @@ export const POINTS = {
   referralStreak: 50,
   /** Referral tier 3: the friend uploads their first panel within 30 days. */
   referralPanel: 150,
+  /**
+   * Referrer milestones — the check-in streak ladder, mirrored for inviting.
+   * Per-friend tiers reward one good introduction; these reward keeping going,
+   * the same way the 7- and 30-day streak bonuses reward a habit over a day.
+   */
+  referrer7Friends: 50,
+  referrer30Friends: 250,
   /** Per marker that meaningfully improved between panels. */
   outcomeBonusPerMarker: 250,
 } as const;
@@ -38,6 +45,8 @@ export const POINTS_REASON = {
   referralOnboard: "referral",
   referralStreak: "referral_streak",
   referralPanel: "referral_panel",
+  referrer7: "referrer_7_friends",
+  referrer30: "referrer_30_friends",
   outcomeBonus: "outcome_bonus",
 } as const;
 

@@ -78,6 +78,9 @@ export const ACCELERATED_REASONS: readonly string[] = [
   "panel_upload",
   "retest_upload",
   "outcome_bonus",
+  // NOT listed, deliberately: referral, referral_streak, referral_panel,
+  // referrer_7_friends, referrer_30_friends, welcome_grant. The referral ones
+  // pay for someone else's behaviour; the grant is a gift.
 ];
 
 /** Ledger reason for the partner welcome balance. */
