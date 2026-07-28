@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CHECKIN_POINTS,
   computeAwards,
+  STREAK_MILESTONES,
   computeStreak,
   daysBetweenUTC,
   displayStreak,
@@ -120,12 +122,57 @@ describe("computeAwards / totalAwarded", () => {
     expect(a).toEqual([{ reason: "checkin", amount: 10 }]);
     expect(totalAwarded(a)).toBe(10);
   });
-  it("adds the 7-day bonus exactly at streak 7", () => {
-    expect(totalAwarded(computeAwards(7))).toBe(60);
-    expect(totalAwarded(computeAwards(8))).toBe(10);
+  it("pays a milestone the first time it is reached", () => {
+    // Derived from POINTS, not hardcoded — the economy gets retuned, and a
+    // test that has to be edited on every reprice stops being a safety net.
+    for (const m of STREAK_MILESTONES) {
+      expect(totalAwarded(computeAwards(m.days, m.days - 1)), `day ${m.days}`).toBe(
+        CHECKIN_POINTS + m.amount,
+      );
+    }
   });
-  it("adds the 30-day bonus exactly at streak 30", () => {
-    expect(totalAwarded(computeAwards(30))).toBe(260);
+
+  it("never pays the same milestone twice", () => {
+    // Day 8 of a streak whose best is already 7: just the daily 10.
+    expect(totalAwarded(computeAwards(8, 7))).toBe(10);
+    // A 200-day streak that has already banked 7/30/90/180.
+    expect(totalAwarded(computeAwards(200, 199))).toBe(10);
+  });
+
+  it("closes the streak-farming hole", () => {
+    // The old rule fired whenever the streak EQUALLED 7, so cycling
+    // 7-on/1-off collected 50 every eight days forever and beat a perfect
+    // streak by 38% over a year. Rebuilding to 7 when the best is already 7
+    // must now pay nothing beyond the daily.
+    expect(totalAwarded(computeAwards(7, 7))).toBe(10);
+    expect(totalAwarded(computeAwards(7, 30))).toBe(10);
+
+    // Over a year: a perfect streak must out-earn any cycle.
+    const perfect = Array.from({ length: 365 }, (_, i) =>
+      totalAwarded(computeAwards(i + 1, i)),
+    ).reduce((a, b) => a + b, 0);
+    let cycled = 0;
+    let streak = 0;
+    let best = 0;
+    for (let d = 0; d < 365; d++) {
+      if (streak === 7) { streak = 0; continue; } // deliberate miss
+      streak++;
+      cycled += totalAwarded(computeAwards(streak, best));
+      best = Math.max(best, streak);
+    }
+    expect(perfect).toBeGreaterThan(cycled);
+  });
+
+  it("catches up if several milestones are crossed at once", () => {
+    // Cannot happen a day at a time, but can if a streak is ever backfilled.
+    const upTo90 = STREAK_MILESTONES.filter((m) => m.days <= 100)
+      .reduce((sum, m) => sum + m.amount, 0);
+    expect(totalAwarded(computeAwards(100, 0))).toBe(CHECKIN_POINTS + upTo90);
+  });
+
+  it("rewards going long, which the old ladder stopped doing at 30", () => {
+    const beyond = STREAK_MILESTONES.filter((m) => m.days > 30);
+    expect(beyond.map((m) => m.days)).toEqual([90, 180, 365]);
   });
 });
 

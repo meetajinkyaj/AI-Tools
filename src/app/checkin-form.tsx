@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import type { Rank } from "@/lib/iki-rank";
+import { RankBadge, RankUpToast } from "./rank-badge";
 import { ShareCheckinCard } from "./share-card";
 import { ShareModal } from "./share-modal";
 
@@ -38,6 +40,8 @@ interface CheckinState {
   checkedInToday: boolean;
   streak: number;
   pointsBalance: number;
+  /** Lifetime, unboosted — drives the rank badge. */
+  ikiScore?: number;
 }
 
 const ENERGY_VALUES = Array.from(
@@ -74,6 +78,7 @@ export function CheckinForm({
   // The modal is the post-save interruption; `showShare` is the inline
   // "come back later" path. Kept apart so dismissing one never hides the other.
   const [shareModal, setShareModal] = useState(false);
+  const [rankUp, setRankUp] = useState<Rank | null>(null);
   const [inviteCode, setInviteCode] = useState("");
   const startedRef = useRef(false);
 
@@ -176,6 +181,7 @@ export function CheckinForm({
       });
       const data = (await res.json()) as CheckinState & {
         pointsAwarded?: number;
+        rankUp?: Rank | null;
         error?: string;
       };
       if (!res.ok || !data.checkin) {
@@ -187,7 +193,11 @@ export function CheckinForm({
         checkedInToday: true,
         streak: data.streak,
         pointsBalance: data.pointsBalance,
+        ikiScore: data.ikiScore,
       });
+      // Only ever set when this check-in actually crossed a boundary, so the
+      // celebration cannot fire twice for the same rank.
+      if (data.rankUp) setRankUp(data.rankUp);
       setEarned(data.pointsAwarded ?? 0);
       setJustSaved(true);
       // Offer the card on the win itself, as a modal — inline it sat below the
@@ -317,6 +327,8 @@ export function CheckinForm({
         </Card>
       </div>
 
+      <RankBadge score={state?.ikiScore ?? 0} />
+
       {/*
         Sharing is available for as long as today's check-in exists — not only
         in the seconds after saving.
@@ -326,6 +338,8 @@ export function CheckinForm({
         field was edited. Anyone who checked in and returned later had no way
         into the share sheet at all, which is most people most of the time.
       */}
+      {rankUp && <RankUpToast rank={rankUp} onClose={() => setRankUp(null)} />}
+
       {(justSaved || checkedInToday) && (
         <Card className="flex flex-col gap-4 border-accent/40 bg-surface-2 p-4">
           {justSaved && (
