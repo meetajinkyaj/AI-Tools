@@ -128,6 +128,47 @@ only thing that cannot be rebuilt from anything.
 **Step 2 is the one that matters.** Step 4 is not worth it until user volume is
 much higher.
 
+### The current decision, and what should change it
+
+**Founder's call, 2026-07-27: stay on Free for now, revisit at 20 testers.**
+
+This is a considered acceptance of a known risk, not an oversight. At
+single-digit users the data at risk is a handful of records that testers could
+re-enter, so $25/mo buys little today.
+
+**The trigger is ~20 testers.** Do not treat that as a soft target. The
+calculation inverts fast, for two reasons that compound:
+
+- **The loss stops being recoverable by asking.** Three people will happily
+  re-enter a check-in. Twenty will not re-upload blood panels, and a beta
+  cohort that loses its data does not come back.
+- **The trust cost is asymmetric.** Losing early testers' health data is not a
+  technical setback; it is the end of a beta and the story that follows the
+  product.
+
+Anyone reading this after that threshold has passed: the decision above has
+expired. Turn on Pro.
+
+**You will not have to remember this.** The threshold is enforced in code, not
+by this paragraph. `src/lib/backup-risk.ts` compares the live signup count
+against it, and the admin console's Analytics tab shows the result directly
+above the funnel: a quiet one-line note while the count is under, and an
+unmissable banner the moment it is over. It sits next to the very number that
+expires the decision, because that is where the person who can act on it is
+already looking.
+
+It reads the `DB_BACKUPS` var in `wrangler.jsonc`, which is `"none"` today.
+**Anything other than the exact string `protected` counts as unprotected** —
+including the variable being missing entirely. That is deliberate: a typo or a
+fresh environment must not be able to silence the warning, because wrongly
+warning costs a moment's annoyance and wrongly staying quiet costs every user's
+health data.
+
+Once you turn on Pro **and have rehearsed a restore**, set
+`"DB_BACKUPS": "protected"` and deploy. Do not set it just because you have
+paid — the flag claims recoverability, and that is only true once it has been
+tested.
+
 **The caveat on step 3:** Pro's backups live *inside the same Supabase account as
 the database they protect*. That is a correlated failure — an account
 suspension, a billing lapse or a compromised login takes the database and its

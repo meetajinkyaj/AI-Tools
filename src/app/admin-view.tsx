@@ -122,6 +122,14 @@ function TabButton({
 
 interface AnalyticsData {
   funnel: { users: number; onboarded: number; activated: number; retested: number };
+  backupRisk: {
+    posture: "none" | "protected";
+    users: number;
+    threshold: number;
+    overdue: boolean;
+    accepted: boolean;
+    headroom: number;
+  };
   retention: { day: number; eligible: number; retained: number; rate: number | null }[];
   active: { dau: number; wau: number; mau: number };
   streaks: { none: number; short: number; week: number; month: number };
@@ -138,6 +146,51 @@ interface AnalyticsData {
     }[];
     count7d: number;
   };
+}
+
+/**
+ * The backup tripwire, shown above the funnel.
+ *
+ * There are no database backups — a deliberate choice while the tester count is
+ * tiny (`docs/RUNBOOK.md` §2b). The risk of that choice is that it gets
+ * forgotten, so it is enforced next to the very number that expires it rather
+ * than left in a document nobody re-reads.
+ *
+ * Two deliberately different voices. Under the threshold it is a quiet line of
+ * text — the decision is sound and nagging about it would train the reader to
+ * ignore this space. Over it, it is loud, because at that point real people's
+ * health data is at stake and a muted note would be complicity.
+ */
+function BackupNotice({ risk }: { risk: AnalyticsData["backupRisk"] }) {
+  if (risk.posture === "protected") return null;
+
+  if (risk.overdue) {
+    return (
+      <section className="flex flex-col gap-2 rounded-card border-2 border-accent bg-accent/10 p-4">
+        <p className="font-label text-[0.65rem] uppercase tracking-[0.28em] text-accent">
+          Act now — database has no backups
+        </p>
+        <p className="font-body text-sm text-foreground">
+          {risk.users} people have trusted this app with their health data, and
+          none of it is backed up. If the database is lost, it is gone
+          permanently — there is no recovery path.
+        </p>
+        <p className="font-body text-sm text-muted">
+          This was an accepted risk below {risk.threshold} testers. That no
+          longer holds. Turn on Supabase Pro ($25/mo, daily backups), then set{" "}
+          <code className="font-mono text-xs">DB_BACKUPS=protected</code> to
+          clear this. See RUNBOOK §2b.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <p className="font-body text-xs text-muted">
+      No database backups — accepted below {risk.threshold} testers ({risk.users}{" "}
+      now, {risk.headroom} to go). RUNBOOK §2b.
+    </p>
+  );
 }
 
 function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }) {
@@ -187,6 +240,8 @@ function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }
 
   return (
     <div className="flex flex-col gap-6">
+      <BackupNotice risk={data.backupRisk} />
+
       {/* Funnel — the checklist's core conversion metrics */}
       <section className="flex flex-col gap-3">
         <Eyebrow>Funnel</Eyebrow>

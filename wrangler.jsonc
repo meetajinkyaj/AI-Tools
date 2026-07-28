@@ -20,7 +20,13 @@
     "ADMIN_EMAILS": "meetajinkyaj@gmail.com",
     // Runtime environment marker. Guards the production database against
     // non-production deploys (src/lib/supabase-admin.ts).
-    "APP_ENV": "production"
+    "APP_ENV": "production",
+    // Whether this database has real backups. "none" today — the Supabase
+    // project is on the Free plan, which includes none (docs/RUNBOOK.md §2b).
+    // The admin console warns while this says "none", loudly once the tester
+    // count passes the threshold the risk was accepted under. Flip this to
+    // "protected" only after backups exist AND a restore has been rehearsed.
+    "DB_BACKUPS": "none"
   },
   "observability": {
     "enabled": true
@@ -35,6 +41,12 @@
       "vars": {
         "ADMIN_EMAILS": "meetajinkyaj@gmail.com",
         "APP_ENV": "staging",
+        // Set explicitly because `vars` is NOT inherited by named
+        // environments — omitting it makes wrangler warn on every staging
+        // deploy. "none" is also simply true: the staging database has no
+        // backups and needs none, and its signup count never approaches the
+        // threshold that would make the warning loud.
+        "DB_BACKUPS": "none",
         // The staging Supabase project's URL (project `ikigaro-staging`).
         // Public, so it belongs here rather than in secrets. If this is ever
         // emptied, the app falls back to the production URL, which the
