@@ -109,3 +109,44 @@ create index if not exists users_accelerated_partner_idx
 create index if not exists users_boost_started_idx
   on users (boost_started_at)
   where boost_started_at is not null;
+
+-- ---------------------------------------------------------------------------
+-- Partners — the entity behind an Accelerated Points code.
+--
+-- A partner is a gym, a community or a brand. It is NOT a user: there is no
+-- account to hang the code on, and a partnership has its own name, terms and
+-- start date. Modelling it as a flag on a user row worked for a single
+-- influencer and falls over the moment you want to ask "who joined through
+-- FITTR, and what did they cost us".
+--
+-- `users.referral_code` still exists and still means "this person invites
+-- friends". Partner codes live here instead, and a ?ref code is resolved
+-- against partners FIRST — see /api/auth/sync.
+-- ---------------------------------------------------------------------------
+create table if not exists partners (
+  id             uuid primary key default gen_random_uuid(),
+  name           text not null,
+  -- Normalised the same way user referral codes are (uppercase alnum).
+  code           text not null,
+  -- What a signup through this code earns during the boost window.
+  multiplier     numeric not null default 2,
+  -- "Endowed progress" — spendable, never counted toward rank.
+  welcome_grant  integer not null default 150,
+  active         boolean not null default true,
+  notes          text,
+  created_at     timestamptz not null default now(),
+  constraint partners_multiplier_check check (multiplier >= 1 and multiplier <= 5),
+  constraint partners_welcome_check    check (welcome_grant >= 0 and welcome_grant <= 5000)
+);
+
+-- Codes must be unique among partners AND must not collide with a user's own
+-- referral code, or a ?ref link would be ambiguous. Uniqueness within partners
+-- is enforced here; the cross-table check lives in the admin route, which is
+-- the only writer.
+create unique index if not exists partners_code_key on partners (upper(code));
+
+alter table users
+  add column if not exists partner_id uuid references partners(id) on delete set null;
+
+create index if not exists users_partner_id_idx
+  on users (partner_id) where partner_id is not null;

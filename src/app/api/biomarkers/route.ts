@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { applyMultiplier } from "@/lib/accelerated-points";
 import { getPrivyUserId } from "@/lib/api-auth";
+import { creditPoints } from "@/lib/credit-points";
 import {
   canonicalizeCount,
   computeDerived,
@@ -230,23 +232,32 @@ async function awardPanelPoints(
 
     if (txns.length === 0) return { bonuses, pointsAwarded: 0 };
 
-    // Credit once.
-    const earned = txns.reduce((sum, t) => sum + (t.amount as number), 0);
-    const { data: balanceRow } = await supabase
-      .from("reward_points")
-      .select("points_balance")
-      .eq("profile_id", profileId)
-      .maybeSingle();
-    const priorBalance = balanceRow?.points_balance ?? 0;
-    await supabase
-      .from("reward_points")
-      .upsert(
-        { user_id: userId, profile_id: profileId, points_balance: priorBalance + earned },
-        { onConflict: "profile_id" },
-      );
-    await supabase.from("points_transactions").insert(txns);
+    // Credit through the shared path so the split ledger, the multiplier and
+    // the audit columns behave identically here and on check-in.
+    const credited = await creditPoints(
+      userId,
+      txns.map((t) => ({ amount: t.amount as number, reason: t.reason as string })),
+      {
+        referenceId: newPanel.id,
+        // Outcome rows carry marker-level provenance the generic path knows
+        // nothing about; pass it through positionally alongside each award.
+        extraTxnFields: txns.map((t) => {
+          const { user_id, profile_id, type, amount, reason, ...rest } = t;
+          void user_id; void profile_id; void type; void amount; void reason;
+          return rest;
+        }),
+      },
+    );
 
-    return { bonuses, pointsAwarded: earned };
+    // The confirmation screen must show what was actually credited, or it and
+    // the ledger disagree in front of the user.
+    if (credited.multiplier > 1) {
+      for (const b of bonuses) {
+        b.points = applyMultiplier(b.points, credited.multiplier);
+      }
+    }
+
+    return { bonuses, pointsAwarded: credited.awarded };
   } catch (err) {
     console.error("Panel points awarding failed (non-fatal):", err);
     return { bonuses: [], pointsAwarded: 0 };

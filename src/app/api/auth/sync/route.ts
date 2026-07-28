@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
 import { normalizeReferralCode } from "@/lib/referral";
+import { grantWelcomePoints } from "@/lib/credit-points";
+import { findActivePartnerByCode } from "@/lib/partners";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
@@ -78,20 +80,45 @@ export async function POST(request: Request) {
     let accessStatus: string;
 
     if (!existing) {
-      // Resolve the referrer (if any) before creating the row. A bad or
-      // unknown code silently skips attribution — it must never block signup.
+      // Resolve the ?ref code before creating the row. A bad or unknown code
+      // silently skips attribution — it must never block a signup.
+      //
+      // ONE code space, two meanings: a partner code (a gym or community, with
+      // Accelerated Points) or a user's own invite code (a friend). Partners
+      // are checked FIRST and the admin route refuses to create a partner code
+      // that collides with a user's, so the two can never be ambiguous.
       let referredBy: string | null = null;
+      let partnerId: string | null = null;
+      let boostStartedAt: string | null = null;
+      let welcomeGrant = 0;
+
       if (refCode) {
-        const { data: referrer } = await supabase
-          .from("users")
-          .select("id")
-          .eq("referral_code", refCode)
-          .maybeSingle();
-        referredBy = referrer?.id ?? null;
+        const partner = await findActivePartnerByCode(refCode);
+        if (partner) {
+          partnerId = partner.id;
+          // The boost window opens now. Stored on this user, so ending the
+          // partnership later never downgrades anyone already in it.
+          boostStartedAt = new Date().toISOString();
+          welcomeGrant = partner.welcome_grant;
+        } else {
+          const { data: referrer } = await supabase
+            .from("users")
+            .select("id")
+            .eq("referral_code", refCode)
+            .maybeSingle();
+          referredBy = referrer?.id ?? null;
+        }
       }
+
       const { data, error } = await supabase
         .from("users")
-        .insert({ privy_user_id: userId, email, referred_by: referredBy })
+        .insert({
+          privy_user_id: userId,
+          email,
+          referred_by: referredBy,
+          partner_id: partnerId,
+          boost_started_at: boostStartedAt,
+        })
         .select("id, access_status")
         .single();
 
@@ -101,6 +128,13 @@ export async function POST(request: Request) {
       userRow = data;
       accessStatus = data.access_status;
       eventType = "user_created";
+
+      // Endowed progress: a balance already in motion is far likelier to be
+      // continued than one sitting at zero. Spendable only — it never touches
+      // iki_score, or a partner code would buy rank.
+      if (welcomeGrant > 0) {
+        await grantWelcomePoints(data.id, welcomeGrant);
+      }
     } else {
       // Keep email in sync if it changed at Privy; touch updated_at via trigger.
       if (existing.email !== email) {

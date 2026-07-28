@@ -9,9 +9,9 @@ import {
   computeStreak,
   displayStreak,
   todayUTC,
-  totalAwarded,
   validateCheckinInput,
 } from "@/lib/checkin";
+import { creditPoints } from "@/lib/credit-points";
 import { getOrCreateSelfProfileId } from "@/lib/profiles";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -187,41 +187,34 @@ export async function POST(request: Request) {
       await awardReferralMilestone(userId, POINTS_REASON.referralStreak, POINTS.referralStreak);
     }
 
-    // Award points: base + any streak bonus, to the ledger and the balance.
-    const awards = computeAwards(streak);
-    const earned = totalAwarded(awards);
+    // Streak milestones pay once ever, keyed off the personal best — see
+    // STREAK_MILESTONES for why the old "exactly 7 or 30" rule paid people to
+    // break their streak.
+    const { data: userRow } = await supabase
+      .from("users")
+      .select("best_streak")
+      .eq("id", userId)
+      .maybeSingle();
+    const bestStreak = (userRow?.best_streak as number | null) ?? 0;
 
-    const priorBalance = await getPointsBalance(profileId);
-    const { data: balanceRow, error: balanceError } = await supabase
-      .from("reward_points")
-      .upsert(
-        { user_id: userId, profile_id: profileId, points_balance: priorBalance + earned },
-        { onConflict: "profile_id" },
-      )
-      .select("points_balance")
-      .single();
-    if (balanceError || !balanceRow) {
-      throw new Error(`reward_points upsert failed: ${balanceError?.message ?? "no row"}`);
+    const awards = computeAwards(streak, bestStreak);
+
+    if (streak > bestStreak) {
+      await supabase.from("users").update({ best_streak: streak }).eq("id", userId);
     }
 
-    // Best-effort ledger writes; don't fail the check-in if they don't land.
-    await supabase.from("points_transactions").insert(
-      awards.map((a) => ({
-        user_id: userId,
-        profile_id: profileId,
-        type: "earn",
-        amount: a.amount,
-        reason: a.reason,
-        reference_id: created.id,
-      })),
-    );
+    // One place credits points to both ledgers — see credit-points.ts.
+    const credited = await creditPoints(userId, awards, { referenceId: created.id });
 
     return NextResponse.json({
       checkin: created,
       checkedInToday: true,
       streak,
-      pointsAwarded: earned,
-      pointsBalance: balanceRow.points_balance,
+      pointsAwarded: credited.awarded,
+      pointsBalance: credited.balance,
+      ikiScore: credited.ikiScore,
+      multiplier: credited.multiplier,
+      rankUp: credited.rankUp,
     });
   } catch (err) {
     console.error("POST /api/checkin failed:", err);
