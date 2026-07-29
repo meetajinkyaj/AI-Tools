@@ -1,0 +1,49 @@
+import { NextResponse } from "next/server";
+
+import { getPrivyUserId } from "@/lib/api-auth";
+import { resolveApprovedUserId } from "@/lib/app-user";
+import { signState } from "@/lib/wearables/oauth-state";
+import { PROVIDERS, isProviderId, providerConfigured } from "@/lib/wearables/providers";
+import { callbackUrl } from "@/lib/wearables/urls";
+
+/**
+ * GET /api/wearables/connect?provider=oura
+ *
+ * Returns the vendor's consent URL for the browser to open. It returns the URL
+ * rather than 302-ing because the caller is a fetch() from an authenticated
+ * screen — a redirect would be followed by fetch and land the consent page
+ * inside an XHR, which the user never sees.
+ */
+export async function GET(request: Request) {
+  const privyUserId = await getPrivyUserId(request);
+  if (!privyUserId) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  const userId = await resolveApprovedUserId(privyUserId);
+  if (!userId) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+
+  const providerId = new URL(request.url).searchParams.get("provider");
+  if (!providerId || !isProviderId(providerId)) {
+    return NextResponse.json({ error: "Unknown provider" }, { status: 400 });
+  }
+
+  const provider = PROVIDERS[providerId];
+  if (!providerConfigured(provider)) {
+    // Better a clear 503 than sending the user to a vendor page that will
+    // reject an empty client_id with the vendor's own branding on the error.
+    return NextResponse.json(
+      { error: `${provider.name} isn't configured yet.` },
+      { status: 503 },
+    );
+  }
+
+  const clientId = process.env[provider.clientIdEnv]!;
+  const state = await signState(userId, providerId);
+
+  const url = new URL(provider.authorizeUrl);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", callbackUrl(providerId));
+  url.searchParams.set("scope", provider.scopes.join(" "));
+  url.searchParams.set("state", state);
+
+  return NextResponse.json({ url: url.toString() });
+}

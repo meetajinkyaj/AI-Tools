@@ -116,13 +116,49 @@ async function runReminders(env: Env): Promise<string> {
   return summary;
 }
 
+/**
+ * Nightly wearable sync.
+ *
+ * Rides on this Worker rather than getting its own because it needs exactly
+ * what this one already has: a Cloudflare cron trigger that fires on time and
+ * the CRON_SECRET to call the app with. The app does all the work; this only
+ * pulls the trigger.
+ *
+ * Runs on its own schedule, early morning IST, so a night's sleep has been
+ * finalised by the vendors before we ask for it.
+ */
+async function runWearableSync(env: Env): Promise<string> {
+  const res = await fetch(`${env.APP_URL}/api/cron/sync-wearables`, {
+    headers: { Authorization: `Bearer ${env.CRON_SECRET}` },
+  });
+  if (!res.ok) {
+    throw new Error(`sync-wearables failed: HTTP ${res.status} ${await res.text()}`);
+  }
+  const summary = await res.text();
+  console.log(`wearable sync: ${summary}`);
+  return summary;
+}
+
+/** Which job a firing is for. Both are declared in wrangler.toml. */
+const WEARABLE_CRON = "0 2 * * *";
+
 const handler = {
-  /** Cron trigger — the primary path. */
-  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+  /**
+   * Cron trigger — the primary path.
+   *
+   * Two schedules share this Worker, so the handler branches on which one
+   * fired. Defaulting to reminders (rather than to the sync) is deliberate: if
+   * a schedule is ever edited to a value this code does not recognise, the
+   * failure mode should be "the nudge still goes out", not "everything silently
+   * becomes a database sweep".
+   */
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    const job = event.cron === WEARABLE_CRON ? runWearableSync : runReminders;
+    const label = event.cron === WEARABLE_CRON ? "wearable sync" : "reminder";
     ctx.waitUntil(
-      runReminders(env).catch((err) => {
+      job(env).catch((err) => {
         // Logged to Workers observability; the run is visibly a failure.
-        console.error("reminder run failed:", err instanceof Error ? err.message : err);
+        console.error(`${label} run failed:`, err instanceof Error ? err.message : err);
         throw err;
       }),
     );

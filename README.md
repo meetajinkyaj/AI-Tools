@@ -146,6 +146,7 @@ or CLI. All are idempotent — safe to re-run.
 | `0012_referrals` | `referral_code` (unique) + `referred_by` |
 | `0013_points_rank_split` | `users.iki_score` + `best_streak`, ledger `base_amount`/`multiplier`, `partners`, and the `invite_codes` shared namespace |
 | `0014_rls_on_partners_and_invite_codes` | RLS on the two tables 0013 added |
+| `0015_wearable_connections` | Cloud wearable OAuth grants (encrypted tokens) + normalized daily metrics |
 
 > **Migration-first, always.** Run the migration on production *before* merging
 > code that depends on it. Code reading a column that doesn't exist yet takes the
@@ -180,5 +181,6 @@ or CLI. All are idempotent — safe to re-run.
 | [`docs/REFERENCE_DATA.md`](./docs/REFERENCE_DATA.md) | How clinical reference data is stored and changed |
 | [`docs/FAQ.md`](./docs/FAQ.md) | User-facing answers (points, ranks, redemption, referrals). `points.ts` is canonical; a test keeps this file honest |
 | [`docs/POINTS_ECONOMY.md`](./docs/POINTS_ECONOMY.md) | Internal reference: every earn, the multiplier glide path, rank thresholds and modelled timelines |
+| [`docs/WEARABLES.md`](./docs/WEARABLES.md) | Wearable integrations: which credentials to get, which need approval, how sync runs |
 | [`docs/cowork/`](./docs/cowork/) | Prompts for production DB work handed to Claude Cowork, with their verification queries |
 | [`AGENTS.md`](./AGENTS.md) | Next.js 16 conventions — read before writing App Router code |

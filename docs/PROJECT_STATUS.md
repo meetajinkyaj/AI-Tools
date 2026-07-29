@@ -184,6 +184,28 @@ operate it, and the known follow-ups. Update this as work lands.
     say so, a rank is one public fact. Habit data only — the input type has
     nowhere to put a biomarker reading.
 
+22. **Cloud wearable integrations** — Oura, Fitbit, Whoop, Withings, Garmin and
+    Ultrahuman connect by OAuth from the web app. **No native app**: Apple
+    HealthKit and Android Health Connect are on-device APIs with no web access
+    at all, so they need one — these six do not, which is why they come first.
+    The native path, when it comes, writes into the same
+    `wearable_daily_metrics` table as one more provider.
+    Six dialects normalize into one canonical vocabulary at the adapter boundary
+    (`src/lib/wearables/metrics.ts`), so Whoop's "recovery" and Oura's
+    "readiness" land on the same key rather than on two axes that quietly mean
+    different things. Everything easy to get wrong — refresh, **rotation**,
+    backoff, idempotent upsert — is shared in `sync.ts`.
+    OAuth tokens are AES-GCM encrypted with a Worker secret
+    (`WEARABLE_TOKEN_KEY`); a refresh token is standing permission to a third
+    party's copy of someone's health data, and disk-level encryption does
+    nothing against the realistic threat of a leaked service key. **Fails
+    closed** — no key means no storage, never plaintext.
+    Garmin is push-only (no on-demand fetch exists), so it has its own webhook
+    and the sweep skips it. Garmin and Ultrahuman need approved applications
+    with weeks of lead time. Setup: `docs/WEARABLES.md`.
+    NOT YET: nothing surfaced in Trends, and no points for wearable data —
+    steps are trivially spoofable and paying for them invites exactly that.
+
 ## 3. Key architecture decisions
 
 - **Text-layer-first extraction**, thinking disabled, streaming keep-alive
@@ -255,7 +277,7 @@ operate it, and the known follow-ups. Update this as work lands.
   **Bot Fight Mode OFF** (it 403'd our own cron caller; endpoints carry their
   own auth). Workers Builds git integration disconnected — CI is the only
   deploy path.
-- **Schema:** `supabase/migrations/0001–0014` (idempotent; run on prod
+- **Schema:** `supabase/migrations/0001–0015` (idempotent; run on prod
   Supabase BEFORE merging code that depends on them). Seed template:
   `supabase/seed_redemption_catalog.sql`.
 - **Marketing Worker:** `ikigaro-os` serves `public/index.html` + edge-injected
@@ -366,8 +388,10 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
 | Badge artwork (one builder, app + share card) / kanji outlines | `src/lib/rank-pin.ts`, `rank-kanji.ts` |
 | Rank card UI / rank share card | `src/app/rank-badge.tsx`, `rank-share-card.tsx`, `rank-card-render.ts`, `src/lib/rank-share-card.ts` |
 | Admin partners API | `src/app/api/admin/partners/route.ts` |
+| Wearables: metrics vocabulary, token crypto, adapters, sync | `src/lib/wearables/*` |
+| Wearables API (connect, callback, sync cron, Garmin push) | `src/app/api/wearables/*`, `src/app/api/cron/sync-wearables/route.ts` |
 | Landing / splash / startup states | `src/app/landing.tsx`, `ui.tsx` (`Splash`), `home-view.tsx`, `globals.css` |
-| Schema | `supabase/migrations/0001–0014` |
+| Schema | `supabase/migrations/0001–0015` |
 | E2E suite / config | `e2e/*.spec.ts`, `playwright.config.ts`, `vitest.config.ts` |
 | Docs | `docs/HANDOVER.md`, `RUNBOOK.md`, `STAGING.md`, `TESTING.md`, `REFERENCE_DATA.md`, `SCALING.md`, `FAQ.md`, `POINTS_ECONOMY.md`, `cowork/` |
 

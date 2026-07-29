@@ -187,9 +187,6 @@ function hanko(id: RankId, x: number, y: number, plate: number, glyph: number): 
 
 /** Ring radius, shared by both arcs. */
 const RING_R = 97;
-/** Bottom arc runs from theta 180deg round through the bottom to 0deg. */
-const ARC_FROM = 180;
-const ARC_TO = 0;
 
 /**
  * Set 生き甲斐 along the bottom of the ring, one rotated outline per glyph.
