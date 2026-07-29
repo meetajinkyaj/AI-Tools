@@ -69,7 +69,7 @@ Use sparingly — it bypasses every check.
 ## 2. Database migrations
 
 Schema lives in `supabase/migrations/`, applied in filename order (`0001` …
-`0012` today). All migrations are written to be **idempotent** — safe to re-run.
+`0014` today). All migrations are written to be **idempotent** — safe to re-run.
 
 **The rule that matters: migration first, merge second.**
 
@@ -408,6 +408,24 @@ Access policy on that hostname.
   is the only place values live — UI copy and the in-app FAQ interpolate from it.
 - **Read the beta's health:** Analytics tab (default) — funnel, D1/7/30
   retention, DAU/WAU/MAU, streaks, 14-day check-in chart, client errors.
+- **Onboard an Accelerated Points partner:** Partners tab → create with a name
+  and a code (3–16 letters/numbers, normalized like a user invite code). Give
+  them `app.ikigaro.com/?ref=THEIRCODE`. Defaults are 2x for 90 days and a
+  150-point welcome grant; both are editable per partner.
+  A code that collides with a user's invite code is rejected with a 409 — the
+  `invite_codes` primary key arbitrates, so this holds even against the race
+  where `/api/referral` would otherwise generate the same code for a user from
+  their name.
+- **End a partnership:** Partners tab → deactivate. This stops **new** signups
+  getting the deal. Everyone already in keeps their rate, because it is
+  snapshotted on their own user row — that is deliberate, not a bug. Do not
+  delete the partner row; the roll-up and attribution hang off it.
+- **See what a partner cost:** Partners tab shows signups / onboarded /
+  activated / points issued / boost cost / redemptions / still-in-window per
+  partner, plus the roster who joined via that code.
+- **Spot beta drop-off:** Users tab → the **Onboarded** column and the
+  "N approved, not onboarded" count in the header. Those are people who were
+  let in and never started — the ones worth a nudge.
 
 ---
 

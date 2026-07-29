@@ -144,10 +144,20 @@ or CLI. All are idempotent — safe to re-run.
 | `0010_beta_waitlist` | `users.access_status` + guarded backfill |
 | `0011_deletable_vouchers` | Item-name snapshots so history survives deletion |
 | `0012_referrals` | `referral_code` (unique) + `referred_by` |
+| `0013_points_rank_split` | `users.iki_score` + `best_streak`, ledger `base_amount`/`multiplier`, `partners`, and the `invite_codes` shared namespace |
+| `0014_rls_on_partners_and_invite_codes` | RLS on the two tables 0013 added |
 
 > **Migration-first, always.** Run the migration on production *before* merging
 > code that depends on it. Code reading a column that doesn't exist yet takes the
 > whole app down. See [`docs/RUNBOOK.md`](./docs/RUNBOOK.md) §2.
+
+> **Every new table gets `enable row level security` with NO policies.** Supabase
+> grants `anon` and `authenticated` privileges on everything in `public`, so RLS
+> is the only thing between the project's anon key and the table; the service
+> role bypasses it, and every query in this app is server-side through
+> `createSupabaseAdmin()`. Migration `0013` shipped two tables without it and
+> `0014` had to close that live. If a migration creates a table, the same
+> migration turns RLS on.
 
 > **Clinical safety:** reference ranges seeded into `biomarker_catalog` are
 > common, unvalidated adult intervals used to bootstrap the schema (every row is
@@ -168,5 +178,7 @@ or CLI. All are idempotent — safe to re-run.
 | [`docs/TESTING.md`](./docs/TESTING.md) | Unit vs E2E suites, what's covered, and what isn't |
 | [`docs/SCALING.md`](./docs/SCALING.md) | Deferred optimizations and the trigger for each |
 | [`docs/REFERENCE_DATA.md`](./docs/REFERENCE_DATA.md) | How clinical reference data is stored and changed |
-| [`docs/FAQ.md`](./docs/FAQ.md) | Canonical user-facing answers (points, redemption, referrals) |
+| [`docs/FAQ.md`](./docs/FAQ.md) | User-facing answers (points, ranks, redemption, referrals). `points.ts` is canonical; a test keeps this file honest |
+| [`docs/POINTS_ECONOMY.md`](./docs/POINTS_ECONOMY.md) | Internal reference: every earn, the multiplier glide path, rank thresholds and modelled timelines |
+| [`docs/cowork/`](./docs/cowork/) | Prompts for production DB work handed to Claude Cowork, with their verification queries |
 | [`AGENTS.md`](./AGENTS.md) | Next.js 16 conventions — read before writing App Router code |

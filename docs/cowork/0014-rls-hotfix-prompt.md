@@ -1,5 +1,9 @@
 # Cowork prompt — apply migration 0014 to production Supabase (priority)
 
+> **DONE — kept for the record, do not re-run.** Migration 0014 was applied to production 2026-07-28 and verified: RLS on both tables, no policies, zero rows changed, and the exposure sweep found no other table in `public` without RLS.
+>
+> Migrations are idempotent, so a re-run is harmless, but there is nothing to do here.
+
 This follows the 0013 run. The RLS warning Supabase showed during that run was
 correct and the omission was a real exposure, live on production from the moment
 0013 was applied. 0014 closes it. Run it now — it does not wait on PR #64.

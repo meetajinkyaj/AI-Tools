@@ -51,6 +51,18 @@ quiet an error.** A literal like `["low", "high"]` widens to `string[]` and
 will accept a value the union no longer contains, which is exactly the drift
 this is meant to catch.
 
+### Documentation is tested too
+
+`src/lib/docs-drift.test.ts` asserts that `docs/FAQ.md` and
+`docs/POINTS_ECONOMY.md` quote the values actually in `src/lib/points.ts` and
+`iki-rank.ts`, and that the FAQ never names the secret rank or its threshold.
+
+It exists because the FAQ called itself "the canonical copy" of the points
+economy while quietly disagreeing with the app for weeks after a retune — the
+Trends screen interpolates from `POINTS` and was right, the hand-written doc was
+not, and nothing was comparing them. Retuning the economy now fails CI until the
+docs follow.
+
 ## End-to-end tests
 
 ```bash

@@ -69,7 +69,7 @@ From **Project Settings → API**, copy:
 ### 1.2 Create the schema
 
 In the staging project's SQL editor, run every file in
-`supabase/migrations/` **in filename order**, `0001` through `0012`. They are
+`supabase/migrations/` **in filename order**, `0001` through `0014`. They are
 idempotent, so a re-run is harmless.
 
 Then confirm:
