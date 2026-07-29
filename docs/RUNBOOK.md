@@ -69,7 +69,7 @@ Use sparingly — it bypasses every check.
 ## 2. Database migrations
 
 Schema lives in `supabase/migrations/`, applied in filename order (`0001` …
-`0014` today). All migrations are written to be **idempotent** — safe to re-run.
+`0015` today). All migrations are written to be **idempotent** — safe to re-run.
 
 **The rule that matters: migration first, merge second.**
 
@@ -408,6 +408,11 @@ Access policy on that hostname.
   is the only place values live — UI copy and the in-app FAQ interpolate from it.
 - **Read the beta's health:** Analytics tab (default) — funnel, D1/7/30
   retention, DAU/WAU/MAU, streaks, 14-day check-in chart, client errors.
+- **Turn on a wearable provider:** register a developer app with the vendor, set
+  its two secrets, deploy. The provider appears in Settings → Connected devices
+  on its own; nothing else is needed. Full walkthrough, including which two
+  vendors need an approved application with weeks of lead time, in
+  `docs/WEARABLES.md`.
 - **Onboard an Accelerated Points partner:** Partners tab → create with a name
   and a code (3–16 letters/numbers, normalized like a user invite code). Give
   them `app.ikigaro.com/?ref=THEIRCODE`. Defaults are 2x for 90 days and a

@@ -11,6 +11,15 @@ import { defineConfig } from "vitest/config";
  *   npm run e2e → Playwright, e2e/**, against a running app
  */
 export default defineConfig({
+  resolve: {
+    // See test/server-only-stub.ts for why this alias exists.
+    alias: [
+      {
+        find: /^server-only$/,
+        replacement: new URL("./test/server-only-stub.ts", import.meta.url).pathname,
+      },
+    ],
+  },
   test: {
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     exclude: ["e2e/**", "node_modules/**", ".next/**", ".open-next/**"],

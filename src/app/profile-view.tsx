@@ -8,6 +8,7 @@ import {
 } from "@/lib/profile";
 import { EXERCISE_TYPE_LABELS, isExerciseType } from "@/lib/exercises";
 import { NotificationSettings } from "./notification-settings";
+import { WearableSettings } from "./wearable-settings";
 import { Card, Eyebrow, secondaryButtonClass } from "./ui";
 
 /**
@@ -74,6 +75,8 @@ export function ProfileView({
       </Card>
 
       <NotificationSettings getToken={getToken} />
+
+      <WearableSettings getToken={getToken} />
     </div>
   );
 }

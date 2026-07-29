@@ -10,8 +10,11 @@ compatibility_flags = ["nodejs_compat"]
 # 12:30 UTC = 18:00 IST. Cloudflare cron triggers fire on time — this exists
 # because GitHub Actions' scheduler was running the same job 90–110 minutes
 # late every day.
+# 02:00 UTC = 07:30 IST is the wearable sync: late enough that vendors have
+# finalised the night's sleep, early enough that the data is there when someone
+# opens the app in the morning. The handler branches on which cron fired.
 [triggers]
-crons = ["30 12 * * *"]
+crons = ["30 12 * * *", "0 2 * * *"]
 
 # Plaintext vars are REPLACED from this file on every deploy — never set them
 # in the dashboard. Secrets (`wrangler secret put --config <this file>`)
