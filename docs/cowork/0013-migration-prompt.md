@@ -1,5 +1,9 @@
 # Cowork prompt — apply migration 0013 to production Supabase
 
+> **DONE — kept for the record, do not re-run.** Migration 0013 was applied to production 2026-07-28 and verified: backfills matched per user (`iki_score` == ledger earned, `best_streak` == check-in peak), triggers live, all existing user codes adopted into `invite_codes`.
+>
+> Migrations are idempotent, so a re-run is harmless, but there is nothing to do here.
+
 Paste everything below the line into Claude Cowork.
 
 ---

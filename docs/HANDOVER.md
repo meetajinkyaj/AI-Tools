@@ -218,6 +218,31 @@ that bearer token.
 user resolves to *no user* at all eight data-route lookup sites, so they cannot
 read or write anything. Approval is an admin action.
 
+**The points economy is two numbers, not one.** `reward_points.points_balance`
+is spendable and can be boosted by a partner multiplier; `users.iki_score` is
+lifetime, base-only, never spent, and is the *only* thing that drives rank. Both
+are written in one place — `creditPoints()` in `src/lib/credit-points.ts`. If you
+are adding a new way to earn, go through that function; it writes the boosted
+amount, the base amount, and the ledger's `base_amount`/`multiplier` columns
+together, and returns whether the earn crossed a rank boundary. Writing to
+either balance directly is how they drift apart.
+
+**One namespace for invite codes.** A `?ref` code resolves against `partners`
+first and `users.referral_code` second, so the two must never collide. Two
+unique indexes cannot express that, and the gap was not theoretical:
+`/api/referral` generates a user's code from their *name* and retries only on a
+`users` unique violation, so with partner code `FITTR` live a user named Fittr
+would silently have been assigned it, and their invite link would have credited
+the partner forever with no error anywhere. The guarantee is the `invite_codes`
+table (migration 0013) — both tables sync into it by trigger, and its primary
+key fails the transaction that tries to take a taken code.
+
+**RLS is on every table, with no policies.** That is the convention, not an
+oversight: `anon`/`authenticated` are denied everything, the service role
+bypasses, and every query in this app is server-side. When you add a table, turn
+RLS on in the same migration. Migration 0013 forgot, and 0014 existed only to
+close it.
+
 ---
 
 ## 7. Things that will bite you

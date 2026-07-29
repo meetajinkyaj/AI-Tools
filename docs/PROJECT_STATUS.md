@@ -49,10 +49,23 @@ operate it, and the known follow-ups. Update this as work lands.
 4. **Trends** — leads with the daily check-in signal (panels are 6–12 months
    apart); biomarker deltas on distinct test dates; outcome-verified rewards
    (healthy-direction continued improvement, ≥14 days apart, capped).
-5. **Points economy** — all values in `src/lib/points.ts` (single source of
-   truth, trivially retunable). Earns: check-in 10, streaks 50/250, first panel
-   200, re-test 150, outcome bonus 250/marker (max 3). Anti-farm: date guard +
-   content-signature replay guard (same report never earns twice).
+5. **Points economy — two currencies, one ledger.** All values in
+   `src/lib/points.ts` (single source of truth, trivially retunable); the full
+   earn reference is `docs/POINTS_ECONOMY.md`.
+   - **Points** (`reward_points.points_balance`) — spendable, boostable by a
+     partner multiplier, reduced by redemptions.
+   - **Iki Score** (`users.iki_score`) — lifetime, BASE amounts only before any
+     multiplier, never reduced by spending. Drives rank. This split is what
+     stops a voucher purchase demoting you and stops a 2x partner code buying
+     status.
+
+   Earns: check-in 10 · streak 50/150/250/500/1,000 at 7/30/90/180/365 · first
+   panel 200 · re-test 150 · outcome bonus 50/marker (max 3) · welcome grant
+   150 (spendable only, never scored). Anti-farm: date guard,
+   content-signature replay guard (same report never earns twice), and streak
+   milestones that pay **once ever on personal best** (`users.best_streak`)
+   rather than whenever the streak equals 7 — the old rule paid people to break
+   the habit, and 7-on/1-off beat a perfect year by 38%.
 6. **Doctor-Ready PDF** — client-side jsPDF (lazy-loaded), Web Share API to
    WhatsApp/Telegram, Latin-1 glyph sanitizer.
 7. **PWA** — installable (manifest + brand icons generated from
@@ -88,7 +101,13 @@ operate it, and the known follow-ups. Update this as work lands.
 13. **Admin console** (`admin.ikigaro.com/admin`) — Analytics (default tab:
     funnel, D1/7/30 retention, DAU/WAU/MAU, streaks, 14-day check-in chart,
     client errors) · Rewards (add/delete items with instruction presets, bulk
-    code upload, inventory) · Users (roster + approve/revoke). Destructive
+    code upload, inventory) · Users (roster + approve/revoke, vanity invite
+    codes, and an **Onboarded** tick — "has a self profile", the same test the
+    app uses, so the console cannot disagree with what the user sees; the
+    header counts "approved, not onboarded", which is the beta's real
+    drop-off) · **Partners** (create/rename/retune/deactivate an Accelerated
+    Points code, per-partner roll-up, and the roster who joined through it).
+    Destructive
     actions go through an in-app ConfirmDialog (never `window.confirm`).
     Auth: `ADMIN_EMAILS` allow-list (fail-closed) + Cloudflare Access;
     `app.ikigaro.com/admin` redirects to the admin subdomain.
@@ -107,8 +126,17 @@ operate it, and the known follow-ups. Update this as work lands.
     via one shared `awardReferralMilestone` (at-most-once per milestone+friend,
     best-effort): +100 friend onboards (`referral`), +50 first 7-day streak
     (`referral_streak`), +150 first panel within 30 days (`referral_panel`) —
-    max 300 (`REFERRAL_MAX_TOTAL`). Invite card (Share + Copy) on Partners;
+    max 300 per friend (`REFERRAL_MAX_TOTAL`). **Referrer volume milestones**
+    mirror the check-in streak ladder — +50 at 7 friends onboarded, +150 at 30
+    — counted off `referral` ledger rows, so they track friends who actually
+    onboarded rather than raw signups. Invite card (Share + Copy) on Partners;
     Terms §14 referral clause keeps values out of legal text.
+    **The invite link is OFF on shared cards during closed beta**
+    (`INVITE_LINK_ON_SHARED_CARDS`, `src/lib/share-card.ts`) — both the image
+    and the caption, on both the check-in and the rank card. Access is
+    invite-only, so a posted card advertising a join link sends strangers at a
+    door that will not open. Flip that one flag at ~20 testers; both cards light
+    up together and tests cover both states.
 17. **Startup & entry polish** — landing offers **Sign up** (primary) and **Log
     in** (secondary), both opening the same Privy OTP flow (it creates the
     account when the email is new). One branded `Splash` covers every pre-app
@@ -123,6 +151,38 @@ operate it, and the known follow-ups. Update this as work lands.
     document** as it renders (it was silently destroying the edge-injected legal
     footer), so the Worker patches the rendered DOM via a persistent idempotent
     interval. The vestigial `src/` TanStack app was deleted (69 deps → 0).
+
+19. **Iki ranks & the enamel badges** — five tiers off `iki_score`: Iki Rookie
+    🌱 0 · Iki Apprentice 🛠️ 400 · Iki Pro ⚡ 2,000 · Iki Sensei 🥋 8,000 ·
+    **Iki Grandmaster 🏆 25,000 (secret)**. Thresholds were fitted to modelled
+    earn rates, not picked: a consistent user reaches Sensei in ~14 months.
+    Grandmaster is withheld from the ladder, the progress bar **and** the "next
+    rank" line — leaking it there once revealed both its name and its exact
+    threshold to everyone one rung below.
+    Artwork is Claude Design's "Iki Badges v3", cloisonné enamel pins with a
+    hanko seal (芽 修 錬 師 道). One builder (`src/lib/rank-pin.ts`) feeds both
+    the in-app SVG and the share canvas so they cannot drift. **Size picks the
+    artwork**: full pin at 120px+, chip below that, because the scene turns to
+    mud smaller. Gold `#D9B36A` is reserved for the Grandmaster pin and is used
+    nowhere else in the product (there is a test).
+    The rank card leads **Home**; the level-up toast fires on Check-in, where
+    the earn happens.
+20. **Accelerated Points (partner codes)** — a `partners` row (gym, community,
+    brand — deliberately not a user) grants a boosted earn rate to everyone who
+    signs up through its `?ref` code, on a glide path: 2.0x for 90 days, then
+    1.5x for 90 more **if** the activity floor was met (45 check-ins), then
+    1.25x steady. Plus a 150-point welcome grant, spendable only. The rate is
+    snapshotted on the user's own row at signup, so deactivating a partner stops
+    NEW joiners getting the deal without retroactively downgrading anyone
+    already in. The floor is evaluated lazily on the first earn after day 90 —
+    no scheduled job to own or discover has been failing for a month.
+    **Multipliers never touch `iki_score`**, so a community code cannot buy rank.
+21. **Shareable rank card** — the same canvas pipeline as the check-in card
+    (rendered client-side; nothing uploaded, no image service to run). One card,
+    three formats (Story/Post/Square), no templates or field toggles: a check-in
+    publishes several separable facts and some are nobody's business unless you
+    say so, a rank is one public fact. Habit data only — the input type has
+    nowhere to put a biomarker reading.
 
 ## 3. Key architecture decisions
 
@@ -195,7 +255,7 @@ operate it, and the known follow-ups. Update this as work lands.
   **Bot Fight Mode OFF** (it 403'd our own cron caller; endpoints carry their
   own auth). Workers Builds git integration disconnected — CI is the only
   deploy path.
-- **Schema:** `supabase/migrations/0001–0012` (idempotent; run on prod
+- **Schema:** `supabase/migrations/0001–0014` (idempotent; run on prod
   Supabase BEFORE merging code that depends on them). Seed template:
   `supabase/seed_redemption_catalog.sql`.
 - **Marketing Worker:** `ikigaro-os` serves `public/index.html` + edge-injected
@@ -243,6 +303,43 @@ operate it, and the known follow-ups. Update this as work lands.
   caches under the original key, and `caches.match` finds it. Not a bug — noted
   so it isn't re-investigated.
 
+- **A `CASE` expression in plpgsql resolves field references on BOTH arms.** A
+  trigger shared between `users` and `partners` used `case when k='user' then
+  new.referral_code else new.code end`, which failed with "record new has no
+  field referral_code" on the partners side. An `IF` only evaluates the arm it
+  takes. Caught by the collision test, not by review.
+- **`points_transactions` stores redemptions as a POSITIVE amount with
+  `type='redeem'`** (there is a `..._amount_pos` check constraint). Any backfill
+  or roll-up that sums the ledger must filter `type = 'earn'`, or it inflates
+  the total by everything users have spent.
+- **Two tables created without RLS were readable AND writable by the anon key.**
+  Migration 0013 added `partners` and `invite_codes` without `enable row level
+  security`; every other table has had it since 0001. Supabase's dashboard
+  warned at apply time and the warning was waved through on the reasoning that
+  RLS-with-no-policies would break the app — it does not, because the service
+  role bypasses RLS and every query here is server-side. Reproduced the hole on
+  a local Postgres with the Supabase role setup (an anon `insert into partners`
+  with `multiplier 5, welcome_grant 5000` succeeded), then closed it in 0014.
+  **Rule: if a migration creates a table, the same migration enables RLS.**
+- **Marcellus has no CJK.** Its only subsets are `latin` and `latin-ext`, so
+  `生き甲斐` set in it renders purely from whatever Japanese face the device
+  happens to have — fine on a Mac, tofu on Windows without the JP language pack.
+  It rendered correctly in testing for exactly that reason, which is why the bug
+  survived a visual check. `next/font/google` also offers **no Japanese subset
+  for Noto Sans JP** (cyrillic/latin/latin-ext/vietnamese only). All Japanese
+  glyphs in this product are therefore shipped as vector outlines
+  (`ikigai-motif.ts`, `rank-kanji.ts`), which deletes the failure mode rather
+  than guarding against it.
+- **Render it before believing it.** Three defects this cycle survived code
+  review and died instantly on a screenshot: the secret rank leaking its name
+  and threshold into the "next rank" line, the ring tofu above, and a third of
+  the Story-format share card left empty. Anything visual gets rasterised and
+  looked at before it ships.
+- **Verify PR and deploy state, never assert it.** Claimed a PR was open that
+  had been merged, and separately reported a feature "not deployed" when the
+  Cloudflare step was still mid-run. Both are one API call to check. Merge to
+  live on this pipeline is roughly 5–8 minutes.
+
 **Debugging order when something works locally but fails live:** (a) is it
 actually deployed, (b) build-time env vars, (c) migration applied?, (d)
 model-call latency/thinking defaults, (e) connection/idle timeouts, (f) DB
@@ -264,10 +361,15 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
 | PWA (manifest, SW, install) / push client / telemetry | `src/app/manifest.ts`, `public/sw.js`, `install-prompt.tsx`, `push-client.ts`, `telemetry.tsx` |
 | Waitlist / confirm dialog | `src/app/waitlist-screen.tsx`, `confirm-dialog.tsx` |
 | Referrals (codes, milestone awards, invite API) | `src/lib/referral.ts`, `referral-award.ts`, `src/app/api/referral/route.ts` |
+| **Crediting points (the ONLY place either balance is written)** | `src/lib/credit-points.ts` |
+| Rank ladder / partners / accelerated multiplier | `src/lib/iki-rank.ts`, `partners.ts`, `accelerated-points.ts` |
+| Badge artwork (one builder, app + share card) / kanji outlines | `src/lib/rank-pin.ts`, `rank-kanji.ts` |
+| Rank card UI / rank share card | `src/app/rank-badge.tsx`, `rank-share-card.tsx`, `rank-card-render.ts`, `src/lib/rank-share-card.ts` |
+| Admin partners API | `src/app/api/admin/partners/route.ts` |
 | Landing / splash / startup states | `src/app/landing.tsx`, `ui.tsx` (`Splash`), `home-view.tsx`, `globals.css` |
-| Schema | `supabase/migrations/0001–0012` |
+| Schema | `supabase/migrations/0001–0014` |
 | E2E suite / config | `e2e/*.spec.ts`, `playwright.config.ts`, `vitest.config.ts` |
-| Docs | `docs/HANDOVER.md`, `RUNBOOK.md`, `STAGING.md`, `TESTING.md`, `REFERENCE_DATA.md`, `SCALING.md`, `FAQ.md` |
+| Docs | `docs/HANDOVER.md`, `RUNBOOK.md`, `STAGING.md`, `TESTING.md`, `REFERENCE_DATA.md`, `SCALING.md`, `FAQ.md`, `POINTS_ECONOMY.md`, `cowork/` |
 
 ## 7. Operational recipes
 
@@ -320,5 +422,14 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   backups, 7-day retention). See `RUNBOOK.md` §2b.
 - **Scaling levers** (~10k users): OCR vendor, prompt caching, batch API,
   async queue — `docs/SCALING.md`.
+- **Admin roll-ups aggregate in application memory** — `/api/admin/users`,
+  `partnerStats()` and the analytics endpoint each pull whole tables and reduce
+  them in JS. Correct at beta scale, wrong somewhere around 2–5k users;
+  `daily_checkins` crosses first because it grows one row per user per day. The
+  plan, and a cheaper pagination stopgap, are in `docs/SCALING.md`.
+- **Rank thresholds are unvalidated against real behaviour.** They were fitted
+  to a model of earn rates, not to observed users, because there are no observed
+  users yet. Once ~20 testers have a month of history, check whether Apprentice
+  really lands in week 2–4; that is the one that shapes first impressions.
 - **Catalog range tuning** (BUN, Estradiol, Cortisol, MCV, MCH) via the
   migration path. Occasional HBsAg extraction miss — only touch if it recurs.

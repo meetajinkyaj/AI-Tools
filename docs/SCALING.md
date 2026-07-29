@@ -49,6 +49,33 @@ order the pressure shows up.
 
 ---
 
+## Admin & roll-up queries — the other thing that will need moving
+
+The scaling story above is about the lab-PDF pipeline. There is a second,
+unrelated one: **several admin/roll-up endpoints pull whole tables and aggregate
+in application memory.** That is the right call at beta scale (a handful of
+users, one round trip, no SQL to maintain) and the wrong one somewhere north of
+a few thousand.
+
+| Endpoint | What it pulls | Trigger to move into SQL |
+|---|---|---|
+| `GET /api/admin/users` | All `users`, plus **all** `reward_points`, `biomarker_panels`, `daily_checkins`, and self `profiles` | ~2–5k users, or when the Users tab feels slow. `daily_checkins` grows fastest — it is one row per user per day, so it crosses first. |
+| `partnerStats()` (`src/lib/partners.ts`) | All partner-cohort users, then their whole ledger + redemptions | A few thousand users **per partner** |
+| `GET /api/admin/analytics` | Telemetry + check-in history for the funnel and retention windows | Same order; watch it alongside the roster |
+
+**The shape of the fix** is the same in each case: a SQL aggregate (or a
+materialized view refreshed on a schedule) returning one row per user or per
+partner, instead of `select *` and a `Map`. None of it is urgent, none of it is
+hard, and none of it should be built before the trigger fires — but the day the
+admin console takes 10 seconds to load, this is why, and this table is the plan.
+
+A cheaper stopgap that buys a lot of headroom: the roster already `.limit(1000)`
+on `users` but not on the tables it joins against, so the joins are the real
+cost. Paginating the roster and scoping the child queries to the visible page is
+a much smaller change than moving to SQL, and worth doing first.
+
+---
+
 ## Guardrails that stay true at every scale
 
 These aren't optimizations — they're invariants we should not trade away for cost:
@@ -73,5 +100,5 @@ These aren't optimizations — they're invariants we should not trade away for c
 3. Cost guardrails (#9) — before opening signup wider.
 4. Everything else (#3–#8) — only when its specific trigger fires.
 
-_Last updated: 2026-07-15. Revisit when we cross ~10k active users or add
-generated (non-templated) narratives._
+_Last updated: 2026-07-29. Revisit when we cross ~10k active users, add
+generated (non-templated) narratives, or the admin console starts to drag._

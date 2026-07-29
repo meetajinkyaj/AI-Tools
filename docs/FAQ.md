@@ -1,21 +1,69 @@
 # Ikigaro — FAQ (rewards & trends)
 
-Plain-language answers about iki points, rewards, and how trends work. This is
-the canonical copy; the app shows the same answers on the Trends screen. Keep
-the two in sync when either changes.
+Plain-language answers about iki points, rewards, and how trends work.
+
+**`src/lib/points.ts` is the source of truth for every number below.** The
+Trends screen interpolates its copy straight from it, so the app is always
+right; this file is written by hand and is the one that drifts. It did drift
+once — the 30-day streak bonus was cut and this page kept quoting the old,
+higher figure for weeks. `src/lib/docs-drift.test.ts` now fails CI if the two
+disagree, so retuning the economy will tell you to come back here.
 
 ## How do I earn iki points?
 
 - **Daily check-in** — 10 points for your first check-in each day.
-- **Streak bonuses** — 50 points at a 7-day streak, 250 at 30 days.
+- **Streak bonuses** — 50 at a 7-day streak, 150 at 30, 250 at 90, 500 at 180,
+  1,000 at a full year. Each is paid **once ever**, the first time you reach
+  that streak length — so a broken streak costs you the run, not the reward you
+  already earned.
 - **First lab panel** — 200 points for uploading your first blood report (the
   most valuable thing you can do for your baseline).
 - **Re-test** — 150 points for each genuinely new panel after that
   (re-uploading the same report earns nothing).
-- **Outcome-verified improvement** — points when a health marker genuinely
-  improves between two lab panels (see below).
-- **Referrals** — up to 300 points per friend, milestone by milestone (see
-  "How do referrals work?" below).
+- **Outcome-verified improvement** — 50 points per marker that genuinely
+  improves between two lab panels, up to 3 markers per panel (see below).
+- **Referrals** — up to 300 points per friend, milestone by milestone, plus
+  50 when 7 friends have onboarded and 150 at 30 (see "How do referrals work?").
+- **Welcome grant** — 150 points if you joined through a partner code. Spendable
+  straight away; it does not count toward your rank.
+
+## What's the difference between points and my Iki Score?
+
+Two different things, deliberately.
+
+**Points** are the currency. You spend them on rewards, and they go down when
+you do.
+
+**Iki Score** is your record. It only ever goes up, it counts the base value of
+everything you have earned, and spending never touches it. Your rank comes from
+this — so redeeming a voucher can never demote you.
+
+## How do ranks work?
+
+Four ranks, earned on Iki Score:
+
+| Rank | Iki Score |
+|---|---|
+| 🌱 Iki Rookie | 0 |
+| 🛠️ Iki Apprentice | 400 |
+| ⚡ Iki Pro | 2,000 |
+| 🥋 Iki Sensei | 8,000 |
+
+Ranks never go down. There is no time limit — a rank tracks what you have
+accumulated, not how fast, so checking in steadily gets you there whether that
+takes months or years.
+
+*(There is one more above Sensei. You will find out.)*
+
+## What is Accelerated Points?
+
+If you joined through a partner's invite code — a gym, a community, a brand —
+you earn at a boosted rate: 2x for your first 90 days, then 1.5x for the next 90
+if you have kept checking in, then 1.25x from there.
+
+The boost applies to **spendable points only**. Your Iki Score, and so your
+rank, always counts the base amount. Two people at the same rank did the same
+amount of work, whichever door they came in through.
 
 ## What is an "outcome-verified" reward?
 
