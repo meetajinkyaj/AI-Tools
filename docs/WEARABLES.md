@@ -61,6 +61,7 @@ FITBIT_CLIENT_ID / FITBIT_CLIENT_SECRET
 WHOOP_CLIENT_ID / WHOOP_CLIENT_SECRET
 WITHINGS_CLIENT_ID / WITHINGS_CLIENT_SECRET
 GARMIN_CLIENT_ID / GARMIN_CLIENT_SECRET
+GARMIN_PUSH_SECRET        # required before Garmin works — see below
 ULTRAHUMAN_CLIENT_ID / ULTRAHUMAN_CLIENT_SECRET
 ```
 
@@ -125,8 +126,24 @@ Tuesday". Consequences:
   against the connection.
 - A user who connects Garmin sees nothing until their watch next syncs. The UI
   says so, because otherwise it reads as broken.
-- Register the push URL in the Garmin developer console; nothing arrives
-  without it.
+- Register the push URL in the Garmin developer console, **including the
+  secret**:
+
+  ```
+  https://app.ikigaro.com/api/wearables/garmin-push?key=<GARMIN_PUSH_SECRET>
+  ```
+
+  Garmin does not sign its pushes, so knowledge of that URL is the only thing
+  separating a real push from a forged one. Without the check, anyone who
+  learned a Garmin user id could inject arbitrary sleep, steps and HRV into that
+  person's account — data they would then be shown as their own.
+
+  The endpoint **fails closed**: with `GARMIN_PUSH_SECRET` unset every push is
+  rejected, because there is nothing to check against and accepting everything
+  is worse than accepting nothing. It answers 404 rather than 401, so an
+  unauthenticated caller cannot confirm the endpoint exists.
+
+  Generate it the same way as the token key: `openssl rand -base64 32`.
 
 ---
 

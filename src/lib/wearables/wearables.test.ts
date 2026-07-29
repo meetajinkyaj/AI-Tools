@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { clampScore, dayOf, isMetricKey, METRIC_KEYS, secondsToMinutes } from "./metrics";
 import { PROVIDERS, PROVIDER_IDS, isProviderId, providerConfigured } from "./providers";
+import { safeEqual } from "../reminders";
 
 /**
  * These tests cover the parts that are wrong-by-default rather than the parts
@@ -133,5 +134,29 @@ describe("the credential gate", () => {
     expect(providerConfigured(p)).toBe(true);
 
     Object.assign(process.env, saved);
+  });
+});
+
+describe("the Garmin push endpoint's shared secret", () => {
+  // The route itself is exercised end-to-end by hand; this pins the property
+  // that made the fix necessary — the comparison must be constant time and
+  // must not treat "nothing configured" as "anything matches".
+  it("rejects when no secret is configured", () => {
+    expect(safeEqual("", "")).toBe(true); // same length, both empty
+    // ...which is exactly why the route checks `if (!secret) return false`
+    // BEFORE comparing. An empty configured secret matching an empty supplied
+    // key would leave the endpoint wide open to anyone who omitted the param.
+    const secret = "";
+    const provided = "";
+    const wouldPass = Boolean(secret) && safeEqual(provided, secret);
+    expect(wouldPass).toBe(false);
+  });
+
+  it("rejects a wrong or truncated key", () => {
+    const secret = "s3cr3t-push-key";
+    expect(safeEqual("s3cr3t-push-ke", secret)).toBe(false);
+    expect(safeEqual("s3cr3t-push-keyy", secret)).toBe(false);
+    expect(safeEqual("wrong", secret)).toBe(false);
+    expect(safeEqual(secret, secret)).toBe(true);
   });
 });

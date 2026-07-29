@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { safeEqual } from "@/lib/reminders";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { num } from "@/lib/wearables/http";
 import { secondsToMinutes, type DailyMetric } from "@/lib/wearables/metrics";
@@ -43,7 +44,42 @@ interface GarminPush {
   hrv?: GarminSummary[];
 }
 
+/**
+ * A shared secret, because this endpoint takes writes from the public internet.
+ *
+ * Garmin does not sign its pushes, so the only thing that distinguishes a real
+ * one from a forged one is knowledge of the URL. The secret is therefore part
+ * of the URL registered in Garmin's console:
+ *
+ *   https://app.ikigaro.com/api/wearables/garmin-push?key=<GARMIN_PUSH_SECRET>
+ *
+ * Without this, anyone who learned a Garmin user id could inject arbitrary
+ * sleep, steps and HRV into that person's account — health data they would
+ * then see presented as their own. Every other route in this feature is
+ * authenticated; this one has to be too, just differently, because the caller
+ * is a machine that cannot hold a bearer token for one of our users.
+ *
+ * FAILS CLOSED. No secret configured means every push is rejected: with nothing
+ * to check against there is no way to tell a real push from a forged one, and
+ * accepting both is strictly worse than accepting neither.
+ */
+function pushAuthorized(request: Request): boolean {
+  const secret = process.env.GARMIN_PUSH_SECRET;
+  if (!secret) return false;
+  const url = new URL(request.url);
+  const provided =
+    url.searchParams.get("key") ?? request.headers.get("x-ikigaro-push-key") ?? "";
+  return safeEqual(provided, secret);
+}
+
 export async function POST(request: Request) {
+  if (!pushAuthorized(request)) {
+    // 404 rather than 401: an unauthenticated caller should not be able to
+    // confirm that this endpoint exists, and Garmin — which always has the
+    // key — never sees this branch.
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   let payload: GarminPush;
   try {
     payload = (await request.json()) as GarminPush;
