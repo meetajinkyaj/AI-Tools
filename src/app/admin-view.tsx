@@ -857,6 +857,8 @@ interface RosterUser {
   created_at: string;
   deleted: boolean;
   access_status: string; // 'waitlisted' | 'approved'
+  /** Has a self profile — the same test the app uses to skip onboarding. */
+  onboarded: boolean;
   referral_code: string | null;
   points: number;
   panels: number;
@@ -974,11 +976,18 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
     a.access_status === b.access_status ? 0 : a.access_status === "waitlisted" ? -1 : 1,
   );
   const waiting = users.filter((u) => u.access_status === "waitlisted").length;
+  // Approved but never onboarded: the people who were let in and then did not
+  // start. That is the drop-off worth chasing, and it is invisible if you only
+  // count approvals.
+  const stalled = users.filter(
+    (u) => u.access_status === "approved" && !u.onboarded && !u.deleted,
+  ).length;
 
   return (
     <div className="flex flex-col gap-3">
       <Eyebrow>
         {users.length} users{waiting > 0 ? ` · ${waiting} waiting for approval` : ""}
+        {stalled > 0 ? ` · ${stalled} approved, not onboarded` : ""}
       </Eyebrow>
       {codeMsg && (
         <p
@@ -989,11 +998,12 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
         </p>
       )}
       <Card className="overflow-x-auto p-0">
-        <table className="w-full min-w-[42rem] text-left">
+        <table className="w-full min-w-[48rem] text-left">
           <thead>
             <tr className="border-b border-border font-body text-xs text-muted">
               <th className="px-4 py-2 font-medium">Email</th>
               <th className="px-4 py-2 font-medium">Access</th>
+              <th className="px-4 py-2 font-medium">Onboarded</th>
               <th className="px-4 py-2 font-medium">Invite code</th>
               <th className="px-4 py-2 font-medium">Joined</th>
               <th className="px-4 py-2 font-medium">Points</th>
@@ -1027,6 +1037,29 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                       {u.access_status === "approved" ? "Revoke" : "Approve"}
                     </button>
                   </div>
+                </td>
+                <td className="px-4 py-2">
+                  {u.onboarded ? (
+                    <span className="font-body text-sm text-foreground" title="Profile completed">
+                      <span aria-hidden>✓</span>
+                      <span className="sr-only">Onboarding complete</span>
+                    </span>
+                  ) : (
+                    // An em dash rather than a cross: not onboarded yet is a
+                    // pending state, not a failure, and a red ✗ against someone
+                    // who signed up an hour ago reads as one.
+                    <span
+                      className="font-body text-sm text-muted"
+                      title={
+                        u.access_status === "approved"
+                          ? "Approved but has not completed onboarding"
+                          : "Cannot onboard until approved"
+                      }
+                    >
+                      <span aria-hidden>—</span>
+                      <span className="sr-only">Onboarding not complete</span>
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-2">
                   {editingCode?.id === u.id ? (

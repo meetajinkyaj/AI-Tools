@@ -6,16 +6,22 @@ import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
  * GET /api/admin/users — a roster with each user's key engagement signals:
- * points balance, panels uploaded, and last check-in / streak. Aggregated in
- * memory (fine at beta scale). Admin-only.
+ * access status, whether they finished onboarding, points balance, panels
+ * uploaded, and last check-in / streak. Aggregated in memory (fine at beta
+ * scale). Admin-only.
  */
 export async function GET(request: Request) {
   const admin = await requireAdmin(request);
   if (!admin) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
 
   const supabase = createSupabaseAdmin();
-  const [{ data: users }, { data: points }, { data: panels }, { data: checkins }] =
-    await Promise.all([
+  const [
+    { data: users },
+    { data: points },
+    { data: panels },
+    { data: checkins },
+    { data: profiles },
+  ] = await Promise.all([
       supabase
         .from("users")
         .select("id, email, created_at, deleted_at, access_status, referral_code")
@@ -24,6 +30,11 @@ export async function GET(request: Request) {
       supabase.from("reward_points").select("user_id, points_balance"),
       supabase.from("biomarker_panels").select("user_id"),
       supabase.from("daily_checkins").select("user_id, checkin_date, streak_count"),
+      // Onboarding is "has a self profile" — the exact condition authed-app.tsx
+      // uses to decide whether to show the onboarding form or the app. Deriving
+      // it from anything else here would let the admin view disagree with what
+      // the user is actually looking at.
+      supabase.from("profiles").select("user_id").eq("relationship", "self"),
     ]);
 
   const pointsByUser = new Map<string, number>();
@@ -46,6 +57,8 @@ export async function GET(request: Request) {
     }
   }
 
+  const onboardedIds = new Set((profiles ?? []).map((p) => (p as { user_id: string }).user_id));
+
   const roster = (users ?? []).map((u) => {
     const last = lastCheckin.get(u.id);
     return {
@@ -54,6 +67,7 @@ export async function GET(request: Request) {
       created_at: u.created_at,
       deleted: u.deleted_at != null,
       access_status: u.access_status,
+      onboarded: onboardedIds.has(u.id),
       referral_code: u.referral_code ?? null,
       points: pointsByUser.get(u.id) ?? 0,
       panels: panelsByUser.get(u.id) ?? 0,
