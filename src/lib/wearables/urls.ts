@@ -12,7 +12,7 @@ import type { ProviderId } from "./types";
  * `APP_ORIGIN` overrides for staging, where the host differs and the vendor
  * registration points somewhere else.
  */
-export function appOrigin(): string {
+function appOrigin(): string {
   return process.env.APP_ORIGIN || "https://app.ikigaro.com";
 }
 

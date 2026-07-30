@@ -200,11 +200,21 @@ operate it, and the known follow-ups. Update this as work lands.
     party's copy of someone's health data, and disk-level encryption does
     nothing against the realistic threat of a leaked service key. **Fails
     closed** — no key means no storage, never plaintext.
-    Garmin is push-only (no on-demand fetch exists), so it has its own webhook
-    and the sweep skips it. Garmin and Ultrahuman need approved applications
-    with weeks of lead time. Setup: `docs/WEARABLES.md`.
-    NOT YET: nothing surfaced in Trends, and no points for wearable data —
-    steps are trivially spoofable and paying for them invites exactly that.
+    Garmin is push-only (no on-demand fetch exists), so it has its own webhook,
+    authenticated by a shared secret in the registered URL because Garmin does
+    not sign its pushes. Garmin and Ultrahuman need approved applications with
+    weeks of lead time. Setup: `docs/WEARABLES.md`, forms:
+    `docs/WEARABLES_APPLICATIONS.md`.
+    **Several devices merge into one series per metric** (`merge.ts`): a ranked
+    source per metric, falling back PER DAY so the nights a ring was charging
+    are filled by a watch instead of lost. Never averaged — that invents a
+    number no device reported. Reasoning: `docs/WEARABLE_DATA.md`.
+    Surfaced as "From your devices" in Trends, and measured sleep now replaces
+    self-reported sleep in the Future You momentum model when a device has
+    reported.
+    NOT YET: no points for wearable data — steps are trivially spoofable and
+    paying for them invites exactly that. The source ranking is not
+    user-overridable, and there is no historical backfill on connect.
 
 ## 3. Key architecture decisions
 
@@ -451,6 +461,11 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   them in JS. Correct at beta scale, wrong somewhere around 2–5k users;
   `daily_checkins` crosses first because it grows one row per user per day. The
   plan, and a cheaper pagination stopgap, are in `docs/SCALING.md`.
+- **`healthkit_syncs` is dead schema.** Added in 0002, never written to, and
+  superseded by `wearable_daily_metrics` — which the native path will also
+  write into when it arrives. Left in place because dropping a table is a
+  production migration for no benefit; drop it whenever the next migration
+  touches that area. Do NOT build on it.
 - **Rank thresholds are unvalidated against real behaviour.** They were fitted
   to a model of earn rates, not to observed users, because there are no observed
   users yet. Once ~20 testers have a month of history, check whether Apprentice
