@@ -166,6 +166,10 @@ would put the same idea on two axes and make the charts lie by omission.
 **Rescale scores in the adapter, never at read time.** Everything ending
 `_score` is 0–100 by the time it leaves the adapter.
 
+Once a metric can come from more than one provider, how the winner is chosen is
+in [`WEARABLE_DATA.md`](./WEARABLE_DATA.md) — read that before adding a provider
+that overlaps an existing one.
+
 ---
 
 ## The trap that will bite whoever touches this next
