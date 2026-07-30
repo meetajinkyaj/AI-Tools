@@ -58,11 +58,16 @@ Do these before anything else so the review clock runs while you do the rest.
 - **Also register the push URL** (they will ask, or ask later):
   `https://app.ikigaro.com/api/wearables/garmin-push?key=<GARMIN_PUSH_SECRET>`
 
-Generate that secret first so you have it to hand:
+Generate that secret first so you have it to hand — **URL-safe**, because it
+travels in a query string where `+` legally means a space. Hex is the easiest
+way; any plain alphanumeric value is equally fine:
 
 ```bash
-openssl rand -base64 32
+openssl rand -hex 32
 ```
+
+Save it to your password manager. Cloudflare secrets cannot be read back, and
+you need this value again on Garmin's form.
 
 > Garmin is push-only — there is no way to poll it. Data arrives when a user's
 > watch next syncs, which is why the push URL matters as much as the OAuth one.

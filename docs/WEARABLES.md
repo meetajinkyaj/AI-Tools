@@ -143,11 +143,13 @@ Tuesday". Consequences:
   is worse than accepting nothing. It answers 404 rather than 401, so an
   unauthenticated caller cannot confirm the endpoint exists.
 
-  **Generate it as hex, not base64:** `openssl rand -hex 32`. The value is read
-  out of a query parameter, where `+` legally means a space — so a base64
-  secret would arrive with spaces where plusses were and never match, failing
-  as a 404 that looks like Garmin being broken. The route decodes defensively
-  so base64 does in fact work, but there is no reason to depend on that.
+  **Generate it URL-safe** — `openssl rand -hex 32` is the easiest way, and any
+  plain alphanumeric value does just as well. What matters is avoiding `+` and
+  `/`: the value is read out of a query parameter, where `+` legally means a
+  space, so a base64 secret would arrive with spaces where plusses were and
+  never match — failing as a 404 that looks like Garmin being broken rather
+  than a config error. The route decodes defensively so base64 does in fact
+  work, but there is no reason to depend on that.
 
 ---
 
