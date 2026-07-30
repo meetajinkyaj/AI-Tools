@@ -92,12 +92,10 @@ export function WearableHomeCard({
       <p className="font-body text-sm text-foreground">
         {live > 0
           ? "Sync your ring or watch and see sleep and recovery next to your lab results."
-          : "Device syncing is coming — Oura, Whoop, Garmin, Fitbit, Withings and Ultrahuman first."}
+          : "Wearable device syncing is coming soon."}
       </p>
       <p className="font-body text-xs text-muted">
-        {/* Named rather than vague: "more coming" tells a user nothing, whereas
-            the actual names let them recognise their own device. */}
-        Apple Health and Google Health Connect follow with our mobile apps.
+        Apple Health and Google Health Connect coming soon.
       </p>
 
       {live > 0 && (
