@@ -65,6 +65,55 @@ The boost applies to **spendable points only**. Your Iki Score, and so your
 rank, always counts the base amount. Two people at the same rank did the same
 amount of work, whichever door they came in through.
 
+## Can I connect more than one device?
+
+Yes — connect as many as you like. A ring, a watch and a scale together give a
+fuller picture than any one of them, and there is no limit.
+
+## What happens if two devices disagree?
+
+For each day, we use the device best suited to that measurement, and fall back
+to another one when the first has nothing.
+
+So if your ring was charging on Tuesday night, Tuesday's sleep comes from your
+watch and the rest of the week still comes from the ring. **You get a complete
+picture instead of gaps.** Every number tells you which device it came from.
+
+**We never average two devices together.** Averaging would produce a number
+neither device actually recorded, which you could not check against either app.
+We would rather show you one real measurement than a blend of two.
+
+## Which device wins for which measurement?
+
+Whichever one is built to measure it.
+
+- **Sleep, HRV, recovery** — a ring or band worn all night, ahead of a watch you
+  may not sleep in.
+- **Steps and activity** — a watch or tracker worn all day, ahead of a ring
+  (rings under-count steps).
+- **Weight and body composition** — your scale, since nothing else actually
+  measures it.
+
+## Do my devices change my Iki points or rank?
+
+No. Points and rank come from checking in, uploading panels, and the outcomes
+that follow — things you do. Connecting a device doesn't earn points and doesn't
+affect your rank.
+
+## Where does my device data show up?
+
+In **Trends**, as a "From your devices" card covering the last 30 days.
+
+It also improves **Future You**: if a device has recorded your sleep, we use the
+measured figure instead of the hours you type into your check-in. A wearable
+knows what you actually got; the check-in is your best guess afterwards.
+
+## Can I disconnect a device?
+
+Any time, from Settings. Disconnecting deletes our permission to read from that
+service immediately. Data already synced stays in your history unless you delete
+your account.
+
 ## What is an "outcome-verified" reward?
 
 Points for a marker moving in its **healthy direction** between two lab panels —

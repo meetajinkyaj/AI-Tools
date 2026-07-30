@@ -393,7 +393,7 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
 | Landing / splash / startup states | `src/app/landing.tsx`, `ui.tsx` (`Splash`), `home-view.tsx`, `globals.css` |
 | Schema | `supabase/migrations/0001–0015` |
 | E2E suite / config | `e2e/*.spec.ts`, `playwright.config.ts`, `vitest.config.ts` |
-| Docs | `docs/HANDOVER.md`, `RUNBOOK.md`, `STAGING.md`, `TESTING.md`, `REFERENCE_DATA.md`, `SCALING.md`, `FAQ.md`, `POINTS_ECONOMY.md`, `cowork/` |
+| Docs | `docs/HANDOVER.md`, `RUNBOOK.md`, `STAGING.md`, `TESTING.md`, `REFERENCE_DATA.md`, `SCALING.md`, `FAQ.md`, `POINTS_ECONOMY.md`, `WEARABLE_DATA.md`, `cowork/CURRENT.md` |
 
 ## 7. Operational recipes
 
