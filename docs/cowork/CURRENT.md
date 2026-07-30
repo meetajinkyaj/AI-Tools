@@ -3,10 +3,10 @@
 **One file, always.** When a task here is done, delete it from this file rather
 than adding a "completed" note. A folder of finished prompts is a pile nobody
 reads and a trap for whoever re-runs one by accident. The permanent record of
-what was applied lives in the "Already applied" ledger at the bottom — one line
-each, no instructions.
+what was applied lives in the "Already applied" ledger below — one line each,
+no instructions.
 
-Last updated: 2026-07-30.
+Last updated: 2026-07-30. **No task is pending.**
 
 ---
 
@@ -23,62 +23,32 @@ Last updated: 2026-07-30.
 | `WEARABLE_TOKEN_KEY` | Set on prod Worker `ai-tools` 2026-07-30 via the Cloudflare dashboard, verified present as a Secret. Not set on `ikigaro-reminders` or staging — correct. |
 | `GARMIN_PUSH_SECRET` | Set on prod `ai-tools` 2026-07-30, URL-safe alphanumeric, saved to the founder's password manager. Needed again on Garmin's application form. |
 
-**No database work is pending, and both base secrets are set.**
+| Verification | Status |
+|---|---|
+| Wearables UI on production | Confirmed live 2026-07-30 on `app.ikigaro.com`. Settings shows **Connected devices** with the coming-soon copy and Apple Health / Google Health Connect listed; Home shows the **Your devices** card. No Connect buttons on either surface — correct, since no provider credentials exist yet. Dismiss ✕ persists across reload. No app console errors. |
+
+| Repo hygiene | Status |
+|---|---|
+| Branch cleanup | 2026-07-30: all 30 stale branches deleted, leaving only `main`. **"Automatically delete head branches" is now enabled** in Settings → General, so merged PRs clean up after themselves — do not let this pile up again. |
+
+**No database work is pending, both base secrets are set, and the UI is
+verified live.**
 
 ---
 
-# PENDING TASK — paste everything below the line into Cowork
+# PENDING TASK
 
----
+**Nothing.** Everything that needed production access is done.
 
-Confirm the wearables UI is live on production now that PR #72 has been merged
-and deployed.
-
-Background: the two base secrets (`WEARABLE_TOKEN_KEY`, `GARMIN_PUSH_SECRET`)
-are already set on the `ai-tools` Worker. No provider credentials exist yet —
-those come from vendor application forms that are still in progress.
-
-## What to check
-
-Load `app.ikigaro.com`, sign in, and open Settings.
-
-**Expected:** a **"Connected devices"** section, containing:
-- the intro line "Wearable device syncing is coming soon."
-- a **Coming soon** group listing **Apple Health** and **Google Health Connect**
-- **nothing connectable** — no Connect buttons, because no provider has its
-  client id and secret set yet
-
-Also open **Home**. Expect a **"Your devices"** card saying "Wearable device
-syncing is coming soon." with a dismiss ✕ and no Connect button.
-
-**This is the complete and correct state.** No Connect buttons is not a failure
-— providers appear one at a time as each vendor's credentials arrive.
-
-## If you see something different
-
-- **No "Connected devices" section at all** → the deploy has not landed yet.
-  Check the latest CI run on `main` finished, wait, and re-check.
-- **A Connect button for some provider** → unexpected, since no provider
-  credentials are set. Report which provider.
-- **A console error mentioning `wearables`** → report the exact text.
-
-## Do not
-
-- Do not add any provider credentials — those are not available yet.
-- Do not paste any keys, tokens or connection strings into chat.
-
-## Report back
-
-Whether both surfaces match the expected state, and the exact text of anything
-that differs.
+The next wearables step is blocked on vendor credentials, which arrive from the
+application forms in [`../WEARABLES_APPLICATIONS.md`](../WEARABLES_APPLICATIONS.md)
+— a founder task, not a Cowork one. When a set arrives, see below.
 
 ---
 
 ## Later, as each provider's credentials arrive
 
-Not a task yet — it needs credentials from the vendor application forms first
-(see [`../WEARABLES_APPLICATIONS.md`](../WEARABLES_APPLICATIONS.md)). When one
-comes through, it is two commands and a deploy:
+When a vendor comes through, it is two commands and a deploy:
 
 ```bash
 wrangler secret put OURA_CLIENT_ID
