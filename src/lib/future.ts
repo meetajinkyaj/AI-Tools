@@ -27,6 +27,8 @@ export interface HabitSignals {
   /** Check-ins made / days in window (0..1). */
   checkinRate: number;
   avgSleep: number | null;
+  /** True when `avgSleep` came from a device rather than the check-in form. */
+  sleepIsMeasured: boolean;
   trainingDaysPerWeek: number;
   /** Recent-window energy minus the window before (null = not enough data). */
   energyDelta: number | null;
@@ -38,16 +40,27 @@ export interface Momentum {
   signals: HabitSignals;
 }
 
-/** Summarize the habit inputs that actually drive change between panels. */
+/**
+ * Summarize the habit inputs that actually drive change between panels.
+ *
+ * `measuredSleepHours` is the merged figure from whatever devices the user has
+ * connected, when they have any. MEASURED BEATS REMEMBERED: the self-reported
+ * number is an estimate made after the fact by somebody who was asleep for it,
+ * and a wearable simply knows. Passing null — which is what happens for every
+ * user without a device, and for a user whose devices have not reported in this
+ * window — leaves the existing self-reported path exactly as it was.
+ */
 export function computeHabitSignals(
   checkins: CheckinPoint[],
   windowDays = MOMENTUM_WINDOW_DAYS,
+  measuredSleepHours: number | null = null,
 ): HabitSignals {
   const trend = summarizeCheckins(checkins, windowDays);
   const weeks = windowDays / 7;
   return {
     checkinRate: Math.min(1, trend.count / windowDays),
-    avgSleep: trend.avgSleep,
+    avgSleep: measuredSleepHours ?? trend.avgSleep,
+    sleepIsMeasured: measuredSleepHours != null,
     trainingDaysPerWeek: Math.round((trend.trainingDays / weeks) * 10) / 10,
     energyDelta: trend.energyDelta,
   };

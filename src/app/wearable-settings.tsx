@@ -33,6 +33,27 @@ interface Payload {
   connections: Connection[];
 }
 
+/**
+ * The two we cannot do yet, shown so the roadmap is visible.
+ *
+ * Apple HealthKit and Android Health Connect are on-device APIs with no web
+ * access of any kind — reading either requires a native app in the respective
+ * store. Listing them as "coming soon" is honest about a real plan rather than
+ * a placeholder, and it stops the obvious question ("where's Apple Health?")
+ * reading as an omission.
+ *
+ * Rendered as plain rows, deliberately NOT as disabled buttons. A greyed-out
+ * button invites tapping, and a button that does nothing when tapped reads as
+ * broken rather than as unreleased.
+ *
+ * No "needs our iOS app" caveat. Why a thing is not ready yet is our problem,
+ * not something a user should have to read on the way past.
+ */
+const COMING_SOON = [
+  { name: "Apple Health", blurb: "Sleep, steps and workouts from iPhone and Apple Watch." },
+  { name: "Google Health Connect", blurb: "Sleep, steps and heart rate from Android." },
+];
+
 function whenSynced(iso: string | null): string {
   if (!iso) return "not synced yet";
   const mins = Math.round((Date.now() - Date.parse(iso)) / 60000);
@@ -99,7 +120,11 @@ export function WearableSettings({
     })();
   }, [load]);
 
-  if (!data?.enabled || data.available.length === 0) return null;
+  // Renders as soon as the server answers, even with no providers configured —
+  // otherwise the "coming soon" roadmap stays hidden until the first vendor
+  // approval lands, which is exactly the stretch when saying what is coming is
+  // most useful.
+  if (!data) return null;
 
   const connectedBy = new Map(data.connections.map((c) => [c.provider, c]));
 
@@ -176,8 +201,11 @@ export function WearableSettings({
       </div>
 
       <p className="font-body text-sm text-muted">
-        Connect a ring, watch or scale and your sleep, recovery and activity flow
-        into Trends automatically. You can disconnect at any time.
+        {data.available.length > 0
+          ? "Connect a ring, watch or scale and your sleep, recovery and activity flow into Trends automatically. You can disconnect at any time."
+          : // Nothing is connectable yet, so promising a connect action here
+            // would be a button that does not exist. Say what is coming instead.
+            "Wearable device syncing is coming soon."}
       </p>
 
       {message && (
@@ -236,6 +264,18 @@ export function WearableSettings({
           );
         })}
       </ul>
+
+      <div className="flex flex-col gap-2 border-t border-border pt-3">
+        <p className="font-label text-[0.55rem] uppercase tracking-[0.24em] text-muted">
+          Coming soon
+        </p>
+        {COMING_SOON.map((c) => (
+          <div key={c.name} className="flex flex-col gap-0.5">
+            <span className="font-body text-sm text-muted">{c.name}</span>
+            <span className="font-body text-xs text-muted/70">{c.blurb}</span>
+          </div>
+        ))}
+      </div>
     </Card>
   );
 }

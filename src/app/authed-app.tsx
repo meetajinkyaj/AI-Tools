@@ -160,6 +160,7 @@ export function AuthedApp() {
             profile={profile as ProfileRow}
             getToken={getAccessToken}
             onCheckIn={() => setTab("checkin")}
+            onOpenSettings={() => setTab("profile")}
             refreshKey={summaryVersion}
           />
           <InterventionLog getToken={getAccessToken} />

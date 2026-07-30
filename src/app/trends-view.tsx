@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { POINTS, REFERRAL_MAX_TOTAL } from "@/lib/points";
 import type { CheckinTrend, MarkerDelta } from "@/lib/trends";
 import { Card, Eyebrow, PageHeader, primaryButtonClass } from "./ui";
+import { WearableTrends } from "./wearable-trends";
 
 interface CheckinSeriesPoint {
   checkin_date: string;
@@ -163,6 +164,10 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
         title="Your movement"
         subtitle="Day-to-day from your check-ins, and the bigger picture from your lab panels."
       />
+
+      {/* Device data, merged across everything connected. Renders itself away
+          when nothing is connected or nothing has synced. */}
+      <WearableTrends getToken={getToken} />
 
       {/* Outcome-verified rewards — the payoff moment */}
       {bonuses.length > 0 && (

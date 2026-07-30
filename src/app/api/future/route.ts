@@ -13,6 +13,7 @@ import {
 } from "@/lib/future";
 import { getOrCreateSelfProfileId } from "@/lib/profiles";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
+import { measuredSleepHours, mergeMetrics, type MetricRow } from "@/lib/wearables/merge";
 import type { CheckinPoint } from "@/lib/trends";
 
 /**
@@ -47,8 +48,31 @@ export async function GET(request: Request) {
       .eq("profile_id", profileId)
       .order("checkin_date", { ascending: false })
       .limit(MOMENTUM_WINDOW_DAYS * 2); // window + the window before, for the delta
+    // Merged wearable sleep, when any device has reported in the window. This
+    // is a small query and it upgrades the single most-guessed input in the
+    // whole model — self-reported sleep hours — into a measured one.
+    const { data: wearableRows } = await supabase
+      .from("wearable_daily_metrics")
+      .select("provider, metric_date, metric, value")
+      .eq("user_id", userId)
+      .eq("metric", "sleep_minutes")
+      .gte(
+        "metric_date",
+        new Date(Date.now() - MOMENTUM_WINDOW_DAYS * 86_400_000)
+          .toISOString()
+          .slice(0, 10),
+      );
+    const measuredSleep = measuredSleepHours(
+      mergeMetrics((wearableRows ?? []) as MetricRow[]),
+      MOMENTUM_WINDOW_DAYS,
+    );
+
     const momentum = computeMomentum(
-      computeHabitSignals((checkins ?? []) as CheckinPoint[]),
+      computeHabitSignals(
+        (checkins ?? []) as CheckinPoint[],
+        MOMENTUM_WINDOW_DAYS,
+        measuredSleep,
+      ),
     );
 
     // --- Panels, collapsed to distinct test dates (latest save per date) ---

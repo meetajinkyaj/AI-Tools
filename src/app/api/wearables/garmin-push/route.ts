@@ -63,12 +63,38 @@ interface GarminPush {
  * to check against there is no way to tell a real push from a forged one, and
  * accepting both is strictly worse than accepting neither.
  */
+/**
+ * Read a query parameter WITHOUT the form-encoding rule that turns "+" into a
+ * space.
+ *
+ * `URLSearchParams` implements application/x-www-form-urlencoded, where a
+ * literal "+" means space. That is correct for form posts and wrong for a
+ * secret: `openssl rand -base64 32` emits "+" about half the time, so a
+ * perfectly good key would arrive with spaces where plusses were, never match,
+ * and every Garmin push would 404 — looking exactly like Garmin being broken
+ * rather than like a config bug.
+ *
+ * Decoding the raw slice ourselves keeps "+" as "+" while still handling a
+ * properly percent-encoded "%2B", so both spellings work.
+ */
+function rawQueryParam(url: URL, name: string): string | null {
+  const m = url.search.match(new RegExp(`[?&]${name}=([^&]*)`));
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    // A malformed escape is not a valid secret; hand back the raw text and let
+    // the comparison fail rather than throwing inside an auth check.
+    return m[1];
+  }
+}
+
 function pushAuthorized(request: Request): boolean {
   const secret = process.env.GARMIN_PUSH_SECRET;
   if (!secret) return false;
   const url = new URL(request.url);
   const provided =
-    url.searchParams.get("key") ?? request.headers.get("x-ikigaro-push-key") ?? "";
+    rawQueryParam(url, "key") ?? request.headers.get("x-ikigaro-push-key") ?? "";
   return safeEqual(provided, secret);
 }
 
