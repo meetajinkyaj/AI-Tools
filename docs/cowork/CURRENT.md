@@ -6,7 +6,7 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below — one line each,
 no instructions.
 
-Last updated: 2026-07-30. **No task is pending.**
+Last updated: 2026-07-30. **One task pending: migration 0016.**
 
 ---
 
@@ -36,13 +36,83 @@ verified live.**
 
 ---
 
-# PENDING TASK
+# PENDING TASK — paste everything below the line into Cowork
 
-**Nothing.** Everything that needed production access is done.
+**This must run BEFORE the device-requests PR is merged.** The code reads a
+table that does not exist yet; merging first gives every user a broken
+Settings page until the migration lands.
 
-The next wearables step is blocked on vendor credentials, which arrive from the
-application forms in [`../WEARABLES_APPLICATIONS.md`](../WEARABLES_APPLICATIONS.md)
-— a founder task, not a Cowork one. When a set arrives, see below.
+---
+
+Apply migration `0016_device_requests` to the production Supabase database,
+then verify it.
+
+The file is `supabase/migrations/0016_device_requests.sql` in the repo. It
+creates one new table for user-submitted device suggestions ("which wearable
+should we add next"). It creates nothing else and **touches no existing table**
+— no ALTER, no UPDATE, no backfill. If you see it proposing to modify an
+existing table, stop and tell me.
+
+## Apply
+
+Supabase dashboard → SQL Editor → paste the file's contents → Run.
+
+## Verify — please actually run these and paste the output
+
+**1. The table exists with the right shape**
+
+```sql
+select column_name, data_type, is_nullable
+from information_schema.columns
+where table_name = 'device_requests'
+order by ordinal_position;
+```
+
+Expect 8 columns: `id`, `user_id`, `raw_text`, `device_key`, `notify`,
+`notified_at`, `created_at`, `updated_at`.
+
+**2. RLS is on with NO policies** — the house rule for every table
+
+```sql
+select relname, relrowsecurity from pg_class where relname = 'device_requests';
+select count(*) from pg_policies where tablename = 'device_requests';
+```
+
+Expect `relrowsecurity = true` and a policy count of **0**. Both matter: RLS on
+with zero policies means anon and authenticated can read nothing, and the
+service role — which is what our server routes use — bypasses it. This is the
+exact gap migration 0014 had to go back and close, so please confirm it rather
+than assuming.
+
+**3. The one-vote-per-person index exists**
+
+```sql
+select indexname from pg_indexes where tablename = 'device_requests';
+```
+
+Expect `device_requests_user_device` among them. Without it one person can
+submit "Oura" five times and the admin tally will report five people.
+
+**4. Nothing else changed**
+
+```sql
+select count(*) from users;
+select count(*) from wearable_connections;
+```
+
+Tell me both numbers. They should match whatever they were before — this
+migration has no reason to alter either.
+
+## Do not
+
+- Do not insert any test rows into `device_requests` on production. I want the
+  first real row to be a real user.
+- Do not paste keys, tokens or connection strings into chat.
+
+## Report back
+
+The output of all four checks, and confirmation that the table is empty. Once
+you confirm, I will merge the code.
 
 ---
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { DeviceSuggest } from "./device-suggest";
 import { Card, Eyebrow, primaryButtonClass, secondaryButtonClass } from "./ui";
 
 /**
@@ -276,6 +277,8 @@ export function WearableSettings({
           </div>
         ))}
       </div>
+
+      <DeviceSuggest getToken={getToken} />
     </Card>
   );
 }
