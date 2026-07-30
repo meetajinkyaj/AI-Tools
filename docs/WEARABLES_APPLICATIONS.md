@@ -137,6 +137,43 @@ of its env vars are set and the Worker redeploys. Nothing else to switch on.
 
 ---
 
+## Devices we evaluated and cannot add
+
+Recorded so the same research is not repeated. A "no" here is about the
+vendor's API, not the device — several are good hardware.
+
+### ✗ Fittr HART — no route in, evaluated 2026-07-30
+
+Three ways a device's data can reach us, and HART closes all three:
+
+1. **No public or partner API.** No developer portal, no OAuth, no documented
+   endpoint. Fittr's own site still ships placeholder copy in production, which
+   suggests a partner API is not close.
+2. **No Apple Health write.** This is the decisive one. Their privacy policy
+   says the app *reads* from HealthKit and states plainly: *"Our App cannot
+   write data to HealthKit."* So shipping our iOS app does **not** get us HART
+   data — the ring's readings never enter HealthKit for us to read.
+3. **No documented Health Connect write**, so the Android path is no better.
+
+The data is a one-way silo: HART pulls context in, nothing comes out.
+
+**If demand shows up**, the only move is a direct partnership approach to Fittr
+for API access. That is a conversation worth having with a number attached —
+which is what the Requests tab in the admin console is for. Check it before
+writing to them.
+
+### Where the requests come from
+
+Users suggest devices under **Settings → Connected devices → "Don't see your
+device?"**. The ranked tally lands in **Admin → Requests**. Counts are distinct
+people, so ten entries mean ten people, and each shows how many asked for an
+email when the device goes live.
+
+Use it to order the applications below. The current order is our guess about
+what people own; the tally is what they actually own.
+
+---
+
 ## The one mistake that will cost you an afternoon
 
 **The redirect URI must match byte for byte.** Scheme, host, path, no trailing

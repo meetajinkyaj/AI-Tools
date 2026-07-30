@@ -4,6 +4,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cleanReferralInput, normalizeReferralCode } from "@/lib/referral";
+import { DeviceRequestsPanel } from "./admin-device-requests";
 import { ConfirmDialog, type ConfirmRequest } from "./confirm-dialog";
 
 import {
@@ -18,7 +19,7 @@ import {
 } from "./ui";
 
 type Authz = "checking" | "ok" | "denied";
-type Tab = "analytics" | "vouchers" | "users" | "partners";
+type Tab = "analytics" | "vouchers" | "users" | "partners" | "requests";
 
 /**
  * Internal admin console (gated by the ADMIN_EMAILS allow-list server-side, and
@@ -91,12 +92,16 @@ export function AdminView() {
           <TabButton active={tab === "partners"} onClick={() => setTab("partners")}>
             Partners
           </TabButton>
+          <TabButton active={tab === "requests"} onClick={() => setTab("requests")}>
+            Requests
+          </TabButton>
         </div>
       </div>
       {tab === "analytics" && <AnalyticsPanel getToken={getAccessToken} />}
       {tab === "vouchers" && <VoucherManager getToken={getAccessToken} />}
       {tab === "users" && <UserRoster getToken={getAccessToken} />}
       {tab === "partners" && <PartnerManager getToken={getAccessToken} />}
+      {tab === "requests" && <DeviceRequestsPanel getToken={getAccessToken} />}
     </div>
   );
 }
