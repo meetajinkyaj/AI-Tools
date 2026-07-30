@@ -68,11 +68,14 @@ value now is the right trade. If you would rather keep a recoverable copy,
 Authenticates Garmin's push callbacks. Garmin does not sign its pushes, so
 knowledge of the URL is the only thing separating a real one from a forged one.
 
-**Generate it as hex, not base64:**
+**Generate it URL-safe — hex is the easiest way:**
 
 ```bash
 openssl rand -hex 32
 ```
+
+Any alphanumeric value works equally well. What matters is avoiding `+` and `/`
+(see below), not hex specifically.
 
 **Why hex matters.** This value is read out of a URL query parameter, where a
 literal `+` legally means a space. Base64 emits `+` about half the time, so a
@@ -105,13 +108,22 @@ wrangler secret list
 
 Both names should appear. Cloudflare lists secret **names** only, never values.
 
-Then load `app.ikigaro.com`, sign in, and open Settings.
+Then load `app.ikigaro.com`, sign in, and open Settings. **What you should see
+depends on whether PR #72 has been merged and deployed** — check that first:
 
-You should see a **"Connected devices"** section listing Apple Health and Google
-Health Connect under "Coming soon", **with nothing connectable yet**. That is
-the correct result, not a half-finished one: the token key switches the
-machinery on, and individual providers appear only once each one's client id and
-secret are also set. None are yet.
+**Before #72 is deployed:** the Settings screen shows NO device section at all.
+That is correct and is not a failed secret. The shipped gate hides the whole
+section until at least one provider has its client id and secret set, and none
+do yet.
+
+**After #72 is deployed:** a **"Connected devices"** section appears, listing
+Apple Health and Google Health Connect under "Coming soon", with nothing
+connectable. That is also correct — the token key switches the machinery on;
+individual providers appear only as each one's credentials are added.
+
+Either way the secrets are set correctly. If the observed state does not match
+the deploy state, say so rather than assuming the secret failed — that
+combination means something else is wrong.
 
 ## Do not
 
@@ -125,8 +137,8 @@ secret are also set. None are yet.
 - That both names appear in `wrangler secret list`
 - That `GARMIN_PUSH_SECRET` is saved in the password manager and was generated
   as **hex**
-- That Settings shows "Connected devices" with the two coming-soon rows and
-  nothing connectable
+- Whether PR #72 was deployed at the time you looked, and that what Settings
+  showed matches the corresponding case above
 
 No values, no partial values, no lengths.
 
