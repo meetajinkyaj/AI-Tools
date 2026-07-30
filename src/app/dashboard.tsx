@@ -7,6 +7,7 @@ import { PRIMARY_GOAL_LABELS, type ProfileRow } from "@/lib/profile";
 import type { RankCardInput } from "@/lib/rank-share-card";
 import { RankBadge } from "./rank-badge";
 import { RankShareModal } from "./rank-share-modal";
+import { WearableHomeCard } from "./wearable-home-card";
 import { Card, Eyebrow, PageHeader, primaryButtonClass } from "./ui";
 
 interface Summary {
@@ -30,11 +31,14 @@ export function Dashboard({
   profile,
   getToken,
   onCheckIn,
+  onOpenSettings,
   refreshKey,
 }: {
   profile: ProfileRow;
   getToken: () => Promise<string | null>;
   onCheckIn: () => void;
+  /** Devices are managed in Settings; Home only points at them. */
+  onOpenSettings: () => void;
   refreshKey: number;
 }) {
   const firstName = profile.full_name.split(" ")[0] || profile.full_name;
@@ -105,6 +109,8 @@ export function Dashboard({
       {summary && (
         <RankBadge score={summary.ikiScore} onShare={() => void openShare()} />
       )}
+
+      <WearableHomeCard getToken={getToken} onOpenSettings={onOpenSettings} />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="flex flex-col gap-2 p-6">
