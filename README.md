@@ -181,6 +181,7 @@ or CLI. All are idempotent — safe to re-run.
 | [`docs/REFERENCE_DATA.md`](./docs/REFERENCE_DATA.md) | How clinical reference data is stored and changed |
 | [`docs/FAQ.md`](./docs/FAQ.md) | User-facing answers (points, ranks, redemption, referrals). `points.ts` is canonical; a test keeps this file honest |
 | [`docs/POINTS_ECONOMY.md`](./docs/POINTS_ECONOMY.md) | Internal reference: every earn, the multiplier glide path, rank thresholds and modelled timelines |
-| [`docs/WEARABLES.md`](./docs/WEARABLES.md) | Wearable integrations: which credentials to get, which need approval, how sync runs |
+| [`docs/WEARABLES.md`](./docs/WEARABLES.md) | Wearable integrations: how sync runs, why tokens are encrypted, adding a provider |
+| [`docs/WEARABLES_APPLICATIONS.md`](./docs/WEARABLES_APPLICATIONS.md) | The registration checklist: every form, the exact redirect URIs and scopes to paste |
 | [`docs/cowork/`](./docs/cowork/) | Prompts for production DB work handed to Claude Cowork, with their verification queries |
 | [`AGENTS.md`](./AGENTS.md) | Next.js 16 conventions — read before writing App Router code |
