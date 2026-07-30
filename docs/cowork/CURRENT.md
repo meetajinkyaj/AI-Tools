@@ -77,7 +77,7 @@ openssl rand -hex 32
 Any alphanumeric value works equally well. What matters is avoiding `+` and `/`
 (see below), not hex specifically.
 
-**Why hex matters.** This value is read out of a URL query parameter, where a
+**Why URL-safe matters.** This value is read out of a URL query parameter, where a
 literal `+` legally means a space. Base64 emits `+` about half the time, so a
 base64 secret would arrive with spaces where plusses were, never match, and
 every Garmin push would fail with a 404 that looks exactly like Garmin being
@@ -90,7 +90,7 @@ Then:
    not give it back.
 2. `wrangler secret put GARMIN_PUSH_SECRET` and paste it when prompted.
 3. The URL registered on Garmin's application form is:
-   `https://app.ikigaro.com/api/wearables/garmin-push?key=<the hex value>`
+   `https://app.ikigaro.com/api/wearables/garmin-push?key=<the value>`
 
 ## Which Worker — this matters
 
@@ -135,8 +135,8 @@ combination means something else is wrong.
 ## Report back
 
 - That both names appear in `wrangler secret list`
-- That `GARMIN_PUSH_SECRET` is saved in the password manager and was generated
-  as **hex**
+- That `GARMIN_PUSH_SECRET` is saved in the password manager, and that it
+  contains no `+` or `/` (hex or plain alphanumeric both satisfy this)
 - Whether PR #72 was deployed at the time you looked, and that what Settings
   showed matches the corresponding case above
 
