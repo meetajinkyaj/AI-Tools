@@ -149,7 +149,7 @@ export async function persistTokens(
  *
  * Throws `ReauthRequired` when only the user can fix it.
  */
-export async function accessTokenFor(conn: ConnectionRow): Promise<string> {
+async function accessTokenFor(conn: ConnectionRow): Promise<string> {
   const expiresAt = conn.expires_at ? Date.parse(conn.expires_at) : null;
   const stillValid =
     expiresAt === null || expiresAt - EXPIRY_SKEW_SECONDS * 1000 > Date.now();

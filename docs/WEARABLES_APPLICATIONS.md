@@ -117,19 +117,19 @@ you need this value again on Garmin's form.
 
 ---
 
-## 3. Secrets to set once you have credentials
+## 3. Secrets
+
+**Already done — do not redo:** `WEARABLE_TOKEN_KEY` and `GARMIN_PUSH_SECRET`
+were both set on the production Worker `ai-tools` on 2026-07-30. The push secret
+is in the password manager, which is where to get it for Garmin's form above.
+Cloudflare cannot show it to you again.
+
+**Still to do — two per provider, as each one's credentials arrive:**
 
 ```bash
-# The one that switches the whole feature on. Do this first.
-openssl rand -base64 32 | wrangler secret put WEARABLE_TOKEN_KEY
-
-# Then per provider, as each one comes through:
 wrangler secret put OURA_CLIENT_ID
 wrangler secret put OURA_CLIENT_SECRET
 # …and the same pair for FITBIT_, WHOOP_, WITHINGS_, GARMIN_, ULTRAHUMAN_
-
-# Garmin only, and only when its approval lands:
-wrangler secret put GARMIN_PUSH_SECRET
 ```
 
 Each provider appears in **Settings → Connected devices** on its own once both
