@@ -92,8 +92,14 @@ Two optional plain vars, settable in `wrangler.toml` or the dashboard:
 
 | Variable | Default | Notes |
 |---|---|---|
-| `EMAIL_FROM` | `Ikigaro <hello@ikigaro.com>` | Must be on the verified domain |
-| `EMAIL_REPLY_TO` | unset | A real inbox. The mail says "just reply to this email", which is a lie if replies bounce — **set this before the first send.** |
+| `EMAIL_FROM` | `Ikigaro <team@ikigaro.com>` | Must be on the verified domain, **and must be an address that receives** |
+| `EMAIL_REPLY_TO` | unset | Only needed if `From` is an address nobody reads. Leave unset while `From` is a real mailbox — replies go to `From` by default. |
+
+`team@ikigaro.com` is a real Hostinger mailbox. That is load-bearing, not
+incidental: the message tells the reader to reply to it. Receiving mail is
+entirely separate from Resend — Resend only sends, and inbound mail is handled
+by the domain's existing MX records. If `EMAIL_FROM` is ever pointed at an
+address that does not receive, set `EMAIL_REPLY_TO` to one that does.
 
 `APP_ORIGIN` already exists and is what the email's link uses, so staging mail
 points at staging.

@@ -125,15 +125,16 @@ wrangler secret put RESEND_API_KEY
 Or Cloudflare dashboard → Workers → `ai-tools` → Settings → Variables →
 **Encrypt**. Paste the key into the secret field only.
 
-**c. Set the reply-to address**
+**c. Check the From address**
 
-Add a plain (non-secret) environment variable on the same Worker:
+The code already defaults to `Ikigaro <team@ikigaro.com>`, which is a real
+Hostinger mailbox, so **no variable needs setting** — and `EMAIL_REPLY_TO` is
+deliberately left unset, because replies go to the From address by default.
 
-`EMAIL_REPLY_TO` = an inbox that a human actually reads.
-
-This matters: the email tells the user "just reply to this email". If replies
-bounce, that sentence is a lie, and it is the one message where we most want a
-reply.
+Only if the address ever needs to differ: add a plain (non-secret) variable
+`EMAIL_FROM`, on the verified domain, pointing at an address that **receives**.
+The email tells the reader "just reply to this email", which is a lie if that
+address bounces.
 
 ## Do not
 

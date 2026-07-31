@@ -20,8 +20,16 @@ import "server-only";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
-/** Who mail comes from. Must be on the domain verified in Resend. */
-const DEFAULT_FROM = "Ikigaro <hello@ikigaro.com>";
+/**
+ * Who mail comes from. Must be on the domain verified in Resend.
+ *
+ * `team@ikigaro.com` is a real Hostinger mailbox, which is the part that
+ * matters: the message tells the reader to reply to it. Because this address
+ * receives, no separate `EMAIL_REPLY_TO` is needed — replies go to `From` by
+ * default. Overriding this with an address nobody reads would quietly turn
+ * "just reply to this email" into a lie.
+ */
+const DEFAULT_FROM = "Ikigaro <team@ikigaro.com>";
 
 export interface EmailMessage {
   to: string;
