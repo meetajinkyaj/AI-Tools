@@ -184,5 +184,6 @@ or CLI. All are idempotent — safe to re-run.
 | [`docs/WEARABLES.md`](./docs/WEARABLES.md) | Wearable integrations: how sync runs, why tokens are encrypted, adding a provider |
 | [`docs/WEARABLES_APPLICATIONS.md`](./docs/WEARABLES_APPLICATIONS.md) | The registration checklist: every form, the exact redirect URIs and scopes to paste |
 | [`docs/WEARABLE_DATA.md`](./docs/WEARABLE_DATA.md) | How several devices are merged into one series, and why we never average |
+| [`docs/EMAIL.md`](./docs/EMAIL.md) | Resend setup, the access-granted email, and how "send exactly once" is enforced |
 | [`docs/cowork/CURRENT.md`](./docs/cowork/CURRENT.md) | The single live Cowork task list, plus a ledger of what has already been applied |
 | [`AGENTS.md`](./AGENTS.md) | Next.js 16 conventions — read before writing App Router code |

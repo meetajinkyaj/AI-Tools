@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/admin-auth";
+import { sendEmail } from "@/lib/email";
+import { accessGrantedEmail, shouldSendAccessEmail } from "@/lib/emails/access-granted";
 import { normalizeReferralCode } from "@/lib/referral";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -141,9 +143,24 @@ export async function PATCH(request: Request) {
     );
   }
 
+  // Read before writing: whether to send the "you're in" email depends on what
+  // the status WAS. A second Approve on an already-approved user is not a new
+  // grant, and must not mail them again.
+  const { data: before } = await supabase
+    .from("users")
+    .select("email, access_status, access_granted_email_at")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("users")
-    .update({ access_status })
+    .update({
+      access_status,
+      // Revoking access clears the stamp, so that if this person is approved
+      // again later they are told again — while still never getting two emails
+      // for one grant.
+      ...(access_status === "waitlisted" ? { access_granted_email_at: null } : {}),
+    })
     .eq("id", id);
   if (error) {
     console.error("admin access update failed:", error);
@@ -155,5 +172,88 @@ export async function PATCH(request: Request) {
     type: access_status === "approved" ? "beta_approved" : "beta_waitlisted",
     metadata: { by: admin.email },
   });
-  return NextResponse.json({ ok: true });
+
+  const emailed = await maybeSendAccessEmail(id, {
+    email: (before?.email as string) ?? null,
+    previousStatus: (before?.access_status as string) ?? null,
+    nextStatus: access_status,
+    alreadySentAt: (before?.access_granted_email_at as string) ?? null,
+  });
+
+  // The approval has already succeeded and been audited by this point. The
+  // email result rides along so the admin UI can say "approved, emailed" or
+  // "approved, email failed" — but it can never turn a successful approval
+  // into a failed request.
+  return NextResponse.json({ ok: true, emailed });
+}
+
+/**
+ * Send the "you're in" mail, if this is genuinely a new grant.
+ *
+ * Returns what happened rather than throwing. Nothing about approving a user
+ * is allowed to depend on an outbound HTTP call to a third party succeeding.
+ */
+async function maybeSendAccessEmail(
+  userId: string,
+  args: {
+    email: string | null;
+    previousStatus: string | null;
+    nextStatus: string;
+    alreadySentAt: string | null;
+  },
+): Promise<"sent" | "skipped" | "failed"> {
+  if (!args.email) return "skipped";
+  if (
+    !shouldSendAccessEmail({
+      previousStatus: args.previousStatus,
+      nextStatus: args.nextStatus,
+      alreadySentAt: args.alreadySentAt,
+    })
+  ) {
+    return "skipped";
+  }
+
+  const supabase = createSupabaseAdmin();
+  // The greeting is nicer with a name and fine without one, so a missing
+  // profile is not worth failing over.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("user_id", userId)
+    .eq("relationship", "self")
+    .maybeSingle();
+
+  const result = await sendEmail(
+    accessGrantedEmail({ to: args.email, fullName: (profile?.full_name as string) ?? null }),
+  );
+
+  if (!result.sent) {
+    // "not_configured" is the expected state before the domain is verified,
+    // and is not an error worth recording as one.
+    if (result.reason !== "not_configured") {
+      console.error("access-granted email failed:", result.reason, result.detail ?? "");
+      await supabase.from("events").insert({
+        user_id: userId,
+        type: "access_email_failed",
+        metadata: { reason: result.reason, detail: result.detail ?? null },
+      });
+      return "failed";
+    }
+    return "skipped";
+  }
+
+  // Stamped only after Resend has accepted it. Stamping first would mean a
+  // failed send permanently marks the user as told.
+  await supabase
+    .from("users")
+    .update({ access_granted_email_at: new Date().toISOString() })
+    .eq("id", userId);
+
+  await supabase.from("events").insert({
+    user_id: userId,
+    type: "access_email_sent",
+    metadata: { provider: "resend", id: result.id },
+  });
+
+  return "sent";
 }
