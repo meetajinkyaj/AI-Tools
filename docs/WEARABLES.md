@@ -1,4 +1,4 @@
-# Wearable integrations — setup and operation
+# Wearable integrations, setup and operation
 
 Six cloud wearable providers, connected by OAuth from the existing web app. No
 native app, no app store, no review.
@@ -12,7 +12,7 @@ native app, no app store, no review.
 
 ## Do these two things today
 
-Garmin and Ultrahuman are **not self-serve** — both need an application
+Garmin and Ultrahuman are **not self-serve**, both need an application
 reviewed, and the published lead times run one to four weeks. Everything else
 takes an afternoon. Start these now so the wait runs in parallel with the rest:
 
@@ -39,7 +39,7 @@ Register a developer app with each, then set the two env vars.
 | Whoop | developer.whoop.com | `https://app.ikigaro.com/api/wearables/callback/whoop` |
 | Withings | developer.withings.com | `https://app.ikigaro.com/api/wearables/callback/withings` |
 
-**The redirect URI must match byte for byte** — scheme, host, path, no trailing
+**The redirect URI must match byte for byte**, scheme, host, path, no trailing
 slash. Every one of these vendors rejects a mismatch with the same unhelpful
 `invalid redirect_uri` and nothing else. The value is generated in one place,
 `src/lib/wearables/urls.ts`, so what you register is what we send.
@@ -55,13 +55,13 @@ All are Worker secrets (`wrangler secret put NAME`), never committed, never
 pasted into chat.
 
 ```
-WEARABLE_TOKEN_KEY        # required — see below
+WEARABLE_TOKEN_KEY        # required, see below
 OURA_CLIENT_ID / OURA_CLIENT_SECRET
 FITBIT_CLIENT_ID / FITBIT_CLIENT_SECRET
 WHOOP_CLIENT_ID / WHOOP_CLIENT_SECRET
 WITHINGS_CLIENT_ID / WITHINGS_CLIENT_SECRET
 GARMIN_CLIENT_ID / GARMIN_CLIENT_SECRET
-GARMIN_PUSH_SECRET        # required before Garmin works — see below
+GARMIN_PUSH_SECRET        # required before Garmin works, see below
 ULTRAHUMAN_CLIENT_ID / ULTRAHUMAN_CLIENT_SECRET
 ```
 
@@ -81,7 +81,7 @@ one that cannot store them at all, because nothing about it looks wrong
 afterwards.
 
 **Losing or rotating it** costs every connected user a reconnect. Recoverable,
-and far better than the alternative — so rotate only if you believe it leaked.
+and far better than the alternative, so rotate only if you believe it leaked.
 
 ---
 
@@ -92,7 +92,7 @@ holds it pull a user's sleep, heart rate and recovery from a third party,
 indefinitely, until somebody notices and revokes it.
 
 Postgres encrypts at rest at the disk level, which defends against someone
-stealing a disk — not the realistic threat here, which is a leaked service-role
+stealing a disk, not the realistic threat here, which is a leaked service-role
 key or a stray `pg_dump`. A key that lives only in Worker secrets means the
 database on its own is not enough to impersonate our users against six vendors.
 
@@ -109,8 +109,8 @@ database on its own is not enough to impersonate our users against six vendors.
 
 The sweep re-pulls a **fixed recent window** (7 days, 14 for Withings) rather
 than tracking a high-water mark. Every one of these vendors revises data after
-the fact — a sleep score finalises hours later, a watch that was offline
-backfills days at once — so a window plus an idempotent upsert is both simpler
+the fact, a sleep score finalises hours later, a watch that was offline
+backfills days at once, so a window plus an idempotent upsert is both simpler
 and more accurate than a cursor that would silently miss every late arrival.
 
 It is bounded per run and ordered by `last_sync_at` ascending, so it cannot
@@ -136,18 +136,18 @@ Tuesday". Consequences:
   Garmin does not sign its pushes, so knowledge of that URL is the only thing
   separating a real push from a forged one. Without the check, anyone who
   learned a Garmin user id could inject arbitrary sleep, steps and HRV into that
-  person's account — data they would then be shown as their own.
+  person's account, data they would then be shown as their own.
 
   The endpoint **fails closed**: with `GARMIN_PUSH_SECRET` unset every push is
   rejected, because there is nothing to check against and accepting everything
   is worse than accepting nothing. It answers 404 rather than 401, so an
   unauthenticated caller cannot confirm the endpoint exists.
 
-  **Generate it URL-safe** — `openssl rand -hex 32` is the easiest way, and any
+  **Generate it URL-safe**, `openssl rand -hex 32` is the easiest way, and any
   plain alphanumeric value does just as well. What matters is avoiding `+` and
   `/`: the value is read out of a query parameter, where `+` legally means a
   space, so a base64 secret would arrive with spaces where plusses were and
-  never match — failing as a 404 that looks like Garmin being broken rather
+  never match, failing as a 404 that looks like Garmin being broken rather
   than a config error. The route decodes defensively so base64 does in fact
   work, but there is no reason to depend on that.
 
@@ -156,20 +156,20 @@ Tuesday". Consequences:
 ## Adding a seventh provider
 
 1. Add the id to `ProviderId` and to the `provider` CHECK in a new migration.
-2. Add an adapter to `src/lib/wearables/providers.ts` — OAuth endpoints, scopes,
+2. Add an adapter to `src/lib/wearables/providers.ts`. OAuth endpoints, scopes,
    and a `fetchRange` that returns `DailyMetric[]`.
 3. Nothing else. Refresh, rotation, backoff, persistence and upsert are shared.
 
 Normalize into the existing vocabulary in `metrics.ts` wherever the vendor is
 answering a question we already have a key for. Whoop's "recovery" and Oura's
-"readiness" both land on `readiness_score` for exactly that reason — two keys
+"readiness" both land on `readiness_score` for exactly that reason, two keys
 would put the same idea on two axes and make the charts lie by omission.
 
 **Rescale scores in the adapter, never at read time.** Everything ending
-`_score` is 0–100 by the time it leaves the adapter.
+`_score` is 0-100 by the time it leaves the adapter.
 
 Once a metric can come from more than one provider, how the winner is chosen is
-in [`WEARABLE_DATA.md`](./WEARABLE_DATA.md) — read that before adding a provider
+in [`WEARABLE_DATA.md`](./WEARABLE_DATA.md), read that before adding a provider
 that overlaps an existing one.
 
 ---
@@ -179,7 +179,7 @@ that overlaps an existing one.
 **Refresh tokens rotate.** Most of these vendors return a *new* refresh token on
 every refresh and retire the old one. If the new one is not persisted, the
 connection keeps working until the access token expires and then dies
-permanently — hours later, with nothing in the logs connecting the failure to
+permanently, hours later, with nothing in the logs connecting the failure to
 the cause.
 
 `sync.ts` therefore writes back whatever it receives, unconditionally, and

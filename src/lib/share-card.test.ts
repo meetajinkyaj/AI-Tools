@@ -54,14 +54,14 @@ describe("activityLabel", () => {
 describe("labels", () => {
   it("formats energy out of five", () => {
     expect(energyLabel(4)).toBe("4 of 5");
-    expect(energyLabel(null)).toBe("—");
+    expect(energyLabel(null)).toBe("-");
   });
 
   it("drops the decimal on whole hours", () => {
     expect(sleepLabel(7)).toBe("7h");
     expect(sleepLabel(7.5)).toBe("7.5h");
     expect(sleepLabel(7.46)).toBe("7.5h");
-    expect(sleepLabel(null)).toBe("—");
+    expect(sleepLabel(null)).toBe("-");
   });
 
   it("formats the masthead date as the design specifies", () => {
@@ -87,7 +87,7 @@ describe("the invite link, for when the beta opens", () => {
   const enabledLine = (code: string) =>
     code ? referralLink(code).slice("https://".length) : "app.ikigaro.com";
 
-  it("is the SAME link the app hands out — not an invented one", () => {
+  it("is the SAME link the app hands out, not an invented one", () => {
     // This shipped as `ikigaro.com/join · CODE`, which 404s. Anyone who typed
     // it in landed nowhere and the referral never attributed, so the growth
     // loop the card exists for was silently broken.
@@ -97,7 +97,7 @@ describe("the invite link, for when the beta opens", () => {
 
   it("keeps the query parameter lowercase", () => {
     // The renderer uppercases every other tracked label on the card. Doing it
-    // to this one turns `?ref=` into `?REF=` — a different parameter, so
+    // to this one turns `?ref=` into `?REF=`, a different parameter, so
     // attribution fails while the card still looks correct.
     expect(enabledLine("AJINKYA")).toContain("?ref=");
     expect(enabledLine("AJINKYA")).not.toContain("?REF=");
@@ -145,7 +145,7 @@ describe("FORMATS", () => {
   });
 });
 
-describe("statTiles — the privacy surface", () => {
+describe("statTiles, the privacy surface", () => {
   it("defaults to habit data only: energy and sleep are OFF", () => {
     expect(DEFAULT_FIELDS.energy).toBe(false);
     expect(DEFAULT_FIELDS.sleep).toBe(false);
@@ -297,7 +297,7 @@ describe("fitFontSize", () => {
     expect(fitFontSize(measure(50), 10, 340, 16)).toBe(16);
   });
 
-  it("is monotonic — a wider box never yields a smaller size", () => {
+  it("is monotonic, a wider box never yields a smaller size", () => {
     expect(fitFontSize(measure(3), 900, 340)).toBeGreaterThanOrEqual(
       fitFontSize(measure(3), 300, 340),
     );

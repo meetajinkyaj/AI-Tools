@@ -1,7 +1,7 @@
 /**
- * Reminder sender — a Cloudflare Worker on a cron trigger.
+ * Reminder sender, a Cloudflare Worker on a cron trigger.
  *
- * Replaces the GitHub Actions schedule, which was firing 90–110 minutes late,
+ * Replaces the GitHub Actions schedule, which was firing 90-110 minutes late,
  * every day, consistently. A "6 PM daily nudge" arriving at 7:40 PM undermines
  * the exact habit it exists to build, and GitHub documents scheduled runs as
  * best-effort under load. Cloudflare cron triggers fire on time.
@@ -19,7 +19,7 @@ import { sendPush, type PushSubscription } from "../../../src/lib/web-push";
 
 /**
  * The two Workers runtime types this file needs, declared locally rather than
- * pulling in `@cloudflare/workers-types` — that package redefines `fetch`,
+ * pulling in `@cloudflare/workers-types`, that package redefines `fetch`,
  * `Request` and friends, which collides with the DOM lib the Next app is
  * typechecked against. Two interfaces are cheaper than that fight.
  */
@@ -108,7 +108,7 @@ async function runReminders(env: Env): Promise<string> {
     : { sent: 0, expired: 0, failed: 0 };
 
   const summary =
-    `${date}: ${subscriptions.length} check-in nudge(s), ${retestSubs.length} re-test push(es) — ` +
+    `${date}: ${subscriptions.length} check-in nudge(s), ${retestSubs.length} re-test push(es), ` +
     `sent ${daily.sent + retestTally.sent}, ` +
     `expired ${daily.expired + retestTally.expired}, ` +
     `failed ${daily.failed + retestTally.failed}`;
@@ -144,7 +144,7 @@ const WEARABLE_CRON = "0 2 * * *";
 
 const handler = {
   /**
-   * Cron trigger — the primary path.
+   * Cron trigger, the primary path.
    *
    * Two schedules share this Worker, so the handler branches on which one
    * fired. Defaulting to reminders (rather than to the sync) is deliberate: if
@@ -166,7 +166,7 @@ const handler = {
 
   /**
    * Manual trigger, so the pipeline can be exercised without waiting for 6 PM.
-   * Requires the same CRON_SECRET — this Worker sends real notifications to
+   * Requires the same CRON_SECRET, this Worker sends real notifications to
    * real people, so it is never open.
    */
   async fetch(request: Request, env: Env): Promise<Response> {

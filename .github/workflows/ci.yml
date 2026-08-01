@@ -33,7 +33,7 @@ jobs:
   deploy-staging:
     # Deploy every pull request to the staging Worker once CI passes, so changes
     # can be exercised against a real deployment BEFORE they reach the live app.
-    # Staging has its own Supabase project — it cannot touch production data
+    # Staging has its own Supabase project, it cannot touch production data
     # (src/lib/supabase-admin.ts refuses to start if it would). See docs/STAGING.md.
     needs: build
     if: github.event_name == 'pull_request'
@@ -71,12 +71,12 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "**https://ai-tools-staging.meetajinkyaj.workers.dev**" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Fixed URL — it does not change per PR. Look for the \"Staging · not live data\" badge." >> "$GITHUB_STEP_SUMMARY"
+          echo "Fixed URL, it does not change per PR. Look for the \"Staging · not live data\" badge." >> "$GITHUB_STEP_SUMMARY"
 
   e2e:
     # Exercise the real staging deployment in a real browser, after it updates.
     # This is the gate that used to be "a human remembered to click through it".
-    # Every test is read-only (no signup, no writes) — see docs/TESTING.md.
+    # Every test is read-only (no signup, no writes), see docs/TESTING.md.
     needs: deploy-staging
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -130,7 +130,7 @@ jobs:
 
       # Separate Worker, separate deploy. Its secrets (CRON_SECRET,
       # VAPID_PRIVATE_KEY) are set once with `wrangler secret put` and persist
-      # across deploys — this step never touches them.
+      # across deploys, this step never touches them.
       - name: Deploy the reminders Worker
         run: npm run cf:deploy:reminders
         env:

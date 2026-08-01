@@ -11,7 +11,7 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * Every test is READ-ONLY: no signup, no writes, nothing that mutates data.
  * That is what makes it safe to point at production, and it is a constraint to
- * keep — see docs/TESTING.md before adding a test that writes anything.
+ * keep, see docs/TESTING.md before adding a test that writes anything.
  */
 
 const TARGETS = {
@@ -65,7 +65,7 @@ export default defineConfig({
       ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH }
       : {},
     // Escape hatch for restricted networks (agent sandboxes, corporate
-    // proxies) where the browser cannot reach the internet directly — without
+    // proxies) where the browser cannot reach the internet directly, without
     // it, the app loads but Privy never initializes and every UI test fails on
     // a splash screen. Unset in CI, which has direct egress.
     ...(process.env.PLAYWRIGHT_PROXY
@@ -78,7 +78,7 @@ export default defineConfig({
 
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
-    // The app is phone-first — most testers will only ever see this viewport.
+    // The app is phone-first, most testers will only ever see this viewport.
     { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
 

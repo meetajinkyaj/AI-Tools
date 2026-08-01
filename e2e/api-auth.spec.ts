@@ -4,8 +4,7 @@ import { expect, test } from "@playwright/test";
  * Every data route must refuse an unauthenticated caller.
  *
  * This is the regression suite for the app's security posture. All Supabase
- * access runs through the service-role key, which bypasses Row Level Security —
- * so these route-level checks are not one layer of defense, they are THE layer.
+ * access runs through the service-role key, which bypasses Row Level Security, * so these route-level checks are not one layer of defense, they are THE layer.
  * A route that forgets its auth check is a full data leak, and nothing else in
  * the stack would stop it.
  *
@@ -53,7 +52,7 @@ async function call(request: import("@playwright/test").APIRequestContext, metho
   return request.fetch(path, {
     method,
     // A body on every method keeps JSON-parsing routes from failing before
-    // their auth check — we want to prove auth rejects, not that parsing did.
+    // their auth check, we want to prove auth rejects, not that parsing did.
     data: {},
     failOnStatusCode: false,
   });
@@ -87,14 +86,14 @@ test.describe("unauthenticated API access", () => {
   test("the reminders cron endpoint requires its secret", async ({ request }) => {
     // 401 where CRON_SECRET is configured (staging, production); 503 "not
     // configured" on a local build without it. Both refuse. What must never
-    // happen is a 200 — that would hand a list of users to any caller.
+    // happen is a 200, that would hand a list of users to any caller.
     const attempts: Record<string, string>[] = [{}, { Authorization: "Bearer wrong-secret" }];
     for (const headers of attempts) {
       const res = await request.get("/api/cron/due-reminders", {
         headers,
         failOnStatusCode: false,
       });
-      expect([401, 503], `got ${res.status()} — the cron endpoint must refuse`).toContain(
+      expect([401, 503], `got ${res.status()}, the cron endpoint must refuse`).toContain(
         res.status(),
       );
       expect(await res.text()).not.toContain("subscriptions");

@@ -1,9 +1,9 @@
--- 0006: Capture-now fields — stop discarding data we can't reconstruct later.
+-- 0006: Capture-now fields, stop discarding data we can't reconstruct later.
 --
 -- Three additive changes, all "capture from day one or the data is gone":
 --   1. biomarker_readings: keep the value + unit + reference range EXACTLY AS
 --      PRINTED by the lab, alongside the canonical value we flag against. Today
---      we canonicalize on ingest (e.g. WBC 6870 -> 6.87) and drop the raw — which
+--      we canonicalize on ingest (e.g. WBC 6870 -> 6.87) and drop the raw, which
 --      blocks cross-lab normalization. Store both so normalization is backfillable.
 --   2. intervention_log: what the user changed (started magnesium, began strength
 --      training). Can't be reconstructed after the fact; powers attribution.
@@ -23,7 +23,7 @@ alter table biomarker_readings
   add column if not exists lab_reference_high numeric; -- the lab's printed range high
 
 -- ---------------------------------------------------------------------------
--- 2. intervention_log — what changed, for attribution.
+-- 2. intervention_log, what changed, for attribution.
 -- ---------------------------------------------------------------------------
 create table if not exists intervention_log (
   id           uuid primary key default gen_random_uuid(),

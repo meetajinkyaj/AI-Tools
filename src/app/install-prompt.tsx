@@ -26,7 +26,7 @@ function detectInitial(): { ios: boolean; show: boolean } {
   const ios =
     /ipad|iphone|ipod/.test(nav.userAgent.toLowerCase()) &&
     !(window as unknown as { MSStream?: unknown }).MSStream;
-  // iOS has no beforeinstallprompt — show the manual hint straight away.
+  // iOS has no beforeinstallprompt, show the manual hint straight away.
   return { ios, show: ios };
 }
 
@@ -79,7 +79,7 @@ export function InstallPrompt() {
           </p>
           <p className="font-body text-xs text-muted">
             {ios
-              ? "Tap the Share button, then “Add to Home Screen” — it opens full-screen and you’ll get daily check-in reminders."
+              ? "Tap the Share button, then “Add to Home Screen”. It opens full-screen and you’ll get daily check-in reminders."
               : "Install it for a full-screen, app-like experience and daily check-in reminders."}
           </p>
         </div>

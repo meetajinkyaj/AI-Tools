@@ -15,8 +15,8 @@ import { createSupabaseAdmin } from "@/lib/supabase-admin";
  * GET /api/cron/due-reminders
  *
  * Returns the push subscriptions that should get a nudge now, in two lists:
- *   subscriptions — the daily check-in reminder (no check-in yet today);
- *   retest        — the once-per-cycle "your re-test window is open" push for
+ *   subscriptions, the daily check-in reminder (no check-in yet today);
+ *   retest, the once-per-cycle "your re-test window is open" push for
  *                   subscribers whose last panel is ~6 months old (payload is
  *                   built HERE so the points value stays in src/lib/points.ts).
  * A user due the (rarer, more valuable) re-test push skips the daily nudge that
@@ -94,7 +94,7 @@ export async function GET(request: Request) {
     }
     const lastRetestReminderOf = new Map<string, string>();
     for (const r of retestReminded ?? []) {
-      // ordered desc — first row per user is the latest reminder
+      // ordered desc, first row per user is the latest reminder
       if (!lastRetestReminderOf.has(r.user_id as string)) {
         lastRetestReminderOf.set(r.user_id as string, r.created_at as string);
       }
@@ -146,7 +146,7 @@ export async function GET(request: Request) {
               subscriptions: retestSubs,
               payload: {
                 title: "Your re-test window is open",
-                body: `It's been six months since your last panel. A re-test shows what your habits actually did — and earns +${POINTS.reTestUpload} iki points.`,
+                body: `It's been six months since your last panel. A re-test shows what your habits actually did, and earns +${POINTS.reTestUpload} iki points.`,
                 url: "/",
                 tag: "retest-due",
               },

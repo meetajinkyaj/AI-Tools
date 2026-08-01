@@ -119,7 +119,7 @@ describe("turning typed text into an email", () => {
   });
 
   it("signs off from a person, above the company", () => {
-    expect(msg("Body text goes here.").text).toContain("— Ajinkya\nIkigaro");
+    expect(msg("Body text goes here.").text).toContain("Ajinkya\nIkigaro");
   });
 });
 

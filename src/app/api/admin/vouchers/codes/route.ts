@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
- * POST /api/admin/vouchers/codes — bulk-load voucher codes into an item's pool.
+ * POST /api/admin/vouchers/codes, bulk-load voucher codes into an item's pool.
  * Body: { item_id, codes: string[] }. Duplicate codes (per item) are silently
  * skipped by the (item_id, code) unique index, so re-uploads are safe.
  */

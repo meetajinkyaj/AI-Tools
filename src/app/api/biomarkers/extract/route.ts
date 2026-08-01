@@ -22,14 +22,14 @@ import {
 
 /**
  * Read a lab-report PDF and return a *draft* of the biomarker values found in
- * it, mapped to our catalog. Nothing is saved — the client shows the draft for
+ * it, mapped to our catalog. Nothing is saved, the client shows the draft for
  * the user to review/edit, then persists it via POST /api/biomarkers. Flags are
  * intentionally NOT computed here; the save route recomputes them
  * deterministically after the human confirms.
  *
  *   POST /api/biomarkers/extract  (multipart/form-data, field "file")
  *     -> streamed body: newline heartbeats while the model reads, then a final
- *        JSON line — { test_date, lab_name, readings, unmatched } or { error }.
+ *        JSON line, { test_date, lab_name, readings, unmatched } or { error }.
  *
  * The response is streamed because the model read takes ~20-30s: holding the
  * HTTP connection open with no bytes for that long trips an idle-connection
@@ -54,7 +54,7 @@ function toBase64(bytes: Uint8Array): string {
 }
 
 /**
- * Prefer the PDF's text layer — a digital lab report extracts in well under a
+ * Prefer the PDF's text layer, a digital lab report extracts in well under a
  * second and reads in seconds, versus a slow, timeout-prone vision pass over
  * every page. Fall back to sending the PDF for vision reading only when there's
  * no usable text layer (e.g. a scanned report).
@@ -144,7 +144,7 @@ export async function POST(request: Request) {
 
 type ExtractionOutcome = Awaited<ReturnType<typeof parseExtractionResponse>> | { error: string };
 
-/** Resolve the user, read the PDF, call the model — the slow work behind the stream. */
+/** Resolve the user, read the PDF, call the model, the slow work behind the stream. */
 async function runExtraction(
   privyUserId: string,
   bytes: Uint8Array,

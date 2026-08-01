@@ -86,7 +86,7 @@ describe("the message itself", () => {
     expect(m.html).toContain("https://app.ikigaro.com");
   });
 
-  it("carries no invite link — the beta is closed on purpose", () => {
+  it("carries no invite link, the beta is closed on purpose", () => {
     // The moment someone is let in is the worst possible moment to ask them to
     // bring strangers to a waitlist. Mirrors INVITE_LINK_ON_SHARED_CARDS.
     const m = msg();
@@ -117,13 +117,13 @@ describe("the message itself", () => {
   it("has no tracking pixel or external asset", () => {
     // Nothing to load means nothing blocked, and no open-tracking beacon on a
     // transactional message. This is also why the social row is text links
-    // rather than icons — icons would be remote images, blocked by default.
+    // rather than icons, icons would be remote images, blocked by default.
     expect(msg().html).not.toMatch(/<img/i);
   });
 
   it("signs off from a person, above the company", () => {
     const m = msg();
-    expect(m.text).toContain("— Ajinkya\nIkigaro");
+    expect(m.text).toContain("Ajinkya\nIkigaro");
     // <br /> rather than two paragraphs, so the two lines read as one signature.
     expect(m.html).toMatch(/Ajinkya<br\s*\/?>Ikigaro/);
   });
@@ -144,7 +144,7 @@ describe("the social links", () => {
   });
 
   it("only ever emits absolute https links", () => {
-    // A relative or http link in an email is broken or insecure — there is no
+    // A relative or http link in an email is broken or insecure, there is no
     // page context to resolve it against.
     for (const href of msg().html.match(/href="([^"]*)"/g) ?? []) {
       expect(href, href).toMatch(/href="https:\/\//);

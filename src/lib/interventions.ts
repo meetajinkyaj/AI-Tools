@@ -1,7 +1,7 @@
 /**
  * Intervention log: what the user changed (started a supplement, began strength
  * training, switched their diet). Captured from day one because it can't be
- * reconstructed later — it powers attribution ("what actually moved my LDL?").
+ * reconstructed later, it powers attribution ("what actually moved my LDL?").
  * Pure validation logic, shared by the API route and testable in isolation.
  */
 
@@ -81,7 +81,7 @@ export function validateInterventionInput(body: unknown): InterventionValidation
 
 /** A real YYYY-MM-DD calendar date, or null. Unlike biomarker dates, a start
  * date may be today or slightly in the future (planned change), so no past-only
- * bound — just calendar validity. */
+ * bound, just calendar validity. */
 function optionalDate(value: unknown): string | null {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const [y, m, d] = value.split("-").map(Number);

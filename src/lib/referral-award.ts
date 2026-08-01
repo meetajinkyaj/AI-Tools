@@ -5,13 +5,13 @@ import { POINTS, POINTS_REASON, REFERRAL_PANEL_WINDOW_DAYS } from "./points";
 import { createSupabaseAdmin } from "./supabase-admin";
 
 /**
- * Referral milestone awards — pay the REFERRER when their referred friend hits
+ * Referral milestone awards, pay the REFERRER when their referred friend hits
  * a milestone (onboarding completed / first 7-day streak / first panel within
  * the signup window). One shared implementation so all three hooks behave
  * identically:
  *   - at-most-once per (milestone, referred friend): the ledger is checked for
  *     an existing txn with this reason + reference_id (= referred user's id);
- *   - best-effort: never throws — a referral hiccup must never fail the
+ *   - best-effort: never throws, a referral hiccup must never fail the
  *     friend's check-in, onboarding, or panel save.
  */
 export async function awardReferralMilestone(
@@ -46,7 +46,7 @@ export async function awardReferralMilestone(
     if (existing && existing.length > 0) return;
 
     // Credited through the shared path so this raises iki_score like every
-    // other earn. It is never multiplied — accelerate-points excludes referral
+    // other earn. It is never multiplied, accelerate-points excludes referral
     // reasons, since these pay for someone ELSE's behaviour.
     await creditPoints(referrerId, [{ amount, reason }], {
       referenceId: referredUserId,
@@ -66,8 +66,8 @@ export async function awardReferralMilestone(
 /**
  * Pay the referrer for reaching 7 and 30 onboarded friends.
  *
- * Counted from the ledger — one `referral` txn exists per friend who completed
- * onboarding — rather than from raw signups. A signup that never onboards costs
+ * Counted from the ledger, one `referral` txn exists per friend who completed
+ * onboarding, rather than from raw signups. A signup that never onboards costs
  * nothing to create, so counting those would make the milestone farmable with
  * throwaway addresses.
  */
@@ -89,7 +89,7 @@ export async function awardReferrerVolumeMilestones(
 
   for (const tier of tiers) {
     if (friends < tier.at) continue;
-    // Once ever, ledger-checked — the same at-most-once rule the per-friend
+    // Once ever, ledger-checked, the same at-most-once rule the per-friend
     // milestones use.
     const { data: paid } = await supabase
       .from("points_transactions")

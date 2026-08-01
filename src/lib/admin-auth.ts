@@ -8,15 +8,15 @@ import { createSupabaseAdmin } from "./supabase-admin";
  * AND the resolved user's email is on the ADMIN_EMAILS allow-list.
  *
  * Reuses the normal Privy login (no separate password to leak), and is
- * fail-closed — if ADMIN_EMAILS is unset or empty, nobody is admin. Pair with
+ * fail-closed, if ADMIN_EMAILS is unset or empty, nobody is admin. Pair with
  * Cloudflare Access on admin.ikigaro.com for a second, network-layer gate.
  *
- * NOTE — deliberately does NOT check `access_status`, and must not start:
+ * NOTE, deliberately does NOT check `access_status`, and must not start:
  * the allow-list *is* the authorization, and beta approval is a separate,
  * product-level concern. It is also load-bearing. On a fresh environment
  * (staging, or a rebuilt prod) the first admin signs up and lands waitlisted
  * like everyone else; requiring approval here would mean nobody could ever
- * approve them — a permanent lockout with no way out except direct SQL.
+ * approve them, a permanent lockout with no way out except direct SQL.
  */
 
 function adminEmails(): Set<string> {

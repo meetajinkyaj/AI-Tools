@@ -1,4 +1,4 @@
--- Ikigaro — biomarker report foundation
+-- Ikigaro, biomarker report foundation
 -- Run in the Supabase SQL Editor (or via the Supabase CLI) AFTER 0003.
 --
 -- Foundation for the full biomarker report:

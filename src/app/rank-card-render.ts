@@ -6,7 +6,7 @@
  * truth for the artwork between the app and the card. But an SVG loaded that
  * way is its own document: it cannot see the page's fonts, so any <text> in it
  * would fall back or vanish. That is why the pin is requested WITHOUT ring
- * lettering and the ring is drawn here, on the canvas, in Marcellus — which by
+ * lettering and the ring is drawn here, on the canvas, in Marcellus, which by
  * then has genuinely loaded, because `drawRankCard` waits for it.
  *
  * The kanji seal needs no such care: it is an outline path inside the SVG, so
@@ -60,7 +60,7 @@ function tracked(
   ctx.letterSpacing = "0px";
 }
 
-/** 生き甲斐 from outlines — the same reason as everywhere else: no JP font. */
+/** 生き甲斐 from outlines, the same reason as everywhere else: no JP font. */
 function drawIkigai(c: Ctx, x: number, baseline: number, size: number, color: string) {
   const { ctx } = c;
   const s = size / KANJI_UNITS_PER_EM;
@@ -135,7 +135,7 @@ function drawRingText(
 /**
  * 生き甲斐 around the bottom of the ring, from outlines.
  *
- * The kanji cannot go through `drawRingText` — that measures and fills text,
+ * The kanji cannot go through `drawRingText`, that measures and fills text,
  * and no font in this product carries these characters. Same fix as everywhere
  * else: place each outline at its own angle, rotated onto the tangent.
  */
@@ -231,7 +231,7 @@ export async function drawRankCard(
   // Centre the whole block rather than pinning it to a fraction of the height.
   // Measuring from the top worked at 4:5 and left a third of the 9:16 Story
   // card empty below the stats, because the content does not grow with the
-  // canvas — only the space around it does.
+  // canvas, only the space around it does.
   const nameGap = 96 * c.k;
   const blockH = pin + nameGap + 44 * c.k + 72 * c.k + 76 * c.k + 62 * c.k;
   const top = pad + 60 * c.k;
@@ -245,7 +245,7 @@ export async function drawRankCard(
     ctx.drawImage(img, pinX, pinY, pin, pin);
   } catch {
     // If the SVG will not decode, a bare disc still reads as a badge and the
-    // rest of the card — which is the actual message — survives.
+    // rest of the card, which is the actual message, survives.
     ctx.beginPath();
     ctx.arc(pinX + pin / 2, pinY + pin / 2, pin * 0.47, 0, Math.PI * 2);
     ctx.fillStyle = art.rim;
@@ -328,7 +328,7 @@ export async function drawRankCard(
   const invite = rankInviteLine(input.referralCode);
   if (invite) {
     // NOT uppercased. The check-in card learned this the hard way: the tracked
-    // label helper upper-cases, which turns "?ref=" into "?REF=" — a different
+    // label helper upper-cases, which turns "?ref=" into "?REF=", a different
     // query parameter, and a link that silently drops the attribution.
     ctx.font = `400 ${20 * c.k}px ${c.label}`;
     ctx.fillStyle = RANK_PALETTE.faint;

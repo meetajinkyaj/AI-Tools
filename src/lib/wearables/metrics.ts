@@ -3,10 +3,10 @@
  *
  * WHY A VOCABULARY AND NOT "WHATEVER THE VENDOR SENT". Six vendors describe
  * overlapping things in incompatible units and names: Oura reports sleep in
- * seconds, Fitbit in minutes; Whoop scores recovery 0–100, Oura scores
- * readiness 0–100, and they do not mean the same thing but they answer the same
+ * seconds, Fitbit in minutes; Whoop scores recovery 0-100, Oura scores
+ * readiness 0-100, and they do not mean the same thing but they answer the same
  * question. If the raw shapes reach the rest of the app, then every chart, every
- * trend and every future feature has to know six dialects — and the seventh
+ * trend and every future feature has to know six dialects, and the seventh
  * vendor becomes a rewrite rather than a file.
  *
  * So the adapter boundary is where dialects stop. Downstream code only ever
@@ -56,8 +56,8 @@ export interface DailyMetric {
 /**
  * A score is a score, but vendors disagree on the range.
  *
- * Everything in this vocabulary that ends in `_score` is 0–100. An adapter for
- * a vendor that scores 0–10 multiplies; one that scores 0–21 (Whoop's old sleep
+ * Everything in this vocabulary that ends in `_score` is 0-100. An adapter for
+ * a vendor that scores 0-10 multiplies; one that scores 0-21 (Whoop's old sleep
  * "performance") rescales. Doing that in the adapter rather than at read time
  * is what lets two providers' scores sit in the same chart without a legend
  * explaining that one of them means something different.
@@ -79,7 +79,7 @@ export function secondsToMinutes(seconds: number): number {
  * Sleep is the reason this needs care: a night that starts at 23:40 on the 3rd
  * and ends 07:10 on the 4th is "the 4th's sleep" to every vendor here, because
  * they key a night to the morning you wake. Adapters therefore pass the END of
- * the interval, and this only has to strip the clock — not guess.
+ * the interval, and this only has to strip the clock, not guess.
  */
 export function dayOf(iso: string): string {
   return iso.slice(0, 10);

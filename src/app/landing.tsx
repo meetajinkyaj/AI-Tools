@@ -36,7 +36,7 @@ export function Landing() {
             Log in
           </button>
           <p className="font-body text-xs text-tan">
-            Just your email — no password needed.
+            Just your email, no password needed.
           </p>
         </div>
 

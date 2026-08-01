@@ -10,7 +10,7 @@ import { Card, Eyebrow } from "./ui";
  *
  * THE TALLY LEADS. The decision this screen exists to support is "which vendor
  * do I chase next", and that decision is a ranked count. The individual entries
- * matter too, but they are evidence, not the answer — so they sit underneath.
+ * matter too, but they are evidence, not the answer, so they sit underneath.
  *
  * The raw text is always shown next to the bucket it folded into, because a
  * normalisation table is only ever approximately right and this is the only
@@ -119,7 +119,7 @@ export function DeviceRequestsPanel({ getToken }: { getToken: () => Promise<stri
                       {d.blocked && <Tag tone="warn">blocked</Tag>}
                       {d.unrecognised && <Tag tone="muted">unrecognised</Tag>}
                     </span>
-                    {/* Why we cannot do it, kept next to the demand — so a big
+                    {/* Why we cannot do it, kept next to the demand, so a big
                         number against a blocked device reads as "go talk to
                         the vendor", not as a backlog item. */}
                     {d.reason && (
@@ -164,7 +164,7 @@ export function DeviceRequestsPanel({ getToken }: { getToken: () => Promise<stri
       </Card>
 
       <p className="font-body text-xs text-muted">
-        Counts are distinct people — one person can suggest several devices, but
+        Counts are distinct people, one person can suggest several devices, but
         cannot vote twice for the same one. Tap a row to see who asked and what
         they typed.
       </p>

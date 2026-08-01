@@ -66,7 +66,7 @@ describe("the six pillars", () => {
   });
 });
 
-describe("geometry — normalised, so one spec serves every format", () => {
+describe("geometry, normalised, so one spec serves every format", () => {
   it("re-slants the gradient axis per aspect ratio", () => {
     for (const [w, h] of FORMATS) {
       const a = gradientAxis(w, h);
@@ -132,7 +132,7 @@ describe("the motif artwork", () => {
   });
 });
 
-describe("defaultBackdrop — opening on what the user actually did", () => {
+describe("defaultBackdrop, opening on what the user actually did", () => {
   it("opens on Movement after a hard session", () => {
     expect(defaultBackdrop(true, ["running"])).toBe("movement");
     expect(defaultBackdrop(true, ["gym", "boxing"])).toBe("movement");

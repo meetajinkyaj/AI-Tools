@@ -11,7 +11,7 @@ import { safeEqual } from "../reminders";
  *
  * The adapters' HTTP calls are deliberately NOT mocked. A mock of Oura's API is
  * a test of my guess about Oura's API, and it passes just as happily when the
- * guess is wrong — which is the only interesting failure. The vendor shapes are
+ * guess is wrong, which is the only interesting failure. The vendor shapes are
  * verified against a real sandbox key at integration time; see docs/WEARABLES.md.
  */
 
@@ -127,7 +127,7 @@ describe("the credential gate", () => {
 
     process.env[p.clientIdEnv] = "id";
     // A client id with no secret would send the user to a consent screen that
-    // the token exchange then cannot complete — worse than not offering it.
+    // the token exchange then cannot complete, worse than not offering it.
     expect(providerConfigured(p)).toBe(false);
 
     process.env[p.clientSecretEnv] = "secret";
@@ -139,7 +139,7 @@ describe("the credential gate", () => {
 
 describe("the Garmin push endpoint's shared secret", () => {
   // The route itself is exercised end-to-end by hand; this pins the property
-  // that made the fix necessary — the comparison must be constant time and
+  // that made the fix necessary, the comparison must be constant time and
   // must not treat "nothing configured" as "anything matches".
   it("rejects when no secret is configured", () => {
     expect(safeEqual("", "")).toBe(true); // same length, both empty

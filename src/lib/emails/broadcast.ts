@@ -12,7 +12,7 @@ import { socialsHtml, socialsText } from "./socials";
  *     sending.
  *   - Anything typed into that box is interpolated into an HTML document. If
  *     the box accepted HTML, the composer would be an injection vector into
- *     the inbox of every user — pasted content from anywhere could carry
+ *     the inbox of every user, pasted content from anywhere could carry
  *     markup nobody reviewed. Escaping everything and building the paragraphs
  *     ourselves means the only HTML that ever ships is HTML we wrote.
  */
@@ -49,7 +49,7 @@ export function unsubscribeUrl(token: string): string {
 /**
  * Build one recipient's copy of an announcement.
  *
- * The unsubscribe link is per-recipient and NOT optional — see the migration
+ * The unsubscribe link is per-recipient and NOT optional, see the migration
  * for why the transactional channel depends on it.
  */
 export function broadcastEmail(opts: {
@@ -65,9 +65,9 @@ export function broadcastEmail(opts: {
 
   const text = [
     ...paragraphs,
-    // One block, not two entries — the join below puts a blank line between
+    // One block, not two entries, the join below puts a blank line between
     // entries, which would split the signature across a paragraph break.
-    "— Ajinkya\nIkigaro",
+    "Ajinkya\nIkigaro",
     `Open Ikigaro: ${url}`,
     ...(socialText.length > 0 ? [socialText.join("\n")] : []),
     `You're receiving this because you have an Ikigaro account.\nUnsubscribe from announcements: ${unsub}`,
@@ -90,7 +90,7 @@ export function broadcastEmail(opts: {
         <a href="${url}" style="display:inline-block;padding:12px 24px;background:#1c1b19;color:#faf8f5;text-decoration:none;border-radius:999px;font-size:14px;">Open Ikigaro</a>
       </p>
 
-      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">&mdash; Ajinkya<br />Ikigaro</p>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">. Ajinkya<br />Ikigaro</p>
 
       <div style="padding-top:16px;border-top:1px solid #e5e0d8;">
         ${socialsHtml()}
@@ -135,10 +135,10 @@ export interface AudienceCandidate {
  * is exactly why it is a pure function with tests rather than a WHERE clause
  * assembled at the call site:
  *
- *   - opted out — the entire point of the opt-out
- *   - deleted   — mailing a deleted account is a data-protection problem, not
+ *   - opted out, the entire point of the opt-out
+ *   - deleted, mailing a deleted account is a data-protection problem, not
  *                 just an embarrassment
- *   - no email  — cannot be sent to
+ *   - no email, cannot be sent to
  *
  * Deduplicated by address: two accounts sharing an inbox should not mean the
  * same person receives the announcement twice.

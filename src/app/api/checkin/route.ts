@@ -188,13 +188,13 @@ export async function POST(request: Request) {
       throw new Error(`daily_checkins insert failed: ${insertError?.message ?? "no row"}`);
     }
 
-    // Referral tier 2: the friend built the habit — their first 7-day streak
+    // Referral tier 2: the friend built the habit, their first 7-day streak
     // pays their referrer. Once ever (ledger-checked); best-effort.
     if (streak === 7) {
       await awardReferralMilestone(userId, POINTS_REASON.referralStreak, POINTS.referralStreak);
     }
 
-    // Streak milestones pay once ever, keyed off the personal best — see
+    // Streak milestones pay once ever, keyed off the personal best, see
     // STREAK_MILESTONES for why the old "exactly 7 or 30" rule paid people to
     // break their streak.
     const { data: userRow } = await supabase
@@ -210,7 +210,7 @@ export async function POST(request: Request) {
       await supabase.from("users").update({ best_streak: streak }).eq("id", userId);
     }
 
-    // One place credits points to both ledgers — see credit-points.ts.
+    // One place credits points to both ledgers, see credit-points.ts.
     const credited = await creditPoints(userId, awards, { referenceId: created.id });
 
     return NextResponse.json({

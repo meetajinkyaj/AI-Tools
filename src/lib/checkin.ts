@@ -147,13 +147,13 @@ export function computeStreak(
 ): number {
   if (!prevDate) return 1;
   const gap = daysBetweenUTC(prevDate, today);
-  if (gap === 0) return prevStreak; // already counted today — defensive
+  if (gap === 0) return prevStreak; // already counted today, defensive
   if (gap === 1) return prevStreak + 1;
   return 1;
 }
 
 /**
- * Streak milestones, each paid ONCE EVER — the first time a user reaches that
+ * Streak milestones, each paid ONCE EVER, the first time a user reaches that
  * length.
  *
  * The old rule fired whenever the streak equalled exactly 7 or 30, which paid
@@ -161,7 +161,7 @@ export function computeStreak(
  * collected two bonuses, while cycling 7-days-on/1-day-off collected 50 every
  * eight days forever. Past ~90 days the farmer was ahead; by a year, 38% ahead.
  *
- * Keying off the personal best kills that completely — a bonus already
+ * Keying off the personal best kills that completely, a bonus already
  * collected cannot be collected again, no matter how the streak is shaped. The
  * ladder also runs to a year now, so someone 200 days deep still has something
  * ahead of them, which under the old rule they did not.
@@ -186,7 +186,7 @@ export function computeAwards(newStreak: number, bestStreak = 0): PointsAward[] 
   const awards: PointsAward[] = [{ reason: "checkin", amount: CHECKIN_POINTS }];
   const best = Number.isFinite(bestStreak) ? Math.max(0, bestStreak) : 0;
   for (const m of STREAK_MILESTONES) {
-    // Catches up correctly even if several are crossed at once — which cannot
+    // Catches up correctly even if several are crossed at once, which cannot
     // happen a day at a time, but can if a streak is ever backfilled.
     if (newStreak >= m.days && best < m.days) {
       awards.push({ reason: m.reason, amount: m.amount });

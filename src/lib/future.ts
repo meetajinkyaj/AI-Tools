@@ -1,13 +1,13 @@
 /**
- * "Future You" domain logic — a directional six-month outlook. Pure and
+ * "Future You" domain logic, a directional six-month outlook. Pure and
  * dependency-free so it can be unit tested and shared by the API route.
  *
  * Design constraint (product): lab panels arrive once or twice a YEAR, so the
  * engine of the projection is the user's daily inputs (check-in consistency,
  * sleep, training, energy), and the annual panel is the scoreboard. Concretely:
  *   - Habit momentum (0-100) is computed from recent check-ins and always leads.
- *   - A flagged marker gets a DIRECTIONAL outlook driven by momentum — never an
- *     invented number — while a marker with 2+ real data points earns a clamped
+ *   - A flagged marker gets a DIRECTIONAL outlook driven by momentum, never an
+ *     invented number, while a marker with 2+ real data points earns a clamped
  *     linear projection (model "linear_v1").
  * Everything here is motivational, not diagnostic; copy stays directional and
  * the UI carries the standard disclaimer.
@@ -20,7 +20,7 @@ import { type CheckinPoint, daysBetween, healthyImprovement, summarizeCheckins }
 export const MOMENTUM_WINDOW_DAYS = 30;
 /** Six months, matching the checklist's projection horizon. */
 export const HORIZON_DAYS = 182;
-/** Suggested gap between panels (~6 months — users test once or twice a year). */
+/** Suggested gap between panels (~6 months, users test once or twice a year). */
 export const RETEST_AFTER_DAYS = 182;
 
 export interface HabitSignals {
@@ -46,9 +46,9 @@ export interface Momentum {
  * `measuredSleepHours` is the merged figure from whatever devices the user has
  * connected, when they have any. MEASURED BEATS REMEMBERED: the self-reported
  * number is an estimate made after the fact by somebody who was asleep for it,
- * and a wearable simply knows. Passing null — which is what happens for every
+ * and a wearable simply knows. Passing null, which is what happens for every
  * user without a device, and for a user whose devices have not reported in this
- * window — leaves the existing self-reported path exactly as it was.
+ * window, leaves the existing self-reported path exactly as it was.
  */
 export function computeHabitSignals(
   checkins: CheckinPoint[],
@@ -97,7 +97,7 @@ export interface MarkerOutlook {
   marker_name: string | null;
   current_value: number | null;
   flag: string;
-  /** "improving" | "holding" | "needs_inputs" — the directional read. */
+  /** "improving" | "holding" | "needs_inputs", the directional read. */
   outlook: "improving" | "holding" | "needs_inputs";
   /** Numeric projection, only when 2+ real data points exist (linear_v1). */
   projected_value: number | null;
@@ -111,8 +111,7 @@ function round2(n: number): number {
 
 /**
  * Least-squares linear projection from 2+ real observations to the horizon,
- * clamped so the projected move never exceeds 30% of the current value —
- * a directional read, not a promise.
+ * clamped so the projected move never exceeds 30% of the current value, * a directional read, not a promise.
  */
 export function projectLinear(
   history: MarkerPoint[],
@@ -132,7 +131,7 @@ export function projectLinear(
     num += (xs[i] - meanX) * (ys[i] - meanY);
     den += (xs[i] - meanX) ** 2;
   }
-  if (den === 0) return null; // all same date — no time axis
+  if (den === 0) return null; // all same date, no time axis
   const slope = num / den;
   const last = sorted[n - 1];
   const raw = last.value + slope * horizonDays;
@@ -152,7 +151,7 @@ export function projectLinear(
 
 /**
  * The outlook for one marker. With real history (2+ points) the direction comes
- * from the data itself; with a single panel it comes from habit momentum — the
+ * from the data itself; with a single panel it comes from habit momentum, the
  * daily inputs are what will move the next panel.
  */
 export function markerOutlook(

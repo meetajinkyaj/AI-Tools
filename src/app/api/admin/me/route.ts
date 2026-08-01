@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/admin-auth";
 
-/** GET /api/admin/me — the admin UI calls this to decide whether to render. */
+/** GET /api/admin/me, the admin UI calls this to decide whether to render. */
 export async function GET(request: Request) {
   const admin = await requireAdmin(request);
   if (!admin) {

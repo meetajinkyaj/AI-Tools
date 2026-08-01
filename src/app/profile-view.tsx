@@ -30,9 +30,9 @@ export function ProfileView({
     { label: "Gender", value: BIOLOGICAL_SEX_LABELS[profile.biological_sex] },
     { label: "Primary goal", value: PRIMARY_GOAL_LABELS[profile.primary_goal] },
     { label: "Activity level", value: ACTIVITY_LEVEL_LABELS[profile.activity_level] },
-    { label: "Known conditions", value: profile.known_conditions || "—" },
-    { label: "Country", value: profile.country || "—" },
-    { label: "City", value: profile.city || "—" },
+    { label: "Known conditions", value: profile.known_conditions || "-" },
+    { label: "Country", value: profile.country || "-" },
+    { label: "City", value: profile.city || "-" },
     {
       label: "Activities",
       value:
@@ -41,7 +41,7 @@ export function ProfileView({
               .filter(isExerciseType)
               .map((t) => EXERCISE_TYPE_LABELS[t])
               .join(", ")
-          : "—",
+          : "-",
     },
     { label: "Product emails", value: profile.marketing_consent ? "On" : "Off" },
   ];

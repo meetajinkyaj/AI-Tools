@@ -64,7 +64,7 @@ describe("the secret rank stays secret", () => {
 
   it("is NOT named by the next-rank line either", () => {
     // The bug this caught: `next` returned the secret rank, so the badge said
-    // "15,800 to Iki Grandmaster" — revealing the name AND the exact threshold
+    // "15,800 to Iki Grandmaster", revealing the name AND the exact threshold
     // to precisely the people it is meant to surprise.
     const p = rankProgress(9_200);
     expect(p.rank.id).toBe("sensei");
@@ -88,7 +88,7 @@ describe("rankProgress", () => {
     expect(p.remaining).toBe(1_500);
   });
 
-  it("keeps the bar fraction inside 0–1 at every score", () => {
+  it("keeps the bar fraction inside 0-1 at every score", () => {
     for (const s of [0, 1, 399, 400, 2_000, 7_999, 8_000, 25_000, 1e9, NaN, -10]) {
       const f = rankProgress(s as number).fraction;
       expect(f, String(s)).toBeGreaterThanOrEqual(0);

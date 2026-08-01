@@ -44,8 +44,8 @@ export const ACTIVITY_LEVEL_LABELS: Record<ActivityLevel, string> = {
 
 export const ACTIVITY_LEVEL_DESCRIPTIONS: Record<ActivityLevel, string> = {
   sedentary: "Mostly seated, under 5k steps/day.",
-  light: "Moving a bit each day, around 5k–7.5k steps/day.",
-  moderate: "On your feet often, around 7.5k–10k steps/day.",
+  light: "Moving a bit each day, around 5k-7.5k steps/day.",
+  moderate: "On your feet often, around 7.5k-10k steps/day.",
   high: "Active most of the day, 10k+ steps/day.",
 };
 
@@ -93,7 +93,7 @@ const MAX_LOCATION_LENGTH = 120;
 
 /**
  * Validate and normalize an untrusted request body into a ProfileInput.
- * Never throws — returns a discriminated result.
+ * Never throws, returns a discriminated result.
  */
 export function validateProfileInput(body: unknown): ValidationResult {
   if (typeof body !== "object" || body === null) {
@@ -202,7 +202,7 @@ export function dateOfBirthError(value: string): string | null {
     return invalid;
   }
   if (ageInYears(date, now) > MAX_AGE_YEARS) {
-    return "That date of birth doesn't look right — please check the year.";
+    return "That date of birth doesn't look right, please check the year.";
   }
   return null;
 }

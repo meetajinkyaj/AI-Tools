@@ -123,7 +123,7 @@ describe("computeAwards / totalAwarded", () => {
     expect(totalAwarded(a)).toBe(10);
   });
   it("pays a milestone the first time it is reached", () => {
-    // Derived from POINTS, not hardcoded — the economy gets retuned, and a
+    // Derived from POINTS, not hardcoded, the economy gets retuned, and a
     // test that has to be edited on every reprice stops being a safety net.
     for (const m of STREAK_MILESTONES) {
       expect(totalAwarded(computeAwards(m.days, m.days - 1)), `day ${m.days}`).toBe(

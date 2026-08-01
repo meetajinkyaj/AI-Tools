@@ -11,7 +11,7 @@ import { callbackUrl } from "@/lib/wearables/urls";
  *
  * Returns the vendor's consent URL for the browser to open. It returns the URL
  * rather than 302-ing because the caller is a fetch() from an authenticated
- * screen — a redirect would be followed by fetch and land the consent page
+ * screen, a redirect would be followed by fetch and land the consent page
  * inside an XHR, which the user never sees.
  */
 export async function GET(request: Request) {

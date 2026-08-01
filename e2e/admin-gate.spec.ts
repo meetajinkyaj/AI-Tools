@@ -7,10 +7,10 @@ import { gotoApp } from "./helpers";
  * The admin console's front door.
  *
  * Two independent protections, tested separately:
- *   1. Authorization — `requireAdmin` (ADMIN_EMAILS, fail-closed) gates every
+ *   1. Authorization, `requireAdmin` (ADMIN_EMAILS, fail-closed) gates every
  *      admin API server-side. That is what actually protects data, and
  *      `api-auth.spec.ts` asserts all nine admin routes return 403.
- *   2. The host split — production sends /admin to the Cloudflare Access-gated
+ *   2. The host split, production sends /admin to the Cloudflare Access-gated
  *      subdomain, so the console isn't served on the public app host.
  *
  * On production the console sits behind Access, which the test runner has no
@@ -47,7 +47,7 @@ test.describe("admin console UI", () => {
   });
 
   test("is excluded from search engines", async ({ page }) => {
-    // Server-rendered metadata — deliberately does NOT wait for the app to
+    // Server-rendered metadata, deliberately does NOT wait for the app to
     // boot, so this still holds if the client bundle is broken.
     await page.goto("/admin");
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
@@ -63,7 +63,7 @@ test.describe("admin host split", () => {
   }) => {
     test.skip(E2E_TARGET !== "production", "only app.ikigaro.com redirects");
 
-    // Deliberately does NOT follow the redirect — the point is that an HTTP
+    // Deliberately does NOT follow the redirect, the point is that an HTTP
     // redirect exists at all. This regressed to a 200 carrying a client-side
     // redirect instruction that only browsers acted on; see next.config.ts.
     const res = await request.get("/admin", {

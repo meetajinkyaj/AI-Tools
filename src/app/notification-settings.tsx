@@ -50,7 +50,7 @@ export function NotificationSettings({
       <Eyebrow>Daily reminders</Eyebrow>
       <div className="flex items-start justify-between gap-4">
         <p className="min-w-0 font-body text-sm text-muted">
-          A nudge at 6 PM to log your energy, sleep and training — one a day, only
+          A nudge at 6 PM to log your energy, sleep and training, one a day, only
           if you haven&rsquo;t checked in yet.
         </p>
         {state === "on" ? (

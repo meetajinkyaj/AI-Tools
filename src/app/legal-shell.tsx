@@ -8,7 +8,7 @@ export const LEGAL_EFFECTIVE_DATE = "1 January 2026";
 
 /**
  * Shared chrome + typographic styling for the public legal pages (/privacy,
- * /terms). Server component — these routes render statically, without the
+ * /terms). Server component, these routes render statically, without the
  * app's auth providers. Content is authored as plain semantic HTML; the
  * wrapper styles descendants so the pages stay easy to edit.
  */

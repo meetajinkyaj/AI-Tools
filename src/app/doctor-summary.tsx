@@ -55,14 +55,14 @@ interface SummaryData {
   };
 }
 
-const DISCLAIMER = "Educational, not a diagnosis — please consult a doctor.";
+const DISCLAIMER = "Educational, not a diagnosis. Please consult a doctor.";
 
 function rangeText(low: number | null, high: number | null, unit: string | null): string {
   const u = unit ? ` ${unit}` : "";
-  if (low != null && high != null) return `${low}–${high}${u}`;
+  if (low != null && high != null) return `${low}-${high}${u}`;
   if (low != null) return `≥ ${low}${u}`;
   if (high != null) return `≤ ${high}${u}`;
-  return "—";
+  return "-";
 }
 
 export function DoctorSummary({
@@ -129,7 +129,7 @@ export function DoctorSummary({
         }
       }
       downloadBlob(blob, file.name);
-      setNote("Sharing isn't available on this device — the PDF was downloaded instead.");
+      setNote("Sharing isn't available on this device. The PDF was downloaded instead.");
     } catch (err) {
       console.error("Share failed:", err);
       setNote("Couldn't create the PDF. Please try again.");
@@ -180,12 +180,12 @@ export function DoctorSummary({
         <button onClick={onBack} className={`${secondaryButtonClass} shrink-0`}>Back</button>
       </div>
 
-      {/* On-screen preview — mirrors the PDF */}
+      {/* On-screen preview, mirrors the PDF */}
       <Card className="flex flex-col gap-5 p-6">
         <div className="flex flex-col gap-0.5">
           <span className="font-display text-lg font-medium text-foreground">{profile.name}</span>
           <span className="font-body text-xs text-muted">
-            {[profile.sex, profile.dob ? `DOB ${profile.dob}` : null].filter(Boolean).join(" · ") || "—"}
+            {[profile.sex, profile.dob ? `DOB ${profile.dob}` : null].filter(Boolean).join(" · ") || "-"}
           </span>
         </div>
 
@@ -248,8 +248,8 @@ export function DoctorSummary({
         <div className="flex flex-col gap-2">
           <Eyebrow>Lifestyle context</Eyebrow>
           <p className="font-body text-sm text-foreground/80">
-            Avg energy {lifestyle.avgEnergy ?? "—"}/5 · Avg sleep{" "}
-            {lifestyle.avgSleep != null ? `${lifestyle.avgSleep}h` : "—"} · {lifestyle.streak}-day streak ·{" "}
+            Avg energy {lifestyle.avgEnergy ?? "-"}/5 · Avg sleep{" "}
+            {lifestyle.avgSleep != null ? `${lifestyle.avgSleep}h` : "-"} · {lifestyle.streak}-day streak ·{" "}
             {lifestyle.checkinCount} check-ins
           </p>
           {lifestyle.interventions.length > 0 && (
@@ -259,7 +259,7 @@ export function DoctorSummary({
                 {lifestyle.interventions.map((it, i) => (
                   <li key={i} className="font-body text-sm text-foreground/80">
                     {it.label}
-                    {it.dose_note ? ` — ${it.dose_note}` : ""}
+                    {it.dose_note ? `, ${it.dose_note}` : ""}
                     <span className="text-muted"> (since {it.started_at})</span>
                   </li>
                 ))}
@@ -338,7 +338,7 @@ function buildSummaryPdf(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.setTextColor(20);
-  doc.text(pdfText("Ikigaro — Health Summary"), M, y);
+  doc.text(pdfText("Ikigaro. Health Summary"), M, y);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(120);
@@ -349,7 +349,7 @@ function buildSummaryPdf(
   // Patient
   line(data.profile.name, 12, "bold", 20);
   line(
-    [data.profile.sex, data.profile.dob ? `DOB ${data.profile.dob}` : null].filter(Boolean).join("  ·  ") || "—",
+    [data.profile.sex, data.profile.dob ? `DOB ${data.profile.dob}` : null].filter(Boolean).join("  ·  ") || "-",
     9,
     "normal",
     110,
@@ -374,7 +374,7 @@ function buildSummaryPdf(
         doc.setFontSize(10);
         doc.setTextColor(30);
         doc.text(pdfText(m.name), M, y);
-        const rhs = `${m.value ?? "—"}${m.unit ? ` ${m.unit}` : ""}   (${rangeText(m.refLow, m.refHigh, m.unit)})   ${m.flag.toUpperCase()}`;
+        const rhs = `${m.value ?? "-"}${m.unit ? ` ${m.unit}` : ""}   (${rangeText(m.refLow, m.refHigh, m.unit)})   ${m.flag.toUpperCase()}`;
         doc.text(pdfText(rhs), right, y, { align: "right" });
         y += 5;
       }
@@ -401,14 +401,14 @@ function buildSummaryPdf(
   // Lifestyle
   line("LIFESTYLE CONTEXT", 9, "bold", 150);
   line(
-    `Avg energy ${data.lifestyle.avgEnergy ?? "—"}/5   ·   Avg sleep ${data.lifestyle.avgSleep != null ? `${data.lifestyle.avgSleep}h` : "—"}   ·   ${data.lifestyle.streak}-day streak   ·   ${data.lifestyle.checkinCount} check-ins`,
+    `Avg energy ${data.lifestyle.avgEnergy ?? "-"}/5   ·   Avg sleep ${data.lifestyle.avgSleep != null ? `${data.lifestyle.avgSleep}h` : "-"}   ·   ${data.lifestyle.streak}-day streak   ·   ${data.lifestyle.checkinCount} check-ins`,
     10,
   );
   if (data.lifestyle.interventions.length > 0) {
     gap(1);
     line("Current interventions:", 9, "bold", 110);
     for (const it of data.lifestyle.interventions) {
-      line(`• ${it.label}${it.dose_note ? ` — ${it.dose_note}` : ""}  (since ${it.started_at})`, 9, "normal", 60);
+      line(`• ${it.label}${it.dose_note ? `, ${it.dose_note}` : ""}  (since ${it.started_at})`, 9, "normal", 60);
     }
   }
   gap(4);

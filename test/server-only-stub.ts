@@ -7,7 +7,7 @@
  * makes every module carrying the guard untestable.
  *
  * Aliasing it here (see vitest.config.ts) keeps the guard fully in force where
- * it matters — Next resolves the real package at build time — while letting the
+ * it matters. Next resolves the real package at build time, while letting the
  * tests import the modules it protects. The alternative was removing
  * `server-only` from files that genuinely need it, which would trade a real
  * safety net for a test runner's convenience.

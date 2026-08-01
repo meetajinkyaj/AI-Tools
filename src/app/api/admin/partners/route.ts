@@ -90,15 +90,14 @@ export async function POST(request: Request) {
   const code = normalizeReferralCode(b.code);
   if (!code) {
     return NextResponse.json(
-      { error: "Codes are 3–16 letters/numbers." },
+      { error: "Codes are 3-16 letters/numbers." },
       { status: 400 },
     );
   }
 
   // Pre-flight for a readable error. The real guarantee is the invite_codes
   // primary key, which also covers the race this check cannot: two admins
-  // creating the same code at once, and — the case that actually mattered —
-  // /api/referral later generating that code for a user from their name.
+  // creating the same code at once, and, the case that actually mattered, // /api/referral later generating that code for a user from their name.
   const taken = await isCodeTaken(code);
   if (taken) {
     return NextResponse.json(
@@ -127,7 +126,7 @@ export async function POST(request: Request) {
 
   if (error || !data) {
     // 23505 here means the invite_codes primary key caught a collision the
-    // pre-flight missed — a race, or a code taken between check and insert.
+    // pre-flight missed, a race, or a code taken between check and insert.
     if (error?.code === "23505") {
       return NextResponse.json(
         { error: `“${code}” was just taken. Try another.` },
@@ -172,6 +171,6 @@ export async function PATCH(request: Request) {
   }
 
   // Deactivating only stops NEW signups getting the deal. Everyone already in
-  // keeps their rate, because it lives on their own row — see migration 0013.
+  // keeps their rate, because it lives on their own row, see migration 0013.
   return NextResponse.json({ ok: true });
 }

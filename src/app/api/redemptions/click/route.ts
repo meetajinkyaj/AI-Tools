@@ -5,7 +5,7 @@ import { resolveReportUser } from "@/lib/biomarker-report-data";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
- * POST /api/redemptions/click — log an affiliate product click (best-effort,
+ * POST /api/redemptions/click, log an affiliate product click (best-effort,
  * for attribution). Never blocks the user's click-through; failures are ignored.
  */
 export async function POST(request: Request) {
@@ -38,6 +38,6 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("Affiliate click log failed (non-fatal):", err);
   }
-  // Always OK — click tracking must never block the user.
+  // Always OK, click tracking must never block the user.
   return NextResponse.json({ ok: true });
 }

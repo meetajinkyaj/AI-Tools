@@ -1,12 +1,12 @@
--- 0008: Redemption loop — vouchers (points → code) and affiliate products.
+-- 0008: Redemption loop, vouchers (points → code) and affiliate products.
 --
 -- Builds on the redemption_items / redemption_transactions tables from 0002:
 --   1. redemption_items grows a `kind` (voucher | affiliate) plus presentation
 --      fields (image, terms, how-to) and an affiliate_url for click-out items.
 --   2. voucher_codes: a pre-loaded pool of codes per item; redemption assigns
 --      the next available one.
---   3. redeem_voucher(): an ATOMIC redeem — check balance, pop a code, deduct
---      points, write the ledger + redemption rows — all in one transaction with
+--   3. redeem_voucher(): an ATOMIC redeem, check balance, pop a code, deduct
+--      points, write the ledger + redemption rows, all in one transaction with
 --      row locks, so points can't be double-spent and a code can't be issued
 --      twice under concurrency.
 --
@@ -33,7 +33,7 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 2. voucher_codes — the pre-loaded code pool.
+-- 2. voucher_codes, the pre-loaded code pool.
 -- ---------------------------------------------------------------------------
 create table if not exists voucher_codes (
   id            uuid primary key default gen_random_uuid(),
@@ -53,7 +53,7 @@ create index if not exists voucher_codes_available_idx
   on voucher_codes (item_id, status);
 
 -- ---------------------------------------------------------------------------
--- 3. redeem_voucher() — atomic points-for-code redemption.
+-- 3. redeem_voucher(), atomic points-for-code redemption.
 --    Raises a coded exception the API maps to a friendly message:
 --      item_not_found | not_a_voucher | not_available | no_balance |
 --      insufficient_points | out_of_stock
@@ -103,7 +103,7 @@ begin
   insert into points_transactions (user_id, profile_id, type, amount, reason, reference_id)
   values (p_user_id, p_profile_id, 'redeem', v_item.points_cost, 'redemption', p_item_id);
 
-  -- Redemption record (fulfilled — the code is issued immediately).
+  -- Redemption record (fulfilled, the code is issued immediately).
   insert into redemption_transactions
     (user_id, profile_id, item_id, points_spent, status, discount_code, redeemed_at)
   values

@@ -20,7 +20,7 @@ interface InterventionRow {
 /**
  * A 30-second "what changed" logger. Captures interventions (supplements, diet,
  * training…) so we can later attribute biomarker movement to them. Compact by
- * design — it lives as a card on the dashboard.
+ * design, it lives as a card on the dashboard.
  */
 export function InterventionLog({
   getToken,
@@ -99,7 +99,7 @@ export function InterventionLog({
       <div className="flex flex-col gap-1">
         <Eyebrow>Log a change</Eyebrow>
         <p className="font-body text-sm text-muted">
-          Started a supplement, changed your training or diet? Note it — we&rsquo;ll
+          Started a supplement, changed your training or diet? Note it and we&rsquo;ll
           connect it to how your markers move.
         </p>
       </div>
@@ -130,7 +130,7 @@ export function InterventionLog({
           value={dose}
           onChange={(e) => setDose(e.target.value)}
           maxLength={200}
-          placeholder="Optional note — e.g. 400mg nightly"
+          placeholder="Optional note, e.g. 400mg nightly"
         />
 
         {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
@@ -152,7 +152,7 @@ export function InterventionLog({
                 <span className="text-muted">{INTERVENTION_TYPE_LABELS[it.type]} · </span>
                 {it.label}
                 {it.dose_note ? (
-                  <span className="text-muted"> — {it.dose_note}</span>
+                  <span className="text-muted">, {it.dose_note}</span>
                 ) : null}
               </span>
               <span className="shrink-0 font-body text-xs text-muted">

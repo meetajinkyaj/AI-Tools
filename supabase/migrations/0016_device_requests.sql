@@ -1,4 +1,4 @@
--- 0016: "Which device should we add next?" — user-submitted device requests.
+-- 0016: "Which device should we add next?", user-submitted device requests.
 --
 -- THE POINT. Six vendors are integrated, and every one of them was picked by us
 -- guessing what people own. This table replaces the guess with a count. It is
@@ -6,7 +6,7 @@
 -- already looking at the list of devices we support, and already noticing that
 -- theirs is missing.
 --
--- The immediate trigger was Fittr HART — a ring with real users in India, no
+-- The immediate trigger was Fittr HART, a ring with real users in India, no
 -- public API, and no HealthKit write, so we cannot integrate it however much we
 -- want to. That is worth knowing as a number rather than as an anecdote: if
 -- twenty people ask for a device we cannot reach, that is a case for going to
@@ -16,7 +16,7 @@
 -- `device_key` is that string folded onto a canonical name by
 -- `src/lib/device-requests.ts`. Storing only the raw string gives a tally that
 -- splits "oura", "Oura", "oura ring 4" into three rows and undercounts the one
--- device by a factor of three — the exact failure that makes a suggestion box
+-- device by a factor of three, the exact failure that makes a suggestion box
 -- useless. Storing only the key throws away the evidence needed to notice a
 -- fold is wrong, and to add the alias that fixes it. Both, or the data rots.
 --
@@ -49,8 +49,8 @@ create table if not exists device_requests (
 );
 
 -- ONE ROW PER PERSON PER DEVICE. Without this, one enthusiastic user submitting
--- "Oura" five times reads as five people wanting Oura, and the tally — whose
--- entire job is to say how many people want a thing — lies. The write path
+-- "Oura" five times reads as five people wanting Oura, and the tally, whose
+-- entire job is to say how many people want a thing, lies. The write path
 -- upserts onto this, so re-submitting updates rather than duplicates.
 create unique index if not exists device_requests_user_device
   on device_requests (user_id, device_key);
@@ -66,5 +66,5 @@ create index if not exists device_requests_created
 -- RLS on, no policies: deny-all for anon and authenticated, service role
 -- bypasses. Every read and write here goes through a server route that has
 -- already checked the caller. Same posture as every other table in this schema
--- — see 0014 for what happens when a table is added without it.
+--, see 0014 for what happens when a table is added without it.
 alter table device_requests enable row level security;

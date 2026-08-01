@@ -31,7 +31,7 @@ describe("resolving several devices onto one series", () => {
     ]);
   });
 
-  it("falls back per DAY, not per series — this is the whole point", () => {
+  it("falls back per DAY, not per series, this is the whole point", () => {
     // The night the ring was on the charger still has data, from the watch.
     // A per-series winner would have thrown that night away entirely.
     const merged = mergeMetrics([
@@ -104,7 +104,7 @@ describe("resolving several devices onto one series", () => {
 describe("hostile and awkward input", () => {
   it("parses numerics that arrive as strings", () => {
     // Postgres `numeric` comes over PostgREST as a string. Left unparsed it
-    // sorts lexically — "9" > "10" — which looks like bad data, not bad code.
+    // sorts lexically, "9" > "10", which looks like bad data, not bad code.
     const merged = mergeMetrics([row("oura", "2026-07-04", "sleep_minutes", "431")]);
     expect(merged[0].points[0].value).toBe(431);
     expect(typeof merged[0].points[0].value).toBe("number");

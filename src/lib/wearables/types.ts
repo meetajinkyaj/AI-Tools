@@ -6,7 +6,7 @@ import type { DailyMetric } from "./metrics";
  * Six vendors, six dialects, one shape. What varies between them is genuinely
  * only: where the OAuth endpoints are, what scopes to ask for, how to call the
  * data endpoints, and how to turn the answer into `DailyMetric[]`. Everything
- * else — refresh, retry, backoff, persistence, idempotent upsert — is written
+ * else, refresh, retry, backoff, persistence, idempotent upsert, is written
  * once in `sync.ts` and shared, because that is where the subtle bugs live and
  * six copies of subtle would be six times the bugs.
  */
@@ -23,7 +23,7 @@ export interface OAuthTokens {
   accessToken: string;
   /**
    * Absent when the vendor issues non-expiring access tokens, present
-   * otherwise. See `refreshRotates` — for several vendors this value CHANGES on
+   * otherwise. See `refreshRotates`, for several vendors this value CHANGES on
    * every refresh and must be written back.
    */
   refreshToken?: string;
@@ -43,7 +43,7 @@ export interface WearableProvider {
 
   /* ----------------------------- credentials ---------------------------- */
 
-  /** Env var names. Absent values mean "not configured" — the UI hides it. */
+  /** Env var names. Absent values mean "not configured", the UI hides it. */
   clientIdEnv: string;
   clientSecretEnv: string;
 
@@ -72,8 +72,8 @@ export interface WearableProvider {
   /**
    * Pull and normalize a date window.
    *
-   * `null` means the vendor does not support on-demand fetching — Garmin, which
-   * is push-only — and its data arrives through a webhook instead.
+   * `null` means the vendor does not support on-demand fetching. Garmin, which
+   * is push-only, and its data arrives through a webhook instead.
    */
   fetchRange:
     | ((args: {

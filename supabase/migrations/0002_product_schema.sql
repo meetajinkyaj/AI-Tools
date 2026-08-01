@@ -1,4 +1,4 @@
--- Ikigaro product schema — Phase 0 data model
+-- Ikigaro product schema. Phase 0 data model
 -- Run in the Supabase SQL Editor (or via the Supabase CLI) AFTER 0001.
 --
 -- Adds the core product entities every MVP feature depends on: biomarker
@@ -16,7 +16,7 @@
 -- comments) with lightweight CHECK constraints on true enums for integrity.
 
 -- ===========================================================================
--- Biomarker catalog — the fixed marker taxonomy + reference ranges.
+-- Biomarker catalog, the fixed marker taxonomy + reference ranges.
 -- ===========================================================================
 -- IMPORTANT (clinical safety): the reference ranges seeded below are common,
 -- widely-cited ADULT intervals in conventional US units, provided only to
@@ -53,7 +53,7 @@ create trigger biomarker_catalog_set_updated_at
   for each row execute function set_updated_at();
 
 -- ===========================================================================
--- Biomarker panels — one lab draw / upload event per row.
+-- Biomarker panels, one lab draw / upload event per row.
 -- ===========================================================================
 create table if not exists biomarker_panels (
   id            uuid primary key default gen_random_uuid(),
@@ -78,7 +78,7 @@ create trigger biomarker_panels_set_updated_at
   for each row execute function set_updated_at();
 
 -- ===========================================================================
--- Biomarker readings — individual marker values within a panel.
+-- Biomarker readings, individual marker values within a panel.
 -- user_id is denormalized from the panel for simpler per-user queries/indexing.
 -- flag is computed against the catalog range at write time and stored.
 -- ===========================================================================
@@ -104,7 +104,7 @@ create index if not exists biomarker_readings_user_marker_idx
   on biomarker_readings (user_id, marker_key);
 
 -- ===========================================================================
--- Daily check-ins — the 30-second retention loop. One row per user per day.
+-- Daily check-ins, the 30-second retention loop. One row per user per day.
 -- ===========================================================================
 create table if not exists daily_checkins (
   id              uuid primary key default gen_random_uuid(),
@@ -131,7 +131,7 @@ create trigger daily_checkins_set_updated_at
   for each row execute function set_updated_at();
 
 -- ===========================================================================
--- Reward points — the current iki-points balance. One row per user.
+-- Reward points, the current iki-points balance. One row per user.
 -- The append-only ledger lives in points_transactions; this row is the
 -- running total (kept in sync by the server when writing a transaction).
 -- ===========================================================================
@@ -151,7 +151,7 @@ create trigger reward_points_set_updated_at
   for each row execute function set_updated_at();
 
 -- ===========================================================================
--- Points transactions — the append-only iki-points ledger.
+-- Points transactions, the append-only iki-points ledger.
 -- amount is always positive; `type` says whether it added or removed points.
 -- reference_id links to the thing that caused it (a check-in, panel,
 -- redemption, referral), interpreted per `reason`.
@@ -173,7 +173,7 @@ create index if not exists points_transactions_user_created_idx
   on points_transactions (user_id, created_at desc);
 
 -- ===========================================================================
--- Redemption catalog — marketplace items (server/admin-managed, not user-scoped).
+-- Redemption catalog, marketplace items (server/admin-managed, not user-scoped).
 -- ===========================================================================
 create table if not exists redemption_items (
   id               uuid primary key default gen_random_uuid(),
@@ -200,7 +200,7 @@ create trigger redemption_items_set_updated_at
   for each row execute function set_updated_at();
 
 -- ===========================================================================
--- Redemption transactions — a user spending points on a catalog item.
+-- Redemption transactions, a user spending points on a catalog item.
 -- ===========================================================================
 create table if not exists redemption_transactions (
   id            uuid primary key default gen_random_uuid(),
@@ -226,7 +226,7 @@ create trigger redemption_transactions_set_updated_at
   for each row execute function set_updated_at();
 
 -- ===========================================================================
--- Predictions — "Future You" directional projections per marker.
+-- Predictions, "Future You" directional projections per marker.
 -- v1 is a simple linear extrapolation; model_version records how it was made.
 -- ===========================================================================
 create table if not exists predictions (
@@ -246,7 +246,7 @@ create index if not exists predictions_user_marker_idx
   on predictions (user_id, marker_key, generated_at desc);
 
 -- ===========================================================================
--- HealthKit / Health Connect sync — DEFINED NOW, UNUSED until the Phase 2
+-- HealthKit / Health Connect sync. DEFINED NOW, UNUSED until the Phase 2
 -- native app. Kept here so Phase 0 is complete and the entity is not lost.
 -- ===========================================================================
 create table if not exists healthkit_syncs (

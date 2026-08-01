@@ -17,7 +17,7 @@ interface Summary {
   ikiScore: number;
 }
 
-/** Shimmer stand-in for a stat value while the summary loads — never a fake 0. */
+/** Shimmer stand-in for a stat value while the summary loads, never a fake 0. */
 function StatPlaceholder() {
   return <div className="h-8 w-16 animate-pulse rounded bg-surface-2" />;
 }
@@ -103,7 +103,7 @@ export function Dashboard({
       {/*
         The rank card leads Home. It used to sit on the Check-in tab, which
         meant the one thing that shows a user how far they have come was behind
-        a tab they only opened to file today's entry — and invisible on the
+        a tab they only opened to file today's entry, and invisible on the
         days they did not check in at all.
       */}
       {summary && (

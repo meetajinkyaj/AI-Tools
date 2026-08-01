@@ -3,7 +3,7 @@ import type { ProviderId } from "./types";
 /**
  * The OAuth redirect URI.
  *
- * MUST MATCH THE VENDOR REGISTRATION EXACTLY — scheme, host, path, no trailing
+ * MUST MATCH THE VENDOR REGISTRATION EXACTLY, scheme, host, path, no trailing
  * slash. Every vendor here rejects a mismatch outright, and the error they
  * return says only "invalid redirect_uri", which is the least helpful possible
  * description of a typo. Building it in one place means the value registered in

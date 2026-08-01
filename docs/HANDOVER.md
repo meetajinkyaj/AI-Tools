@@ -1,4 +1,4 @@
-# CTO Handover — Ikigaro
+# CTO Handover. Ikigaro
 
 _Last updated: 2026-07-27_
 
@@ -10,7 +10,7 @@ The codebase was built by the founder working with an AI pair-programmer. That
 has two consequences worth knowing up front: the code is unusually
 well-commented and consistently structured, but there is **no second human who
 has this system in their head**. These docs are the substitute. They are written
-to be true, not flattering — the known weak spots are in §7 and §8.
+to be true, not flattering, the known weak spots are in §7 and §8.
 
 ---
 
@@ -29,13 +29,20 @@ In this order:
 | 7 | [`SCALING.md`](./SCALING.md) | Deliberately deferred optimizations + the trigger for each | skim |
 | 8 | [`REFERENCE_DATA.md`](./REFERENCE_DATA.md) | How clinical reference ranges are stored and changed | skim |
 | 9 | [`FAQ.md`](./FAQ.md) | The user-facing answers (canonical copy for points/redemption) | skim |
+| 10 | [`WEARABLES.md`](./WEARABLES.md) | How device sync runs, why tokens are encrypted, adding a provider | skim |
+| 11 | [`WEARABLE_DATA.md`](./WEARABLE_DATA.md) | How several devices become one series, and why we never average | skim |
+| 12 | [`EMAIL.md`](./EMAIL.md) | Resend, the two message types, and how "send exactly once" is enforced | skim |
 
 Then do the day-one checklist in §5.
 
 **Repo conventions that are not optional:**
-- [`AGENTS.md`](../AGENTS.md) — this is Next.js 16, which differs from most
-  training data and most blog posts. Read `node_modules/next/dist/docs/` before
-  writing App Router code. Several hours were lost to this; see §7.
+- [`AGENTS.md`](../AGENTS.md), which carries two rules:
+  - **This is Next.js 16**, which differs from most training data and most blog
+    posts. Read `node_modules/next/dist/docs/` before writing App Router code.
+    Several hours were lost to this; see §7.
+  - **No em dashes**, anywhere: copy, docs, comments, commit messages. A test
+    (`src/lib/no-em-dash.test.ts`) fails the build on one. Use a comma, colon
+    or full stop.
 - Verification convention before any merge: `npm run lint` + `npx tsc --noEmit`
   + `npm test` + `npm run build` + `npm run cf:build`. CI additionally runs the
   Playwright suite against staging ([`TESTING.md`](./TESTING.md)).
@@ -47,12 +54,12 @@ Then do the day-one checklist in §5.
 A longevity/health app for people who already track things (wearables, labs) and
 are drowning in disconnected numbers. Three loops:
 
-1. **Understand** — upload a lab PDF; the app extracts ~83 biomarkers, flags
+1. **Understand**, upload a lab PDF; the app extracts ~83 biomarkers, flags
    what's worth attention, and produces a doctor-shareable summary.
-2. **Build the habit** — a 30-second daily check-in (energy/sleep/training),
+2. **Build the habit**, a 30-second daily check-in (energy/sleep/training),
    streaks, and trends that lead with check-in signal because panels are only
-   6–12 months apart.
-3. **Reward** — an "iki points" economy earned across all of the above, spent in
+   6-12 months apart.
+3. **Reward**, an "iki points" economy earned across all of the above, spent in
    a Partners marketplace (voucher codes + affiliate links) and grown through
    referrals.
 
@@ -74,12 +81,12 @@ Playwright (E2E against staging, plus a production smoke monitor).
 
 ---
 
-## 3. What you are inheriting — honest inventory
+## 3. What you are inheriting, honest inventory
 
 **Genuinely solid:**
 - The interpretation engine is deterministic and unit-tested. The LLM only
   transcribes numbers off a page; **code** decides high/low/band. This is the
-  single most important safety property in the system — do not let it migrate
+  single most important safety property in the system, do not let it migrate
   into the model.
 - Points, "same report" identity, and the beta gate each have exactly one source
   of truth (`src/lib/points.ts`, `panelContentSignature`, `resolveApprovedUserId`).
@@ -91,13 +98,13 @@ Playwright (E2E against staging, plus a production smoke monitor).
 - Unit tests covering the domain logic (biomarkers, points, trends, future,
   check-ins, referrals, reminders, analytics, token verification), plus a
   Playwright suite that exercises the deployed staging app on every PR.
-  `npm test` for the current count — see `docs/TESTING.md`.
+  `npm test` for the current count, see `docs/TESTING.md`.
 
 **Real debt, sized:**
 - **E2E covers the signed-out surface only.** Playwright runs against staging on
   every PR (landing renders, every API route rejects anonymous callers, admin
-  gate, legal pages, PWA). Everything *behind login* — onboarding, upload,
-  check-in, redemption — is still verified by hand, because Privy's email-OTP
+  gate, legal pages, PWA). Everything *behind login*, onboarding, upload,
+  check-in, redemption, is still verified by hand, because Privy's email-OTP
   login can't be automated without either a mail service or an auth backdoor.
   The options are laid out in [`TESTING.md`](./TESTING.md). See §8, item 1.
 - **Staging exists but is single-slot.** Every PR deploys to one shared staging
@@ -126,17 +133,17 @@ Legend: **P0** = you cannot operate without it · **P1** = needed within week on
 
 | # | System | What it controls | Transfer action | Pri |
 |---|--------|------------------|-----------------|-----|
-| 1 | **GitHub** — `meetajinkyaj/AI-Tools`, `meetajinkyaj/ikigaro-os` | Source of truth; CI deploys from `main` | Add as admin. Longer term move both repos to a **GitHub organization** so ownership isn't a personal account. | P0 |
+| 1 | **GitHub**, `meetajinkyaj/AI-Tools`, `meetajinkyaj/ikigaro-os` | Source of truth; CI deploys from `main` | Add as admin. Longer term move both repos to a **GitHub organization** so ownership isn't a personal account. | P0 |
 | 2 | **Cloudflare** (account `21510d84b951ec23fc0b34eb316e6546`) | Workers `ai-tools` (app+admin), `ai-tools-staging`, `ikigaro-reminders` (daily push cron), `ikigaro-os`; DNS for all hostnames; Cloudflare Access on admin | Invite as account member with Workers + DNS + Access admin. | P0 |
-| 3 | **Supabase** | The entire database — all user and health data | Add as project owner/admin. Confirm **PITR/backup posture** while you're in there (see §7). | P0 |
+| 3 | **Supabase** | The entire database, all user and health data | Add as project owner/admin. Confirm **PITR/backup posture** while you're in there (see §7). | P0 |
 | 4 | **Privy** | Auth. If this is lost, nobody can log in | Add to the Privy app team. App ID `cmr7snzr8003e0ejvn5y0sppr` is public; the **app secret** is a Worker secret. | P0 |
-| 5 | **Anthropic Console** | The extraction API key; the billing that stops report uploads when exhausted | Add to the org; set a **spend alert** — there is none today. | P0 |
+| 5 | **Anthropic Console** | The extraction API key; the billing that stops report uploads when exhausted | Add to the org; set a **spend alert**, there is none today. | P0 |
 | 6 | **Domain registrar** (ikigaro.com) | Everything, ultimately | Confirm who holds it; add access or transfer to a company account. | P0 |
-| 7 | **GitHub Actions secrets** | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CRON_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Repo admin (#1) gives you write access. Values are not readable — rotate rather than retrieve (RUNBOOK §4). | P1 |
-| 8 | **Worker secrets** | `ANTHROPIC_API_KEY`, `PRIVY_APP_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` on `ai-tools`; `CRON_SECRET` + `VAPID_PRIVATE_KEY` on `ikigaro-reminders` | Set via `npx wrangler secret put`. Not readable after being set — rotate to take ownership. | P1 |
+| 7 | **GitHub Actions secrets** | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CRON_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Repo admin (#1) gives you write access. Values are not readable, rotate rather than retrieve (RUNBOOK §4). | P1 |
+| 8 | **Worker secrets** | `ANTHROPIC_API_KEY`, `PRIVY_APP_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` on `ai-tools`; `CRON_SECRET` + `VAPID_PRIVATE_KEY` on `ikigaro-reminders` | Set via `npx wrangler secret put`. Not readable after being set, rotate to take ownership. | P1 |
 | 9 | **`ADMIN_EMAILS`** in `wrangler.jsonc` | Who can open the admin console | Add your email, commit, deploy. It is a committed plaintext var **on purpose** (§7, item 3). | P1 |
-| 10 | **Cloudflare Access** on `admin.ikigaro.com` | Second gate in front of admin | Add your email to the Access policy — separate from #9; both must allow you. | P1 |
-| 11 | **Email** — `hello@ikigaro.com` | User-facing contact on the app, marketing site, and legal pages | Get a mailbox/alias. | P1 |
+| 10 | **Cloudflare Access** on `admin.ikigaro.com` | Second gate in front of admin | Add your email to the Access policy, separate from #9; both must allow you. | P1 |
+| 11 | **Email**, `hello@ikigaro.com` | User-facing contact on the app, marketing site, and legal pages | Get a mailbox/alias. | P1 |
 | 12 | **Google Analytics / other marketing tooling**, if any | Marketing-site measurement | Confirm with the founder whether anything exists; the app's own analytics are first-party and in-repo. | P1 |
 
 **Rotation-on-handover policy.** If the previous holder should no longer have
@@ -149,11 +156,11 @@ and GitHub secret) or daily reminders stop.
 
 ## 5. Day one / week one
 
-**Day one — prove you can operate it:**
+**Day one, prove you can operate it:**
 1. Complete all P0 rows in §4.
 2. Clone, `npm install`, `npm run dev`, sign in with your own email against the
    dev config (README §Getting started).
-3. Run the full verification chain — `npm run lint && npx tsc --noEmit && npm
+3. Run the full verification chain, `npm run lint && npx tsc --noEmit && npm
    test && npm run build && npm run cf:build`. All five must pass before you
    trust any change you make.
 4. Add your email to `ADMIN_EMAILS` + the Cloudflare Access policy, deploy via a
@@ -161,7 +168,7 @@ and GitHub secret) or daily reminders stop.
    **You have now done a production deploy end to end.** That is the day-one goal.
 5. Read the admin Analytics tab. That is the real state of the beta.
 
-**Week one — build your own map:**
+**Week one, build your own map:**
 6. Read `src/lib/biomarkers.ts` and `src/lib/points.ts` in full. They are the
    product's two engines and are the highest-consequence files in the repo.
 7. Trace one full request: `src/app/api/biomarkers/route.ts` (upload/save) top to
@@ -204,8 +211,8 @@ and GitHub secret) or daily reminders stop.
 **Why reminders are their own Worker:** the app decides *who* is due and *what*
 to say; a separate `ikigaro-reminders` Worker on a Cloudflare cron trigger does
 the scheduling and sending. It used to be GitHub Actions, until GitHub's
-scheduler proved to run it 90–110 minutes late every day. Sends are marked
-**before** hand-off, so a duplicate run can never double-notify — which is what
+scheduler proved to run it 90-110 minutes late every day. Sends are marked
+**before** hand-off, so a duplicate run can never double-notify, which is what
 makes keeping the GitHub workflow as a late backup safe.
 
 **Auth flow:** Privy issues an email-OTP token → client sends it to
@@ -221,7 +228,7 @@ read or write anything. Approval is an admin action.
 **The points economy is two numbers, not one.** `reward_points.points_balance`
 is spendable and can be boosted by a partner multiplier; `users.iki_score` is
 lifetime, base-only, never spent, and is the *only* thing that drives rank. Both
-are written in one place — `creditPoints()` in `src/lib/credit-points.ts`. If you
+are written in one place, `creditPoints()` in `src/lib/credit-points.ts`. If you
 are adding a new way to earn, go through that function; it writes the boosted
 amount, the base amount, and the ledger's `base_amount`/`multiplier` columns
 together, and returns whether the earn crossed a rank boundary. Writing to
@@ -234,7 +241,7 @@ unique indexes cannot express that, and the gap was not theoretical:
 `users` unique violation, so with partner code `FITTR` live a user named Fittr
 would silently have been assigned it, and their invite link would have credited
 the partner forever with no error anywhere. The guarantee is the `invite_codes`
-table (migration 0013) — both tables sync into it by trigger, and its primary
+table (migration 0013), both tables sync into it by trigger, and its primary
 key fails the transaction that tries to take a taken code.
 
 **RLS is on every table, with no policies.** That is the convention, not an
@@ -267,18 +274,18 @@ handover.
    `wrangler.jsonc` `vars`. Secrets set via `wrangler secret put` are separate
    and do survive.
 4. **`NEXT_PUBLIC_*` inlines at build time.** If it's missing in CI, you ship a
-   white screen — which happened. That's why the Supabase URL, Privy app ID, and
+   white screen, which happened. That's why the Supabase URL, Privy app ID, and
    VAPID public key are hardcoded defaults in `src/lib/*`. They are public values;
    this is deliberate, not sloppiness.
-5. **GitHub's cron is not reliable** — in two distinct ways. It silently skipped
-   a scheduled run entirely (2026-07-24), and it ran the same job 90–110 minutes
+5. **GitHub's cron is not reliable**, in two distinct ways. It silently skipped
+   a scheduled run entirely (2026-07-24), and it ran the same job 90-110 minutes
    late every day thereafter. Reminders now run on a Cloudflare cron Worker;
    GitHub is only a backup. Don't move anything time-sensitive back onto it.
 6. **Cloudflare Bot Fight Mode is off on purpose.** It served a managed challenge
    to our own GitHub Actions cron caller and 403'd it. Every endpoint carries its
    own auth. If someone turns BFM on, reminders break silently.
 7. **`window.confirm` can be suppressed by the browser** and then returns `true`
-   — a user clicked delete, saw no dialog, and the delete went through. All
+   a user clicked delete, saw no dialog, and the delete went through. All
    destructive admin actions go through the in-app `ConfirmDialog`. Never
    reintroduce `window.confirm`.
 8. **There are no database backups.** Checked on 2026-07-27: the Supabase
@@ -287,7 +294,7 @@ handover.
    while the tester count is single-digit, with **~20 testers as the trigger to
    turn on Supabase Pro ($25/mo)**. If you are reading this and there are
    already twenty or more users, that decision has expired and this is the
-   first thing to fix — before any feature work. `RUNBOOK.md` §2b has the
+   first thing to fix, before any feature work. `RUNBOOK.md` §2b has the
    detail, the manual stopgap, and the restore drill to run once backups
    exist.
 
@@ -300,13 +307,13 @@ constraints, (g) Cloudflare zone features (Access, Bot Fight Mode) in the path.
 
 ## 8. Where to kick off from
 
-Ordered by what I'd actually do first, with the reasoning — disagree freely once
+Ordered by what I'd actually do first, with the reasoning, disagree freely once
 you have your own read.
 
 **1. Authenticated E2E coverage.** Staging and a Playwright suite both exist now:
 every PR deploys to `ai-tools-staging` and CI exercises the signed-out surface in
 a real browser ([`TESTING.md`](./TESTING.md)). The gap is everything behind login
-— onboarding, panel upload and confirmation, check-ins, redemption — which is
+onboarding, panel upload and confirmation, check-ins, redemption, which is
 still hand-verified because Privy's email-OTP flow resists automation. The clean
 fix is a test mailbox the suite can read OTPs from (Mailosaur or a catch-all
 inbox); the tempting fix, a test-only auth bypass, would be a permanent backdoor
@@ -316,18 +323,18 @@ path gets more complex.
 **2. Check the tester count against the backup decision.** There are no
 backups (see trap 8); the founder accepted that below ~20 testers. Your first
 job is to confirm that threshold still holds. If it does not, turning on
-Supabase Pro ($25/mo) is a billing change, not an investigation — then rehearse
+Supabase Pro ($25/mo) is a billing change, not an investigation, then rehearse
 a restore into a scratch project, because an unrehearsed backup is a hope, not
 a backup. Half a day; removes the biggest single-point risk in the system.
 
-**3. Get real beta signal.** ~20–30 testers are the immediate plan. The admin
+**3. Get real beta signal.** ~20-30 testers are the immediate plan. The admin
 Analytics tab already tracks the funnel, D1/7/30 retention, and DAU/WAU/MAU.
 Watch two things: does the report land (do people upload a second panel?), and
 does the daily check-in survive week one? Those two answers should reorder
 everything below this line.
 
 **4. Family vault / multi-profile UI.** The schema has supported it since
-migration 0005 — every health row already hangs off `profile_id` and one "self"
+migration 0005, every health row already hangs off `profile_id` and one "self"
 profile is auto-created per user. This is a UI project on a done data model,
 which makes it the cheapest large feature available. It's also the compliant path
 for under-18 users (guardian accounts) and the "track my parents' health" use
@@ -336,7 +343,7 @@ case, which is the strongest word-of-mouth driver in this category.
 **5. Personalized recommendation loop under Partners.** A deterministic
 marker→intervention catalog that the model *presents* rather than invents,
 surfacing partner products and unmonetized food suggestions beside them.
-Deliberately under Partners, not the Report — the Report must stay clinical and
+Deliberately under Partners, not the Report, the Report must stay clinical and
 unmonetized. Blocked on a real partner catalog, not on engineering.
 
 **6. Marketing-site rebuild.** Replace the 12.4MB Babel-in-the-browser snapshot
@@ -360,15 +367,15 @@ deliberately.
   interprets. Human confirmation before save is the accuracy backstop.
 - **Single sources of truth stay single.** Points values, "same report" identity,
   and the beta gate each live in exactly one place. Resist inlining them.
-- **Reference data lives in the DB, not code** — range changes ship as idempotent
+- **Reference data lives in the DB, not code**, range changes ship as idempotent
   migrations with no deploy (`REFERENCE_DATA.md`).
-- **Every reading carries provenance** — the lab's own printed range vs. our
+- **Every reading carries provenance**, the lab's own printed range vs. our
   catalog's. Keep this as data sources multiply.
 - **Points-affecting operations must be idempotent.** Every earn path has a
   replay guard; every push send is marked before it's handed off.
 - **Prod data is never mutated without an explicit ask**, and DB changes are
   rehearsed on a throwaway Postgres before they touch production.
-- **The disclaimer is fixed copy:** "Educational, not a diagnosis — please
+- **The disclaimer is fixed copy:** "Educational, not a diagnosis, please
   consult a doctor." Don't soften it without counsel.
 
 ---
@@ -378,7 +385,7 @@ deliberately.
 Ask these directly; they're not answerable from the code.
 
 1. Who legally owns the domain and the Cloudflare/Supabase/Anthropic accounts
-   today — a personal identity or a company entity? Moving to company ownership
+   today, a personal identity or a company entity? Moving to company ownership
    is cleanest before more people are added.
 2. What is the intended monetization? Affiliate/voucher economics are built; the
    subscription question is entirely unanswered in the codebase.

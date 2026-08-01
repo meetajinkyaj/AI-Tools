@@ -4,7 +4,7 @@
  * Why hand-rolled: the reminder sender needs to run on Cloudflare Workers, and
  * the usual `web-push` package is Node-only. This is the same trade already
  * made for Privy token verification (`verify-privy-token.ts`) and for the same
- * reason — the runtime, not preference.
+ * reason, the runtime, not preference.
  *
  * Because this is crypto we wrote ourselves, it is checked against the official
  * RFC 8291 §5 test vector, including the intermediate PRK / CEK / NONCE / header
@@ -46,7 +46,7 @@ function concat(...parts: Uint8Array[]): Uint8Array {
   return out;
 }
 
-/** A copy in its own ArrayBuffer — TS's BufferSource rejects Uint8Array views. */
+/** A copy in its own ArrayBuffer. TS's BufferSource rejects Uint8Array views. */
 function buf(bytes: Uint8Array): ArrayBuffer {
   const ab = new ArrayBuffer(bytes.length);
   new Uint8Array(ab).set(bytes);
@@ -69,7 +69,7 @@ async function hmac(key: Uint8Array, data: Uint8Array): Promise<Uint8Array> {
 }
 
 /**
- * One-block HKDF (extract + expand), which is all Web Push needs — every
+ * One-block HKDF (extract + expand), which is all Web Push needs, every
  * output here is ≤32 bytes, so the expand loop never runs twice.
  */
 async function hkdf(
@@ -137,9 +137,9 @@ export interface EncryptResult {
  */
 export async function encryptPayload(opts: {
   payload: Uint8Array;
-  /** Subscription `keys.p256dh` — the user agent's public key, raw 65 bytes. */
+  /** Subscription `keys.p256dh`, the user agent's public key, raw 65 bytes. */
   userPublicKey: Uint8Array;
-  /** Subscription `keys.auth` — 16-byte shared auth secret. */
+  /** Subscription `keys.auth`, 16-byte shared auth secret. */
   authSecret: Uint8Array;
   salt?: Uint8Array;
   senderKeys?: { publicKey: Uint8Array; privateKey: Uint8Array };
@@ -274,7 +274,7 @@ export interface SendResult {
 }
 
 /**
- * Deliver one notification. Never throws — a single bad subscription must not
+ * Deliver one notification. Never throws, a single bad subscription must not
  * stop the rest of the batch.
  */
 export async function sendPush(opts: {

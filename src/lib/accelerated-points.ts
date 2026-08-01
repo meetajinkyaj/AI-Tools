@@ -1,12 +1,12 @@
 /**
- * Accelerated Points — partner codes that earn faster, on a decaying glide path.
+ * Accelerated Points, partner codes that earn faster, on a decaying glide path.
  *
  * A community or brand gets a custom invite code with "AP partner" switched on
  * in the admin console. Anyone who signs up through it earns at an elevated
  * rate that steps down over their first six months:
  *
- *   day 0–90     2.00x
- *   day 91–180   1.50x if they met the activity floor in the first 90 days,
+ *   day 0-90     2.00x
+ *   day 91-180   1.50x if they met the activity floor in the first 90 days,
  *                1.25x if they did not
  *   day 181+     1.25x steady state
  *
@@ -27,15 +27,15 @@ export const BOOST_WINDOW_DAYS = 90;
 export const GLIDE_END_DAYS = 180;
 
 export const BOOST_INITIAL = 2.0;
-/** Days 91–180, if the activity floor was met. */
+/** Days 91-180, if the activity floor was met. */
 export const BOOST_SUSTAINED = 1.5;
-/** Days 91–180 without the floor, and the steady state for everyone after. */
+/** Days 91-180 without the floor, and the steady state for everyone after. */
 export const BOOST_STEADY = 1.25;
 
 /**
  * Check-ins required within the first 90 days to keep the higher rate.
  *
- * ⚠️ ASSUMPTION — confirm before the first partnership. Half the window: a
+ * ⚠️ ASSUMPTION, confirm before the first partnership. Half the window: a
  * normal person who has a bad fortnight still clears it, a dormant account does
  * not. Change this one number to retune; nothing else depends on its value.
  */
@@ -46,9 +46,9 @@ export const MAX_MULTIPLIER = 5;
 
 /**
  * Welcome balance granted when someone activates through a partner code
- * ("endowed progress" — starting at zero is the most abandonable state).
+ * ("endowed progress", starting at zero is the most abandonable state).
  *
- * ⚠️ ASSUMPTION — spendable only, and deliberately NOT counted toward
+ * ⚠️ ASSUMPTION, spendable only, and deliberately NOT counted toward
  * iki_score. A gift is not work, and rank has to stay a record of what someone
  * actually did or a partner code buys status. Set to 0 to disable.
  */
@@ -59,7 +59,7 @@ export const WELCOME_GRANT_POINTS = 150;
 /**
  * Which earns accelerate: what the user did THEMSELVES.
  *
- * Referral milestones are excluded — they pay a referrer for someone else's
+ * Referral milestones are excluded, they pay a referrer for someone else's
  * behaviour, so doubling them rewards recruiting rather than health and hands
  * partner users a permanently better rate at farming signups. The welcome grant
  * is excluded because multiplying a gift is just a bigger gift.
@@ -68,12 +68,12 @@ export const WELCOME_GRANT_POINTS = 150;
  * `POINTS_REASON`. The check-in path builds awards in `checkin.ts` and writes
  * `"streak_bonus"` for both the 7- and 30-day bonuses; `POINTS_REASON.streak7`
  * / `.streak30` are declared and never written. Validating this list against
- * `POINTS_REASON` therefore proves nothing — the tests drive it from the real
+ * `POINTS_REASON` therefore proves nothing, the tests drive it from the real
  * award producers instead.
  */
 export const ACCELERATED_REASONS: readonly string[] = [
   "checkin",
-  // Covers both the 7-day and 30-day bonuses — see the warning above.
+  // Covers both the 7-day and 30-day bonuses, see the warning above.
   "streak_bonus",
   "panel_upload",
   "retest_upload",
@@ -89,8 +89,8 @@ export const WELCOME_GRANT_REASON = "welcome_grant";
 /**
  * Earns that do NOT count toward lifetime rank.
  *
- * Only gifts. Everything a user earns — including referral milestones, which
- * are a real contribution — raises their score, just never at a multiplier.
+ * Only gifts. Everything a user earns, including referral milestones, which
+ * are a real contribution, raises their score, just never at a multiplier.
  */
 const RANK_EXCLUDED_REASONS: readonly string[] = [WELCOME_GRANT_REASON];
 
@@ -213,7 +213,7 @@ export function totalSpendable(awards: readonly AcceleratedAward[]): number {
   return awards.reduce((sum, a) => sum + a.amount, 0);
 }
 
-/** What hits lifetime iki score — base only, gifts excluded. */
+/** What hits lifetime iki score, base only, gifts excluded. */
 export function totalTowardRank(awards: readonly AcceleratedAward[]): number {
   return awards.reduce(
     (sum, a) => sum + (countsTowardRank(a.reason) ? a.baseAmount : 0),

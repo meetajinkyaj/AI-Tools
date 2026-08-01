@@ -6,7 +6,7 @@ import {
   declaredBackupPosture,
 } from "./backup-risk";
 
-describe("declaredBackupPosture — fails safe", () => {
+describe("declaredBackupPosture, fails safe", () => {
   it("only the explicit string counts as protected", () => {
     expect(declaredBackupPosture("protected")).toBe("protected");
     expect(declaredBackupPosture("  PROTECTED  ")).toBe("protected");
@@ -14,7 +14,7 @@ describe("declaredBackupPosture — fails safe", () => {
 
   it("treats anything else as unprotected, including nothing at all", () => {
     // The whole point. A missing or misspelled variable must not be read as
-    // "backups exist" — wrongly warning costs a moment's annoyance, wrongly
+    // "backups exist", wrongly warning costs a moment's annoyance, wrongly
     // staying quiet costs every user's health data.
     for (const value of [
       undefined,

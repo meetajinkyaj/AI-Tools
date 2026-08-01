@@ -102,7 +102,7 @@ describe("input we did not anticipate", () => {
   });
 
   it("normalises accents and symbols without emptying the string", () => {
-    expect(normalize("Ōura—Ring")).toBe("oura ring");
+    expect(normalize("Ōura-Ring")).toBe("oura ring");
   });
 });
 
@@ -173,7 +173,7 @@ describe("the autocomplete hints", () => {
 
   it("offers names the matcher actually recognises", () => {
     // A hint that does not round-trip would teach users a spelling we then fail
-    // to fold — worse than offering no hint at all.
+    // to fold, worse than offering no hint at all.
     for (const hint of SUGGESTION_HINTS) {
       const m = matchDevice(hint);
       expect(m, hint).not.toBeNull();

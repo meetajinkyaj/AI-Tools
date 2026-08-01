@@ -4,7 +4,7 @@ import { Card, Eyebrow, primaryButtonClass, secondaryButtonClass } from "./ui";
 
 /**
  * In-app confirmation modal for destructive actions. Replaces window.confirm,
- * which browsers can silently suppress ("prevent additional dialogs") — after
+ * which browsers can silently suppress ("prevent additional dialogs"), after
  * which it returns true and the action fires with no prompt at all. This one
  * always renders, matching the app's overlay style (see the redeem flow).
  */

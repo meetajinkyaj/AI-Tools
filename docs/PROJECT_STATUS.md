@@ -1,11 +1,11 @@
-# Ikigaro — Project & Session Reference
+# Ikigaro. Project & Session Reference
 
-_Last updated: 2026-07-27_
+_Last updated: 2026-07-30_
 
 A living reference for the Ikigaro app: architecture, what's built, how to
 operate it, and the known follow-ups. Update this as work lands.
 
-> **New to the project?** Read [`HANDOVER.md`](./HANDOVER.md) first — it orients
+> **New to the project?** Read [`HANDOVER.md`](./HANDOVER.md) first, it orients
 > you and links every doc in reading order. Operational procedures (deploy,
 > migrate, rotate secrets, incident response) live in [`RUNBOOK.md`](./RUNBOOK.md).
 
@@ -34,27 +34,27 @@ operate it, and the known follow-ups. Update this as work lands.
 
 ## 2. What's built (all live)
 
-1. **Baseline Biomarker Report** — PDF upload → text-layer extraction (`unpdf`,
+1. **Baseline Biomarker Report**. PDF upload → text-layer extraction (`unpdf`,
    vision fallback) → Claude transcribes onto the ~83-marker catalog → human
    confirmation screen → deterministic flags/bands/derived markers/unit
    canonicalization on save. Report leads with "Worth a look" (incl. borderline);
    the full per-category breakdown is collapsed behind "See all N markers".
    Exact-duplicate re-saves return the existing panel (content-signature dedup).
-2. **Profile layer** — every health row hangs off `profile_id`; one auto-created
+2. **Profile layer**, every health row hangs off `profile_id`; one auto-created
    "self" profile per user today; multi-profile family vault is the planned
    add-on (also the compliant path for minors' data via guardian accounts).
-3. **Daily check-ins** — energy/sleep/training/exercises, streaks, and the
+3. **Daily check-ins**, energy/sleep/training/exercises, streaks, and the
    points economy. **Capture-now provenance**: raw-as-printed values + the
    lab's own printed ranges stored on every reading; intervention log.
-4. **Trends** — leads with the daily check-in signal (panels are 6–12 months
+4. **Trends**, leads with the daily check-in signal (panels are 6-12 months
    apart); biomarker deltas on distinct test dates; outcome-verified rewards
    (healthy-direction continued improvement, ≥14 days apart, capped).
-5. **Points economy — two currencies, one ledger.** All values in
+5. **Points economy, two currencies, one ledger.** All values in
    `src/lib/points.ts` (single source of truth, trivially retunable); the full
    earn reference is `docs/POINTS_ECONOMY.md`.
-   - **Points** (`reward_points.points_balance`) — spendable, boostable by a
+   - **Points** (`reward_points.points_balance`), spendable, boostable by a
      partner multiplier, reduced by redemptions.
-   - **Iki Score** (`users.iki_score`) — lifetime, BASE amounts only before any
+   - **Iki Score** (`users.iki_score`), lifetime, BASE amounts only before any
      multiplier, never reduced by spending. Drives rank. This split is what
      stops a voucher purchase demoting you and stops a 2x partner code buying
      status.
@@ -64,16 +64,16 @@ operate it, and the known follow-ups. Update this as work lands.
    150 (spendable only, never scored). Anti-farm: date guard,
    content-signature replay guard (same report never earns twice), and streak
    milestones that pay **once ever on personal best** (`users.best_streak`)
-   rather than whenever the streak equals 7 — the old rule paid people to break
+   rather than whenever the streak equals 7, the old rule paid people to break
    the habit, and 7-on/1-off beat a perfect year by 38%.
-6. **Doctor-Ready PDF** — client-side jsPDF (lazy-loaded), Web Share API to
+6. **Doctor-Ready PDF**, client-side jsPDF (lazy-loaded), Web Share API to
    WhatsApp/Telegram, Latin-1 glyph sanitizer.
-7. **PWA** — installable (manifest + brand icons generated from
-   `brand/ikigaro-app-icon-512.png` by `npm run icons` — never hand-edit
+7. **PWA**, installable (manifest + brand icons generated from
+   `brand/ikigaro-app-icon-512.png` by `npm run icons`, never hand-edit
    `public/`), conservative service
    worker (offline fallback only; no app/API caching), install prompt
    (Chromium button / iOS share-sheet hint).
-8. **Daily reminders** — opt-in Web Push ("Daily reminders" toggle in
+8. **Daily reminders**, opt-in Web Push ("Daily reminders" toggle in
    Settings). Sent by the **`ikigaro-reminders` Cloudflare Worker**
    (`workers/reminders`) on a Cloudflare cron trigger at 12:30 UTC (18:00 IST);
    `/api/cron/due-reminders` (CRON_SECRET) returns who's due and marks them
@@ -81,28 +81,28 @@ operate it, and the known follow-ups. Update this as work lands.
    hand-rolled on Web Crypto (`src/lib/web-push.ts`, RFC 8291/8292) and verified
    against the official RFC 8291 §5 test vector. GitHub Actions is now only a
    late backup / break-glass sender.
-9. **Panel-day push** — once per panel cycle, when the ~6-month re-test window
+9. **Panel-day push**, once per panel cycle, when the ~6-month re-test window
    opens: "Your re-test window is open… earns +150 iki points". Same pipeline;
    `retest_reminder_sent` guard; replaces that day's check-in nudge.
-10. **Future You** — habit momentum 0–100 (consistency/sleep/training/energy)
+10. **Future You**, habit momentum 0-100 (consistency/sleep/training/energy)
     leads; flagged markers get directional outlooks (`habit_v1`, no invented
     numbers) upgraded to clamped linear projections (`linear_v1`) with 2+ real
     test dates; re-test scoreboard card; active-interventions "running
     experiment" framing. Motivational, not diagnostic.
-11. **Redemption marketplace (Partners tab)** — voucher items (points → instant
+11. **Redemption marketplace (Partners tab)**, voucher items (points → instant
     code from a pre-loaded pool, atomic `redeem_voucher()` with SKIP LOCKED; no
     double-spend/double-issue) + affiliate items (free click-out, disclosure
     line, click logging). Copyable codes; collapsible redemption history that
     survives item deletion (name snapshot). How-to-redeem explainer + FAQ.
-12. **Beta waitlist** — new signups land waitlisted (verified email via Privy
+12. **Beta waitlist**, new signups land waitlisted (verified email via Privy
     OTP), see a branded waitlist screen, and are invisible to every data API
     (`resolveApprovedUserId` choke point). Admin approves/revokes from the
     console (audit-logged); waitlisted logins don't pollute DAU.
-13. **Admin console** (`admin.ikigaro.com/admin`) — Analytics (default tab:
+13. **Admin console** (`admin.ikigaro.com/admin`). Analytics (default tab:
     funnel, D1/7/30 retention, DAU/WAU/MAU, streaks, 14-day check-in chart,
     client errors) · Rewards (add/delete items with instruction presets, bulk
     code upload, inventory) · Users (roster + approve/revoke, vanity invite
-    codes, and an **Onboarded** tick — "has a self profile", the same test the
+    codes, and an **Onboarded** tick, "has a self profile", the same test the
     app uses, so the console cannot disagree with what the user sees; the
     header counts "approved, not onboarded", which is the beta's real
     drop-off) · **Partners** (create/rename/retune/deactivate an Accelerated
@@ -111,40 +111,39 @@ operate it, and the known follow-ups. Update this as work lands.
     actions go through an in-app ConfirmDialog (never `window.confirm`).
     Auth: `ADMIN_EMAILS` allow-list (fail-closed) + Cloudflare Access;
     `app.ikigaro.com/admin` redirects to the admin subdomain.
-14. **Observability** — `POST /api/telemetry`: `app_opened` beacon (approved
+14. **Observability**, `POST /api/telemetry`: `app_opened` beacon (approved
     users only, deduped/day → powers retention) + client error capture
     (window.onerror/unhandledrejection, pre-auth included, capped). Server
     errors: Cloudflare Workers observability.
-15. **Age policy** — no minimum age (per legal review); under-18s use with
+15. **Age policy**, no minimum age (per legal review); under-18s use with
     parent/guardian consent (Terms §1); onboarding shows the consent note.
     Rewards/points terms live in Terms §14 (`/terms#rewards`, draft pending
     counsel's wording pass).
-16. **Referrals** — name-based codes (`?ref=AJINKYA`; numbered on collision,
+16. **Referrals**, name-based codes (`?ref=AJINKYA`; numbered on collision,
     random fallback, generated lazily) + admin-assigned vanity codes ("FITTR",
     inline editor in the Users tab with live normalize/preview). Attribution
     at signup only (`referred_by`); **tiered milestone earns** to the referrer
     via one shared `awardReferralMilestone` (at-most-once per milestone+friend,
     best-effort): +100 friend onboards (`referral`), +50 first 7-day streak
-    (`referral_streak`), +150 first panel within 30 days (`referral_panel`) —
-    max 300 per friend (`REFERRAL_MAX_TOTAL`). **Referrer volume milestones**
-    mirror the check-in streak ladder — +50 at 7 friends onboarded, +150 at 30
-    — counted off `referral` ledger rows, so they track friends who actually
+    (`referral_streak`), +150 first panel within 30 days (`referral_panel`), max 300 per friend (`REFERRAL_MAX_TOTAL`). **Referrer volume milestones**
+    mirror the check-in streak ladder, +50 at 7 friends onboarded, +150 at 30
+    counted off `referral` ledger rows, so they track friends who actually
     onboarded rather than raw signups. Invite card (Share + Copy) on Partners;
     Terms §14 referral clause keeps values out of legal text.
     **The invite link is OFF on shared cards during closed beta**
-    (`INVITE_LINK_ON_SHARED_CARDS`, `src/lib/share-card.ts`) — both the image
+    (`INVITE_LINK_ON_SHARED_CARDS`, `src/lib/share-card.ts`), both the image
     and the caption, on both the check-in and the rank card. Access is
     invite-only, so a posted card advertising a join link sends strangers at a
     door that will not open. Flip that one flag at ~20 testers; both cards light
     up together and tests cover both states.
-17. **Startup & entry polish** — landing offers **Sign up** (primary) and **Log
+17. **Startup & entry polish**, landing offers **Sign up** (primary) and **Log
     in** (secondary), both opening the same Privy OTP flow (it creates the
     account when the email is new). One branded `Splash` covers every pre-app
     wait, so startup reads as a single moment. `html` carries the linen ground +
     `color-scheme: light` (without it, dark-mode phones painted a black first
     frame and reloads flashed white). Home shows shimmer placeholders instead of
     fake zeros while the summary loads.
-18. **Marketing site** (`ikigaro-os`) — the Notion-backed waitlist is retired;
+18. **Marketing site** (`ikigaro-os`), the Notion-backed waitlist is retired;
     every "Join the waitlist" CTA points at `app.ikigaro.com`, and the bottom
     email form is replaced by a signup button. `POST /api/waitlist` answers 410
     for stale cached pages. The landing snapshot's bootstrap **replaces the whole
@@ -152,12 +151,12 @@ operate it, and the known follow-ups. Update this as work lands.
     footer), so the Worker patches the rendered DOM via a persistent idempotent
     interval. The vestigial `src/` TanStack app was deleted (69 deps → 0).
 
-19. **Iki ranks & the enamel badges** — five tiers off `iki_score`: Iki Rookie
+19. **Iki ranks & the enamel badges**, five tiers off `iki_score`: Iki Rookie
     🌱 0 · Iki Apprentice 🛠️ 400 · Iki Pro ⚡ 2,000 · Iki Sensei 🥋 8,000 ·
     **Iki Grandmaster 🏆 25,000 (secret)**. Thresholds were fitted to modelled
     earn rates, not picked: a consistent user reaches Sensei in ~14 months.
     Grandmaster is withheld from the ladder, the progress bar **and** the "next
-    rank" line — leaking it there once revealed both its name and its exact
+    rank" line, leaking it there once revealed both its name and its exact
     threshold to everyone one rung below.
     Artwork is Claude Design's "Iki Badges v3", cloisonné enamel pins with a
     hanko seal (芽 修 錬 師 道). One builder (`src/lib/rank-pin.ts`) feeds both
@@ -167,39 +166,38 @@ operate it, and the known follow-ups. Update this as work lands.
     nowhere else in the product (there is a test).
     The rank card leads **Home**; the level-up toast fires on Check-in, where
     the earn happens.
-20. **Accelerated Points (partner codes)** — a `partners` row (gym, community,
-    brand — deliberately not a user) grants a boosted earn rate to everyone who
+20. **Accelerated Points (partner codes)**, a `partners` row (gym, community,
+    brand, deliberately not a user) grants a boosted earn rate to everyone who
     signs up through its `?ref` code, on a glide path: 2.0x for 90 days, then
     1.5x for 90 more **if** the activity floor was met (45 check-ins), then
     1.25x steady. Plus a 150-point welcome grant, spendable only. The rate is
     snapshotted on the user's own row at signup, so deactivating a partner stops
     NEW joiners getting the deal without retroactively downgrading anyone
-    already in. The floor is evaluated lazily on the first earn after day 90 —
-    no scheduled job to own or discover has been failing for a month.
+    already in. The floor is evaluated lazily on the first earn after day 90, no scheduled job to own or discover has been failing for a month.
     **Multipliers never touch `iki_score`**, so a community code cannot buy rank.
-21. **Shareable rank card** — the same canvas pipeline as the check-in card
+21. **Shareable rank card**, the same canvas pipeline as the check-in card
     (rendered client-side; nothing uploaded, no image service to run). One card,
     three formats (Story/Post/Square), no templates or field toggles: a check-in
     publishes several separable facts and some are nobody's business unless you
-    say so, a rank is one public fact. Habit data only — the input type has
+    say so, a rank is one public fact. Habit data only, the input type has
     nowhere to put a biomarker reading.
 
-22. **Cloud wearable integrations** — Oura, Fitbit, Whoop, Withings, Garmin and
+22. **Cloud wearable integrations**. Oura, Fitbit, Whoop, Withings, Garmin and
     Ultrahuman connect by OAuth from the web app. **No native app**: Apple
     HealthKit and Android Health Connect are on-device APIs with no web access
-    at all, so they need one — these six do not, which is why they come first.
+    at all, so they need one, these six do not, which is why they come first.
     The native path, when it comes, writes into the same
     `wearable_daily_metrics` table as one more provider.
     Six dialects normalize into one canonical vocabulary at the adapter boundary
     (`src/lib/wearables/metrics.ts`), so Whoop's "recovery" and Oura's
     "readiness" land on the same key rather than on two axes that quietly mean
-    different things. Everything easy to get wrong — refresh, **rotation**,
-    backoff, idempotent upsert — is shared in `sync.ts`.
+    different things. Everything easy to get wrong, refresh, **rotation**,
+    backoff, idempotent upsert, is shared in `sync.ts`.
     OAuth tokens are AES-GCM encrypted with a Worker secret
     (`WEARABLE_TOKEN_KEY`); a refresh token is standing permission to a third
     party's copy of someone's health data, and disk-level encryption does
     nothing against the realistic threat of a leaked service key. **Fails
-    closed** — no key means no storage, never plaintext.
+    closed**, no key means no storage, never plaintext.
     Garmin is push-only (no on-demand fetch exists), so it has its own webhook,
     authenticated by a shared secret in the registered URL because Garmin does
     not sign its pushes. Garmin and Ultrahuman need approved applications with
@@ -207,24 +205,24 @@ operate it, and the known follow-ups. Update this as work lands.
     `docs/WEARABLES_APPLICATIONS.md`.
     **Several devices merge into one series per metric** (`merge.ts`): a ranked
     source per metric, falling back PER DAY so the nights a ring was charging
-    are filled by a watch instead of lost. Never averaged — that invents a
+    are filled by a watch instead of lost. Never averaged, that invents a
     number no device reported. Reasoning: `docs/WEARABLE_DATA.md`.
     Surfaced as "From your devices" in Trends, and measured sleep now replaces
     self-reported sleep in the Future You momentum model when a device has
     reported.
-    NOT YET: no points for wearable data — steps are trivially spoofable and
+    NOT YET: no points for wearable data, steps are trivially spoofable and
     paying for them invites exactly that. The source ranking is not
     user-overridable, and there is no historical backfill on connect.
 
 ## 3. Key architecture decisions
 
 - **Text-layer-first extraction**, thinking disabled, streaming keep-alive
-  heartbeats — the model transcribes; `src/lib/biomarkers.ts` interprets
+  heartbeats, the model transcribes; `src/lib/biomarkers.ts` interprets
   deterministically. Human confirmation is the accuracy guard.
-- **Reference data lives in the DB** (`biomarker_catalog`) — ranges/bands
+- **Reference data lives in the DB** (`biomarker_catalog`), ranges/bands
   update via migration, no code change (`docs/REFERENCE_DATA.md`).
 - **Single sources of truth:** point values (`src/lib/points.ts`), "same
-  report" identity (`panelContentSignature` — shared by points anti-farm and
+  report" identity (`panelContentSignature`, shared by points anti-farm and
   panel dedup), beta gate (`resolveApprovedUserId`).
 - **Push architecture:** the app owns who-is-due and the payload copy; a
   separate `ikigaro-reminders` Worker owns scheduling and delivery. All sends
@@ -233,16 +231,16 @@ operate it, and the known follow-ups. Update this as work lands.
   GitHub Actions; it turned out to be entirely doable on Web Crypto, and moving
   it removed GitHub from a core product loop.
 - **Next 16 quirks:** `middleware` is deprecated → `proxy`, and proxy runs on
-  the Node runtime which **OpenNext/Workers cannot run** — host-based redirects
+  the Node runtime which **OpenNext/Workers cannot run**, host-based redirects
   live in server components instead (see `(app)/admin/page.tsx`). Read
   `node_modules/next/dist/docs/` before assuming conventions.
 - **Public build-time values are hardcoded defaults** (Supabase URL, Privy app
   ID, VAPID public key) because `NEXT_PUBLIC_*` inline at build time and were
   missing in CI.
-- **Plaintext Worker vars must live in `wrangler.jsonc` `vars`** — `wrangler
+- **Plaintext Worker vars must live in `wrangler.jsonc` `vars`**, `wrangler
   deploy` REPLACES dashboard-set vars every deploy (this wiped `ADMIN_EMAILS`
   once). Secrets via `wrangler secret put` persist.
-- **Migration-first deploys, always** — code that reads a column before its
+- **Migration-first deploys, always**, code that reads a column before its
   migration runs takes the whole app down (the waitlist deploy briefly risked
   this). Merge is the *second* step.
 
@@ -257,7 +255,7 @@ operate it, and the known follow-ups. Update this as work lands.
 - **Production smoke (`smoke.yml`):** the same E2E suite against
   `app.ikigaro.com` every ~30 min + on demand. Exists because CI only tests
   staging, so production can break with every check green.
-- **E2E (`docs/TESTING.md`):** read-only by design — no signup, no writes — so
+- **E2E (`docs/TESTING.md`):** read-only by design, no signup, no writes, so
   it is safe against any target. Covers the landing render (the white-screen
   class of bug), every API route rejecting anonymous callers, the admin gate,
   legal pages, and PWA assets. Authenticated flows remain hand-verified;
@@ -265,7 +263,7 @@ operate it, and the known follow-ups. Update this as work lands.
 - **Staging (`docs/STAGING.md`, live since 2026-07-25):** `ai-tools-staging` at
   `ai-tools-staging.meetajinkyaj.workers.dev`, backed by the `ikigaro-staging`
   Supabase project (`albhabiyfaqvpnxilovf`) with its own Anthropic key. Shares
-  the production Privy app — identity shared, data not; verified by a signup
+  the production Privy app, identity shared, data not; verified by a signup
   landing only in staging while production's user count stayed put. Separate
   Worker + separate Supabase project;
   `APP_ENV=staging` var. `assertNotProductionDatabase` refuses to boot if a
@@ -285,9 +283,9 @@ operate it, and the known follow-ups. Update this as work lands.
 - **Cloudflare:** custom domain `admin.ikigaro.com` on the `ai-tools` worker;
   Cloudflare Access app on that hostname (email OTP, admin allow-list);
   **Bot Fight Mode OFF** (it 403'd our own cron caller; endpoints carry their
-  own auth). Workers Builds git integration disconnected — CI is the only
+  own auth). Workers Builds git integration disconnected. CI is the only
   deploy path.
-- **Schema:** `supabase/migrations/0001–0015` (idempotent; run on prod
+- **Schema:** `supabase/migrations/0001-0018` (idempotent; run on prod
   Supabase BEFORE merging code that depends on them). Seed template:
   `supabase/seed_redemption_catalog.sql`.
 - **Marketing Worker:** `ikigaro-os` serves `public/index.html` + edge-injected
@@ -300,8 +298,7 @@ operate it, and the known follow-ups. Update this as work lands.
 - White screen: empty `NEXT_PUBLIC_PRIVY_APP_ID` at CI build (hardcode publics).
 - Extraction 502s: vision→text-layer; adaptive thinking→disabled; idle
   drop→streaming heartbeats. Save 500: `source` CHECK (map `pdf`→`pdf_upload`).
-- Spurious trends: duplicate same-date panels (collapse to distinct dates) —
-  later fixed at the root with content-signature panel dedup.
+- Spurious trends: duplicate same-date panels (collapse to distinct dates), later fixed at the root with content-signature panel dedup.
 - jsPDF dropped en-dashes (Latin-1) → `pdfText()` sanitizer.
 - **Bot Fight Mode** served a managed challenge to the GH Actions cron → 403
   (turned BFM off; endpoints have real auth).
@@ -309,7 +306,7 @@ operate it, and the known follow-ups. Update this as work lands.
   pinned in `wrangler.jsonc`.
 - **GitHub silently skipped a scheduled run** (no run at all on 2026-07-24) →
   idempotent sends + backup cron.
-- **GitHub's scheduler then ran reminders 90–110 minutes late every day**
+- **GitHub's scheduler then ran reminders 90-110 minutes late every day**
   (14:08/14:19/14:39 UTC against a 12:30 schedule) → 6 PM nudges arriving at
   7:40 PM. Moved scheduling *and* sending to a Cloudflare cron Worker; GitHub
   kept as a late backup, which is harmless because sends are at-most-once.
@@ -324,7 +321,7 @@ operate it, and the known follow-ups. Update this as work lands.
   in `STAGING.md` §1.5, and a **production smoke monitor** (`smoke.yml`, ~every
   30 min) so config-level breakage surfaces in minutes.
 - **`redirect()` in a streaming Server Component does not emit an HTTP
-  redirect** — Next inserts a client-side `NEXT_REDIRECT` instruction, so
+  redirect**. Next inserts a client-side `NEXT_REDIRECT` instruction, so
   `app.ikigaro.com/admin` returned 200 to anything that doesn't run React. Moved
   to a `next.config.ts` host-scoped redirect (a real 307), asserted by E2E.
   (No admin UI was ever rendered on the app host; authorization never depended
@@ -332,7 +329,7 @@ operate it, and the known follow-ups. Update this as work lands.
 - **Investigated and dismissed:** `/offline.html` 307s to `/offline` (Cloudflare
   Assets drops `.html`), which looked like it would break the service worker's
   `cache.addAll` precache. Tested in a browser: `addAll` follows the redirect,
-  caches under the original key, and `caches.match` finds it. Not a bug — noted
+  caches under the original key, and `caches.match` finds it. Not a bug, noted
   so it isn't re-investigated.
 
 - **A `CASE` expression in plpgsql resolves field references on BOTH arms.** A
@@ -348,14 +345,14 @@ operate it, and the known follow-ups. Update this as work lands.
   Migration 0013 added `partners` and `invite_codes` without `enable row level
   security`; every other table has had it since 0001. Supabase's dashboard
   warned at apply time and the warning was waved through on the reasoning that
-  RLS-with-no-policies would break the app — it does not, because the service
+  RLS-with-no-policies would break the app, it does not, because the service
   role bypasses RLS and every query here is server-side. Reproduced the hole on
   a local Postgres with the Supabase role setup (an anon `insert into partners`
   with `multiplier 5, welcome_grant 5000` succeeded), then closed it in 0014.
   **Rule: if a migration creates a table, the same migration enables RLS.**
 - **Marcellus has no CJK.** Its only subsets are `latin` and `latin-ext`, so
   `生き甲斐` set in it renders purely from whatever Japanese face the device
-  happens to have — fine on a Mac, tofu on Windows without the JP language pack.
+  happens to have, fine on a Mac, tofu on Windows without the JP language pack.
   It rendered correctly in testing for exactly that reason, which is why the bug
   survived a visual check. `next/font/google` also offers **no Japanese subset
   for Noto Sans JP** (cyrillic/latin/latin-ext/vietnamese only). All Japanese
@@ -370,7 +367,7 @@ operate it, and the known follow-ups. Update this as work lands.
 - **Verify PR and deploy state, never assert it.** Claimed a PR was open that
   had been merged, and separately reported a feature "not deployed" when the
   Cloudflare step was still mid-run. Both are one API call to check. Merge to
-  live on this pipeline is roughly 5–8 minutes.
+  live on this pipeline is roughly 5-8 minutes.
 
 **Debugging order when something works locally but fails live:** (a) is it
 actually deployed, (b) build-time env vars, (c) migration applied?, (d)
@@ -400,19 +397,33 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
 | Admin partners API | `src/app/api/admin/partners/route.ts` |
 | Wearables: metrics vocabulary, token crypto, adapters, sync | `src/lib/wearables/*` |
 | Wearables API (connect, callback, sync cron, Garmin push) | `src/app/api/wearables/*`, `src/app/api/cron/sync-wearables/route.ts` |
+| Device requests (suggest a device, admin tally) | `src/lib/device-requests.ts`, `src/app/device-suggest.tsx`, `src/app/admin-device-requests.tsx` |
+| Email: Resend client, templates, socials | `src/lib/email.ts`, `src/lib/emails/*` |
+| Announcements (compose, send, resume, unsubscribe) | `src/app/admin-broadcasts.tsx`, `src/app/api/admin/broadcasts/route.ts`, `src/app/api/email/unsubscribe/route.ts` |
 | Landing / splash / startup states | `src/app/landing.tsx`, `ui.tsx` (`Splash`), `home-view.tsx`, `globals.css` |
-| Schema | `supabase/migrations/0001–0015` |
+| Schema | `supabase/migrations/0001-0018` |
 | E2E suite / config | `e2e/*.spec.ts`, `playwright.config.ts`, `vitest.config.ts` |
-| Docs | `docs/HANDOVER.md`, `RUNBOOK.md`, `STAGING.md`, `TESTING.md`, `REFERENCE_DATA.md`, `SCALING.md`, `FAQ.md`, `POINTS_ECONOMY.md`, `WEARABLE_DATA.md`, `cowork/CURRENT.md` |
+| Docs | `docs/HANDOVER.md`, `RUNBOOK.md`, `STAGING.md`, `TESTING.md`, `REFERENCE_DATA.md`, `SCALING.md`, `FAQ.md`, `POINTS_ECONOMY.md`, `WEARABLES.md`, `WEARABLE_DATA.md`, `WEARABLES_APPLICATIONS.md`, `EMAIL.md`, `cowork/CURRENT.md` |
 
 ## 7. Operational recipes
 
 - **Approve a beta tester:** admin console → Users → Approve (they tap "Check
-  again" — no re-login needed). Revoke reverses it (confirm dialog).
+  again", no re-login needed). Revoke reverses it (confirm dialog).
 - **Add a voucher:** admin → Rewards → Add item (instruction/terms presets) →
   "Add codes" (paste one per line; duplicates skipped). Delete is safe: users'
   history keeps a name snapshot + code; unused codes are discarded.
 - **Retune the economy:** edit `src/lib/points.ts` only.
+- **Send an announcement:** admin -> Email. Write it, pick an audience, press
+  "Send test to me" FIRST, then Send. Sends are capped at 50 per run; anything
+  left shows a Resume button. Unsubscribed, deleted and duplicate addresses are
+  excluded automatically, and the count next to the audience is the real
+  post-exclusion number.
+- **See which wearable to build next:** admin -> Requests. Counts are distinct
+  people, not submissions. Check it before chasing a vendor application.
+- **Approving someone now emails them.** The console says which happened
+  ("Approved, and emailed them" / "Approved, but the email failed"). It sends
+  only on the waitlisted -> approved transition, so re-approving is silent.
+  Full rules in [`EMAIL.md`](./EMAIL.md).
 - **Update a reference range/band:** idempotent `UPDATE biomarker_catalog …`
   migration; no code change.
 - **Set a Worker secret:** `npx wrangler secret put <NAME>`. **Set a plaintext
@@ -427,48 +438,48 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
 
 ## 8. Known follow-ups / deferred
 
-- **Referral +150 panel tier** — verified by design + unit-level only (testing
-  it live needs real blood data on a throwaway account — declined). It verifies
+- **Referral +150 panel tier**, verified by design + unit-level only (testing
+  it live needs real blood data on a throwaway account, declined). It verifies
   organically: when the first referred beta tester uploads a panel, glance at
   the ledger for the `referral_panel` entry.
-- **Family vault / multi-profile UI** — schema-ready since 0005; the add-on
+- **Family vault / multi-profile UI**, schema-ready since 0005; the add-on
   that serves under-18s via guardian accounts and aging-parent care.
-- **Lawyer pass** — rewards terms (§14), eligibility wording (§1), privacy
+- **Lawyer pass**, rewards terms (§14), eligibility wording (§1), privacy
   policy vs. DPDP; all drafted, flagged for counsel.
 - **Personalized recommendation loop** (under Partners, NOT the Report):
   deterministic marker→intervention catalog the model presents; unmonetized
   food suggestions beside partner products; blocked on a real partner catalog.
-- **Beta prep:** recruit 20–50 (India-first cohort), feedback channel; delete
+- **Beta prep:** recruit 20-50 (India-first cohort), feedback channel; delete
   the leftover secrets file if not yet done; `+beta1` is the standing QA
   account.
-- **E2E covers the signed-out surface only** — the authenticated critical path
+- **E2E covers the signed-out surface only**, the authenticated critical path
   (onboarding → upload → confirm → check-in → redeem) is still hand-verified on
   staging. Automating it needs a test mailbox to read Privy OTPs; a test-only
   auth bypass was considered and rejected (`docs/TESTING.md`).
-- **🔴 THERE ARE NO DATABASE BACKUPS — accepted risk, expires at ~20 testers.**
+- **🔴 THERE ARE NO DATABASE BACKUPS, accepted risk, expires at ~20 testers.**
   Verified 2026-07-27, not assumed: the Supabase project is on the Free plan,
   which includes no backups and no PITR. If the database is lost, everything is
-  lost — every user, panel, reading and points transaction, permanently.
+  lost, every user, panel, reading and points transaction, permanently.
   Founder's decision is to stay on Free while user count is single-digit and
   revisit at ~20 testers, which is a reasonable trade at this size. **That
   threshold is the whole safety margin**: past it, losing the data ends the
   beta rather than inconveniencing it. Fix is $25/mo (Supabase Pro → daily
   backups, 7-day retention). See `RUNBOOK.md` §2b.
 - **Scaling levers** (~10k users): OCR vendor, prompt caching, batch API,
-  async queue — `docs/SCALING.md`.
-- **Admin roll-ups aggregate in application memory** — `/api/admin/users`,
+  async queue, `docs/SCALING.md`.
+- **Admin roll-ups aggregate in application memory**, `/api/admin/users`,
   `partnerStats()` and the analytics endpoint each pull whole tables and reduce
-  them in JS. Correct at beta scale, wrong somewhere around 2–5k users;
+  them in JS. Correct at beta scale, wrong somewhere around 2-5k users;
   `daily_checkins` crosses first because it grows one row per user per day. The
   plan, and a cheaper pagination stopgap, are in `docs/SCALING.md`.
 - **`healthkit_syncs` is dead schema.** Added in 0002, never written to, and
-  superseded by `wearable_daily_metrics` — which the native path will also
+  superseded by `wearable_daily_metrics`, which the native path will also
   write into when it arrives. Left in place because dropping a table is a
   production migration for no benefit; drop it whenever the next migration
   touches that area. Do NOT build on it.
 - **Rank thresholds are unvalidated against real behaviour.** They were fitted
   to a model of earn rates, not to observed users, because there are no observed
   users yet. Once ~20 testers have a month of history, check whether Apprentice
-  really lands in week 2–4; that is the one that shapes first impressions.
+  really lands in week 2-4; that is the one that shapes first impressions.
 - **Catalog range tuning** (BUN, Estradiol, Cortisol, MCV, MCH) via the
-  migration path. Occasional HBsAg extraction miss — only touch if it recurs.
+  migration path. Occasional HBsAg extraction miss, only touch if it recurs.

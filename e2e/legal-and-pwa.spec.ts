@@ -46,7 +46,7 @@ test.describe("PWA", () => {
     };
     expect(manifest.name).toBe("Ikigaro");
     // standalone is what makes an installed launch feel like an app rather
-    // than a browser tab — losing it is a silent downgrade.
+    // than a browser tab, losing it is a silent downgrade.
     expect(manifest.display).toBe("standalone");
     expect(manifest.start_url).toBe("/");
     expect(manifest.icons.length).toBeGreaterThanOrEqual(2);
@@ -65,7 +65,7 @@ test.describe("PWA", () => {
 
   test("the maskable icon is its own full-bleed file", async ({ request }) => {
     // Android crops maskable icons to its own shape. Pointing this entry at the
-    // rounded art double-rounds the corners — a subtle wrong that survives code
+    // rounded art double-rounds the corners, a subtle wrong that survives code
     // review because the manifest still validates and the file still loads.
     const manifest = (await (await request.get("/manifest.webmanifest")).json()) as {
       icons: { src: string; purpose?: string }[];

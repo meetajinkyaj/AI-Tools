@@ -18,7 +18,7 @@ export function Telemetry() {
   const seen = useRef(new Set<string>());
   const opened = useRef(false);
 
-  // Error capture — registered once, works before and after auth.
+  // Error capture, registered once, works before and after auth.
   useEffect(() => {
     const report = (message: string, stack?: string) => {
       if (sent.current >= MAX_REPORTS_PER_SESSION) return;
@@ -30,7 +30,7 @@ export function Telemetry() {
         try {
           token = await getAccessToken();
         } catch {
-          /* pre-auth — report anonymously */
+          /* pre-auth, report anonymously */
         }
         fetch("/api/telemetry", {
           method: "POST",
@@ -67,7 +67,7 @@ export function Telemetry() {
     };
   }, [getAccessToken]);
 
-  // app_opened — once per session, once the user is signed in.
+  // app_opened, once per session, once the user is signed in.
   useEffect(() => {
     if (!authenticated || opened.current) return;
     opened.current = true;

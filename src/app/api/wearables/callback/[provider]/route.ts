@@ -12,7 +12,7 @@ import type { ConnectionRow } from "@/lib/wearables/sync";
  *
  * Where the vendor sends the browser after consent.
  *
- * THIS ROUTE IS UNAUTHENTICATED BY NECESSITY — it is a top-level navigation
+ * THIS ROUTE IS UNAUTHENTICATED BY NECESSITY, it is a top-level navigation
  * from a third-party site, so there is no bearer token to check. The signed
  * `state` is therefore the *only* thing establishing whose account this
  * connection attaches to, and it is verified before anything else happens. A
@@ -82,12 +82,11 @@ export async function GET(
 
     // Pull immediately so the user sees data on the screen they land on, rather
     // than an empty card and no idea whether it worked. Failure here is not
-    // failure of the connection — the nightly sweep will retry.
+    // failure of the connection, the nightly sweep will retry.
     //
     // RE-READ THE ROW FIRST. `row` is what the upsert returned, which is the
     // state BEFORE the tokens were written. Syncing that copy finds no
-    // credentials, raises ReauthRequired, and marks the connection `expired` —
-    // so every successful connect would immediately present itself as broken.
+    // credentials, raises ReauthRequired, and marks the connection `expired`, // so every successful connect would immediately present itself as broken.
     if (PROVIDERS[providerParam].fetchRange) {
       const { data: withTokens } = await supabase
         .from("wearable_connections")

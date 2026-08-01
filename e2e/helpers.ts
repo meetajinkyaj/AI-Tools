@@ -4,7 +4,7 @@ import { expect, type Page } from "@playwright/test";
  * Navigate to a page and wait for the app to finish booting.
  *
  * The app shows a branded splash until Privy initializes, so "stuck on the
- * splash" is a distinct failure from "the page is broken" — and it has two very
+ * splash" is a distinct failure from "the page is broken", and it has two very
  * different causes: the app is genuinely down, or the browser cannot reach
  * Privy (a restricted network, a missing allowed-origin, an outage).
  *
@@ -31,10 +31,10 @@ export async function gotoApp(page: Page, path = "/") {
         ? "The app never got past the startup splash.\n" +
           "Most likely the browser could not reach Privy (auth): a restricted " +
           "network, or this origin is missing from Privy's allowed domains.\n" +
-          "If Privy is reachable, this is a real startup failure — treat it as " +
+          "If Privy is reachable, this is a real startup failure, treat it as " +
           "a white-screen regression.\n" +
           `Rendered text was: ${JSON.stringify(text)}`
-        : `The page rendered almost nothing — likely a client-side crash.\n` +
+        : `The page rendered almost nothing, likely a client-side crash.\n` +
           `Rendered text was: ${JSON.stringify(text)}`,
     );
   }

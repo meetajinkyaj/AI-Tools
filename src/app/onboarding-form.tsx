@@ -192,7 +192,7 @@ export function OnboardingForm({
           <div className={labelClass}>
             <span>Which activities do you do?</span>
             <span className="text-xs font-normal text-muted">
-              Pick the ones you do regularly — they become your quick options at
+              Pick the ones you do regularly, they become your quick options at
               check-in. You can change these anytime.
             </span>
             <div className="mt-1">

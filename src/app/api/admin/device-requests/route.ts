@@ -5,11 +5,11 @@ import { tallyRequests, type RequestRow } from "@/lib/device-requests";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
- * GET /api/admin/device-requests — the ranked tally, plus the raw entries.
+ * GET /api/admin/device-requests, the ranked tally, plus the raw entries.
  *
  * BOTH, ALWAYS. The tally is what you act on; the raw list is the only way to
  * notice the tally is wrong. If someone typed "the ring my brother has" and it
- * became its own bucket, no amount of staring at counts will reveal it — but
+ * became its own bucket, no amount of staring at counts will reveal it, but
  * one glance at the entries will.
  */
 
@@ -34,11 +34,11 @@ export async function GET(request: Request) {
 
   const rows = (data ?? []) as RawRow[];
 
-  // Attach who asked. Emails only, and only for the admin view — the tally
+  // Attach who asked. Emails only, and only for the admin view, the tally
   // itself is anonymous and would work fine without this, but "who wants
   // Oura" is exactly the list you want on the day Oura goes live.
   const userIds = [...new Set(rows.map((r) => r.user_id))];
-  // The name lives on `profiles`, the email on `users` — two reads rather than
+  // The name lives on `profiles`, the email on `users`, two reads rather than
   // one join, because PostgREST embedding here would couple this route to the
   // FK name and buy nothing at this row count.
   const [{ data: users }, { data: profiles }] = userIds.length

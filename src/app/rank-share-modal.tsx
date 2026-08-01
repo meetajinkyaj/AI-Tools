@@ -8,8 +8,8 @@ import { RankShareCard } from "./rank-share-card";
 /**
  * The rank share sheet as a modal.
  *
- * Same shell as the check-in modal — dismissible three ways, page behind
- * locked — because two share sheets that behave differently is worse than
+ * Same shell as the check-in modal, dismissible three ways, page behind
+ * locked, because two share sheets that behave differently is worse than
  * either behaviour on its own.
  */
 export function RankShareModal({

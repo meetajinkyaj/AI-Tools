@@ -3,7 +3,7 @@ name: Daily reminders (backup)
 # BACKUP SENDER. The primary is now the `ikigaro-reminders` Cloudflare Worker
 # (workers/reminders), on a Cloudflare cron trigger that actually fires on time.
 # GitHub's scheduler was running this job 90-110 minutes late every single day
-# — measured, not suspected — which turned a "6 PM check-in nudge" into a
+#, measured, not suspected, which turned a "6 PM check-in nudge" into a
 # 7:40 PM one.
 #
 # This is kept because sends are at-most-once (the app marks people notified
@@ -38,7 +38,7 @@ jobs:
         with:
           node-version: 22
 
-      # web-push is only needed by this job — install it ad hoc so it never
+      # web-push is only needed by this job, install it ad hoc so it never
       # enters the app's dependency tree or the Worker bundle.
       - run: npm install --no-save web-push@^3
 

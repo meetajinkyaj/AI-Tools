@@ -7,21 +7,20 @@ import type { ProviderId } from "./types";
  *
  * THE PROBLEM IT SOLVES. The vendor redirects the browser back to our callback
  * with a code and whatever `state` we sent. That request carries no bearer
- * token — it is a top-level navigation from a third-party site — so the
+ * token, it is a top-level navigation from a third-party site, so the
  * callback has no way to know which user it belongs to except from `state`.
  *
  * Which means `state` decides whose account a health connection gets attached
  * to. If it were a plain user id, anyone could complete an OAuth flow against
  * their own Oura account with someone else's id in the state and bolt their
- * ring onto that person's account — or, more usefully to an attacker, bolt the
+ * ring onto that person's account, or, more usefully to an attacker, bolt the
  * VICTIM's ring onto their own. So it is signed, and the signature is checked
  * before a single byte of it is trusted.
  *
  * It also carries the nonce that makes it single-purpose and an expiry, so a
  * state captured from a browser history or a referrer log is useless later.
  *
- * HMAC-SHA256 with a key derived from the same secret that encrypts tokens —
- * one secret to manage, and a deployment that can store connections can always
+ * HMAC-SHA256 with a key derived from the same secret that encrypts tokens, * one secret to manage, and a deployment that can store connections can always
  * sign for them.
  */
 
@@ -75,7 +74,7 @@ export async function signState(userId: string, provider: ProviderId): Promise<s
 }
 
 /**
- * Verify and decode. Returns null on anything suspicious — bad signature,
+ * Verify and decode. Returns null on anything suspicious, bad signature,
  * expired, malformed, or a provider that no longer exists.
  *
  * `crypto.subtle.verify` is a constant-time comparison, which is why the

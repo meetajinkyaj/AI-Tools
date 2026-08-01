@@ -7,7 +7,7 @@ import { generateReferralCode, nameBasedCode, referralLink } from "@/lib/referra
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
- * GET /api/referral — the user's invite kit:
+ * GET /api/referral, the user's invite kit:
  * their code (generated lazily on first request), the share link, how many
  * friends joined via it, and how many completed onboarding (= earned them the
  * referral bonus). Approved users only.

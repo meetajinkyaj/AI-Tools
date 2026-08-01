@@ -127,7 +127,7 @@ export async function DELETE(request: Request) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const supabase = createSupabaseAdmin();
-  // Hard delete. Users' redemption history survives — each transaction keeps a
+  // Hard delete. Users' redemption history survives, each transaction keeps a
   // snapshot of the item's name (migration 0011) and its issued code; unredeemed
   // codes cascade away with the item.
   const { error } = await supabase.from("redemption_items").delete().eq("id", id);

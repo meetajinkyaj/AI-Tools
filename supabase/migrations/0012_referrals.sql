@@ -1,8 +1,8 @@
--- 0012: Referrals — the last unwired earn in the points table.
+-- 0012: Referrals, the last unwired earn in the points table.
 --
---   referral_code — the user's own shareable code (generated lazily by the API
+--   referral_code, the user's own shareable code (generated lazily by the API
 --                   on first request; unique, human-friendly charset).
---   referred_by   — who referred this user. Set ONCE, at account creation, from
+--   referred_by, who referred this user. Set ONCE, at account creation, from
 --                   a ?ref link (never retro-attributed). The +150 referral earn
 --                   is awarded to the referrer when this user completes
 --                   onboarding (see POST /api/profile), not at signup.

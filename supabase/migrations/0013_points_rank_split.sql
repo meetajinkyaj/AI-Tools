@@ -2,7 +2,7 @@
 --
 -- THE ARCHITECTURAL POINT. Until now one number did two incompatible jobs: it
 -- was the redemption currency AND the implicit measure of how much someone had
--- done. Those pull in opposite directions — spending should reduce what you can
+-- done. Those pull in opposite directions, spending should reduce what you can
 -- buy, but it must not reduce who you are, and a partner multiplier should let
 -- you reach a voucher sooner without letting you buy status.
 --
@@ -19,8 +19,8 @@
 --
 -- ACCELERATED POINTS, on a glide path rather than forever:
 --
---   day 0–90    2.0x
---   day 91–180  1.5x if the activity floor was met in the first 90 days,
+--   day 0-90    2.0x
+--   day 91-180  1.5x if the activity floor was met in the first 90 days,
 --               otherwise 1.25x
 --   day 181+    1.25x steady state
 --
@@ -74,7 +74,7 @@ update points_transactions
  where base_amount is null;
 
 -- Seed iki_score from the ledger that already exists, so nobody who has been
--- using the app since before ranks starts back at zero. Earns only — a
+-- using the app since before ranks starts back at zero. Earns only, a
 -- redemption spends the balance and must not reduce lifetime score.
 with earned as (
   select user_id, sum(coalesce(base_amount, amount))::bigint as total
@@ -111,7 +111,7 @@ create index if not exists users_boost_started_idx
   where boost_started_at is not null;
 
 -- ---------------------------------------------------------------------------
--- Partners — the entity behind an Accelerated Points code.
+-- Partners, the entity behind an Accelerated Points code.
 --
 -- A partner is a gym, a community or a brand. It is NOT a user: there is no
 -- account to hang the code on, and a partnership has its own name, terms and
@@ -121,7 +121,7 @@ create index if not exists users_boost_started_idx
 --
 -- `users.referral_code` still exists and still means "this person invites
 -- friends". Partner codes live here instead, and a ?ref code is resolved
--- against partners FIRST — see /api/auth/sync.
+-- against partners FIRST, see /api/auth/sync.
 -- ---------------------------------------------------------------------------
 create table if not exists partners (
   id             uuid primary key default gen_random_uuid(),
@@ -130,7 +130,7 @@ create table if not exists partners (
   code           text not null,
   -- What a signup through this code earns during the boost window.
   multiplier     numeric not null default 2,
-  -- "Endowed progress" — spendable, never counted toward rank.
+  -- "Endowed progress", spendable, never counted toward rank.
   welcome_grant  integer not null default 150,
   active         boolean not null default true,
   notes          text,
@@ -139,8 +139,8 @@ create table if not exists partners (
   constraint partners_welcome_check    check (welcome_grant >= 0 and welcome_grant <= 5000)
 );
 
--- Uniqueness within partners. The cross-table half — a partner code must not
--- collide with a user's own referral code, or a ?ref link is ambiguous — is
+-- Uniqueness within partners. The cross-table half, a partner code must not
+-- collide with a user's own referral code, or a ?ref link is ambiguous, is
 -- enforced by the invite_codes namespace below, not by application code.
 create unique index if not exists partners_code_key on partners (upper(code));
 
@@ -155,14 +155,14 @@ create index if not exists users_partner_id_idx
 --
 -- A ?ref link carries a single code and is resolved against partners first, so
 -- a partner code and a user's invite code must never be the same string. Two
--- separate unique indexes cannot express that — and the gap was not
+-- separate unique indexes cannot express that, and the gap was not
 -- theoretical:
 --
 --   /api/referral generates a user's code from their NAME and retries on a
 --   unique violation. It only ever knew about users.referral_code. With a
 --   partner code "FITTR" already live, a user named Fittr would be assigned
 --   FITTR, the users index would raise nothing, and from then on their invite
---   link would silently resolve to the partner — their referrals attributing
+--   link would silently resolve to the partner, their referrals attributing
 --   to someone else, permanently, with no error anywhere.
 --
 -- So both tables now write into one keyed table. The primary key does the

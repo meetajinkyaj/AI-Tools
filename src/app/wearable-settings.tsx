@@ -8,7 +8,7 @@ import { Card, Eyebrow, primaryButtonClass, secondaryButtonClass } from "./ui";
 /**
  * "Connected devices" in Settings.
  *
- * Hidden entirely when the server says the feature is off — either no
+ * Hidden entirely when the server says the feature is off, either no
  * encryption key, or no vendor credentials configured. Showing six greyed-out
  * cards for devices nobody can connect is worse than showing nothing.
  */
@@ -38,7 +38,7 @@ interface Payload {
  * The two we cannot do yet, shown so the roadmap is visible.
  *
  * Apple HealthKit and Android Health Connect are on-device APIs with no web
- * access of any kind — reading either requires a native app in the respective
+ * access of any kind, reading either requires a native app in the respective
  * store. Listing them as "coming soon" is honest about a real plan rather than
  * a placeholder, and it stops the obvious question ("where's Apple Health?")
  * reading as an omission.
@@ -121,8 +121,7 @@ export function WearableSettings({
     })();
   }, [load]);
 
-  // Renders as soon as the server answers, even with no providers configured —
-  // otherwise the "coming soon" roadmap stays hidden until the first vendor
+  // Renders as soon as the server answers, even with no providers configured, // otherwise the "coming soon" roadmap stays hidden until the first vendor
   // approval lands, which is exactly the stretch when saying what is coming is
   // most useful.
   if (!data) return null;
@@ -237,7 +236,7 @@ export function WearableSettings({
                 )}
                 {needsReauth && (
                   <span className="font-body text-[0.7rem] text-accent">
-                    Connection expired — reconnect to resume syncing.
+                    Connection expired, reconnect to resume syncing.
                   </span>
                 )}
               </div>

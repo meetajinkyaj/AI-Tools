@@ -9,7 +9,7 @@ import { Card, Eyebrow } from "./ui";
  *
  * SIZE PICKS THE ARTWORK. The full pin's scene turns to mud below about 120px,
  * where it stops reading as a small badge and starts reading as a rendering
- * bug, so anything under that threshold gets the chip instead — rim, band,
+ * bug, so anything under that threshold gets the chip instead, rim, band,
  * kanji, no scene.
  *
  * The spec put the rank card itself on the chip side of that line. It is on
@@ -17,7 +17,7 @@ import { Card, Eyebrow } from "./ui";
  * reserving them for the level-up moment means a user sees their own badge a
  * handful of times a year. The card is wide enough to carry one at full size,
  * so it does. The ladder underneath keeps chips, because four pins across a
- * phone-width card would be ~85px each — under the threshold, and muddy.
+ * phone-width card would be ~85px each, under the threshold, and muddy.
  *
  * All progress data still comes from `rankProgress()`; nothing about which rank
  * you are or how far you have to go is computed in the markup.
@@ -161,7 +161,7 @@ export function RankBadge({
 /**
  * The case: one well per rank, filled as it is earned.
  *
- * Four wells until Grandmaster is reached — `visibleRanks` withholds the fifth,
+ * Four wells until Grandmaster is reached, `visibleRanks` withholds the fifth,
  * so the row itself never hints that a fifth exists.
  */
 export function RankLadder({ score, current }: { score: number; current: Rank }) {

@@ -1,4 +1,4 @@
--- 0007: push_subscriptions — Web Push subscriptions for daily check-in reminders.
+-- 0007: push_subscriptions. Web Push subscriptions for daily check-in reminders.
 --
 -- One row per browser/device that opted in. The reminder sender pushes to these
 -- endpoints once a day (18:00 IST for the India-first beta) for users who have

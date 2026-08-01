@@ -1,13 +1,13 @@
 /**
  * Where to follow us, shared by every email we send.
  *
- * ONE LIST, NOT ONE PER TEMPLATE. A handle that changes — or an account that
- * gets deleted — has to change in exactly one place, or the templates drift
+ * ONE LIST, NOT ONE PER TEMPLATE. A handle that changes, or an account that
+ * gets deleted, has to change in exactly one place, or the templates drift
  * and the least-used one ends up pointing somewhere embarrassing.
  *
  * RENDERED AS TEXT LINKS, NEVER ICONS. Icons would need externally hosted
  * images, and mail clients block remote images by default, so the row would
- * arrive as three broken-image boxes for most recipients — worse than no row
+ * arrive as three broken-image boxes for most recipients, worse than no row
  * at all. Remote images are also the standard open-tracking mechanism, and
  * none of our mail should be tracking anyone.
  *

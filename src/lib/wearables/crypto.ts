@@ -7,7 +7,7 @@ import "server-only";
  * permission: it lets whoever holds it pull a user's sleep, heart rate and
  * recovery from a third party, indefinitely, until someone notices and revokes
  * it. Postgres encrypts at rest at the disk level, which defends against
- * somebody stealing a disk and nothing else — not the realistic threat, which
+ * somebody stealing a disk and nothing else, not the realistic threat, which
  * is a leaked service-role key or a stray `pg_dump` sitting in a download
  * folder. Encrypting with a key that lives only in the Worker's secrets means
  * the database on its own is not enough to impersonate our users against six
@@ -22,7 +22,7 @@ import "server-only";
  * deployment that stores real tokens unencrypted is worse than one that cannot
  * store them at all, because nothing about it looks wrong afterwards.
  *
- * LOSING THE KEY costs every user a reconnect — annoying, recoverable, and
+ * LOSING THE KEY costs every user a reconnect, annoying, recoverable, and
  * strictly better than the alternative. Rotating it has the same cost, so
  * rotate only if you believe it leaked. There is no re-encrypt path on purpose:
  * writing one means decrypting every token into memory to serve a scenario that
@@ -40,7 +40,7 @@ function keyMaterial(): string {
   const raw = process.env[KEY_ENV];
   if (!raw) {
     throw new Error(
-      `${KEY_ENV} is not set. Wearable connections cannot be stored without it — ` +
+      `${KEY_ENV} is not set. Wearable connections cannot be stored without it, ` +
         "generate one with: openssl rand -base64 32",
     );
   }
@@ -91,7 +91,7 @@ function fromBase64(s: string): Uint8Array<ArrayBuffer> {
  * Encrypt a token for storage.
  *
  * Output is `base64(iv):base64(ciphertext)`. The IV is random per call and
- * stored alongside — that is the correct handling, not a leak: GCM's
+ * stored alongside, that is the correct handling, not a leak: GCM's
  * requirement is that an IV is never REUSED with the same key, not that it is
  * secret. Encrypting the same token twice therefore yields different
  * ciphertext, which is also what stops the column revealing that two users
@@ -108,7 +108,7 @@ export async function encryptToken(plaintext: string): Promise<string> {
 /**
  * Decrypt a stored token, or null if it cannot be read.
  *
- * Returns null rather than throwing on malformed or untrusted input — a
+ * Returns null rather than throwing on malformed or untrusted input, a
  * connection whose token will not decrypt is a connection the user has to
  * remake, and the sync sweep should mark it and move on to the next user rather
  * than dying partway through the batch.

@@ -1,7 +1,7 @@
 import { EXERCISE_TYPE_LABELS, EXERCISE_TYPES } from "@/lib/exercises";
 
 /**
- * Multi-select chip group for choosing activity types. Controlled — used by the
+ * Multi-select chip group for choosing activity types. Controlled, used by the
  * onboarding and profile-edit forms to set the user's usual activities.
  */
 export function ActivityChips({

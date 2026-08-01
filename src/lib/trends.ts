@@ -3,11 +3,11 @@
  * unit tested and shared by the trends API and the biomarker save route.
  *
  * Two things share one panel-comparison core:
- *   1. Outcome-verified rewards — points for a marker that genuinely moved from
+ *   1. Outcome-verified rewards, points for a marker that genuinely moved from
  *      out-of-range into range between two panels (the moat feature). Guarded
  *      against gaming: panels must be far enough apart, only "was flagged → now
  *      in range" counts, and the count is capped.
- *   2. The trends view — per-marker baseline→latest deltas, plus a check-in
+ *   2. The trends view, per-marker baseline→latest deltas, plus a check-in
  *      (energy/sleep) trend, which is where the *frequent* signal lives (lab
  *      panels are months apart; check-ins and wearables are daily).
  */
@@ -17,12 +17,12 @@ import { POINTS } from "./points";
 // ---- Outcome reward config (tunable) --------------------------------------
 
 /** Points for one marker that meaningfully improved between panels.
- * (Value lives in src/lib/points.ts — the single source of truth.) */
+ * (Value lives in src/lib/points.ts, the single source of truth.) */
 export const OUTCOME_BONUS_POINTS = POINTS.outcomeBonusPerMarker;
 /** Max markers rewarded from a single new panel (bounds cost + gaming). */
 export const OUTCOME_MAX_MARKERS = 3;
 /** Panels closer than this are still accepted and shown in trends (critical
- * health data), but not rewarded — during illness/recovery markers swing a lot
+ * health data), but not rewarded, during illness/recovery markers swing a lot
  * (WBC/RBC especially), so a bi-weekly floor keeps rewards tied to real change. */
 export const OUTCOME_MIN_DAYS_BETWEEN_PANELS = 14;
 /** A reward needs a real move, not noise: the healthy-direction change must be at
@@ -105,7 +105,7 @@ const FLAGGED = new Set(["low", "high"]);
 
 /**
  * Markers that meaningfully improved in their healthy direction from `previous`
- * to `latest` — including continued improvement past the range boundary
+ * to `latest`, including continued improvement past the range boundary
  * (visceral fat 9→8→6.5 all count). Returns [] if the panels are closer than the
  * minimum interval (accepted, but not rewarded). Deterministic: uses stored
  * values (already canonicalized) + the catalog `direction`, so it can't be gamed

@@ -6,12 +6,12 @@ import { MAX_SUGGESTION_LENGTH, SUGGESTION_HINTS } from "@/lib/device-requests";
 import { secondaryButtonClass } from "./ui";
 
 /**
- * "Don't see your device?" — the suggestion box under Connected devices.
+ * "Don't see your device?", the suggestion box under Connected devices.
  *
  * WHY IT LIVES HERE AND NOWHERE ELSE. The moment a person looks at the list of
  * devices we support and does not find theirs is the only moment they are
  * certain to have an opinion about which device we should add. Asking anywhere
- * else — a survey, an email — asks someone to remember a feeling they had once.
+ * else, a survey, an email, asks someone to remember a feeling they had once.
  *
  * It renders whether or not any vendor is live, deliberately. Before launch it
  * is the only thing on the screen a user can actually do, and the answers are
@@ -73,7 +73,7 @@ export function DeviceSuggest({ getToken }: { getToken: () => Promise<string | n
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         // Inherit the choice already made rather than resetting it to off on
-        // every addition — the checkbox is about the list, not one entry.
+        // every addition, the checkbox is about the list, not one entry.
         body: JSON.stringify({ device, notify: notifyOn }),
       });
       const body = (await res.json()) as PostResult;
@@ -88,9 +88,9 @@ export function DeviceSuggest({ getToken }: { getToken: () => Promise<string | n
       // thank-you. Someone asking for a device we already support has hit a
       // discoverability problem, and telling them so solves it on the spot.
       if (body.device?.supported) {
-        setMessage(`${body.device.label} is already supported — look for it in the list above.`);
+        setMessage(`${body.device.label} is already supported, look for it in the list above.`);
       } else {
-        setMessage("Noted — thank you.");
+        setMessage("Noted, thank you.");
       }
     } catch {
       setMessage("Couldn't save that.");
@@ -179,7 +179,7 @@ export function DeviceSuggest({ getToken }: { getToken: () => Promise<string | n
           aria-label="Suggest a device"
           className="min-w-0 flex-1 rounded-pill border border-border bg-transparent px-4 py-2 font-body text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
         />
-        {/* Hints, not a menu — the field stays free text so the devices we have
+        {/* Hints, not a menu, the field stays free text so the devices we have
             never heard of can still be named. */}
         <datalist id={listId}>
           {SUGGESTION_HINTS.map((h) => (

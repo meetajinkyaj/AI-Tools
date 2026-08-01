@@ -17,7 +17,7 @@ import { measuredSleepHours, mergeMetrics, type MetricRow } from "@/lib/wearable
 import type { CheckinPoint } from "@/lib/trends";
 
 /**
- * GET /api/future — the "Future You" six-month outlook.
+ * GET /api/future, the "Future You" six-month outlook.
  *
  * Panels are once-or-twice a year, so the response leads with habit momentum
  * (from daily check-ins); flagged markers get a directional outlook (habit_v1),
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
       .limit(MOMENTUM_WINDOW_DAYS * 2); // window + the window before, for the delta
     // Merged wearable sleep, when any device has reported in the window. This
     // is a small query and it upgrades the single most-guessed input in the
-    // whole model — self-reported sleep hours — into a measured one.
+    // whole model, self-reported sleep hours, into a measured one.
     const { data: wearableRows } = await supabase
       .from("wearable_daily_metrics")
       .select("provider, metric_date, metric, value")

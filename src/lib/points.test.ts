@@ -39,7 +39,7 @@ describe("uploadEarn", () => {
   });
 
   it("is retunable purely from the POINTS table", () => {
-    // The earn amounts come straight from POINTS — scaling the economy is a
+    // The earn amounts come straight from POINTS, scaling the economy is a
     // one-line change there, never in the awarding logic.
     expect(uploadEarn("2026-02-01", [])!.amount).toBe(POINTS.firstPanelUpload);
     expect(uploadEarn("2026-02-01", ["2026-01-01"])!.amount).toBe(
@@ -107,7 +107,7 @@ describe("isReplayUpload", () => {
 
 /**
  * The product contract: a user must never earn upload points by resubmitting the
- * same report — whether they keep its date, change its date, or re-upload it
+ * same report, whether they keep its date, change its date, or re-upload it
  * across many days/months. The save route enforces this by composing the two
  * guards below (replay-by-content first, then earn-by-date). This block mirrors
  * that composition so neither guard can be silently dropped in a refactor.

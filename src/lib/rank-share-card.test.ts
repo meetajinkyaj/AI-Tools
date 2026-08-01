@@ -41,7 +41,7 @@ describe("the invite link stays off during closed beta", () => {
   });
 
   it("keeps it out of the caption too", () => {
-    // A caption is if anything more public than the image — it survives being
+    // A caption is if anything more public than the image, it survives being
     // copied, so gating only the pixels would leak the link anyway.
     const text = rankCaption(input());
     expect(text).not.toMatch(/http/i);
@@ -55,7 +55,7 @@ describe("the invite link stays off during closed beta", () => {
     expect(rankCaption(input())).not.toContain("ikigaro.com/join");
 
     // The flag is off, so nothing prints today. What matters is what WILL
-    // print the day it flips — assert the source directly, since that is the
+    // print the day it flips, assert the source directly, since that is the
     // only thing `rankInviteLine` and the caption ever build from.
     expect(referralLink("AJINKYA")).toBe("https://app.ikigaro.com/?ref=AJINKYA");
     expect(referralLink("AJINKYA")).not.toContain("/join");
@@ -63,7 +63,7 @@ describe("the invite link stays off during closed beta", () => {
 
   it("keeps ?ref lowercase, which the check-in card learned the hard way", () => {
     // The tracked-label helper upper-cases its text. Run the invite line
-    // through it and "?ref=" becomes "?REF=" — a different query parameter, a
+    // through it and "?ref=" becomes "?REF=", a different query parameter, a
     // link that resolves but attributes to nobody, and no error anywhere.
     expect(referralLink("AJINKYA")).toContain("?ref=");
     expect(referralLink("AJINKYA").toUpperCase()).not.toContain("?ref=");
@@ -134,7 +134,7 @@ describe("the pin artwork", () => {
 
   it("draws the kanji as an outline, never as text", () => {
     // A <text> element would depend on a Japanese font the app does not load
-    // and cannot load — next/font offers no JP subset for Noto Sans JP. Tofu
+    // and cannot load, next/font offers no JP subset for Noto Sans JP. Tofu
     // on a badge people post publicly is not a risk worth carrying.
     for (const r of RANKS) {
       const pin = rankPinSvg(r.id, r.name, { ringText: true });
@@ -155,7 +155,7 @@ describe("the pin artwork", () => {
 
   it("omits ring text when asked, for the canvas path", () => {
     // The share card rasterises the SVG through an <img>, where external fonts
-    // never load — so it asks for no lettering and draws it on canvas instead.
+    // never load, so it asks for no lettering and draws it on canvas instead.
     const bare = rankPinSvg("sensei", "Iki Sensei", { ringText: false });
     expect(bare).not.toContain("<text");
     expect(bare).not.toContain("textPath");

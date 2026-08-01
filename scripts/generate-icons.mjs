@@ -3,12 +3,12 @@
  *
  *   node scripts/generate-icons.mjs
  *
- * Source of truth: `brand/ikigaro-app-icon-512.png` — the app icon exactly as
+ * Source of truth: `brand/ikigaro-app-icon-512.png`, the app icon exactly as
  * it appears in the Ikigaro Logo Pack. Lowercase Cormorant "i" in Onsen Linen
  * with a Clay Ember tittle, on an Obsidian Stone rounded square.
  *
  * When the brand pack changes, replace that one file and re-run this. Do not
- * hand-edit anything in `public/` — it is all derived.
+ * hand-edit anything in `public/`, it is all derived.
  *
  * WHY TWO SILHOUETTES. The pack's master has transparent rounded corners,
  * which is right for `purpose: "any"` (launchers draw it as-is) and wrong for
@@ -18,7 +18,7 @@
  *
  * The glyph occupies the middle ~38% of the master, well inside the maskable
  * safe zone (the centre circle of 80% diameter), so squaring off the corners
- * is all that is needed — no re-centring or rescaling.
+ * is all that is needed, no re-centring or rescaling.
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
@@ -32,7 +32,7 @@ const MASTER = path.join(ROOT, "brand", "ikigaro-app-icon-512.png");
 const PUBLIC = path.join(ROOT, "public");
 const APP = path.join(ROOT, "src", "app");
 
-/** Obsidian Stone — the master's own background, sampled from the pack. */
+/** Obsidian Stone, the master's own background, sampled from the pack. */
 const OBSIDIAN = { r: 0x1b, g: 0x18, b: 0x15, alpha: 1 };
 
 /** Rounded silhouette, alpha preserved. */
@@ -50,8 +50,7 @@ function square(size) {
 
 /**
  * A minimal multi-image ICO. Browsers want 16/32/48 in the favicon, and
- * `sharp` has no ICO encoder, so we wrap PNG frames in the container by hand —
- * the ICO format permits PNG-compressed frames and every browser since IE11
+ * `sharp` has no ICO encoder, so we wrap PNG frames in the container by hand, * the ICO format permits PNG-compressed frames and every browser since IE11
  * reads them.
  *
  * The frames MUST be RGBA. Flattening onto Obsidian Stone drops the alpha
@@ -94,10 +93,10 @@ async function main() {
   await mkdir(PUBLIC, { recursive: true });
 
   const outputs = [
-    // purpose: "any" — the designed silhouette, drawn unmodified.
+    // purpose: "any", the designed silhouette, drawn unmodified.
     [path.join(PUBLIC, "icon-192.png"), rounded(192)],
     [path.join(PUBLIC, "icon-512.png"), rounded(512)],
-    // purpose: "maskable" — Android crops this to its own shape.
+    // purpose: "maskable". Android crops this to its own shape.
     [path.join(PUBLIC, "icon-maskable-512.png"), square(512)],
     // iOS rounds the home-screen icon itself and fills transparency with black.
     [path.join(PUBLIC, "apple-touch-icon.png"), square(180)],

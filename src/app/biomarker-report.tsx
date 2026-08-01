@@ -59,7 +59,7 @@ interface OutcomeBonus {
   points: number;
 }
 
-/** What the user earned by saving a panel — surfaced as a note after saving. */
+/** What the user earned by saving a panel, surfaced as a note after saving. */
 interface AwardNote {
   pointsAwarded: number;
   bonuses: OutcomeBonus[];
@@ -78,7 +78,7 @@ type SaveReading = {
   lab_reference_high?: number | null;
 };
 
-/** One row in the confirmation screen — values kept as editable strings. */
+/** One row in the confirmation screen, values kept as editable strings. */
 interface DraftReading {
   marker_key: string;
   marker_name: string;
@@ -117,10 +117,10 @@ function categoryLabel(key: string): string {
 
 function rangeText(low: number | null, high: number | null, unit: string | null): string {
   const u = unit ? ` ${unit}` : "";
-  if (low != null && high != null) return `${low}–${high}${u}`;
+  if (low != null && high != null) return `${low}-${high}${u}`;
   if (low != null) return `≥ ${low}${u}`;
   if (high != null) return `≤ ${high}${u}`;
-  return "—";
+  return "-";
 }
 
 /** A status chip coloured by severity: strong for low/high, soft for borderline. */
@@ -140,7 +140,7 @@ function StatusPill({ severity, label }: { severity: Severity; label: string }) 
   );
 }
 
-/** The severity + display label for a reading — the band wins over the raw flag. */
+/** The severity + display label for a reading, the band wins over the raw flag. */
 function readingStatus(
   r: ReadingRow,
   band: Band | null,
@@ -157,7 +157,7 @@ function readingStatus(
 /** A short, educational line for an out-of-range reading (numeric or qualitative). */
 function calloutText(r: ReadingRow, band: Band | null): string {
   if (r.result_kind === "qualitative") {
-    return `came back ${r.value_text} — worth confirming with your doctor.`;
+    return `came back ${r.value_text}, worth confirming with your doctor.`;
   }
   const at = `at ${r.value}${r.unit ? ` ${r.unit}` : ""}`;
   if (band) {
@@ -171,7 +171,7 @@ function calloutText(r: ReadingRow, band: Band | null): string {
   )}) ${at}.`;
 }
 
-const DISCLAIMER = "Educational, not a diagnosis — please consult a doctor.";
+const DISCLAIMER = "Educational, not a diagnosis. Please consult a doctor.";
 
 /**
  * The extract endpoint streams newline heartbeats then a final JSON line. Parse
@@ -474,7 +474,7 @@ export function BiomarkerReport({
         <PageHeader
           eyebrow="Report"
           title="Upload your lab report"
-          subtitle="Drop in the PDF from your blood test. We'll read the values, you confirm them — no typing required."
+          subtitle="Drop in the PDF from your blood test. We'll read the values, you confirm them, no typing required."
         />
 
         <form onSubmit={handleExtract} className="flex flex-col gap-5">
@@ -619,7 +619,7 @@ export function BiomarkerReport({
                               update(d.marker_key, { value_text: e.target.value })
                             }
                           >
-                            <option value="">—</option>
+                            <option value="">-</option>
                             {qualitativeOptions(entry?.normal_text ?? null).map((opt) => (
                               <option key={opt} value={opt}>
                                 {opt}
@@ -704,7 +704,7 @@ export function BiomarkerReport({
         <PageHeader
           eyebrow="Report"
           title="Enter your blood panel"
-          subtitle="Type the markers you have — leave the rest blank. We'll flag anything outside its typical range."
+          subtitle="Type the markers you have, leave the rest blank. We'll flag anything outside its typical range."
         />
 
         <form onSubmit={handleManualSubmit} className="flex flex-col gap-6">
@@ -790,7 +790,7 @@ export function BiomarkerReport({
                         }))
                       }
                     >
-                      <option value="">—</option>
+                      <option value="">-</option>
                       {qualitativeOptions(entry.normal_text).map((opt) => (
                         <option key={opt} value={opt}>
                           {opt}
@@ -957,7 +957,7 @@ export function BiomarkerReport({
             ))}
           </ul>
           <p className="font-body text-xs text-muted">
-            General information, not a diagnosis — worth discussing with a
+            General information, not a diagnosis, worth discussing with a
             qualified professional.
           </p>
         </Card>
