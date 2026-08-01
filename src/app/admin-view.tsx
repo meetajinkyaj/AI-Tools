@@ -4,6 +4,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cleanReferralInput, normalizeReferralCode } from "@/lib/referral";
+import { BroadcastPanel } from "./admin-broadcasts";
 import { DeviceRequestsPanel } from "./admin-device-requests";
 import { ConfirmDialog, type ConfirmRequest } from "./confirm-dialog";
 
@@ -19,7 +20,7 @@ import {
 } from "./ui";
 
 type Authz = "checking" | "ok" | "denied";
-type Tab = "analytics" | "vouchers" | "users" | "partners" | "requests";
+type Tab = "analytics" | "vouchers" | "users" | "partners" | "requests" | "email";
 
 /**
  * Internal admin console (gated by the ADMIN_EMAILS allow-list server-side, and
@@ -95,6 +96,9 @@ export function AdminView() {
           <TabButton active={tab === "requests"} onClick={() => setTab("requests")}>
             Requests
           </TabButton>
+          <TabButton active={tab === "email"} onClick={() => setTab("email")}>
+            Email
+          </TabButton>
         </div>
       </div>
       {tab === "analytics" && <AnalyticsPanel getToken={getAccessToken} />}
@@ -102,6 +106,7 @@ export function AdminView() {
       {tab === "users" && <UserRoster getToken={getAccessToken} />}
       {tab === "partners" && <PartnerManager getToken={getAccessToken} />}
       {tab === "requests" && <DeviceRequestsPanel getToken={getAccessToken} />}
+      {tab === "email" && <BroadcastPanel getToken={getAccessToken} />}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { EmailMessage } from "../email";
+import { socialsHtml, socialsText } from "./socials";
 
 /**
  * The "you're in" email — the only mail this product sends today.
@@ -58,6 +59,7 @@ export function accessGrantedEmail(opts: {
   const name = firstName(opts.fullName ?? null);
   const greeting = name ? `Hi ${name},` : "Hi,";
   const url = appOrigin();
+  const socialText = socialsText();
 
   // Plain text is not a fallback nobody reads — it is what keeps this out of
   // spam, and what some clients show by default.
@@ -76,7 +78,9 @@ export function accessGrantedEmail(opts: {
     "We are letting people in a few at a time so everyone gets proper attention.",
     "If something is broken or confusing, just reply to this email.",
     "",
-    "— Ikigaro",
+    "— Ajinkya",
+    "Ikigaro",
+    ...(socialText.length > 0 ? ["", ...socialText] : []),
     "",
     "You are receiving this because you joined the Ikigaro private beta.",
   ].join("\n");
@@ -112,11 +116,16 @@ export function accessGrantedEmail(opts: {
         If something is broken or confusing, just reply to this email.
       </p>
 
-      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">&mdash; Ikigaro</p>
-
-      <p style="margin:0;padding-top:16px;border-top:1px solid #e5e0d8;font-size:12px;line-height:1.5;color:#8a8378;">
-        You&rsquo;re receiving this because you joined the Ikigaro private beta.
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">
+        &mdash; Ajinkya<br />Ikigaro
       </p>
+
+      <div style="padding-top:16px;border-top:1px solid #e5e0d8;">
+        ${socialsHtml()}
+        <p style="margin:0;font-size:12px;line-height:1.5;color:#8a8378;">
+          You&rsquo;re receiving this because you joined the Ikigaro private beta.
+        </p>
+      </div>
     </div>
   </body>
 </html>`;

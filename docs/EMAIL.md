@@ -112,7 +112,86 @@ spam, and it is easy to break invisibly.
 
 ---
 
-## Adding a second email later
+---
+
+## Announcements (Admin → Email)
+
+Compose a subject and a plain-text body, pick an audience, send. History and
+per-send counts are on the same screen.
+
+### Transactional vs announcement — the distinction the whole design rests on
+
+The access-granted email **answers something the user did**. An announcement is
+**us deciding to contact them**. That difference drives everything below:
+
+| | Access-granted | Announcement |
+|---|---|---|
+| Trigger | User was approved | Admin wrote it |
+| Unsubscribe link | No | **Yes, always** |
+| Suppressed by `email_opt_out` | No | Yes |
+| Recorded per recipient | Via `access_granted_email_at` | `broadcast_recipients` row |
+
+**Why the unsubscribe link is non-negotiable.** Without one, a recipient who
+doesn't want the mail has exactly one tool: the spam button. Enough of those
+and the *domain's* reputation degrades — which would silently take the
+access-granted email down with it, long after the broadcast that caused it.
+The opt-out exists to protect the transactional channel, not to satisfy a
+lawyer.
+
+Opting out never suppresses transactional mail. Someone who unsubscribes from
+announcements and is later approved still hears that they're in.
+
+### The composer takes plain text, not HTML
+
+Blank lines become paragraphs. Everything typed is escaped before it reaches
+the HTML — pasted content cannot introduce markup. If the box accepted HTML it
+would be an injection path into every user's inbox, and mail clients render
+only an inconsistent subset of HTML anyway.
+
+The "Open Ikigaro" button and the unsubscribe footer are added automatically.
+
+### Sending is resumable, and cannot double-send
+
+1. The recipient list is resolved and frozen into `broadcast_recipients` as
+   `pending` rows **before anything is sent**.
+2. A run sends at most `MAX_PER_RUN` (50) — Resend's free tier allows 100/day,
+   and a Worker has a ceiling on outbound subrequests per invocation.
+3. Anything left stays `pending`, the broadcast stays `sending`, and **Resume**
+   picks up exactly the pending rows.
+
+The unique index on `(broadcast_id, user_id)` is what makes a resume safe: it
+is structurally impossible to send twice to the same person for one broadcast.
+
+### Who is excluded automatically
+
+Opted out, deleted accounts, and rows with no address. Recipients are also
+deduplicated by address, so two accounts sharing an inbox get one copy.
+
+The count shown next to the audience selector is the real post-exclusion
+number, fetched live — not an estimate.
+
+### Send a test first
+
+The "Send test to me" button sits *before* the send button on purpose. There is
+no way to inspect an email except by receiving one, and every mistake worth
+catching — a collapsed paragraph, a subject that reads badly in a list — is
+obvious in an inbox and invisible in a compose box.
+
+### Unsubscribe is a two-step page, not a link that acts
+
+`GET /api/email/unsubscribe?t=…` renders a confirmation page; only the `POST`
+it submits changes anything. Mail providers and corporate gateways **prefetch
+links to scan them** — a GET that performed the opt-out would unsubscribe
+people who never clicked, and nobody would ever find out why the announcements
+stopped.
+
+The token is a random per-user UUID rather than a signed id: no signing secret
+to manage or leak, revocable per user by updating one row, and 122 bits is not
+guessable.
+
+---
+
+## Adding a third email later
 
 The wearable launch announcement is the obvious next one: the `notify` opt-in
 on `device_requests` already stores who asked, and `notified_at` already exists

@@ -29,7 +29,7 @@ const RESEND_ENDPOINT = "https://api.resend.com/emails";
  * default. Overriding this with an address nobody reads would quietly turn
  * "just reply to this email" into a lie.
  */
-const DEFAULT_FROM = "Ikigaro <team@ikigaro.com>";
+const DEFAULT_FROM = "Ajinkya from Ikigaro <team@ikigaro.com>";
 
 export interface EmailMessage {
   to: string;

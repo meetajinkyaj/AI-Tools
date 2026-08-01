@@ -116,8 +116,45 @@ describe("the message itself", () => {
 
   it("has no tracking pixel or external asset", () => {
     // Nothing to load means nothing blocked, and no open-tracking beacon on a
-    // transactional message.
+    // transactional message. This is also why the social row is text links
+    // rather than icons — icons would be remote images, blocked by default.
     expect(msg().html).not.toMatch(/<img/i);
+  });
+
+  it("signs off from a person, above the company", () => {
+    const m = msg();
+    expect(m.text).toContain("— Ajinkya\nIkigaro");
+    // <br /> rather than two paragraphs, so the two lines read as one signature.
+    expect(m.html).toMatch(/Ajinkya<br\s*\/?>Ikigaro/);
+  });
+});
+
+describe("the social links", () => {
+  const msg = () => accessGrantedEmail({ to: "x@example.com" });
+
+  it("never renders a link that has not been filled in", () => {
+    // An email cannot be edited after it is sent. A 404 from the founder's
+    // first message sits in that inbox permanently, so an unset URL is dropped
+    // rather than rendered dead.
+    expect(msg().html).not.toMatch(/href=""/);
+    expect(msg().html).not.toMatch(/href="undefined"/);
+    // No "Instagram:" with nothing after it, and no empty section header.
+    expect(msg().text).not.toMatch(/^\s*(Instagram|X|LinkedIn):\s*$/m);
+    expect(msg().text).not.toMatch(/Follow along:\s*$/);
+  });
+
+  it("only ever emits absolute https links", () => {
+    // A relative or http link in an email is broken or insecure — there is no
+    // page context to resolve it against.
+    for (const href of msg().html.match(/href="([^"]*)"/g) ?? []) {
+      expect(href, href).toMatch(/href="https:\/\//);
+    }
+  });
+
+  it("keeps the footer intact whether or not socials are present", () => {
+    // The "why you got this" line is the part that must never disappear.
+    expect(msg().text).toMatch(/because you joined/i);
+    expect(msg().html).toMatch(/because you joined/i);
   });
 });
 
