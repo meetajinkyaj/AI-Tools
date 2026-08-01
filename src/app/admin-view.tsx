@@ -881,6 +881,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
     { id: string; email: string; draft: string } | null
   >(null);
   const [codeMsg, setCodeMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [accessMsg, setAccessMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const startedRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -905,11 +906,31 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
 
   const setAccess = async (id: string, access_status: "approved" | "waitlisted") => {
     const token = await getToken();
-    await fetch("/api/admin/users", {
+    const res = await fetch("/api/admin/users", {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ id, access_status }),
     });
+
+    // Approving now also emails the user. Say which happened: a silent
+    // approval that the person never hears about looks identical to one they
+    // were told about, and the difference decides whether they come back.
+    if (access_status === "approved" && res.ok) {
+      const { emailed } = (await res.json().catch(() => ({}))) as {
+        emailed?: "sent" | "skipped" | "failed";
+      };
+      setAccessMsg(
+        emailed === "sent"
+          ? { text: "Approved, and emailed them.", ok: true }
+          : emailed === "failed"
+            ? { text: "Approved — but the email failed. Tell them yourself.", ok: false }
+            : // "skipped" before the domain is verified, or when they were
+              // already approved. Neither is a problem worth an alarm.
+              { text: "Approved. No email sent.", ok: true },
+      );
+    } else {
+      setAccessMsg(null);
+    }
     void load();
   };
 
@@ -1000,6 +1021,15 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
         >
           {codeMsg.ok ? "✓ " : ""}
           {codeMsg.text}
+        </p>
+      )}
+      {accessMsg && (
+        <p
+          role="status"
+          className={`font-body text-sm ${accessMsg.ok ? "text-foreground/80" : "text-accent-hover"}`}
+        >
+          {accessMsg.ok ? "✓ " : ""}
+          {accessMsg.text}
         </p>
       )}
       <Card className="overflow-x-auto p-0">
