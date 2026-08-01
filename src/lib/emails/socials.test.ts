@@ -77,3 +77,51 @@ describe("both emails carry them", () => {
     expect(access.html).not.toContain("/api/email/unsubscribe");
   });
 });
+
+/**
+ * The signature, in every part of every email.
+ *
+ * A bulk edit once turned the leading "&mdash; " of the broadcast signature
+ * into a full stop, so the mail went out reading ". Ajinkya". It survived
+ * because only the access-granted HTML had a signature assertion, and only the
+ * plain-text side of the broadcast did. Every combination is covered now.
+ */
+describe("the signature", () => {
+  const parts: [string, string][] = [
+    ["access-granted text", accessGrantedEmail({ to: "x@example.com" }).text],
+    ["access-granted html", accessGrantedEmail({ to: "x@example.com" }).html],
+    [
+      "announcement text",
+      broadcastEmail({
+        to: "x@example.com",
+        subject: "s",
+        body: "Body text goes here.",
+        unsubscribeToken: "11111111-1111-1111-1111-111111111111",
+      }).text,
+    ],
+    [
+      "announcement html",
+      broadcastEmail({
+        to: "x@example.com",
+        subject: "s",
+        body: "Body text goes here.",
+        unsubscribeToken: "11111111-1111-1111-1111-111111111111",
+      }).html,
+    ],
+  ];
+
+  it.each(parts)("has no stray punctuation before the name in %s", (_label, content) => {
+    // Catches ". Ajinkya", "- Ajinkya", ", Ajinkya" and the em dash we removed.
+    //
+    // Horizontal whitespace only. `\s` would span newlines and match the full
+    // stop ending the previous paragraph, flagging every correct signature.
+    //
+    // The dashes are written as \u2014 and \u2013 rather than literally, so
+    // this file does not itself trip the no-em-dash check.
+    expect(content).not.toMatch(/[.,;:>\-\u2014\u2013][^\S\n]+Ajinkya/);
+  });
+
+  it.each(parts)("names the person above the company in %s", (_label, content) => {
+    expect(content).toMatch(/Ajinkya(<br \/>|\n)Ikigaro/);
+  });
+});
