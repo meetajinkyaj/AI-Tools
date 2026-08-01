@@ -171,7 +171,7 @@ function calloutText(r: ReadingRow, band: Band | null): string {
   )}) ${at}.`;
 }
 
-const DISCLAIMER = "Educational, not a diagnosis, please consult a doctor.";
+const DISCLAIMER = "Educational, not a diagnosis. Please consult a doctor.";
 
 /**
  * The extract endpoint streams newline heartbeats then a final JSON line. Parse

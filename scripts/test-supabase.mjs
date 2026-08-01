@@ -18,9 +18,9 @@ const { error: anonError } = await anonClient
   .limit(1);
 
 if (anonError?.code === "42P01" || anonError?.code === "PGRST205") {
-  console.log("anon key: OK (reached the database, table doesn't exist yet — expected)");
+  console.log("anon key: OK (reached the database, table doesn't exist yet, expected)");
 } else if (anonError) {
-  console.error("anon key: FAILED —", anonError.message);
+  console.error("anon key: FAILED -", anonError.message);
   process.exit(1);
 } else {
   console.log("anon key: OK (unexpected: table __connection_test__ actually exists)");
@@ -32,7 +32,7 @@ const serviceClient = createClient(url, serviceKey, {
 const { error: serviceError } = await serviceClient.auth.admin.listUsers({ perPage: 1 });
 
 if (serviceError) {
-  console.error("service_role key: FAILED —", serviceError.message);
+  console.error("service_role key: FAILED -", serviceError.message);
   process.exit(1);
 }
 console.log("service_role key: OK (admin API reachable)");

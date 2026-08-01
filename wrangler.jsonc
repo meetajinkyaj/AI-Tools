@@ -8,12 +8,11 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  // Plaintext vars are REPLACED by this file on every `wrangler deploy` —
-  // dashboard-set vars get wiped, so any non-secret var MUST live here.
+  // Plaintext vars are REPLACED by this file on every `wrangler deploy`, // dashboard-set vars get wiped, so any non-secret var MUST live here.
   // (Secrets set via `wrangler secret put` survive deploys and stay out of git.)
   //
   // NOTE: `vars` is NOT inherited by named environments. The staging block
-  // below repeats every var it needs on purpose — omitting one there does not
+  // below repeats every var it needs on purpose, omitting one there does not
   // fall back to these values.
   "vars": {
     // Admin allow-list for /admin (comma-separated, case-insensitive).
@@ -21,7 +20,7 @@
     // Runtime environment marker. Guards the production database against
     // non-production deploys (src/lib/supabase-admin.ts).
     "APP_ENV": "production",
-    // Whether this database has real backups. "none" today — the Supabase
+    // Whether this database has real backups. "none" today, the Supabase
     // project is on the Free plan, which includes none (docs/RUNBOOK.md §2b).
     // The admin console warns while this says "none", loudly once the tester
     // count passes the threshold the risk was accepted under. Flip this to
@@ -42,7 +41,7 @@
         "ADMIN_EMAILS": "meetajinkyaj@gmail.com",
         "APP_ENV": "staging",
         // Set explicitly because `vars` is NOT inherited by named
-        // environments — omitting it makes wrangler warn on every staging
+        // environments, omitting it makes wrangler warn on every staging
         // deploy. "none" is also simply true: the staging database has no
         // backups and needs none, and its signup count never approaches the
         // threshold that would make the warning loud.
@@ -50,7 +49,7 @@
         // The staging Supabase project's URL (project `ikigaro-staging`).
         // Public, so it belongs here rather than in secrets. If this is ever
         // emptied, the app falls back to the production URL, which the
-        // APP_ENV guard rejects — staging fails loudly instead of quietly
+        // APP_ENV guard rejects, staging fails loudly instead of quietly
         // reading and writing real user data.
         "SUPABASE_URL": "https://albhabiyfaqvpnxilovf.supabase.co"
       },

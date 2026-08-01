@@ -58,7 +58,7 @@ interface FutureData {
   interventions: InterventionRow[];
 }
 
-const DISCLAIMER = "Educational, not a diagnosis, please consult a doctor.";
+const DISCLAIMER = "Educational, not a diagnosis. Please consult a doctor.";
 
 const OUTLOOK_META: Record<
   MarkerOutlook["outlook"],

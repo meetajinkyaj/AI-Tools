@@ -7,7 +7,7 @@ import { gotoApp } from "./helpers";
  * Confirms the suite is pointed where it thinks it is.
  *
  * Without this, a misconfigured `E2E_BASE_URL` would run the whole suite
- * against the wrong deployment and report green — the tests would pass, and
+ * against the wrong deployment and report green, the tests would pass, and
  * they would be telling you nothing about the code under review.
  */
 test.describe("deployment identity", () => {

@@ -154,7 +154,7 @@ your own data.
 
 ## Is any of this medical advice?
 
-No. Everything in Ikigaro is **educational, not a diagnosis, please consult a
+No. Everything in Ikigaro is **educational, not a diagnosis. Please consult a
 doctor.** Rewards are for engagement and genuine self-improvement, not a medical
 claim or an inducement.
 

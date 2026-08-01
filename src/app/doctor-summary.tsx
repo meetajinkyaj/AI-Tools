@@ -55,7 +55,7 @@ interface SummaryData {
   };
 }
 
-const DISCLAIMER = "Educational, not a diagnosis, please consult a doctor.";
+const DISCLAIMER = "Educational, not a diagnosis. Please consult a doctor.";
 
 function rangeText(low: number | null, high: number | null, unit: string | null): string {
   const u = unit ? ` ${unit}` : "";

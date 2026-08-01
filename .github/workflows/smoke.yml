@@ -3,13 +3,13 @@ name: Production smoke
 # Watches the LIVE app on a schedule.
 #
 # Why this exists: CI only tests staging, so production can break without a
-# single red check anywhere. That happened — a Privy allowed-domains edit
+# single red check anywhere. That happened, a Privy allowed-domains edit
 # dropped app.ikigaro.com, every user got an endless splash screen, and it went
 # unnoticed for a day while CI stayed green. Nothing in the code was wrong,
 # which is exactly the class of failure this catches: the app is only healthy if
 # its configuration is healthy too.
 #
-# The suite is read-only by design (no signup, no writes — see docs/TESTING.md),
+# The suite is read-only by design (no signup, no writes, see docs/TESTING.md),
 # so pointing it at production is safe.
 
 on:
@@ -60,13 +60,13 @@ jobs:
             echo ""
             echo "The live app at https://app.ikigaro.com is misbehaving **right now**."
             echo ""
-            echo "This suite only reads — it never writes — so a failure means the"
+            echo "This suite only reads, it never writes, so a failure means the"
             echo "deployment or its configuration is broken, not the test data."
             echo ""
             echo "Most likely causes, in order:"
             echo "1. **Privy allowed domains** no longer include \`https://app.ikigaro.com\`"
             echo "   (symptom: the app hangs on the startup splash forever)."
-            echo "2. A bad deploy — check the most recent \`deploy\` job on \`main\`."
+            echo "2. A bad deploy, check the most recent \`deploy\` job on \`main\`."
             echo "3. Cloudflare: Bot Fight Mode re-enabled, or a Worker var wiped."
             echo "4. Supabase or Anthropic outage / exhausted billing."
             echo ""

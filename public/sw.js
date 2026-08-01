@@ -1,12 +1,12 @@
-// Ikigaro service worker — enables "add to home screen", an offline fallback,
+// Ikigaro service worker, enables "add to home screen", an offline fallback,
 // and (from step 2) daily check-in push reminders.
 //
 // Deliberately conservative: it does NOT cache app HTML or API responses (this
-// is an authenticated SPA — stale shells/tokens cause bugs). It only pre-caches
+// is an authenticated SPA, stale shells/tokens cause bugs). It only pre-caches
 // a static offline page + icons and serves that page when a navigation fails
 // because the device is offline. Everything else goes straight to the network.
 
-// Bump on any change to PRECACHE's *contents* — the icons were regenerated
+// Bump on any change to PRECACHE's *contents*, the icons were regenerated
 // from the brand pack, and a service worker only re-runs install when its own
 // bytes change.
 const CACHE = "ikigaro-shell-v2";

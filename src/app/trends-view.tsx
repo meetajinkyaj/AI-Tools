@@ -29,7 +29,7 @@ interface TrendsData {
   bonuses: OutcomeBonus[];
 }
 
-const DISCLAIMER = "Educational, not a diagnosis, please consult a doctor.";
+const DISCLAIMER = "Educational, not a diagnosis. Please consult a doctor.";
 
 /** Kept in sync with docs/FAQ.md; values come from the POINTS table so this
  * copy can never drift from the live economy. */

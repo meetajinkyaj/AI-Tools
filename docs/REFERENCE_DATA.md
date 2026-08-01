@@ -76,4 +76,4 @@ not clinical thresholds, the thresholds themselves stay in the catalog.
 ## Disclaimer
 
 None of this is a diagnosis. The report is educational and every screen carries:
-*"Educational, not a diagnosis, please consult a doctor."*
+*"Educational, not a diagnosis. Please consult a doctor."*

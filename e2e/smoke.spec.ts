@@ -7,7 +7,7 @@ import { gotoApp } from "./helpers";
  *
  * This is the single highest-value test in the suite. Every catastrophic
  * failure this project has actually shipped rendered a blank or broken page to
- * every visitor — an empty NEXT_PUBLIC_* at build time, a Privy provider that
+ * every visitor, an empty NEXT_PUBLIC_* at build time, a Privy provider that
  * threw on load, a black first frame on dark-mode phones. All of them would
  * have failed here before a human noticed.
  */
