@@ -26,6 +26,30 @@ function appOrigin(): string {
 }
 
 /**
+ * Where to follow us. Rendered as TEXT LINKS, never icon images.
+ *
+ * Icons would need externally hosted images, and mail clients block remote
+ * images by default — so the row would render as three broken-image boxes for
+ * most recipients, which looks worse than no social row at all. Remote images
+ * are also the standard open-tracking mechanism, and this is transactional
+ * mail that should not be tracking anyone.
+ *
+ * A URL left empty is DROPPED rather than rendered dead. An email is not a web
+ * page you can quietly fix after sending — a link that 404s is out there
+ * permanently, in someone's inbox, from the founder. Better to ship no link
+ * than a wrong one.
+ */
+const SOCIAL_LINKS: { label: string; url: string }[] = [
+  { label: "Instagram", url: "" },
+  { label: "X", url: "" },
+  { label: "LinkedIn", url: "" },
+];
+
+function activeSocials(): { label: string; url: string }[] {
+  return SOCIAL_LINKS.filter((s) => s.url.startsWith("https://"));
+}
+
+/**
  * Escape before interpolating into HTML.
  *
  * The only interpolated value is a user-supplied display name. Someone whose
@@ -58,6 +82,7 @@ export function accessGrantedEmail(opts: {
   const name = firstName(opts.fullName ?? null);
   const greeting = name ? `Hi ${name},` : "Hi,";
   const url = appOrigin();
+  const socials = activeSocials();
 
   // Plain text is not a fallback nobody reads — it is what keeps this out of
   // spam, and what some clients show by default.
@@ -76,7 +101,11 @@ export function accessGrantedEmail(opts: {
     "We are letting people in a few at a time so everyone gets proper attention.",
     "If something is broken or confusing, just reply to this email.",
     "",
-    "— Ikigaro",
+    "— Ajinkya",
+    "Ikigaro",
+    ...(socials.length > 0
+      ? ["", "Follow along:", ...socials.map((s) => `  ${s.label}: ${s.url}`)]
+      : []),
     "",
     "You are receiving this because you joined the Ikigaro private beta.",
   ].join("\n");
@@ -112,11 +141,27 @@ export function accessGrantedEmail(opts: {
         If something is broken or confusing, just reply to this email.
       </p>
 
-      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">&mdash; Ikigaro</p>
-
-      <p style="margin:0;padding-top:16px;border-top:1px solid #e5e0d8;font-size:12px;line-height:1.5;color:#8a8378;">
-        You&rsquo;re receiving this because you joined the Ikigaro private beta.
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">
+        &mdash; Ajinkya<br />Ikigaro
       </p>
+
+      <div style="padding-top:16px;border-top:1px solid #e5e0d8;">
+        ${
+          socials.length > 0
+            ? `<p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:#8a8378;">
+          ${socials
+            .map(
+              (s) =>
+                `<a href="${s.url}" style="color:#8a8378;text-decoration:underline;">${s.label}</a>`,
+            )
+            .join(`<span style="color:#c9c2b6;"> &middot; </span>`)}
+        </p>`
+            : ""
+        }
+        <p style="margin:0;font-size:12px;line-height:1.5;color:#8a8378;">
+          You&rsquo;re receiving this because you joined the Ikigaro private beta.
+        </p>
+      </div>
     </div>
   </body>
 </html>`;

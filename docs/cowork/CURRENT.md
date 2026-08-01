@@ -6,7 +6,7 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below — one line each,
 no instructions.
 
-Last updated: 2026-07-30. **No task is pending.**
+Last updated: 2026-07-30. **One task pending: migration 0018.**
 
 ---
 
@@ -41,9 +41,100 @@ verified live.**
 
 ---
 
-# PENDING TASK
+# PENDING TASK — paste everything below the line into Cowork
 
-**Nothing.** Everything that needed production access is done.
+**Must run BEFORE the broadcasts PR is merged.** The code reads two tables and
+two columns that do not exist yet.
+
+---
+
+Apply migration `0018_broadcasts` to the production Supabase database, then
+verify it.
+
+The file is `supabase/migrations/0018_broadcasts.sql`. It adds the ability to
+send announcements to users from the admin console. It creates:
+
+- two new tables — `broadcasts` and `broadcast_recipients`
+- two new columns on `users` — `email_opt_out` (boolean, default false) and
+  `unsubscribe_token` (uuid, auto-generated per user)
+
+It does **not** modify or delete any existing data. The two new columns get
+defaults, so every existing user is opted IN to announcements and gets a
+random unsubscribe token — which is what we want.
+
+## Apply
+
+Supabase dashboard → SQL Editor → paste the file → Run.
+
+## Verify — please run these and paste the output
+
+**1. Both tables exist**
+
+```sql
+select table_name from information_schema.tables
+where table_name in ('broadcasts', 'broadcast_recipients');
+```
+
+Expect both.
+
+**2. RLS on, no policies, on both**
+
+```sql
+select relname, relrowsecurity from pg_class
+where relname in ('broadcasts', 'broadcast_recipients');
+select tablename, count(*) from pg_policies
+where tablename in ('broadcasts', 'broadcast_recipients') group by tablename;
+```
+
+Expect `relrowsecurity = true` for both and **zero** policies. Same house rule
+as every other table.
+
+**3. Every user got a unique unsubscribe token**
+
+```sql
+select count(*) as users,
+       count(unsubscribe_token) as with_token,
+       count(distinct unsubscribe_token) as distinct_tokens,
+       count(*) filter (where email_opt_out) as opted_out
+from users;
+```
+
+All four numbers matter. `users`, `with_token` and `distinct_tokens` must be
+**identical** — a duplicate or missing token means someone either cannot
+unsubscribe or would unsubscribe the wrong person. `opted_out` must be **0**.
+
+**4. The no-double-send guard exists**
+
+```sql
+select indexname from pg_indexes where tablename = 'broadcast_recipients';
+```
+
+Expect `broadcast_recipients_unique` among them. Without it, resuming a
+partially-sent announcement could email the same person twice.
+
+**5. Nothing else moved**
+
+```sql
+select access_status, count(*) from users group by access_status;
+```
+
+Should be unchanged.
+
+## Do not
+
+- Do not insert any test rows into `broadcasts` or `broadcast_recipients`.
+- Do not send any announcement. I will test with the "Send test to me" button.
+- Do not set `email_opt_out` on anyone.
+- Do not paste keys, tokens or connection strings into chat. The unsubscribe
+  tokens are per-user secrets — send me counts, never values.
+
+## Report back
+
+The output of all five checks. Once confirmed I will merge the code.
+
+---
+
+## After that, nothing is pending
 
 Two things are waiting on the founder rather than on Cowork:
 
