@@ -57,18 +57,28 @@ export function broadcastEmail(opts: {
   subject: string;
   body: string;
   unsubscribeToken: string;
+  /**
+   * Render the "Open Ikigaro" button. OFF unless asked for.
+   *
+   * A call to action on a message that is not asking anyone to open the app is
+   * noise, and it competes with whatever the message actually wants. The
+   * access-granted email is the opposite case and keeps its button always:
+   * that mail exists to say "your access is open", so the button is the point.
+   */
+  includeAppButton?: boolean;
 }): EmailMessage {
   const paragraphs = bodyToParagraphs(opts.body);
   const unsub = unsubscribeUrl(opts.unsubscribeToken);
   const url = appOrigin();
   const socialText = socialsText();
+  const withButton = opts.includeAppButton === true;
 
   const text = [
     ...paragraphs,
     // One block, not two entries, the join below puts a blank line between
     // entries, which would split the signature across a paragraph break.
     "Ajinkya\nIkigaro",
-    `Open Ikigaro: ${url}`,
+    ...(withButton ? [`Open Ikigaro: ${url}`] : []),
     ...(socialText.length > 0 ? [socialText.join("\n")] : []),
     `You're receiving this because you have an Ikigaro account.\nUnsubscribe from announcements: ${unsub}`,
   ].join("\n\n");
@@ -86,9 +96,13 @@ export function broadcastEmail(opts: {
         )
         .join("\n      ")}
 
-      <p style="margin:24px 0 28px;">
+      ${
+        withButton
+          ? `<p style="margin:24px 0 28px;">
         <a href="${url}" style="display:inline-block;padding:12px 24px;background:#1c1b19;color:#faf8f5;text-decoration:none;border-radius:999px;font-size:14px;">Open Ikigaro</a>
-      </p>
+      </p>`
+          : ""
+      }
 
       <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">Ajinkya<br />Ikigaro</p>
 

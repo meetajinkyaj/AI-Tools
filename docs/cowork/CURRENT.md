@@ -6,7 +6,7 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-07-30. **One task pending: migration 0018.**
+Last updated: 2026-07-30. **One task pending: migration 0019.**
 
 ---
 
@@ -19,6 +19,7 @@ Last updated: 2026-07-30. **One task pending: migration 0018.**
 | `0015_wearable_connections` | Applied 2026-07-30, verified. Both tables live, RLS on with no policies, idempotency index present, no rows touched. |
 | `0016_device_requests` | Applied 2026-07-30, verified. 8 columns, RLS on with 0 policies, unique `(user_id, device_key)` index present, table empty, `users`/`wearable_connections` counts unchanged. |
 | `0017_access_granted_email` | Applied 2026-07-30, verified. `users.access_granted_email_at` present and nullable, 0 of 4 users stamped, access breakdown unchanged. |
+| `0018_broadcasts` | Applied 2026-07-30, verified. Both tables live, RLS on with 0 policies, `broadcast_recipients_unique` present, 4/4/4 unique unsubscribe tokens, 0 opted out, access breakdown unchanged. |
 
 | Configuration | Status |
 |---|---|
@@ -43,94 +44,66 @@ verified live.**
 
 # PENDING TASK, paste everything below the line into Cowork
 
-**Must run BEFORE the broadcasts PR is merged.** The code reads two tables and
-two columns that do not exist yet.
+**Must run BEFORE the app-button PR is merged.** The code writes a column that
+does not exist yet.
 
 ---
 
-Apply migration `0018_broadcasts` to the production Supabase database, then
-verify it.
+Apply migration `0019_broadcast_app_button` to production, then verify.
 
-The file is `supabase/migrations/0018_broadcasts.sql`. It adds the ability to
-send announcements to users from the admin console. It creates:
+The file is `supabase/migrations/0019_broadcast_app_button.sql`. It adds **one
+column** to the existing `broadcasts` table:
+`include_app_button boolean not null default false`.
 
-- two new tables, `broadcasts` and `broadcast_recipients`
-- two new columns on `users`, `email_opt_out` (boolean, default false) and
-  `unsubscribe_token` (uuid, auto-generated per user)
-
-It does **not** modify or delete any existing data. The two new columns get
-defaults, so every existing user is opted IN to announcements and gets a
-random unsubscribe token, which is what we want.
+That is the whole migration. No new table, no backfill, no change to any
+existing value. It makes the "Open Ikigaro" button in announcements opt-in
+instead of always-on.
 
 ## Apply
 
-Supabase dashboard → SQL Editor → paste the file → Run.
+Supabase dashboard, SQL Editor, paste the file, Run.
 
-## Verify, please run these and paste the output
+## Verify, please paste the output
 
-**1. Both tables exist**
-
-```sql
-select table_name from information_schema.tables
-where table_name in ('broadcasts', 'broadcast_recipients');
-```
-
-Expect both.
-
-**2. RLS on, no policies, on both**
+**1. The column exists with the right default**
 
 ```sql
-select relname, relrowsecurity from pg_class
-where relname in ('broadcasts', 'broadcast_recipients');
-select tablename, count(*) from pg_policies
-where tablename in ('broadcasts', 'broadcast_recipients') group by tablename;
+select column_name, data_type, is_nullable, column_default
+from information_schema.columns
+where table_name = 'broadcasts' and column_name = 'include_app_button';
 ```
 
-Expect `relrowsecurity = true` for both and **zero** policies. Same house rule
-as every other table.
+Expect one row: `boolean`, `is_nullable = NO`, default `false`.
 
-**3. Every user got a unique unsubscribe token**
+**2. No existing announcement was switched on**
 
 ```sql
-select count(*) as users,
-       count(unsubscribe_token) as with_token,
-       count(distinct unsubscribe_token) as distinct_tokens,
-       count(*) filter (where email_opt_out) as opted_out
-from users;
+select count(*) as broadcasts,
+       count(*) filter (where include_app_button) as with_button
+from broadcasts;
 ```
 
-All four numbers matter. `users`, `with_token` and `distinct_tokens` must be
-**identical**, a duplicate or missing token means someone either cannot
-unsubscribe or would unsubscribe the wrong person. `opted_out` must be **0**.
+`with_button` must be **0**. Anything else would mean an already-sent
+announcement now claims to have carried a button it did not.
 
-**4. The no-double-send guard exists**
+**3. Nothing else moved**
 
 ```sql
-select indexname from pg_indexes where tablename = 'broadcast_recipients';
+select count(*) from users;
+select count(*) from broadcast_recipients;
 ```
 
-Expect `broadcast_recipients_unique` among them. Without it, resuming a
-partially-sent announcement could email the same person twice.
-
-**5. Nothing else moved**
-
-```sql
-select access_status, count(*) from users group by access_status;
-```
-
-Should be unchanged.
+Tell me both numbers; they should be unchanged.
 
 ## Do not
 
-- Do not insert any test rows into `broadcasts` or `broadcast_recipients`.
-- Do not send any announcement. I will test with the "Send test to me" button.
-- Do not set `email_opt_out` on anyone.
-- Do not paste keys, tokens or connection strings into chat. The unsubscribe
-  tokens are per-user secrets, send me counts, never values.
+- Do not send any announcement. I will test with "Send test to me".
+- Do not insert or edit rows in `broadcasts` or `broadcast_recipients`.
+- Do not paste keys, tokens or connection strings into chat.
 
 ## Report back
 
-The output of all five checks. Once confirmed I will merge the code.
+The output of all three checks. Once confirmed I will merge the code.
 
 ---
 

@@ -58,7 +58,7 @@ export async function GET(request: Request) {
   const supabase = createSupabaseAdmin();
   const { data: broadcasts } = await supabase
     .from("broadcasts")
-    .select("id, subject, audience, status, created_by, created_at, completed_at")
+    .select("id, subject, audience, status, created_by, created_at, completed_at, include_app_button")
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -109,6 +109,8 @@ export async function POST(request: Request) {
   const subject = typeof body.subject === "string" ? body.subject.trim() : "";
   const text = typeof body.body === "string" ? body.body.trim() : "";
   const audience = body.audience;
+  // Off unless explicitly ticked, so a malformed request cannot turn it on.
+  const includeAppButton = body.includeAppButton === true;
 
   const valid = validateBroadcast(subject, text);
   if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: 400 });
@@ -131,6 +133,9 @@ export async function POST(request: Request) {
         subject: `[TEST] ${subject}`,
         body: text,
         unsubscribeToken: "test-token-not-real",
+        // The test has to match what the real send will look like, or it is
+        // not a test of anything.
+        includeAppButton,
       }),
     );
     return result.sent
@@ -150,6 +155,7 @@ export async function POST(request: Request) {
       subject,
       body: text,
       audience,
+      include_app_button: includeAppButton,
       created_by: admin.email,
       status: "sending",
       started_at: new Date().toISOString(),
@@ -185,7 +191,7 @@ async function resume(broadcastId: string) {
 
   const { data: broadcast } = await supabase
     .from("broadcasts")
-    .select("id, subject, body")
+    .select("id, subject, body, include_app_button")
     .eq("id", broadcastId)
     .maybeSingle();
   if (!broadcast) return NextResponse.json({ error: "Broadcast not found." }, { status: 404 });
@@ -228,6 +234,10 @@ async function resume(broadcastId: string) {
         subject: broadcast.subject as string,
         body: broadcast.body as string,
         unsubscribeToken: token,
+        // Read from the stored row, not from the request. A send that stops at
+        // the per-run cap finishes later from this row, and the second half
+        // must look identical to the first.
+        includeAppButton: broadcast.include_app_button === true,
       }),
     );
 
