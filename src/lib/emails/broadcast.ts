@@ -90,7 +90,7 @@ export function broadcastEmail(opts: {
         <a href="${url}" style="display:inline-block;padding:12px 24px;background:#1c1b19;color:#faf8f5;text-decoration:none;border-radius:999px;font-size:14px;">Open Ikigaro</a>
       </p>
 
-      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">. Ajinkya<br />Ikigaro</p>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">Ajinkya<br />Ikigaro</p>
 
       <div style="padding-top:16px;border-top:1px solid #e5e0d8;">
         ${socialsHtml()}
