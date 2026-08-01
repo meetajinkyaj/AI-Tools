@@ -1,4 +1,5 @@
 import type { EmailMessage } from "../email";
+import { socialsHtml, socialsText } from "./socials";
 
 /**
  * Announcements, composed in the admin console.
@@ -60,6 +61,7 @@ export function broadcastEmail(opts: {
   const paragraphs = bodyToParagraphs(opts.body);
   const unsub = unsubscribeUrl(opts.unsubscribeToken);
   const url = appOrigin();
+  const socialText = socialsText();
 
   const text = [
     ...paragraphs,
@@ -67,6 +69,7 @@ export function broadcastEmail(opts: {
     // entries, which would split the signature across a paragraph break.
     "— Ajinkya\nIkigaro",
     `Open Ikigaro: ${url}`,
+    ...(socialText.length > 0 ? [socialText.join("\n")] : []),
     `You're receiving this because you have an Ikigaro account.\nUnsubscribe from announcements: ${unsub}`,
   ].join("\n\n");
 
@@ -90,6 +93,7 @@ export function broadcastEmail(opts: {
       <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">&mdash; Ajinkya<br />Ikigaro</p>
 
       <div style="padding-top:16px;border-top:1px solid #e5e0d8;">
+        ${socialsHtml()}
         <p style="margin:0;font-size:12px;line-height:1.5;color:#8a8378;">
           You&rsquo;re receiving this because you have an Ikigaro account.<br />
           <a href="${unsub}" style="color:#8a8378;">Unsubscribe from announcements</a>
