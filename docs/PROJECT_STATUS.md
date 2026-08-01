@@ -285,7 +285,7 @@ operate it, and the known follow-ups. Update this as work lands.
   **Bot Fight Mode OFF** (it 403'd our own cron caller; endpoints carry their
   own auth). Workers Builds git integration disconnected. CI is the only
   deploy path.
-- **Schema:** `supabase/migrations/0001-0018` (idempotent; run on prod
+- **Schema:** `supabase/migrations/0001-0019` (idempotent; run on prod
   Supabase BEFORE merging code that depends on them). Seed template:
   `supabase/seed_redemption_catalog.sql`.
 - **Marketing Worker:** `ikigaro-os` serves `public/index.html` + edge-injected
@@ -401,7 +401,7 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
 | Email: Resend client, templates, socials | `src/lib/email.ts`, `src/lib/emails/*` |
 | Announcements (compose, send, resume, unsubscribe) | `src/app/admin-broadcasts.tsx`, `src/app/api/admin/broadcasts/route.ts`, `src/app/api/email/unsubscribe/route.ts` |
 | Landing / splash / startup states | `src/app/landing.tsx`, `ui.tsx` (`Splash`), `home-view.tsx`, `globals.css` |
-| Schema | `supabase/migrations/0001-0018` |
+| Schema | `supabase/migrations/0001-0019` |
 | E2E suite / config | `e2e/*.spec.ts`, `playwright.config.ts`, `vitest.config.ts` |
 | Docs | `docs/HANDOVER.md`, `RUNBOOK.md`, `STAGING.md`, `TESTING.md`, `REFERENCE_DATA.md`, `SCALING.md`, `FAQ.md`, `POINTS_ECONOMY.md`, `WEARABLES.md`, `WEARABLE_DATA.md`, `WEARABLES_APPLICATIONS.md`, `EMAIL.md`, `cowork/CURRENT.md` |
 
@@ -414,7 +414,8 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   history keeps a name snapshot + code; unused codes are discarded.
 - **Retune the economy:** edit `src/lib/points.ts` only.
 - **Send an announcement:** admin -> Email. Write it, pick an audience, press
-  "Send test to me" FIRST, then Send. Sends are capped at 50 per run; anything
+  "Send test to me" FIRST, then Send. The "Open Ikigaro" button is off unless
+  you tick it. Sends are capped at 50 per run; anything
   left shows a Resume button. Unsubscribed, deleted and duplicate addresses are
   excluded automatically, and the count next to the audience is the real
   post-exclusion number.

@@ -38,6 +38,9 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [audience, setAudience] = useState<AudienceId>("approved");
+  // Off by default. A generic call to action on a message that is not asking
+  // anyone to open the app competes with whatever the message actually wants.
+  const [includeAppButton, setIncludeAppButton] = useState(false);
   const [count, setCount] = useState<number | null>(null);
   const [history, setHistory] = useState<Broadcast[]>([]);
   const [configured, setConfigured] = useState(true);
@@ -103,7 +106,7 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
     try {
       const res = await authed("/api/admin/broadcasts", {
         method: "POST",
-        body: JSON.stringify({ subject, body, audience, test: true }),
+        body: JSON.stringify({ subject, body, audience, includeAppButton, test: true }),
       });
       const b = (await res.json()) as { error?: string };
       setMsg(
@@ -119,7 +122,7 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
   const doSend = async () => {
     const res = await authed("/api/admin/broadcasts", {
       method: "POST",
-      body: JSON.stringify({ subject, body, audience }),
+      body: JSON.stringify({ subject, body, audience, includeAppButton }),
     });
     const b = (await res.json()) as {
       error?: string;
@@ -224,8 +227,8 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
             className={`${fieldClass} resize-y`}
           />
           <p className="font-body text-xs text-muted">
-            Plain text, blank lines become paragraphs. Links are not clickable;
-            an &ldquo;Open Ikigaro&rdquo; button and an unsubscribe link are added automatically.
+            Plain text, blank lines become paragraphs. Links are not clickable.
+            An unsubscribe link is added automatically.
           </p>
         </div>
 
@@ -251,6 +254,22 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
               : `${count} ${count === 1 ? "person" : "people"} will receive this. Unsubscribed and deleted accounts are already excluded.`}
           </p>
         </div>
+
+        <label className="flex items-start gap-2 font-body text-sm text-foreground">
+          <input
+            type="checkbox"
+            checked={includeAppButton}
+            onChange={(e) => setIncludeAppButton(e.target.checked)}
+            className="mt-1 accent-accent"
+          />
+          <span className="flex flex-col gap-0.5">
+            <span>Include an &ldquo;Open Ikigaro&rdquo; button</span>
+            <span className="font-body text-xs text-muted">
+              Only worth it when the message is actually asking someone to open
+              the app. Otherwise it competes with what you wrote.
+            </span>
+          </span>
+        </label>
 
         {msg && (
           <p

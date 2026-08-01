@@ -148,7 +148,24 @@ the HTML, pasted content cannot introduce markup. If the box accepted HTML it
 would be an injection path into every user's inbox, and mail clients render
 only an inconsistent subset of HTML anyway.
 
-The "Open Ikigaro" button and the unsubscribe footer are added automatically.
+The unsubscribe footer is added automatically.
+
+### The "Open Ikigaro" button is opt-in, and off by default
+
+A tick box in the composer. It exists because a generic call to action on a
+message that is not asking anyone to open the app is noise, and it competes
+with whatever the message actually wants: "reply and tell us which device you
+use" reads weaker with a large button underneath pointing somewhere else.
+
+The choice is stored on the broadcast row, not held in the composer or a
+config value. Sending is resumable, so a run that stops at the 50-message cap
+finishes later from that row; if the flag lived anywhere else the second half
+of a send could render differently from the first, and one announcement would
+reach two groups looking like two different emails.
+
+**The access-granted email keeps its button unconditionally.** That message
+exists to say "your access is open", so the button is the point rather than
+decoration.
 
 ### Sending is resumable, and cannot double-send
 

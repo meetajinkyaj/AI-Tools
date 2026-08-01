@@ -147,3 +147,68 @@ describe("refusing to send nonsense", () => {
     expect(validateBroadcast("   ", "   ").ok).toBe(false);
   });
 });
+
+describe("the Open Ikigaro button", () => {
+  const make = (includeAppButton?: boolean) =>
+    broadcastEmail({
+      to: "x@example.com",
+      subject: "News",
+      body: "Something worth announcing.",
+      unsubscribeToken: "11111111-1111-1111-1111-111111111111",
+      includeAppButton,
+    });
+
+  it("is absent unless asked for", () => {
+    // The default matters more than the toggle: an announcement that is not
+    // asking anyone to open the app should not carry a button saying so.
+    const m = make();
+    expect(m.html).not.toContain(">Open Ikigaro<");
+    expect(m.text).not.toContain("Open Ikigaro:");
+  });
+
+  it("is absent when explicitly off", () => {
+    const m = make(false);
+    expect(m.html).not.toContain(">Open Ikigaro<");
+    expect(m.text).not.toContain("Open Ikigaro:");
+  });
+
+  it("appears in both parts when on", () => {
+    // Plain-text readers have nothing to click, so the link has to be spelled
+    // out for them or the button simply does not exist on that side.
+    const m = make(true);
+    expect(m.html).toContain(">Open Ikigaro<");
+    expect(m.text).toContain("Open Ikigaro: https://app.ikigaro.com");
+  });
+
+  it("only accepts a literal true", () => {
+    // Guards the API boundary: a stray string or number in the request body
+    // must not switch it on.
+    for (const v of ["true", 1, {}, [], "yes"] as unknown[]) {
+      const m = broadcastEmail({
+        to: "x@example.com",
+        subject: "s",
+        body: "body text here",
+        unsubscribeToken: "11111111-1111-1111-1111-111111111111",
+        includeAppButton: v as boolean,
+      });
+      expect(m.html, String(v)).not.toContain(">Open Ikigaro<");
+    }
+  });
+
+  it("never removes the unsubscribe link along with the button", () => {
+    // The footer must survive either setting. Losing it would turn an
+    // announcement into something we are not allowed to send.
+    for (const m of [make(), make(true)]) {
+      expect(m.html).toContain("/api/email/unsubscribe?t=");
+      expect(m.text).toContain("/api/email/unsubscribe?t=");
+    }
+  });
+
+  it("keeps the signature in place with the button off", () => {
+    // The button sat between the body and the signature, so removing it must
+    // not leave stray punctuation or collapse the two together.
+    const m = make();
+    expect(m.text).toContain("Ajinkya\nIkigaro");
+    expect(m.html).toMatch(/Ajinkya<br \/>Ikigaro/);
+  });
+});
