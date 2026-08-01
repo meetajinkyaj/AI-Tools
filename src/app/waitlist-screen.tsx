@@ -28,7 +28,7 @@ export function WaitlistScreen({
           </h1>
           <p className="font-body text-sm leading-relaxed text-muted">
             Ikigaro is in a small private beta and we&rsquo;re letting people in
-            deliberately, in batches — so every tester gets our full attention.
+            deliberately, in batches, so every tester gets our full attention.
             {email ? (
               <>
                 {" "}Your spot is reserved under{" "}
@@ -40,7 +40,7 @@ export function WaitlistScreen({
 
         <Card className="flex flex-col gap-2 p-5">
           <p className="font-body text-sm text-foreground/80">
-            Nothing else to do — when your access opens, this screen becomes the
+            Nothing else to do, when your access opens, this screen becomes the
             app. If you were invited personally, tell the person who invited you
             and they&rsquo;ll wave you through.
           </p>

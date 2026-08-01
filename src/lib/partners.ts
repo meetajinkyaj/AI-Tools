@@ -4,7 +4,7 @@ import { effectiveMultiplier } from "./accelerated-points";
 import { createSupabaseAdmin } from "./supabase-admin";
 
 /**
- * Partners — the entity behind an Accelerated Points code.
+ * Partners, the entity behind an Accelerated Points code.
  *
  * A partner is a gym, a community or a brand, not a user. See migration 0013
  * for why that distinction forced its own table.
@@ -23,7 +23,7 @@ export interface Partner {
  * Resolve a `?ref` code to an ACTIVE partner.
  *
  * Inactive partners resolve to null, so ending a partnership stops new signups
- * getting the deal — while everyone already in keeps theirs, because their rate
+ * getting the deal, while everyone already in keeps theirs, because their rate
  * lives on their own row.
  */
 export async function findActivePartnerByCode(
@@ -128,7 +128,7 @@ export async function partnerStats(): Promise<PartnerStats[]> {
   }
 
   const allIds = [...cohort.values()].flat();
-  // Ledger and redemption rows only for the partner cohort — at beta scale
+  // Ledger and redemption rows only for the partner cohort, at beta scale
   // this is a handful of users, and asking for everyone would not scale.
   const [{ data: txns }, { data: redemptions }] =
     allIds.length > 0

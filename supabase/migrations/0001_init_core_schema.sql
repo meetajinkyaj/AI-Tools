@@ -1,10 +1,10 @@
--- Ikigaro core schema — initial migration
+-- Ikigaro core schema, initial migration
 -- Run in the Supabase SQL Editor (or via the Supabase CLI).
 --
 -- Auth model: Privy handles authentication, NOT Supabase Auth. The app verifies
 -- the Privy token server-side and then reads/writes these tables using the
 -- Supabase SERVICE ROLE key. Therefore Row Level Security is ENABLED on every
--- table with NO public policies — the anon/public key can read nothing. All
+-- table with NO public policies, the anon/public key can read nothing. All
 -- access flows through the server after a verified Privy login.
 
 -- Needed for gen_random_uuid()
@@ -22,7 +22,7 @@ end;
 $$ language plpgsql;
 
 -- ---------------------------------------------------------------------------
--- users — core identity. "Who is this", nothing more.
+-- users, core identity. "Who is this", nothing more.
 -- ---------------------------------------------------------------------------
 create table if not exists users (
   id              uuid primary key default gen_random_uuid(),
@@ -41,7 +41,7 @@ create trigger users_set_updated_at
   for each row execute function set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- profiles — everything ABOUT a user. One row per user.
+-- profiles, everything ABOUT a user. One row per user.
 -- ---------------------------------------------------------------------------
 create table if not exists profiles (
   id                uuid primary key default gen_random_uuid(),
@@ -67,7 +67,7 @@ create trigger profiles_set_updated_at
   for each row execute function set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- connections — external device / lab integrations (Oura, Apple Health, labs).
+-- connections, external device / lab integrations (Oura, Apple Health, labs).
 -- Keeps provider tokens + external IDs OUT of the core user row.
 --
 -- SECURITY: access_token / refresh_token are placeholders for later phases.
@@ -98,7 +98,7 @@ create trigger connections_set_updated_at
   for each row execute function set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- events — append-only timeline for the agentic layer.
+-- events, append-only timeline for the agentic layer.
 -- e.g. blood_test_uploaded -> recommendation_accepted -> protocol_suggested
 -- ---------------------------------------------------------------------------
 create table if not exists events (

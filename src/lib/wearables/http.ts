@@ -5,8 +5,8 @@ import { ReauthRequired, type ProviderId } from "./types";
 /**
  * The one HTTP call every adapter makes.
  *
- * Centralised so that the handling of the two answers that matter — "your token
- * is dead" and "you are going too fast" — is identical across six vendors
+ * Centralised so that the handling of the two answers that matter, "your token
+ * is dead" and "you are going too fast", is identical across six vendors
  * rather than six slightly different guesses.
  *
  * 401/403 becomes `ReauthRequired`, which the sync loop turns into a connection
@@ -32,7 +32,7 @@ export async function providerFetch<T>(
   if (res.status === 429) {
     // Deliberately NOT retried here. A per-user rate limit means backing off
     // until the next sweep, not sleeping inside a request the user is waiting
-    // on — and every vendor here backfills, so a skipped run loses nothing.
+    // on, and every vendor here backfills, so a skipped run loses nothing.
     throw new Error(`${provider} rate limited (429)`);
   }
   if (!res.ok) {

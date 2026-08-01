@@ -31,8 +31,7 @@ export function createSupabaseAdmin() {
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY in the environment.");
   }
 
-  // Fail-safe: `url` falls back to PRODUCTION when `SUPABASE_URL` is unset —
-  // right for the production Worker, catastrophic anywhere else. Rule and
+  // Fail-safe: `url` falls back to PRODUCTION when `SUPABASE_URL` is unset, // right for the production Worker, catastrophic anywhere else. Rule and
   // rationale live in `assertNotProductionDatabase`.
   assertNotProductionDatabase(url, DEFAULT_SUPABASE_URL, serverAppEnv());
 

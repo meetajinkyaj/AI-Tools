@@ -14,7 +14,7 @@
 --
 --   1. OPT-OUT IS MANDATORY. Without an unsubscribe path, recipients who do not
 --      want the mail have exactly one tool: the spam button. Enough of those
---      and the DOMAIN's reputation is damaged — which would take down the
+--      and the DOMAIN's reputation is damaged, which would take down the
 --      approval email too, silently, and long after the broadcast that caused
 --      it. Protecting the transactional channel is the real reason this
 --      column exists, not compliance theatre.
@@ -47,7 +47,7 @@ comment on column users.email_opt_out is
   'True when the user has unsubscribed from ANNOUNCEMENTS. Never suppresses transactional mail such as the access-granted email, which answers an action they took.';
 
 -- ---------------------------------------------------------------------------
--- broadcasts — one row per announcement written
+-- broadcasts, one row per announcement written
 -- ---------------------------------------------------------------------------
 
 create table if not exists broadcasts (
@@ -69,14 +69,14 @@ create table if not exists broadcasts (
 
   -- 'draft' until the first recipient is attempted, then 'sending', then
   -- 'sent'. A broadcast that ran out of daily quota stays 'sending' and can be
-  -- resumed — which is the difference between a stuck job and a lost one.
+  -- resumed, which is the difference between a stuck job and a lost one.
   status         text not null default 'draft',
   started_at     timestamptz,
   completed_at   timestamptz
 );
 
 -- ---------------------------------------------------------------------------
--- broadcast_recipients — one row per person per broadcast
+-- broadcast_recipients, one row per person per broadcast
 -- ---------------------------------------------------------------------------
 
 create table if not exists broadcast_recipients (

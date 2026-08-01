@@ -71,7 +71,7 @@ function computeUploadTxn(
 /**
  * If a panel with this exact content signature already exists for the profile,
  * return it (with its full readings). Used to avoid inserting a duplicate panel
- * row when the same report is saved again — the app inserts a new row on every
+ * row when the same report is saved again, the app inserts a new row on every
  * save, so without this an identical re-upload leaves a duplicate baseline row.
  */
 async function findDuplicatePanel(
@@ -125,7 +125,7 @@ async function findDuplicatePanel(
 /**
  * Award panel points on save: the upload earn (first / re-test) plus any
  * outcome-verified improvement, credited to the balance in one update. Best-effort
- * — never fails the save. Returns the outcome bonuses and total points awarded.
+ *, never fails the save. Returns the outcome bonuses and total points awarded.
  */
 async function awardPanelPoints(
   profileId: string,
@@ -159,7 +159,7 @@ async function awardPanelPoints(
     // Anti-farm: the same report re-uploaded earns nothing, even if its
     // (user-editable) test date was changed. The test date can't be trusted as
     // the identity of a report, so match on content: if any prior panel has the
-    // exact same marker/value set, this is a replay — award zero and stop.
+    // exact same marker/value set, this is a replay, award zero and stop.
     const priorIds = prior.map((p) => p.id);
     if (priorIds.length > 0) {
       const { data: priorReadings } = await supabase
@@ -373,7 +373,7 @@ export async function POST(request: Request) {
     // but the row was not). If this exact content already exists for the
     // profile, return that panel instead of inserting a duplicate. A same-date
     // *correction* (genuinely different values) has a different signature and
-    // still saves — only exact replays are collapsed.
+    // still saves, only exact replays are collapsed.
     const newSignature = panelContentSignature([
       ...validation.value.readings.map((r): SignatureReading =>
         byKey.get(r.marker_key)!.result_kind === "qualitative"
@@ -398,7 +398,7 @@ export async function POST(request: Request) {
     }
 
     // The biomarker_panels.source CHECK allows 'manual' | 'pdf_upload' | 'lab_api'.
-    // The client sends "pdf" for the extraction flow — map it to "pdf_upload".
+    // The client sends "pdf" for the extraction flow, map it to "pdf_upload".
     const rawSource = (rawBody as Record<string, unknown>).source;
     const source = rawSource === "pdf" || rawSource === "pdf_upload" ? "pdf_upload" : "manual";
 
@@ -446,7 +446,7 @@ export async function POST(request: Request) {
         };
       }
 
-      // Numeric — canonicalize raw cell-count units (idempotent) and use a
+      // Numeric, canonicalize raw cell-count units (idempotent) and use a
       // lab-provided range override when given.
       const value = canonicalizeCount(r.marker_key, r.value as number);
       const hasOverride = r.ref_low != null || r.ref_high != null;
@@ -465,7 +465,7 @@ export async function POST(request: Request) {
       };
     });
 
-    // Derived markers (Non-HDL, ratios, eAG…) — computed up front, mapped here.
+    // Derived markers (Non-HDL, ratios, eAG…), computed up front, mapped here.
     const derivedRows = derived.map((d) => {
       const entry = byKey.get(d.marker_key)!;
       return {

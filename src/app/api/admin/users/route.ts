@@ -7,7 +7,7 @@ import { normalizeReferralCode } from "@/lib/referral";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
- * GET /api/admin/users — a roster with each user's key engagement signals:
+ * GET /api/admin/users, a roster with each user's key engagement signals:
  * access status, whether they finished onboarding, points balance, panels
  * uploaded, and last check-in / streak. Aggregated in memory (fine at beta
  * scale). Admin-only.
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
       supabase.from("reward_points").select("user_id, points_balance"),
       supabase.from("biomarker_panels").select("user_id"),
       supabase.from("daily_checkins").select("user_id, checkin_date, streak_count"),
-      // Onboarding is "has a self profile" — the exact condition authed-app.tsx
+      // Onboarding is "has a self profile", the exact condition authed-app.tsx
       // uses to decide whether to show the onboarding form or the app. Deriving
       // it from anything else here would let the admin view disagree with what
       // the user is actually looking at.
@@ -82,10 +82,10 @@ export async function GET(request: Request) {
 }
 
 /**
- * PATCH /api/admin/users — one of:
+ * PATCH /api/admin/users, one of:
  *   { id, access_status }  approve / re-waitlist a user (the beta gate);
  *   { id, referral_code }  assign a vanity invite code ("FITTR") for
- *                          partners/influencers — normalized, unique-index
+ *                          partners/influencers, normalized, unique-index
  *                          arbitrated (409 when taken).
  */
 export async function PATCH(request: Request) {
@@ -106,7 +106,7 @@ export async function PATCH(request: Request) {
     const code = normalizeReferralCode(b.referral_code);
     if (!code) {
       return NextResponse.json(
-        { error: "Codes are 3–16 letters/numbers." },
+        { error: "Codes are 3-16 letters/numbers." },
         { status: 400 },
       );
     }
@@ -157,7 +157,7 @@ export async function PATCH(request: Request) {
     .update({
       access_status,
       // Revoking access clears the stamp, so that if this person is approved
-      // again later they are told again — while still never getting two emails
+      // again later they are told again, while still never getting two emails
       // for one grant.
       ...(access_status === "waitlisted" ? { access_granted_email_at: null } : {}),
     })
@@ -182,7 +182,7 @@ export async function PATCH(request: Request) {
 
   // The approval has already succeeded and been audited by this point. The
   // email result rides along so the admin UI can say "approved, emailed" or
-  // "approved, email failed" — but it can never turn a successful approval
+  // "approved, email failed", but it can never turn a successful approval
   // into a failed request.
   return NextResponse.json({ ok: true, emailed });
 }

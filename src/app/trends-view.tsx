@@ -29,7 +29,7 @@ interface TrendsData {
   bonuses: OutcomeBonus[];
 }
 
-const DISCLAIMER = "Educational, not a diagnosis — please consult a doctor.";
+const DISCLAIMER = "Educational, not a diagnosis, please consult a doctor.";
 
 /** Kept in sync with docs/FAQ.md; values come from the POINTS table so this
  * copy can never drift from the live economy. */
@@ -40,11 +40,11 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What is an outcome-verified reward?",
-    a: "Points for a marker moving in its healthy direction between panels — and we keep rewarding continued improvement, not just the first time it reaches the normal range (e.g. visceral fat 9 → 8 → 6.5 earns at each step).",
+    a: "Points for a marker moving in its healthy direction between panels, and we keep rewarding continued improvement, not just the first time it reaches the normal range (e.g. visceral fat 9 → 8 → 6.5 earns at each step).",
   },
   {
     q: "How often can a lab panel earn improvement rewards?",
-    a: "At most once every 14 days. Panels uploaded closer together are still saved and shown in your trends — they're important health data — but don't earn improvement points.",
+    a: "At most once every 14 days. Panels uploaded closer together are still saved and shown in your trends, they're important health data, but don't earn improvement points.",
   },
   {
     q: "Why the 14-day rule?",
@@ -52,14 +52,14 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Are results that don't earn points still saved?",
-    a: "Yes. Every panel is stored and part of your trends and doctor-ready history. Rewards are a bonus for genuine progress — never a gate on your data.",
+    a: "Yes. Every panel is stored and part of your trends and doctor-ready history. Rewards are a bonus for genuine progress, never a gate on your data.",
   },
 ];
 
 function RewardsFaq() {
   return (
     <Card className="flex flex-col gap-2 p-6">
-      <Eyebrow>Rewards &amp; trends — FAQ</Eyebrow>
+      <Eyebrow>Rewards &amp; trends. FAQ</Eyebrow>
       <div className="flex flex-col divide-y divide-border">
         {FAQ.map((item) => (
           <details key={item.q} className="group py-2">
@@ -76,7 +76,7 @@ function RewardsFaq() {
   );
 }
 
-/** A tiny inline sparkline — no chart library, keeps the Worker bundle lean. */
+/** A tiny inline sparkline, no chart library, keeps the Worker bundle lean. */
 function Sparkline({ values, className = "" }: { values: number[]; className?: string }) {
   const pts = values.filter((v) => Number.isFinite(v));
   if (pts.length < 2) return null;
@@ -169,7 +169,7 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
           when nothing is connected or nothing has synced. */}
       <WearableTrends getToken={getToken} />
 
-      {/* Outcome-verified rewards — the payoff moment */}
+      {/* Outcome-verified rewards, the payoff moment */}
       {bonuses.length > 0 && (
         <Card className="flex flex-col gap-2 p-6">
           <Eyebrow>You improved</Eyebrow>
@@ -177,7 +177,7 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
             {bonuses.map((b, i) => (
               <li key={i} className="font-body text-sm text-foreground/80">
                 <span className="font-medium text-foreground">{b.marker_key.toUpperCase()}</span>{" "}
-                moved into range{b.delta_value != null ? ` (${b.delta_value})` : ""} —{" "}
+                moved into range{b.delta_value != null ? ` (${b.delta_value})` : ""} -{" "}
                 <span className="font-medium text-clay">+{b.amount} iki points</span>
               </li>
             ))}
@@ -185,7 +185,7 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
         </Card>
       )}
 
-      {/* Check-in trend — the frequent signal */}
+      {/* Check-in trend, the frequent signal */}
       <Card className="flex flex-col gap-4 p-6">
         <Eyebrow>Check-in trend</Eyebrow>
         {checkin.trend.count === 0 ? (
@@ -198,7 +198,7 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
               <div className="flex flex-col gap-1">
                 <span className="font-body text-xs text-muted">Avg energy (7d)</span>
                 <span className="font-display text-2xl font-medium text-foreground">
-                  {checkin.trend.avgEnergy ?? "—"}
+                  {checkin.trend.avgEnergy ?? "-"}
                   <span className={`ml-2 font-body text-xs ${toneClass(energyDelta.tone)}`}>
                     {checkin.trend.energyDelta != null ? energyDelta.text : ""}
                   </span>
@@ -210,7 +210,7 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
               <div className="flex flex-col gap-1">
                 <span className="font-body text-xs text-muted">Avg sleep (7d)</span>
                 <span className="font-display text-2xl font-medium text-foreground">
-                  {checkin.trend.avgSleep != null ? `${checkin.trend.avgSleep}h` : "—"}
+                  {checkin.trend.avgSleep != null ? `${checkin.trend.avgSleep}h` : "-"}
                   <span className={`ml-2 font-body text-xs ${toneClass(sleepDelta.tone)}`}>
                     {checkin.trend.sleepDelta != null ? sleepDelta.text : ""}
                   </span>
@@ -228,13 +228,13 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
         )}
       </Card>
 
-      {/* Biomarker since-baseline — the infrequent, high-value signal */}
+      {/* Biomarker since-baseline, the infrequent, high-value signal */}
       <Card className="flex flex-col gap-4 p-6">
         <Eyebrow>Since your baseline</Eyebrow>
         {biomarker.panelCount < 2 ? (
           <p className="font-body text-sm text-muted">
-            You have one lab panel so far. Lab work is usually months apart — when you
-            upload your next panel, you&rsquo;ll see exactly which markers moved, and earn
+            You have one lab panel so far. Lab work is usually months apart. When you
+            upload your next panel you&rsquo;ll see exactly which markers moved, and earn
             iki points for any that improve into range.
           </p>
         ) : (

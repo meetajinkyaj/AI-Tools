@@ -6,7 +6,7 @@
  * *normalizes what comes back* against our biomarker catalog.
  *
  * Accuracy strategy (see docs/SCALING.md): the model only reads values off the
- * page and maps them to our catalog keys. It never decides high/low — the
+ * page and maps them to our catalog keys. It never decides high/low, the
  * deterministic engine in `biomarkers.ts` recomputes every flag afterwards, and
  * the user confirms the draft before anything is saved.
  */
@@ -53,18 +53,18 @@ export function buildExtractionPrompt(catalog: CatalogEntry[]): string {
       e.result_kind === "qualitative" && e.normal_text
         ? ` (normal: ${e.normal_text})`
         : "";
-    return `- ${e.marker_key}: ${e.display_name}${unit} — ${kind}${normal}`;
+    return `- ${e.marker_key}: ${e.display_name}${unit}, ${kind}${normal}`;
   });
 
   return [
     "You are a careful medical-lab data extractor. You are given a lab report PDF.",
     "Extract ONLY the biomarker results that map to the catalog below. Do not",
     "invent values, do not compute or infer anything, and do not flag results as",
-    "high or low — only transcribe what is printed.",
+    "high or low, only transcribe what is printed.",
     "",
     "For each result you find that matches a catalog marker, output the marker_key",
-    "from the catalog, the printed value, the printed unit exactly as shown, and —",
-    "if the report prints a reference range next to it — that range's low and high",
+    "from the catalog, the printed value, the printed unit exactly as shown, and -",
+    "if the report prints a reference range next to it, that range's low and high",
     "numbers.",
     "  • numeric markers: put the number in `value` (value_text null).",
     "  • qualitative markers (e.g. Negative/Positive): put the printed word in",
@@ -72,7 +72,7 @@ export function buildExtractionPrompt(catalog: CatalogEntry[]): string {
     "  • `unit`: the unit string exactly as printed (e.g. \"mg/dL\", \"10^3/uL\",",
     "    \"/cumm\"); null if none is printed. Do not convert it.",
     "If a printed lab *result* does not match any catalog marker, add its printed",
-    "name to `unmatched` (do not guess a key) — but keep `unmatched` short: at most",
+    "name to `unmatched` (do not guess a key), but keep `unmatched` short: at most",
     "10 of the most notable unrecognized results, not every heading or line of text.",
     "If the same marker appears more than once, use the most recent / primary result.",
     "",
@@ -124,7 +124,7 @@ function toNumberOrNull(v: unknown): number | null {
  * Normalize a parsed model object against the catalog. Keeps only markers whose
  * key is a known, non-derived catalog entry; coerces numeric vs qualitative to
  * match the catalog's result_kind; dedupes by marker_key (first wins). Never
- * throws — bad shapes yield an empty result.
+ * throws, bad shapes yield an empty result.
  */
 export function normalizeExtraction(
   parsed: unknown,

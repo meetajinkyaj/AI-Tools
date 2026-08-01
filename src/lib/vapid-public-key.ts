@@ -1,7 +1,7 @@
 /**
  * The public VAPID key (a.k.a. applicationServerKey) for Web Push.
  *
- * This is PUBLIC by design — the browser needs it to create a push subscription,
+ * This is PUBLIC by design, the browser needs it to create a push subscription,
  * so it ships in the client bundle. It is safe to commit. The matching PRIVATE
  * key is a secret and lives ONLY in the reminder sender's environment (a GitHub
  * Actions secret), never here and never in the Worker.

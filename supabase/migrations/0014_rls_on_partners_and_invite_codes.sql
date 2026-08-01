@@ -1,7 +1,7 @@
 -- 0014: Enable RLS on the two tables 0013 added.
 --
 -- 0013 shipped `partners` and `invite_codes` without RLS. Every other table in
--- this database — all sixteen of them, since 0001 — enables it. Supabase's
+-- this database, all sixteen of them, since 0001, enables it. Supabase's
 -- dashboard flagged the omission when 0013 was applied to production.
 --
 -- WHY THIS IS NOT COSMETIC. Supabase grants the `anon` and `authenticated`
@@ -17,8 +17,7 @@
 --                 so a real user can never be assigned it.
 --
 -- Scope of the exposure, stated accurately: this app publishes no anon key.
--- There is no NEXT_PUBLIC_SUPABASE_ANON_KEY and no browser Supabase client —
--- every query goes through a Next route holding the service role. So reaching
+-- There is no NEXT_PUBLIC_SUPABASE_ANON_KEY and no browser Supabase client, -- every query goes through a Next route holding the service role. So reaching
 -- these tables required obtaining the anon key some other way, and it was not
 -- readable straight out of the bundle. It is still worth closing: the project
 -- URL is committed in src/lib/supabase-admin.ts, the REST endpoint is public,
@@ -29,7 +28,7 @@
 -- authenticated everything, which is correct because no browser ever touches
 -- these tables: `partners` is read and written only through
 -- `createSupabaseAdmin()` in the admin route and src/lib/partners.ts, and
--- `invite_codes` is never touched by application code at all — the triggers in
+-- `invite_codes` is never touched by application code at all, the triggers in
 -- 0013 maintain it. The service role bypasses RLS, so every existing code path
 -- is unaffected.
 --

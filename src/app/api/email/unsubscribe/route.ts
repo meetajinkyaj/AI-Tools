@@ -1,7 +1,7 @@
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
- * Unsubscribing from announcements. Public — no login required.
+ * Unsubscribing from announcements. Public, no login required.
  *
  * WHY GET DOES NOT UNSUBSCRIBE. Mail providers and corporate security gateways
  * prefetch links in messages to scan them. If the GET performed the opt-out,
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
   // POST validates it anyway.
   return page(
     "Unsubscribe from announcements?",
-    "You&rsquo;ll stop receiving Ikigaro announcements. Emails that answer something you did &mdash; like being let into the beta &mdash; will still reach you.",
+    "You&rsquo;ll stop receiving Ikigaro announcements. Emails that answer something you did, like being let into the beta, will still reach you.",
     `<form method="POST" action="/api/email/unsubscribe?t=${encodeURIComponent(token)}">
         <button type="submit" style="display:inline-block;padding:12px 24px;background:#1c1b19;color:#faf8f5;border:0;border-radius:999px;font-size:14px;cursor:pointer;">Yes, unsubscribe me</button>
       </form>`,
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!data) {
-    // Same wording either way — a stale link and a wrong one are the same
+    // Same wording either way, a stale link and a wrong one are the same
     // thing from here, and distinguishing them helps nobody but a guesser.
     return page(
       "Link not recognised",
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
   }
 
   return page(
-    "Done — you're unsubscribed",
+    "Done, you're unsubscribed",
     "You won&rsquo;t receive Ikigaro announcements any more. If this was a mistake, just reply to any email from us and we&rsquo;ll put you back.",
   );
 }

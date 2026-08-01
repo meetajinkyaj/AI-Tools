@@ -14,19 +14,19 @@ import type { ProviderId, WearableProvider } from "./types";
  * The six cloud wearable adapters.
  *
  * Each is roughly: where OAuth lives, what to ask for, and how to turn one
- * vendor's JSON into `DailyMetric[]`. All the machinery around them — refresh,
- * rotation, backoff, upsert — is in `sync.ts` and shared.
+ * vendor's JSON into `DailyMetric[]`. All the machinery around them, refresh,
+ * rotation, backoff, upsert, is in `sync.ts` and shared.
  *
  * NONE OF THESE WORK WITHOUT CREDENTIALS. Every vendor requires registering a
  * developer application to get a client id and secret; two of them (Garmin,
  * Ultrahuman) require an approved application on top, with a lead time of
  * weeks. A provider whose env vars are unset is simply hidden from the UI, so
- * this file being complete does not mean the feature is live — see
+ * this file being complete does not mean the feature is live, see
  * `docs/WEARABLES.md`.
  *
  * ENDPOINTS DRIFT. These are written against each vendor's documented v1/v2
- * APIs as of mid-2026. The normalizers are defensive — an unexpected shape
- * yields fewer metrics, never a crash — but if a provider suddenly returns
+ * APIs as of mid-2026. The normalizers are defensive, an unexpected shape
+ * yields fewer metrics, never a crash, but if a provider suddenly returns
  * nothing, check their changelog before debugging this file.
  */
 
@@ -153,7 +153,7 @@ const fitbit: WearableProvider = {
     for (const s of sleep.sleep ?? []) {
       push(out, "sleep_minutes", s.dateOfSleep, num(s.minutesAsleep), "fitbit");
       // Fitbit has no "sleep score" in the public API; efficiency is the
-      // closest 0–100 analogue and is labelled as such in the UI.
+      // closest 0-100 analogue and is labelled as such in the UI.
       const eff = num(s.efficiency);
       if (eff !== undefined) push(out, "sleep_score", s.dateOfSleep, clampScore(eff), "fitbit");
     }
@@ -296,7 +296,7 @@ const withings: WearableProvider = {
 };
 
 /* -------------------------------------------------------------------------- */
-/* Garmin — push only                                                          */
+/* Garmin, push only                                                          */
 /* -------------------------------------------------------------------------- */
 
 const garmin: WearableProvider = {
@@ -314,7 +314,7 @@ const garmin: WearableProvider = {
   requiresApproval: true,
   /**
    * NULL ON PURPOSE. Garmin's Health API does not support on-demand fetching at
-   * all — it pushes to a registered webhook when data lands, and there is no
+   * all, it pushes to a registered webhook when data lands, and there is no
    * endpoint to ask "what happened last Tuesday". Everything else here polls;
    * Garmin cannot, so the sync sweep skips it and `/api/wearables/garmin-push`
    * is the only way its data arrives.
@@ -399,7 +399,7 @@ export function isProviderId(v: string): v is ProviderId {
  *
  * Anything unconfigured is hidden from the connect UI rather than shown and
  * failing at the redirect, which is where an unset client id would otherwise
- * surface — as a vendor error page with our name on it.
+ * surface, as a vendor error page with our name on it.
  */
 export function providerConfigured(p: WearableProvider): boolean {
   return Boolean(process.env[p.clientIdEnv] && process.env[p.clientSecretEnv]);

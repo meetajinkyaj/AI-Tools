@@ -1,5 +1,5 @@
 /**
- * Beta analytics domain logic — the numbers the 0-to-1 checklist says to watch:
+ * Beta analytics domain logic, the numbers the 0-to-1 checklist says to watch:
  * onboarding completion, activation (first panel), report→re-test conversion,
  * D1/D7/D30 retention, active counts, streaks, and the daily check-in series.
  *

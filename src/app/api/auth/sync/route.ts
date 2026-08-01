@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   }
 
   // 2. Email comes from the request body (see note above). An optional ref
-  //    code (from a ?ref invite link) attributes the referrer — on account
+  //    code (from a ?ref invite link) attributes the referrer, on account
   //    CREATION only, never retroactively.
   let email: string | null = null;
   let refCode: string | null = null;
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
 
     if (!existing) {
       // Resolve the ?ref code before creating the row. A bad or unknown code
-      // silently skips attribution — it must never block a signup.
+      // silently skips attribution, it must never block a signup.
       //
       // ONE code space, two meanings: a partner code (a gym or community, with
       // Accelerated Points) or a user's own invite code (a friend). Partners
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
       eventType = "user_created";
 
       // Endowed progress: a balance already in motion is far likelier to be
-      // continued than one sitting at zero. Spendable only — it never touches
+      // continued than one sitting at zero. Spendable only, it never touches
       // iki_score, or a partner code would buy rank.
       if (welcomeGrant > 0) {
         await grantWelcomePoints(data.id, welcomeGrant);

@@ -23,8 +23,8 @@ const latest: PanelSnapshot = {
   date: "2026-05-01", // 120 days later
   readings: [
     { marker_key: "hba1c", marker_name: "HbA1c", value: 5.4, flag: "in_range", direction: "lower_better" }, // improved into range
-    { marker_key: "ldl_c", marker_name: "LDL", value: 150, flag: "high", direction: "lower_better" }, // better, still high — now rewarded
-    { marker_key: "hdl_c", marker_name: "HDL", value: 66.5, flag: "in_range", direction: "higher_better" }, // <1% move — noise
+    { marker_key: "ldl_c", marker_name: "LDL", value: 150, flag: "high", direction: "lower_better" }, // better, still high, now rewarded
+    { marker_key: "hdl_c", marker_name: "HDL", value: 66.5, flag: "in_range", direction: "higher_better" }, // <1% move, noise
   ],
 };
 

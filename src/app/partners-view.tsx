@@ -11,7 +11,7 @@ import {
 } from "./ui";
 
 /**
- * Partners / Rewards — the redemption loop. Users spend iki points on brand
+ * Partners / Rewards, the redemption loop. Users spend iki points on brand
  * VOUCHERS (a code is issued instantly from a pre-loaded pool) or open direct
  * AFFILIATE product links (free, commission-monetized). Voucher codes are always
  * retrievable in Redemption history, and a "How to redeem" explainer covers the
@@ -42,7 +42,7 @@ interface HistoryRow {
   discount_code: string | null;
   redeemed_at: string | null;
   created_at: string;
-  /** Snapshot taken at redemption — survives the catalog item being deleted. */
+  /** Snapshot taken at redemption, survives the catalog item being deleted. */
   item_name: string | null;
   item:
     | { name: string; partner: string | null; redeem_instructions: string | null }
@@ -249,7 +249,7 @@ export function PartnersView({
       {items.length === 0 && (
         <Card className="p-6">
           <p className="font-body text-sm text-muted">
-            Partners are being onboarded. Keep earning — redemptions open here soon.
+            Partners are being onboarded. Keep earning, redemptions open here soon.
           </p>
         </Card>
       )}
@@ -277,7 +277,7 @@ export function PartnersView({
         <section className="flex flex-col gap-4">
           <Eyebrow>Shop our picks</Eyebrow>
           <p className="font-body text-xs text-muted">
-            Affiliate links — we may earn a commission, at no extra cost to you.
+            Affiliate links, we may earn a commission, at no extra cost to you.
             Not medical advice.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -362,7 +362,7 @@ interface ReferralInfo {
   maxTotal: number;
 }
 
-/** Invite friends — share your referral link, earn when they finish onboarding. */
+/** Invite friends, share your referral link, earn when they finish onboarding. */
 function InviteCard({ getToken }: { getToken: () => Promise<string | null> }) {
   const [info, setInfo] = useState<ReferralInfo | null>(null);
   const [copied, setCopied] = useState(false); // Share button's fallback feedback
@@ -389,14 +389,14 @@ function InviteCard({ getToken }: { getToken: () => Promise<string | null> }) {
   if (!info) return null;
 
   const share = async () => {
-    const text = `Join me on Ikigaro — upload your blood work and it shows you what actually matters. ${info.link}`;
+    const text = `Join me on Ikigaro, upload your blood work and it shows you what actually matters. ${info.link}`;
     try {
       if (navigator.share) {
         await navigator.share({ title: "Ikigaro", text, url: info.link });
         return;
       }
     } catch {
-      /* user cancelled the sheet — fall through to copy */
+      /* user cancelled the sheet, fall through to copy */
     }
     try {
       await navigator.clipboard.writeText(info.link);
@@ -407,14 +407,14 @@ function InviteCard({ getToken }: { getToken: () => Promise<string | null> }) {
     }
   };
 
-  // Always-available copy — on desktop the share sheet is awkward or absent.
+  // Always-available copy, on desktop the share sheet is awkward or absent.
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(info.link);
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 1500);
     } catch {
-      /* clipboard unavailable — the link is visible beside the buttons */
+      /* clipboard unavailable, the link is visible beside the buttons */
     }
   };
 
@@ -429,7 +429,7 @@ function InviteCard({ getToken }: { getToken: () => Promise<string | null> }) {
         )}
       </div>
       <p className="font-body text-sm text-foreground/80">
-        Share your link — earn up to{" "}
+        Share your link, earn up to{" "}
         <span className="font-medium text-foreground">
           +{info.maxTotal} iki points
         </span>{" "}
@@ -476,10 +476,10 @@ function InviteCard({ getToken }: { getToken: () => Promise<string | null> }) {
 /** The "how to redeem" explainer (generic, applies to every voucher). */
 function HowToRedeem() {
   const steps = [
-    "Redeem points for a voucher — the code appears instantly.",
+    "Redeem points for a voucher. The code appears instantly.",
     "Copy the code. It's also saved in your Redemption history, so you can come back to it anytime.",
     "Follow the partner's redemption steps shown with the code (usually: paste it at checkout on the partner's site or app).",
-    "Vouchers are single-use and may have an expiry or minimum spend — check the terms on the voucher.",
+    "Vouchers are single-use and may have an expiry or minimum spend, check the terms on the voucher.",
   ];
   return (
     <Card className="flex flex-col gap-3 p-6">

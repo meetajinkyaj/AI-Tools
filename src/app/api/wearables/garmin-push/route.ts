@@ -9,7 +9,7 @@ import { storeMetrics } from "@/lib/wearables/sync";
 /**
  * POST /api/wearables/garmin-push
  *
- * Garmin's Health API has no on-demand fetch — it pushes summaries here when a
+ * Garmin's Health API has no on-demand fetch, it pushes summaries here when a
  * watch syncs. Every other provider polls; this one cannot, which is why it is
  * the only vendor with its own route.
  *
@@ -21,7 +21,7 @@ import { storeMetrics } from "@/lib/wearables/sync";
  *
  * IDENTITY comes from Garmin's own user id, which is why
  * `wearable_connections.external_user_id` exists. A push naming a user we do
- * not recognise is dropped — that is a stale grant on their side, not ours.
+ * not recognise is dropped, that is a stale grant on their side, not ours.
  */
 
 interface GarminSummary {
@@ -54,7 +54,7 @@ interface GarminPush {
  *   https://app.ikigaro.com/api/wearables/garmin-push?key=<GARMIN_PUSH_SECRET>
  *
  * Without this, anyone who learned a Garmin user id could inject arbitrary
- * sleep, steps and HRV into that person's account — health data they would
+ * sleep, steps and HRV into that person's account, health data they would
  * then see presented as their own. Every other route in this feature is
  * authenticated; this one has to be too, just differently, because the caller
  * is a machine that cannot hold a bearer token for one of our users.
@@ -71,7 +71,7 @@ interface GarminPush {
  * literal "+" means space. That is correct for form posts and wrong for a
  * secret: `openssl rand -base64 32` emits "+" about half the time, so a
  * perfectly good key would arrive with spaces where plusses were, never match,
- * and every Garmin push would 404 — looking exactly like Garmin being broken
+ * and every Garmin push would 404, looking exactly like Garmin being broken
  * rather than like a config bug.
  *
  * Decoding the raw slice ourselves keeps "+" as "+" while still handling a
@@ -101,8 +101,8 @@ function pushAuthorized(request: Request): boolean {
 export async function POST(request: Request) {
   if (!pushAuthorized(request)) {
     // 404 rather than 401: an unauthenticated caller should not be able to
-    // confirm that this endpoint exists, and Garmin — which always has the
-    // key — never sees this branch.
+    // confirm that this endpoint exists, and Garmin, which always has the
+    // key, never sees this branch.
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -162,7 +162,7 @@ export async function POST(request: Request) {
   for (const [garminId, metrics] of byUser) {
     const userId = ours.get(garminId);
     // Unknown Garmin user: a grant that exists on their side and not ours.
-    // Dropping it is correct — we have nowhere to put it and no way to ask.
+    // Dropping it is correct, we have nowhere to put it and no way to ask.
     if (!userId) continue;
     try {
       stored += await storeMetrics(userId, "garmin", metrics);

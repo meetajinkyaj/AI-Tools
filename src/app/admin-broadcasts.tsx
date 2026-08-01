@@ -16,7 +16,7 @@ import { Card, Eyebrow, fieldClass, labelClass, primaryButtonClass, secondaryBut
  * Admin → Email. Write an announcement, see who it reaches, send it.
  *
  * THE UI'S JOB IS TO SLOW YOU DOWN IN THE RIGHT PLACE. Everything else in this
- * console is reversible — a wrongly approved user can be re-waitlisted, a bad
+ * console is reversible, a wrongly approved user can be re-waitlisted, a bad
  * voucher deleted. An email cannot be recalled. So the recipient count is
  * shown live rather than on the confirm screen, the test send sits directly
  * beside the real one, and the confirmation names the audience and the number
@@ -137,9 +137,9 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
       text:
         `Sent to ${b.sent ?? 0}.` +
         (b.failed ? ` ${b.failed} failed.` : "") +
-        // A partial send is an ordinary outcome, not an error — say so plainly
+        // A partial send is an ordinary outcome, not an error, say so plainly
         // and say what finishes it.
-        (b.remaining ? ` ${b.remaining} still queued — use Resume below.` : ""),
+        (b.remaining ? ` ${b.remaining} still queued, use Resume below.` : ""),
       ok: !b.failed,
     });
     await loadHistory();
@@ -224,7 +224,7 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
             className={`${fieldClass} resize-y`}
           />
           <p className="font-body text-xs text-muted">
-            Plain text — blank lines become paragraphs. Links are not clickable;
+            Plain text, blank lines become paragraphs. Links are not clickable;
             an &ldquo;Open Ikigaro&rdquo; button and an unsubscribe link are added automatically.
           </p>
         </div>
@@ -241,7 +241,7 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
           >
             {AUDIENCES.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.label} — {a.description}
+                {a.label}, {a.description}
               </option>
             ))}
           </select>
@@ -263,7 +263,7 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
         )}
 
         <div className="flex flex-wrap gap-3">
-          {/* Test first, deliberately placed before Send — the only way to see
+          {/* Test first, deliberately placed before Send, the only way to see
               an email is to receive one. */}
           <button
             type="button"

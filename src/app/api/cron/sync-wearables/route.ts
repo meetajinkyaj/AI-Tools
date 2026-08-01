@@ -11,7 +11,7 @@ import { syncDue } from "@/lib/wearables/sync";
  * refreshes their last few days.
  *
  * WHY A WINDOW AND NOT "SINCE LAST SYNC". Every vendor here revises data after
- * the fact — a night's sleep score is finalised hours later, a watch that was
+ * the fact, a night's sleep score is finalised hours later, a watch that was
  * offline backfills days at once. Re-pulling a fixed recent window and relying
  * on the upsert to correct in place is both simpler and more accurate than
  * tracking a high-water mark that would silently miss every late arrival.

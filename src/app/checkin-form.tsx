@@ -40,7 +40,7 @@ interface CheckinState {
   checkedInToday: boolean;
   streak: number;
   pointsBalance: number;
-  /** Lifetime, unboosted — drives the rank badge. */
+  /** Lifetime, unboosted, drives the rank badge. */
   ikiScore?: number;
 }
 
@@ -200,7 +200,7 @@ export function CheckinForm({
       if (data.rankUp) setRankUp(data.rankUp);
       setEarned(data.pointsAwarded ?? 0);
       setJustSaved(true);
-      // Offer the card on the win itself, as a modal — inline it sat below the
+      // Offer the card on the win itself, as a modal, inline it sat below the
       // fold of a long form and went unseen. Done here rather than in an effect
       // on `justSaved`: `loadInviteCode` changes identity once it sets the
       // code, so an effect would re-fire and re-open a sheet the user closed.
@@ -217,7 +217,7 @@ export function CheckinForm({
 
   /**
    * The invite code that rides on every shared card. Fetched only when the
-   * share sheet is opened — most check-ins never open it, and a card without
+   * share sheet is opened, most check-ins never open it, and a card without
    * a code still works (it just shows the bare link).
    */
   const loadInviteCode = useCallback(async () => {
@@ -242,7 +242,7 @@ export function CheckinForm({
       pointsBalance: state?.pointsBalance ?? 0,
       pointsEarned: earned ?? 0,
       trainingLogged,
-      // Human labels only — the card never prints internal type keys.
+      // Human labels only, the card never prints internal type keys.
       activities: exercises.map((e) =>
         e.type === OTHER_TYPE
           ? e.label || "Other"
@@ -292,7 +292,7 @@ export function CheckinForm({
     activities.length > 0 ? activities.filter(isExerciseType) : [...EXERCISE_TYPES];
   const selectedTypes = exercises.map((e) => e.type);
   // Always show a chip for anything already logged today, even if it's no longer
-  // one of the user's profile activities — otherwise a logged activity can't be
+  // one of the user's profile activities, otherwise a logged activity can't be
   // deselected.
   const chipTypes = [
     ...activityOptions,
@@ -328,7 +328,7 @@ export function CheckinForm({
       </div>
 
       {/*
-        Sharing is available for as long as today's check-in exists — not only
+        Sharing is available for as long as today's check-in exists, not only
         in the seconds after saving.
 
         It used to hang entirely off `justSaved`, which is component state: it
@@ -368,7 +368,7 @@ export function CheckinForm({
                 </button>
               </div>
               <p className="font-body text-xs text-muted">
-                Make an image for Instagram or WhatsApp — add your own photo if
+                Make an image for Instagram or WhatsApp, add your own photo if
                 you like.
               </p>
             </div>

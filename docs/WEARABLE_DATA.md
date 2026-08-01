@@ -12,7 +12,7 @@ Implementation: [`src/lib/wearables/merge.ts`](../src/lib/wearables/merge.ts).
 ## The problem
 
 A user can connect every provider at once, and plenty will connect two or three
-— a ring for sleep, a watch for training, a scale for weight. So on any given
+a ring for sleep, a watch for training, a scale for weight. So on any given
 day the same metric can arrive from several sources, and something has to decide
 what "your sleep on the 4th" actually is before a chart or a model can use it.
 
@@ -42,7 +42,7 @@ vendor's own app.
 Averaging is the obvious move and it is wrong here, for three reasons.
 
 **It invents a number nobody reported.** If Oura says 7h10m and Fitbit says
-6h42m, the average is 6h56m — a figure that appears in no app the user has, and
+6h42m, the average is 6h56m, a figure that appears in no app the user has, and
 that they cannot check against anything.
 
 **It corrupts the common case.** Devices disagree mostly when one of them was
@@ -51,7 +51,7 @@ something worse than either. The honest answer to "the ring was charging and the
 watch logged four restless hours" is four hours, from the watch.
 
 **It hides which device is trustworthy for what.** A ring and a wrist tracker
-are not two noisy estimates of the same quantity — they are instruments with
+are not two noisy estimates of the same quantity, they are instruments with
 different strengths, and blending them throws that information away instead of
 using it.
 
@@ -68,7 +68,7 @@ built to measure**, not any view about which brand is better.
 | Steps, active calories, VO₂ max | Garmin → Fitbit → Whoop → Oura → Ultrahuman → Withings | Wrist devices worn all day beat rings, which systematically under-count steps |
 | Weight, body fat | Withings → Fitbit → Garmin → Oura → Ultrahuman → Whoop | A scale is the only device here that measures body composition; the rest relay or infer it |
 
-An unranked provider — one added to the adapters and forgotten here — sorts
+An unranked provider, one added to the adapters and forgotten here, sorts
 last rather than being dropped. It gets used when it is the only source, which
 degrades gracefully instead of silently losing data. There is a test for this.
 
@@ -82,8 +82,8 @@ That is the adapters' job, at the vendor boundary
 
 - **Units.** Oura reports sleep in seconds, Fitbit in minutes. Everything
   becomes `sleep_minutes`.
-- **Scales.** Anything ending `_score` is 0–100 by the time it leaves an
-  adapter. A 0–10 score reaching a chart unscaled next to a 0–100 one would look
+- **Scales.** Anything ending `_score` is 0-100 by the time it leaves an
+  adapter. A 0-10 score reaching a chart unscaled next to a 0-100 one would look
   like the same axis and be read that way.
 - **Vocabulary.** Whoop's "recovery" and Oura's "readiness" answer the same
   question, so both land on `readiness_score`. Two keys would put one idea on
@@ -98,10 +98,10 @@ If a vendor's dialect reaches the merge, the merge is not the place to fix it.
 
 ## Where the merged data is used
 
-**Trends** — a "From your devices" card, 30 days, one row per metric, naming
+**Trends**, a "From your devices" card, 30 days, one row per metric, naming
 its sources.
 
-**Future You** — measured sleep replaces self-reported sleep in the habit
+**Future You**, measured sleep replaces self-reported sleep in the habit
 momentum model when any device has reported in the window. Self-reported sleep
 is an estimate made after the fact by somebody who was asleep for it; a wearable
 knows. Users without a device keep the old path exactly.
@@ -117,7 +117,7 @@ sleep was, and that disagreement is very hard to notice.
 These are choices, not oversights. Each has a trigger.
 
 **The ranking is not user-overridable.** Sensible defaults first. Revisit when a
-real user says the wrong device is winning — until then we would be guessing at
+real user says the wrong device is winning, until then we would be guessing at
 a preference nobody has expressed.
 
 **No confidence or agreement signal.** We could show "your devices disagreed by
@@ -125,7 +125,7 @@ a preference nobody has expressed.
 support questions suggest people want it.
 
 **No historical backfill on connect.** Most vendors offer months of history.
-Worth adding once we know which metrics people actually look at — pulling
+Worth adding once we know which metrics people actually look at, pulling
 everything for metrics nobody opens is rate limit spent for nothing.
 
 **Wearable data earns no points.** Steps are trivially spoofable and paying for
@@ -141,11 +141,11 @@ look wrong.
 
 ## If you are changing the ranking
 
-1. Change `SOURCE_RANK` in `merge.ts` — nothing else.
+1. Change `SOURCE_RANK` in `merge.ts`, nothing else.
 2. `merge.test.ts` asserts that every metric has a ranking and that every
    provider appears in each one exactly once. A partial edit fails.
 3. Changing a ranking silently changes historical charts, because the merge runs
-   at read time over stored per-provider rows. That is intentional — it means a
-   better ranking improves the past too — but it does mean a user can see a
+   at read time over stored per-provider rows. That is intentional, it means a
+   better ranking improves the past too, but it does mean a user can see a
    number change without doing anything. Worth a note in a release if the change
    is large.

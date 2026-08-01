@@ -9,7 +9,7 @@ import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
  * GET    /api/wearables         what's available and what this user has connected
- * POST   /api/wearables         { action: "sync" } — pull now
+ * POST   /api/wearables         { action: "sync" }, pull now
  * DELETE /api/wearables?id=…    disconnect
  *
  * NOTE WHAT IS NOT HERE: no route ever returns a token, encrypted or otherwise.

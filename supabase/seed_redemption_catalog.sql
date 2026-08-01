@@ -1,11 +1,11 @@
--- Seed template for the redemption catalog. NOT a migration — run this by hand
+-- Seed template for the redemption catalog. NOT a migration, run this by hand
 -- (fill in real partners / codes) once partner deals are in place. Safe to run
 -- repeatedly per item as long as you don't re-insert duplicate voucher codes
 -- (the (item_id, code) unique index blocks accidental dupes).
 --
 -- Two item kinds:
---   * voucher   — costs iki points, issues a code from voucher_codes.
---   * affiliate — free click-out to affiliate_url (points_cost 0).
+--   * voucher, costs iki points, issues a code from voucher_codes.
+--   * affiliate, free click-out to affiliate_url (points_cost 0).
 
 -- ---------------------------------------------------------------------------
 -- Example 1: a VOUCHER item + its pre-loaded code pool.
@@ -35,7 +35,7 @@ insert into redemption_items
    inventory_status, kind, affiliate_url, image_url)
 values
   ('Magnesium Glycinate', 'BrandCo',
-   'The magnesium we reach for — chelated, easy on the stomach.', 'Nutrition',
+   'The magnesium we reach for, chelated, easy on the stomach.', 'Nutrition',
    0, 'in_stock', 'affiliate',
    'https://brandco.example/product/mag-glycinate?ref=ikigaro',
    null);

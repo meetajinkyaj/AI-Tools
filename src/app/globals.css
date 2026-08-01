@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 /*
- * Ikigaro design tokens — the "golden-hour" brand system.
+ * Ikigaro design tokens, the "golden-hour" brand system.
  * Source of truth: Ikigaro Brand Guidelines v1.0.
  *
  * Grounds: charcoal (Obsidian Stone) + cream (Onsen Linen), used ~60/30.
- * Terracotta (Golden Hour) is the single accent — ~10%, never body text.
+ * Terracotta (Golden Hour) is the single accent, ~10%, never body text.
  * The app runs on the cream ground by default; the marketing-style hero
  * (landing) uses the charcoal ground explicitly via `bg-obsidian`.
  */
@@ -19,7 +19,7 @@
   --burnt-cedar: #8f3f1d;
   --desert-tan: #c9b79c;
 
-  /* Semantic tokens — light (cream) ground */
+  /* Semantic tokens, light (cream) ground */
   --background: var(--onsen-linen);
   --surface: #fbf7f0; /* warm near-white card lift */
   --surface-2: #f4ecdf; /* subtle raised / hover */
@@ -51,20 +51,20 @@
   --color-clay: var(--clay-ember);
   --color-tan: var(--desert-tan);
 
-  /* Type — three voices, wired from next/font in layout.tsx */
+  /* Type, three voices, wired from next/font in layout.tsx */
   --font-display: var(--font-cormorant);
   --font-label: var(--font-marcellus);
   --font-body: var(--font-hanken);
 
-  /* Corner radius — 8 controls, 14 cards */
+  /* Corner radius, 8 controls, 14 cards */
   --radius-control: 8px;
   --radius-card: 14px;
 }
 
 /*
  * The ground must exist before any component CSS or JS: without it, the
- * browser paints its own default during startup and reloads — black in dark
- * mode, white in light mode — which reads as a broken flash on mobile.
+ * browser paints its own default during startup and reloads, black in dark
+ * mode, white in light mode, which reads as a broken flash on mobile.
  * The app is light-only; color-scheme keeps dark-mode UAs from second-guessing.
  */
 html {

@@ -22,7 +22,7 @@ import {
 
 /**
  * Profile edit screen. Pre-filled from the user's current profile and covers
- * the full editable set — the lean onboarding fields plus the fields deferred
+ * the full editable set, the lean onboarding fields plus the fields deferred
  * from onboarding (known conditions, country, city). Reuses POST /api/profile,
  * which upserts the whole row.
  */

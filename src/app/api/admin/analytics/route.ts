@@ -15,11 +15,10 @@ import { todayUTC } from "@/lib/checkin";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
- * GET /api/admin/analytics — the beta metrics the checklist says to watch:
+ * GET /api/admin/analytics, the beta metrics the checklist says to watch:
  * funnel (signups → onboarded → first panel → re-test), D1/D7/D30 retention,
  * DAU/WAU/MAU, live-streak distribution, the 14-day check-in series, push
- * opt-ins, redemptions, and recent client errors. Aggregated in memory —
- * fine at beta scale. Admin-only.
+ * opt-ins, redemptions, and recent client errors. Aggregated in memory, * fine at beta scale. Admin-only.
  */
 export async function GET(request: Request) {
   const admin = await requireAdmin(request);

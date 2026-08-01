@@ -1,5 +1,5 @@
 /**
- * The iki-points economy — a single source of truth for every point value.
+ * The iki-points economy, a single source of truth for every point value.
  *
  * To retune the economy (e.g. scale first-panel uploads 200 → 100, or re-tests
  * 150 → 50, or bump the outcome bonus), change the number HERE and nowhere else.
@@ -9,7 +9,7 @@ export const POINTS = {
   /** First check-in of the day. */
   checkin: 10,
   /**
-   * Streak milestones, each paid ONCE EVER — the first time a user reaches
+   * Streak milestones, each paid ONCE EVER, the first time a user reaches
    * that streak length. See STREAK_MILESTONES for why "once ever" matters.
    */
   streak7Bonus: 50,
@@ -17,7 +17,7 @@ export const POINTS = {
   streak90Bonus: 250,
   streak180Bonus: 500,
   streak365Bonus: 1_000,
-  /** First-ever lab panel uploaded — the most valuable data ask. */
+  /** First-ever lab panel uploaded, the most valuable data ask. */
   firstPanelUpload: 200,
   /** A genuinely new dated panel after the first (a re-test). */
   reTestUpload: 150,
@@ -28,7 +28,7 @@ export const POINTS = {
   /** Referral tier 3: the friend uploads their first panel within 30 days. */
   referralPanel: 150,
   /**
-   * Referrer milestones — the check-in streak ladder, mirrored for inviting.
+   * Referrer milestones, the check-in streak ladder, mirrored for inviting.
    * Per-friend tiers reward one good introduction; these reward keeping going,
    * the same way the 7- and 30-day streak bonuses reward a habit over a day.
    */
@@ -89,7 +89,7 @@ export function uploadEarn(
   if (testDate != null && !dateSeen) {
     return { amount: POINTS.reTestUpload, reason: POINTS_REASON.reTest };
   }
-  return null; // duplicate date / undated re-save — no reward
+  return null; // duplicate date / undated re-save, no reward
 }
 
 /** A reading reduced to the fields that identify a report's content. */
@@ -103,7 +103,7 @@ export interface SignatureReading {
  * A stable content signature for a panel: the sorted set of marker=value pairs,
  * independent of the test date or lab name. Two uploads of the *same* report
  * produce the same signature even if the (user-editable) test-date field was
- * changed — so the date-based earn can't be farmed by re-uploading one report
+ * changed, so the date-based earn can't be farmed by re-uploading one report
  * under many dates. Pure, so it's unit-tested and reused on both sides of the
  * comparison.
  */
@@ -115,7 +115,7 @@ export function panelContentSignature(readings: SignatureReading[]): string {
 }
 
 /**
- * True when a new panel's content matches one already on file — i.e. the same
+ * True when a new panel's content matches one already on file, i.e. the same
  * report re-uploaded. Used to suppress the upload earn regardless of test date.
  */
 export function isReplayUpload(

@@ -17,7 +17,7 @@ import { drawRankCard } from "./rank-card-render";
  *
  * One card, one control. The check-in sheet earns its templates, backdrops and
  * field toggles because a check-in publishes several separable facts and some
- * of them — how you slept, how your energy was — are nobody's business unless
+ * of them, how you slept, how your energy was, are nobody's business unless
  * you say so. A rank is a single public fact, so there is nothing to consent
  * to and nothing to style around. The only thing left that genuinely varies is
  * where the image is going, which is why the format picker survives and every

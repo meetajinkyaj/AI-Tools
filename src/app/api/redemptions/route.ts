@@ -22,7 +22,7 @@ const REDEEM_ERRORS: Record<string, { message: string; status: number }> = {
     status: 400,
   },
   no_balance: { message: "You don't have any iki points yet.", status: 400 },
-  out_of_stock: { message: "This voucher just sold out — try another.", status: 409 },
+  out_of_stock: { message: "This voucher just sold out, try another.", status: 409 },
   not_available: { message: "This item isn't available right now.", status: 409 },
   not_a_voucher: { message: "This item can't be redeemed for points.", status: 400 },
   item_not_found: { message: "That item no longer exists.", status: 404 },

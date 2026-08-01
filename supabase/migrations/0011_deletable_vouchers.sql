@@ -1,4 +1,4 @@
--- 0011: Deletable catalog items — history survives, the item doesn't have to.
+-- 0011: Deletable catalog items, history survives, the item doesn't have to.
 --
 -- Admins need to hard-delete test/stale vouchers so launch starts from a clean
 -- catalog, but a user's redemption history must keep its records (they spent
@@ -6,7 +6,7 @@
 --   1. Snapshot the item's name onto redemption_transactions at redemption time
 --      (item_name), and backfill existing rows from the join.
 --   2. Relax the FK from ON DELETE RESTRICT to ON DELETE SET NULL (item_id
---      becomes nullable) — deleting an item orphans the history row gracefully
+--      becomes nullable), deleting an item orphans the history row gracefully
 --      instead of blocking the delete. voucher_codes already cascade.
 --   3. redeem_voucher() writes the snapshot on every new redemption.
 --

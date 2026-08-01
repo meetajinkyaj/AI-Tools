@@ -6,7 +6,7 @@ import { activeSocials, socialsHtml, socialsText } from "./socials";
 
 /**
  * These are live links going into real inboxes. An email cannot be corrected
- * after it is sent, so a typo here is permanent — hence asserting the actual
+ * after it is sent, so a typo here is permanent, hence asserting the actual
  * URLs rather than merely that "some links exist".
  */
 
@@ -20,7 +20,7 @@ describe("the accounts we point people at", () => {
   });
 
   it("is https and absolute throughout", () => {
-    // A relative or http link in an email is broken or insecure — there is no
+    // A relative or http link in an email is broken or insecure, there is no
     // page context to resolve it against.
     for (const s of activeSocials()) {
       expect(s.url, s.label).toMatch(/^https:\/\//);
@@ -72,7 +72,7 @@ describe("both emails carry them", () => {
   });
 
   it("keeps the access-granted email free of an unsubscribe link", () => {
-    // It is transactional — it answers something the user did, and offering to
+    // It is transactional, it answers something the user did, and offering to
     // unsubscribe from it would be offering something we will not honour.
     expect(access.html).not.toContain("/api/email/unsubscribe");
   });

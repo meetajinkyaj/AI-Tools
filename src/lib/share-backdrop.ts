@@ -9,7 +9,7 @@
  * These are drawn, not shipped. Six JPEGs at 1080×1920 would be roughly a
  * megabyte of download that still has to be re-exported for each aspect ratio;
  * a gradient, a glyph and a vignette are a few hundred bytes of code that
- * adapt to any size. They also stay useful once real photography exists — a
+ * adapt to any size. They also stay useful once real photography exists, a
  * tonal backdrop is the fallback when an upload is too bright for the scrim,
  * and the neutral option for anyone who doesn't want their room on the
  * internet.
@@ -27,7 +27,7 @@ export interface Backdrop {
   id: BackdropId;
   /** Pillar name, shown in the picker. */
   name: string;
-  /** The design's colour note — "Cedar heat", "Wet stone". */
+  /** The design's colour note, "Cedar heat", "Wet stone". */
   note: string;
   /** Gradient stop at 0.0. Also the motif's fill. */
   highlight: string;
@@ -117,7 +117,7 @@ export function gradientAxis(width: number, height: number) {
   return { x0: 0.18 * width, y0: 0, x1: 0.86 * width, y1: 1.0 * height };
 }
 
-/** Stop offsets. Never add a fourth — banding shows on OLED at these values. */
+/** Stop offsets. Never add a fourth, banding shows on OLED at these values. */
 export const GRADIENT_STOPS = [0, 0.46, 1] as const;
 
 /** Radial overlay that keeps the corners from feeling flat. No grain, ever. */
@@ -135,7 +135,7 @@ export function vignette(width: number, height: number) {
 
 /**
  * Motif em size. Scales off the width alone, with a floor so the glyphs stay
- * readable in the picker's thumbnails — below roughly a 360px canvas the
+ * readable in the picker's thumbnails, below roughly a 360px canvas the
  * proportional size collapses into mush.
  */
 export const MOTIF_MIN_SIZE = 108;
@@ -157,7 +157,7 @@ export function motifOrigin(width: number, height: number) {
 /**
  * Which backdrop to open the picker on, given what the user logged today.
  *
- * The point is that the picker feels like it already knows — most people will
+ * The point is that the picker feels like it already knows, most people will
  * never change it. Only Movement and Stillness can be inferred: the daily
  * check-in records training, energy and sleep hours, and nothing that would
  * distinguish a sauna session from an ice bath or a meal. Guessing those from

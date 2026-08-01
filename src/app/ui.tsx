@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
  * consistent as new tabs are added.
  */
 
-/** Full-height centered container — used by pre-app screens (landing, auth, onboarding). */
+/** Full-height centered container, used by pre-app screens (landing, auth, onboarding). */
 export function Screen({
   children,
   className = "",
@@ -54,7 +54,7 @@ export function Splash({ caption }: { caption?: string }) {
 
 /**
  * The Ikigaro wordmark: lowercase "ikigaro" in Cormorant Garamond with the
- * tittle of the "i" rendered in terracotta — the brand's single mandatory
+ * tittle of the "i" rendered in terracotta, the brand's single mandatory
  * accent. Size it by setting a font-size on `className` (e.g. `text-2xl`).
  */
 export function Wordmark({ className = "" }: { className?: string }) {
@@ -81,7 +81,7 @@ export function Wordmark({ className = "" }: { className?: string }) {
   );
 }
 
-/** Marcellus eyebrow — letterspaced caps, used above titles and as section labels. */
+/** Marcellus eyebrow, letterspaced caps, used above titles and as section labels. */
 export function Eyebrow({
   children,
   className = "",
@@ -140,7 +140,7 @@ export function Card({
 
 
 /* ------------------------------------------------------------------ */
-/* Shared class strings — kept so form fields stay consistent app-wide */
+/* Shared class strings, kept so form fields stay consistent app-wide */
 /* ------------------------------------------------------------------ */
 
 /** Primary action: terracotta fill, cream text (radius 8). */

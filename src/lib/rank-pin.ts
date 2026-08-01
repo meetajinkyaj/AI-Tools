@@ -1,5 +1,5 @@
 /**
- * The Iki rank pin — Claude Design's "Iki Badges v3", the cloisonné enamel set.
+ * The Iki rank pin. Claude Design's "Iki Badges v3", the cloisonné enamel set.
  *
  * ONE SOURCE OF TRUTH, TWO CONSUMERS. The same builder produces the SVG that
  * renders inline in the app and the SVG that gets rasterised into the share
@@ -16,7 +16,7 @@
  * falls back. So the share pipeline asks for the pin WITHOUT ring text and
  * draws that lettering itself, on canvas, once Marcellus has actually loaded.
  *
- * The kanji is always an outline path (see rank-kanji.ts) — it has no font
+ * The kanji is always an outline path (see rank-kanji.ts), it has no font
  * dependency in either consumer, which is what makes the seal safe to bake
  * into the SVG.
  */
@@ -27,7 +27,7 @@ import type { RankId } from "./iki-rank";
 /* ------------------------------ tier tokens ------------------------------ */
 
 export interface RankArt {
-  /** Outer rim metal — the one token that changes most between tiers. */
+  /** Outer rim metal, the one token that changes most between tiers. */
   rim: string;
   /** Scene sky, and the chip's disc fill. */
   sky: string;
@@ -241,7 +241,7 @@ export interface PinOptions {
 /**
  * The full pin at hero size: rim, band, ring lettering, scene, seal.
  *
- * Per the design, this appears ONLY at hero size — detail view, level-up, and
+ * Per the design, this appears ONLY at hero size, detail view, level-up, and
  * the share card. Anything smaller uses the chip, because the scene turns to
  * mud below about 120px and a muddy pin reads as a rendering bug.
  */
@@ -284,7 +284,7 @@ export function rankPinSvg(id: RankId, name: string, opts: PinOptions = {}): str
 /**
  * The chip, for anything at or below 120px.
  *
- * Same silhouette, no scene, no ring text — just the seal colour and the
+ * Same silhouette, no scene, no ring text, just the seal colour and the
  * kanji, which is the part that still reads at thumbnail size. The rank card,
  * the case, and any list row use this.
  */

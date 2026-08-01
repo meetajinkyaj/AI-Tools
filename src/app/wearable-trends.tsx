@@ -7,14 +7,14 @@ import { Card, Eyebrow } from "./ui";
 /**
  * "From your devices" in Trends.
  *
- * Shows the MERGED series — one number per metric per day, resolved server-side
+ * Shows the MERGED series, one number per metric per day, resolved server-side
  * from every connected device. The client never sees the per-provider rows and
  * never applies the resolution rules itself: the same merge feeds Future You,
  * and two implementations is how the chart and the model start disagreeing
  * about what your sleep was.
  *
  * Each metric names where its numbers came from, and says so honestly when
- * that is more than one device — a user comparing this against Oura's own app
+ * that is more than one device, a user comparing this against Oura's own app
  * needs to know which nights came from the ring and which from the watch.
  */
 
@@ -47,7 +47,7 @@ function display(metric: string, value: number, unit: string): string {
     maximumFractionDigits: dp,
   });
   // "count" and "score" are descriptions of the number, not units you say out
-  // loud — "9,000 count" and "55 score" both read as a bug.
+  // loud, "9,000 count" and "55 score" both read as a bug.
   const bare = unit === "count" || unit === "score";
   return `${n}${bare ? "" : ` ${unit}`}`;
 }

@@ -38,7 +38,7 @@ export interface CreditResult {
   balance: number;
   ikiScore: number;
   multiplier: number;
-  /** Set when this earn crossed a rank boundary — drives the celebration. */
+  /** Set when this earn crossed a rank boundary, drives the celebration. */
   rankUp: Rank | null;
 }
 
@@ -172,7 +172,7 @@ async function writeLedger(
 
 /**
  * The partner welcome grant. Spendable, and deliberately NOT counted toward
- * rank — see `countsTowardRank`. Kept here so the exclusion is enforced by the
+ * rank, see `countsTowardRank`. Kept here so the exclusion is enforced by the
  * same code path that enforces it for everything else.
  */
 export async function grantWelcomePoints(
@@ -183,7 +183,7 @@ export async function grantWelcomePoints(
   // Sanity: the reason must be one the rank rule excludes, or a grant would
   // quietly raise someone's rank.
   if (countsTowardRank(WELCOME_GRANT_REASON)) {
-    console.error("welcome grant reason is not rank-excluded — refusing to grant");
+    console.error("welcome grant reason is not rank-excluded, refusing to grant");
     return;
   }
   try {

@@ -6,15 +6,15 @@ import { matchDevice, MAX_SUGGESTION_LENGTH } from "@/lib/device-requests";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
- * "Which device should we add next?" — the user's own suggestions.
+ * "Which device should we add next?", the user's own suggestions.
  *
  *   GET    /api/wearables/requests            this user's suggestions
  *   POST   /api/wearables/requests            add one   { device, notify? }
- *   PATCH  /api/wearables/requests            { notify } — applies to all
+ *   PATCH  /api/wearables/requests            { notify }, applies to all
  *   DELETE /api/wearables/requests?key=…      remove one
  *
  * Deliberately NOT gated on `wearablesConfigured()`. Asking for a device has
- * to work before any vendor is live — that stretch is when the question is
+ * to work before any vendor is live, that stretch is when the question is
  * most useful to us and the answer costs the user the least, because there is
  * nothing else on the screen for them to do.
  *
@@ -97,8 +97,7 @@ export async function POST(request: Request) {
   }
 
   // The match is echoed back so the UI can say something true about the
-  // device — that we already support it, or that we know what blocks it —
-  // rather than a generic thank-you.
+  // device, that we already support it, or that we know what blocks it, // rather than a generic thank-you.
   return NextResponse.json({
     ok: true,
     device: { key: match.key, label: match.label, supported: match.supported, blocked: !!match.blocked },

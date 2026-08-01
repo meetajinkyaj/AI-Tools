@@ -36,7 +36,7 @@ export default function TermsPage() {
         Ikigaro is a <strong>wellness and informational</strong> product. It
         does <strong>not</strong> provide medical advice, diagnosis, or
         treatment, and it is not a substitute for professional medical care.
-        Using the Service does not create a doctor&ndash;patient relationship.
+        Using the Service does not create a doctor, patient relationship.
       </p>
       <ul>
         <li>
@@ -112,7 +112,7 @@ export default function TermsPage() {
           earning rules, and catalog items may change over time.
         </li>
         <li>
-          Points may expire or be forfeited — for example, on account closure or
+          Points may expire or be forfeited, for example, on account closure or
           if we reasonably determine the program is being gamed, abused, or used
           fraudulently.
         </li>
@@ -251,7 +251,7 @@ export default function TermsPage() {
       <p>
         Some products in Rewards are <strong>affiliate links</strong>. If you buy
         through them we may earn a commission, at no extra cost to you. These are
-        products we think are worth knowing about — they are{" "}
+        products we think are worth knowing about, they are{" "}
         <strong>not medical advice or an endorsement</strong>, and no points are
         spent to use them.
       </p>
@@ -260,7 +260,7 @@ export default function TermsPage() {
         Redeeming a reward shares only what a partner needs to fulfil it. We{" "}
         <strong>do not sell your health data</strong> to insurers or advertisers;
         a reward you consent to redeem is not a sale of your data. Everything in
-        Ikigaro is <strong>educational, not a diagnosis — please consult a
+        Ikigaro is <strong>educational, not a diagnosis, please consult a
         doctor.</strong>
       </p>
       <p>

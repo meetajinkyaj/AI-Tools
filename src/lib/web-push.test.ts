@@ -52,7 +52,7 @@ describe("base64url", () => {
   });
 
   it("uses the URL-safe alphabet", () => {
-    // 0xfb 0xff encodes to "+/" in standard base64 — must become "-_".
+    // 0xfb 0xff encodes to "+/" in standard base64, must become "-_".
     const s = bytesToB64url(new Uint8Array([251, 255, 191]));
     expect(s).not.toMatch(/[+/]/);
     expect(b64urlToBytes(s)).toEqual(new Uint8Array([251, 255, 191]));

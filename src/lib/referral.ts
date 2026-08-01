@@ -1,9 +1,9 @@
 /**
- * Referral codes — pure logic, shared by the referral API, auth/sync, and the
+ * Referral codes, pure logic, shared by the referral API, auth/sync, and the
  * admin vanity-code editor.
  *
- * Codes are 3–16 chars of A–Z/0–9 and come in three flavors:
- *   1. Name-based (default): the user's first name — "AJINKYA" — because the
+ * Codes are 3-16 chars of A-Z/0-9 and come in three flavors:
+ *   1. Name-based (default): the user's first name, "AJINKYA", because the
  *      sender shares the link knowingly and a readable code looks trustworthy.
  *      Collisions get a numbered suffix ("AJINKYA2"), arbitrated by the DB's
  *      unique index.
@@ -19,7 +19,7 @@ export const CODE_MAX_LENGTH = 16;
 const RANDOM_CHARSET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 export const RANDOM_CODE_LENGTH = 8;
 
-/** A fresh random code (not guaranteed unique — the DB index enforces that). */
+/** A fresh random code (not guaranteed unique, the DB index enforces that). */
 export function generateReferralCode(
   random: () => number = Math.random,
 ): string {
@@ -32,10 +32,9 @@ export function generateReferralCode(
 
 /**
  * A name-based code candidate from the user's full name: first name,
- * A–Z/0–9 only, capped at 10 chars; attempt 0 is the bare name, later
+ * A-Z/0-9 only, capped at 10 chars; attempt 0 is the bare name, later
  * attempts append a number ("AJINKYA", "AJINKYA2", "AJINKYA3"…).
- * Returns null when the name yields fewer than 3 usable characters —
- * the caller falls back to a random code.
+ * Returns null when the name yields fewer than 3 usable characters, * the caller falls back to a random code.
  */
 export function nameBasedCode(
   fullName: string | null | undefined,
@@ -50,7 +49,7 @@ export function nameBasedCode(
 
 /**
  * The character rule, on its own: uppercase and strip everything outside
- * A–Z/0–9. Used as-you-type in the admin vanity editor so the field always
+ * A-Z/0-9. Used as-you-type in the admin vanity editor so the field always
  * shows exactly what would be saved; length is enforced separately by
  * normalizeReferralCode.
  */
@@ -61,7 +60,7 @@ export function cleanReferralInput(raw: string): string {
 /**
  * Normalize a code from untrusted input (?ref param, admin vanity editor):
  * the character rule plus length bounds. Returns null when it can't be a real
- * code — attribution silently skips rather than erroring a signup.
+ * code, attribution silently skips rather than erroring a signup.
  */
 export function normalizeReferralCode(raw: unknown): string | null {
   if (typeof raw !== "string") return null;

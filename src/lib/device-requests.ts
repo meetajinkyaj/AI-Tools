@@ -3,8 +3,7 @@
  *
  * A suggestion box collects "oura", "Oura Ring", "OURA RING 4", "oura ring gen
  * 3" and "ourua". Counted literally that is five devices with one vote each,
- * and the tally — whose only job is to say how many people want a thing —
- * reports the opposite of the truth. Every entry below exists because a real
+ * and the tally, whose only job is to say how many people want a thing, * reports the opposite of the truth. Every entry below exists because a real
  * person could plausibly type it.
  *
  * THE RULE: fold aggressively onto names we KNOW, and not at all otherwise.
@@ -24,7 +23,7 @@ export interface DeviceMatch {
   key: string;
   /** Display name for the admin tally. */
   label: string;
-  /** True when we already integrate it — changes what the user is told. */
+  /** True when we already integrate it, changes what the user is told. */
   supported: boolean;
   /**
    * True when we know it cannot be integrated today, with `reason` saying why.
@@ -48,7 +47,7 @@ interface DeviceEntry extends Omit<DeviceMatch, "key"> {
  * The devices we can recognise.
  *
  * `supported` ones are in the list because people will ask for a device we
- * already integrate — which is not noise. Before launch it says which vendor
+ * already integrate, which is not noise. Before launch it says which vendor
  * application to chase first; after launch it says the device is in the list
  * but the user did not find it, which is a discoverability bug, not a request.
  */
@@ -97,7 +96,7 @@ const DEVICES: DeviceEntry[] = [
     label: "Apple Health",
     supported: false,
     blocked: true,
-    reason: "On-device API — needs our iOS app.",
+    reason: "On-device API, needs our iOS app.",
     aliases: ["apple health", "applehealth", "healthkit", "health kit", "apple health kit", "ios health", "iphone health", "apple health app"],
   },
   {
@@ -105,7 +104,7 @@ const DEVICES: DeviceEntry[] = [
     label: "Google Health Connect",
     supported: false,
     blocked: true,
-    reason: "On-device API — needs our Android app.",
+    reason: "On-device API, needs our Android app.",
     aliases: ["health connect", "google health connect", "google health", "google fit", "googlefit", "android health", "samsung health connect"],
   },
   // Deliberately its own entry, NOT folded into Apple Health. An Apple Watch
@@ -117,7 +116,7 @@ const DEVICES: DeviceEntry[] = [
     label: "Apple Watch",
     supported: false,
     blocked: true,
-    reason: "Reaches us via Apple Health — needs our iOS app.",
+    reason: "Reaches us via Apple Health, needs our iOS app.",
     aliases: ["apple watch", "applewatch", "iwatch", "apple watch ultra", "apple watch series", "watch os", "watchos"],
   },
 
@@ -243,7 +242,7 @@ const ALIAS_INDEX: Map<string, DeviceEntry> = (() => {
  * Lowercase, strip punctuation, collapse whitespace.
  *
  * Punctuation goes because "Oura Ring®", "oura-ring" and "oura ring" are one
- * device. Nothing else is removed — see the rule at the top of this file.
+ * device. Nothing else is removed, see the rule at the top of this file.
  */
 export function normalize(raw: string): string {
   return raw
@@ -251,7 +250,7 @@ export function normalize(raw: string): string {
     .normalize("NFKD")
     // Drop combining marks left by the decomposition. Without this "Ōura"
     // becomes "o" + a lone macron, the macron is not a letter, and the next
-    // rule turns it into a space — splitting the word into "o ura".
+    // rule turns it into a space, splitting the word into "o ura".
     .replace(/\p{M}+/gu, "")
     // Keep letters, digits and spaces. Everything else becomes a space rather
     // than vanishing, so "oura/whoop" does not become the word "ourawhoop".
@@ -282,7 +281,7 @@ export const MAX_SUGGESTION_LENGTH = 60;
 /**
  * Resolve a typed suggestion to a bucket.
  *
- * Unrecognised input becomes its own key rather than being discarded — that is
+ * Unrecognised input becomes its own key rather than being discarded, that is
  * the entire point of a free-text box, and the long tail is where the devices
  * we have not heard of live.
  */
@@ -325,7 +324,7 @@ export function isUnrecognised(key: string): boolean {
  *
  * Hints, not a menu: the field stays free text. Their job is to nudge spelling
  * toward something the alias table already knows, which is cheaper than adding
- * aliases forever. Supported devices are excluded — suggesting a device we
+ * aliases forever. Supported devices are excluded, suggesting a device we
  * already have is a confusing thing to be prompted toward.
  */
 export const SUGGESTION_HINTS: string[] = DEVICES.filter((d) => !d.supported)

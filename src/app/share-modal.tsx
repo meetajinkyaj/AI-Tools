@@ -8,7 +8,7 @@ import { ShareCheckinCard } from "./share-card";
 /**
  * The share sheet as a modal, shown the instant a check-in saves.
  *
- * Inline, it sat below the fold of a long form — people finished checking in,
+ * Inline, it sat below the fold of a long form, people finished checking in,
  * looked at the "Done ✓" confirmation, and never scrolled far enough to see
  * it existed. A modal is the honest way to offer something at the moment of
  * the win: it is the one interruption the flow can justify, and it is
@@ -26,8 +26,7 @@ export function ShareModal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Escape closes, and the page behind must not scroll while this is open —
-  // otherwise flicking the sheet on a phone scrolls the check-in form instead.
+  // Escape closes, and the page behind must not scroll while this is open, // otherwise flicking the sheet on a phone scrolls the check-in form instead.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -45,8 +44,8 @@ export function ShareModal({
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 p-0 sm:items-center sm:p-4"
       // Only a click that both starts and ends on the backdrop closes it.
-      // Using onClick alone means a drag that begins inside the sheet — while
-      // scrolling it, or dragging a toggle — releases on the backdrop and
+      // Using onClick alone means a drag that begins inside the sheet, while
+      // scrolling it, or dragging a toggle, releases on the backdrop and
       // dismisses the user's work.
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();

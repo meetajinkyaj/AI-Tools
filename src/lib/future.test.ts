@@ -111,7 +111,7 @@ describe("markerOutlook", () => {
     expect(o.projected_value).not.toBeNull();
   });
 
-  it("falls back to habit_v1 on a single panel — no invented number", () => {
+  it("falls back to habit_v1 on a single panel, no invented number", () => {
     const o = markerOutlook(flagged, [{ date: "2026-01-01", value: 5.9 }],
       computeMomentum(computeHabitSignals(checkins(30))));
     expect(o.model).toBe("habit_v1");

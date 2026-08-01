@@ -140,8 +140,8 @@ describe("dateOfBirthError", () => {
     expect(dateOfBirthError("1985-01-01")).toBeNull();
   });
 
-  it("accepts minors — no minimum age (per legal review + Terms)", () => {
-    // The 2015-08-05 beta case: a real date, an under-18 age — now accepted.
+  it("accepts minors, no minimum age (per legal review + Terms)", () => {
+    // The 2015-08-05 beta case: a real date, an under-18 age, now accepted.
     const minorYear = new Date().getUTCFullYear() - 10;
     expect(dateOfBirthError(`${minorYear}-08-05`)).toBeNull();
     const seventeen = new Date().getUTCFullYear() - 17;

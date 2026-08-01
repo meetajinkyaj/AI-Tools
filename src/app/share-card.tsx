@@ -24,7 +24,7 @@ import {
 import { drawBackdrop, drawShareCard } from "./share-card-render";
 
 /**
- * The share sheet — "the screen that makes the card", per the Claude Design
+ * The share sheet, "the screen that makes the card", per the Claude Design
  * spec. Template → backdrop → what to show → format → share.
  *
  * Nothing is uploaded. The photo is read into a canvas and stays on the
@@ -232,7 +232,7 @@ export function ShareCheckinCard({
       type: "image/png",
     });
 
-    // Names the streak, and — once the beta opens — carries the invite link as
+    // Names the streak, and, once the beta opens, carries the invite link as
     // tappable text. Platforms decide whether to keep `text`: Instagram drops
     // it, WhatsApp/Telegram/X/LinkedIn keep it.
     const text = shareCaption(input);
@@ -242,7 +242,7 @@ export function ShareCheckinCard({
         await navigator.share({ files: [file], text });
         return;
       } catch (err) {
-        // Dismissing the sheet throws AbortError — not worth surfacing.
+        // Dismissing the sheet throws AbortError, not worth surfacing.
         if (err instanceof Error && err.name === "AbortError") return;
         // Some targets reject a files+text share outright. Retry with the
         // image alone rather than dropping the user out to a download.
@@ -338,7 +338,7 @@ export function ShareCheckinCard({
             <BackdropSwatch
               key={b.id}
               id={b.id}
-              name={`${b.name} — ${b.note}`}
+              name={`${b.name}, ${b.note}`}
               // A photo covers the backdrop, so nothing is selected while one
               // is loaded, however the state underneath reads.
               selected={photo === null && backdrop === b.id}
@@ -421,7 +421,7 @@ export function ShareCheckinCard({
           {FORMATS.map((f) => (
             <Choice key={f.id} selected={format === f.id} onClick={() => setFormat(f.id)}>
               {f.name}
-              {/* Nobody thinks in aspect ratios — they think "this goes on my
+              {/* Nobody thinks in aspect ratios, they think "this goes on my
                   story". Naming the platforms removes a guess at the exact
                   moment we are asking someone to post. */}
               <span className="mt-1 block font-body text-[0.6rem] normal-case tracking-normal opacity-70">
@@ -449,7 +449,7 @@ export function ShareCheckinCard({
           Save to photos
         </button>
         <p className="font-body text-xs text-muted">
-          {/* Do not promise a link the card is not carrying — during the
+          {/* Do not promise a link the card is not carrying, during the
               closed beta it carries none. See INVITE_LINK_ON_SHARED_CARDS. */}
           {INVITE_LINK_ON_SHARED_CARDS
             ? input.inviteCode

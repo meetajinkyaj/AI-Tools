@@ -31,7 +31,7 @@ describe("token encryption", () => {
 
   it("produces different ciphertext each time", async () => {
     // A random IV per call. Without it, the column would reveal that two rows
-    // hold the same token — and GCM's security collapses on IV reuse.
+    // hold the same token, and GCM's security collapses on IV reuse.
     const a = await encryptToken("same-token");
     const b = await encryptToken("same-token");
     expect(a).not.toBe(b);
@@ -62,8 +62,7 @@ describe("token encryption", () => {
   });
 
   it("fails closed when no key is configured", async () => {
-    // The alternative — quietly writing plaintext into a column named `_enc` —
-    // is worse, because nothing about it looks wrong afterwards.
+    // The alternative, quietly writing plaintext into a column named `_enc`, // is worse, because nothing about it looks wrong afterwards.
     delete process.env.WEARABLE_TOKEN_KEY;
     expect(wearablesConfigured()).toBe(false);
     await expect(encryptToken("rt_secret")).rejects.toThrow(/WEARABLE_TOKEN_KEY/);

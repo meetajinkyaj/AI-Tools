@@ -1,6 +1,6 @@
 /**
  * Pure, runtime-agnostic verification of a Privy access token (ES256 JWT) using
- * the Web Crypto API (`crypto.subtle`) — a native global on Cloudflare Workers,
+ * the Web Crypto API (`crypto.subtle`), a native global on Cloudflare Workers,
  * Node 18+, and browsers. No `node:crypto`, no library, so it behaves identically
  * across build targets (which is exactly the bug we hit with jose on workerd).
  *

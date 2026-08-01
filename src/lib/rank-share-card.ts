@@ -1,5 +1,5 @@
 /**
- * The rank share card — Claude Design's "glory card" from Iki Badges v3.
+ * The rank share card. Claude Design's "glory card" from Iki Badges v3.
  *
  * Deliberately much barer than the check-in card. That one has templates,
  * backdrops, and five field toggles because a check-in is a bundle of
@@ -9,7 +9,7 @@
  *
  * WHAT IS ON IT is fixed and safe by construction: rank, iki score, streak.
  * All habit data. No biomarker or health reading can reach this card because
- * none is passed in — the type simply has nowhere to put one.
+ * none is passed in, the type simply has nowhere to put one.
  */
 
 import { referralLink } from "./referral";
@@ -69,7 +69,7 @@ export const RANK_PALETTE = {
 } as const;
 
 /**
- * "Mon · 26 Jul" — the masthead date.
+ * "Mon · 26 Jul", the masthead date.
  *
  * Locale-independent on purpose: the card is an image, so a date that renders
  * differently per device makes two people's cards look like different products.
@@ -100,7 +100,7 @@ export function rankCardDate(d: Date): string {
  * strips, so it is not a link any user could hold. The real one comes from
  * `referralLink`, the only thing that produces a URL that resolves.
  *
- * Returns null for "draw nothing" — better than a link to a dangling `?ref=`.
+ * Returns null for "draw nothing", better than a link to a dangling `?ref=`.
  */
 export function rankInviteLine(code: string | null): string | null {
   if (!INVITE_LINK_ON_SHARED_CARDS) return null;
@@ -111,8 +111,8 @@ export function rankInviteLine(code: string | null): string | null {
 /**
  * The caption offered alongside the image.
  *
- * The link is spelled out in full — captions are plain text everywhere that
- * matters, so a URL is only tappable if it is actually written out — and is
+ * The link is spelled out in full, captions are plain text everywhere that
+ * matters, so a URL is only tappable if it is actually written out, and is
  * withheld under the same closed-beta flag as the card's own footer. A caption
  * is if anything more public than the image, since it survives being copied.
  */

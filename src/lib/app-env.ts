@@ -4,12 +4,12 @@
  * There are deliberately TWO markers, because they solve different problems at
  * different layers and neither can do the other's job:
  *
- *   1. `APP_ENV` — a **runtime** Worker var, read on the server. Used for the
+ *   1. `APP_ENV`, a **runtime** Worker var, read on the server. Used for the
  *      production-database safety guard in `supabase-admin.ts`. It must be
  *      runtime: a build-time value could be baked wrong and would then be
  *      unverifiable at the moment it matters.
  *
- *   2. `NEXT_PUBLIC_APP_ENV` — a **build-time** value inlined into the bundle.
+ *   2. `NEXT_PUBLIC_APP_ENV`, a **build-time** value inlined into the bundle.
  *      Used for the staging banner. It must be build-time: `/` is statically
  *      prerendered, so a runtime read would be evaluated during the build
  *      anyway and silently produce the wrong answer.
@@ -42,7 +42,7 @@ export function serverAppEnv(): AppEnv {
  * database.
  *
  * This exists because the Supabase URL falls back to production when
- * `SUPABASE_URL` is unset — correct for the production Worker, catastrophic
+ * `SUPABASE_URL` is unset, correct for the production Worker, catastrophic
  * anywhere else. A staging deploy missing that one var would otherwise read and
  * write real user data with no visible symptom. Failing to boot is strictly
  * better than succeeding against the wrong database.
@@ -56,7 +56,7 @@ export function assertNotProductionDatabase(
     throw new Error(
       `Refusing to connect to the production database from APP_ENV="${appEnv}". ` +
         "Set SUPABASE_URL (and a matching SUPABASE_SERVICE_ROLE_KEY) for this " +
-        "environment — see docs/STAGING.md.",
+        "environment, see docs/STAGING.md.",
     );
   }
 }

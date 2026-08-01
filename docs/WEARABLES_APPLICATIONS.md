@@ -1,7 +1,7 @@
-# Wearable provider applications — the checklist
+# Wearable provider applications, the checklist
 
 Everything to register, in the order to do it. Values below are pulled from
-`src/lib/wearables/providers.ts` and `urls.ts` — they are what the code actually
+`src/lib/wearables/providers.ts` and `urls.ts`, they are what the code actually
 sends, so paste them rather than retyping.
 
 > **Never paste a client secret into chat, a commit, or a file.** They go
@@ -35,17 +35,17 @@ sends, so paste them rather than retyping.
 > with third parties, and never used for advertising or ad targeting. Users can
 > disconnect at any time, which deletes the stored authorisation.
 
-That is an accurate description of what the code does — the connection row is
+That is an accurate description of what the code does, the connection row is
 deleted outright on disconnect, and nothing about wearable data touches the
 rewards or partner logic.
 
 ---
 
-## 1. Start these two FIRST — they take 1–4 weeks
+## 1. Start these two FIRST, they take 1-4 weeks
 
 Do these before anything else so the review clock runs while you do the rest.
 
-### ☐ Garmin — Health API
+### ☐ Garmin. Health API
 
 - **Where:** Garmin Developer Portal → Health API → request access
 - **Extra fields they ask for:** company/entity name, expected user volume
@@ -58,7 +58,7 @@ Do these before anything else so the review clock runs while you do the rest.
 - **Also register the push URL** (they will ask, or ask later):
   `https://app.ikigaro.com/api/wearables/garmin-push?key=<GARMIN_PUSH_SECRET>`
 
-Generate that secret first so you have it to hand — **URL-safe**, because it
+Generate that secret first so you have it to hand, **URL-safe**, because it
 travels in a query string where `+` legally means a space. Hex is the easiest
 way; any plain alphanumeric value is equally fine:
 
@@ -69,10 +69,10 @@ openssl rand -hex 32
 Save it to your password manager. Cloudflare secrets cannot be read back, and
 you need this value again on Garmin's form.
 
-> Garmin is push-only — there is no way to poll it. Data arrives when a user's
+> Garmin is push-only, there is no way to poll it. Data arrives when a user's
 > watch next syncs, which is why the push URL matters as much as the OAuth one.
 
-### ☐ Ultrahuman — UltraSignal / Partner API
+### ☐ Ultrahuman. UltraSignal / Partner API
 
 - **Where:** Ultrahuman developer docs → apply, or the partnership channel
 - **Extra fields:** use case, user base size, how the data will be used
@@ -81,7 +81,7 @@ you need this value again on Garmin's form.
 
 ---
 
-## 2. The self-serve four — an afternoon each
+## 2. The self-serve four, an afternoon each
 
 ### ☐ Oura
 
@@ -94,7 +94,7 @@ you need this value again on Garmin's form.
 
 - **Where:** `dev.fitbit.com` → Manage → Register an app
 - **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/fitbit`
-- **OAuth 2.0 Application Type:** `Server` (not Client or Personal — Personal
+- **OAuth 2.0 Application Type:** `Server` (not Client or Personal. Personal
   only ever reads your own account, which is not what we are building)
 - **Scopes:** `activity`, `heartrate`, `sleep`, `oxygen_saturation`, `weight`,
   `profile`
@@ -106,7 +106,7 @@ you need this value again on Garmin's form.
 - **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/whoop`
 - **Scopes:** `read:recovery`, `read:sleep`, `read:cycles`, `read:profile`,
   `offline`
-- `offline` is the one that matters — without it Whoop issues no refresh token
+- `offline` is the one that matters, without it Whoop issues no refresh token
   and every connection dies within the hour.
 
 ### ☐ Withings
@@ -119,12 +119,12 @@ you need this value again on Garmin's form.
 
 ## 3. Secrets
 
-**Already done — do not redo:** `WEARABLE_TOKEN_KEY` and `GARMIN_PUSH_SECRET`
+**Already done, do not redo:** `WEARABLE_TOKEN_KEY` and `GARMIN_PUSH_SECRET`
 were both set on the production Worker `ai-tools` on 2026-07-30. The push secret
 is in the password manager, which is where to get it for Garmin's form above.
 Cloudflare cannot show it to you again.
 
-**Still to do — two per provider, as each one's credentials arrive:**
+**Still to do, two per provider, as each one's credentials arrive:**
 
 ```bash
 wrangler secret put OURA_CLIENT_ID
@@ -140,9 +140,9 @@ of its env vars are set and the Worker redeploys. Nothing else to switch on.
 ## Devices we evaluated and cannot add
 
 Recorded so the same research is not repeated. A "no" here is about the
-vendor's API, not the device — several are good hardware.
+vendor's API, not the device, several are good hardware.
 
-### ✗ Fittr HART — no route in, evaluated 2026-07-30
+### ✗ Fittr HART, no route in, evaluated 2026-07-30
 
 Three ways a device's data can reach us, and HART closes all three:
 
@@ -152,14 +152,13 @@ Three ways a device's data can reach us, and HART closes all three:
 2. **No Apple Health write.** This is the decisive one. Their privacy policy
    says the app *reads* from HealthKit and states plainly: *"Our App cannot
    write data to HealthKit."* So shipping our iOS app does **not** get us HART
-   data — the ring's readings never enter HealthKit for us to read.
+   data, the ring's readings never enter HealthKit for us to read.
 3. **No documented Health Connect write**, so the Android path is no better.
 
 The data is a one-way silo: HART pulls context in, nothing comes out.
 
 **If demand shows up**, the only move is a direct partnership approach to Fittr
-for API access. That is a conversation worth having with a number attached —
-which is what the Requests tab in the admin console is for. Check it before
+for API access. That is a conversation worth having with a number attached, which is what the Requests tab in the admin console is for. Check it before
 writing to them.
 
 ### Where the requests come from
@@ -178,7 +177,7 @@ what people own; the tally is what they actually own.
 
 **The redirect URI must match byte for byte.** Scheme, host, path, no trailing
 slash, no `www`. Every one of these vendors rejects a mismatch with the same
-message — `invalid redirect_uri` — and nothing else to go on.
+message, `invalid redirect_uri`, and nothing else to go on.
 
 Copy the values from the tables above rather than typing them. They come from
 `callbackUrl()` in `src/lib/wearables/urls.ts`, which is the same function that
@@ -198,6 +197,6 @@ production with their own account, which is fine at this size.
 ## What to send back
 
 Nothing secret. Just tell me which providers came through and I will confirm
-the wiring end to end. The first one to land is the interesting one — connecting
+the wiring end to end. The first one to land is the interesting one, connecting
 your own account is what tells us whether this data is worth building Trends
 around.

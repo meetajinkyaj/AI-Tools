@@ -1,17 +1,17 @@
--- 0015: Cloud wearable integrations — connections and normalized daily metrics.
+-- 0015: Cloud wearable integrations, connections and normalized daily metrics.
 --
 -- THE POINT. Apple HealthKit and Android Health Connect are on-device APIs with
 -- no web access at all, so reading them needs a native app. Six wearable
--- vendors — Oura, Fitbit, Whoop, Withings, Garmin, Ultrahuman — instead expose
+-- vendors. Oura, Fitbit, Whoop, Withings, Garmin, Ultrahuman, instead expose
 -- server-to-server OAuth APIs, which the existing web app can talk to today.
 -- This schema is the storage for that path. The native path, when it comes,
 -- writes into the same `wearable_daily_metrics` table as one more provider.
 --
 -- TWO TABLES, ON PURPOSE:
 --
---   wearable_connections    one row per (user, provider) — the OAuth grant.
+--   wearable_connections    one row per (user, provider), the OAuth grant.
 --                           Holds credentials. Encrypted, see below.
---   wearable_daily_metrics  one row per (user, provider, date, metric) — the
+--   wearable_daily_metrics  one row per (user, provider, date, metric), the
 --                           normalized data. Holds no credentials, and is safe
 --                           to read widely inside the app.
 --
@@ -22,7 +22,7 @@
 -- readings, they are *credentials*: a refresh token is standing permission to
 -- pull someone's sleep, heart rate and recovery from a third party, and it
 -- keeps working until revoked. Postgres already encrypts at rest at the disk
--- level, which does nothing against the realistic threat here — a leaked
+-- level, which does nothing against the realistic threat here, a leaked
 -- service-role key or a stray dump. Encrypting with a key that lives only in
 -- the Worker's secrets means the database alone is not enough to impersonate
 -- our users against six vendors. Losing the key costs everyone a reconnect,
@@ -48,9 +48,9 @@ create table if not exists wearable_connections (
   expires_at        timestamptz,
   scopes            text,
 
-  -- 'active'  — syncing normally
-  -- 'expired' — refresh failed in a way the user must fix (re-consent)
-  -- 'revoked' — user disconnected, kept for audit until purged
+  -- 'active', syncing normally
+  -- 'expired', refresh failed in a way the user must fix (re-consent)
+  -- 'revoked', user disconnected, kept for audit until purged
   status            text not null default 'active',
   last_sync_at      timestamptz,
   last_error        text,
@@ -128,7 +128,7 @@ create index if not exists wearable_daily_metrics_read_idx
 -- RLS. Enabled with no policies, the convention since 0001: anon and
 -- authenticated get nothing, the service role bypasses, and every query in this
 -- app is server-side through createSupabaseAdmin(). Migration 0013 shipped two
--- tables without this and 0014 existed only to fix it — hence doing it in the
+-- tables without this and 0014 existed only to fix it, hence doing it in the
 -- same migration that creates the tables.
 --
 -- It matters more here than anywhere else in the schema: without it, the anon

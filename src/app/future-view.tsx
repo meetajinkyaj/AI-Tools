@@ -6,7 +6,7 @@ import { POINTS } from "@/lib/points";
 import { Card, Eyebrow, PageHeader, primaryButtonClass } from "./ui";
 
 /**
- * Future You — the six-month directional outlook. Panels land once or twice a
+ * Future You, the six-month directional outlook. Panels land once or twice a
  * year, so the screen leads with what the user controls daily (habit momentum)
  * and frames the next panel as the scoreboard that verifies it. Motivational,
  * not diagnostic: no invented numbers on a single panel, no dosing language.
@@ -58,14 +58,14 @@ interface FutureData {
   interventions: InterventionRow[];
 }
 
-const DISCLAIMER = "Educational, not a diagnosis — please consult a doctor.";
+const DISCLAIMER = "Educational, not a diagnosis, please consult a doctor.";
 
 const OUTLOOK_META: Record<
   MarkerOutlook["outlook"],
   { label: string; cls: string }
 > = {
   improving: { label: "Set up to improve", cls: "bg-accent/10 text-accent" },
-  holding: { label: "Holding — keep going", cls: "bg-clay/10 text-clay" },
+  holding: { label: "Holding, keep going", cls: "bg-clay/10 text-clay" },
   needs_inputs: { label: "Needs your daily inputs", cls: "bg-surface-2 text-muted" },
 };
 
@@ -75,7 +75,7 @@ const MOMENTUM_COPY: Record<Momentum["level"], string> = {
   building:
     "You're building a base. More consistent check-ins, sleep and training tilt the next panel your way.",
   early:
-    "Your next panel will reflect what you do daily. Start with the check-in — it takes 30 seconds.",
+    "Your next panel will reflect what you do daily. Start with the check-in. It takes 30 seconds.",
 };
 
 export function FutureView({
@@ -135,7 +135,7 @@ export function FutureView({
     );
   }
 
-  // No panel yet — the outlook needs a baseline.
+  // No panel yet, the outlook needs a baseline.
   if (data.panelCount === 0) {
     return (
       <div className="flex w-full max-w-xl flex-col gap-6">
@@ -162,7 +162,7 @@ export function FutureView({
       <PageHeader
         eyebrow="Future You"
         title="Six months out"
-        subtitle="Lab tests come once or twice a year — what you do daily in between is what they'll show. This is the direction you're pointed in."
+        subtitle="Lab tests come once or twice a year, what you do daily in between is what they'll show. This is the direction you're pointed in."
       />
 
       {/* The engine: habit momentum */}
@@ -185,7 +185,7 @@ export function FutureView({
           <Signal label="Check-ins" value={`${Math.round(s.checkinRate * 100)}%`} sub="last 30 days" />
           <Signal
             label="Sleep"
-            value={s.avgSleep != null ? `${s.avgSleep}h` : "—"}
+            value={s.avgSleep != null ? `${s.avgSleep}h` : "-"}
             sub="nightly avg"
           />
           <Signal label="Training" value={`${s.trainingDaysPerWeek}×`} sub="per week" />
@@ -193,7 +193,7 @@ export function FutureView({
             label="Energy"
             value={
               s.energyDelta == null
-                ? "—"
+                ? "-"
                 : s.energyDelta > 0
                   ? "rising"
                   : s.energyDelta < 0
@@ -217,7 +217,7 @@ export function FutureView({
           <p className="pb-2 font-body text-xs text-muted">
             Directional, based on{" "}
             {data.panelCount >= 2 ? "your panel history and " : ""}your daily
-            inputs — your next panel is what confirms it.
+            inputs, your next panel is what confirms it.
           </p>
           <ul className="flex flex-col divide-y divide-border">
             {data.markers.map((mk) => {
@@ -229,7 +229,7 @@ export function FutureView({
                       {mk.marker_name ?? mk.marker_key}
                     </span>
                     <span className="font-body text-xs text-muted">
-                      now {mk.current_value ?? "—"}
+                      now {mk.current_value ?? "-"}
                       {mk.model === "linear_v1" && mk.projected_value != null
                         ? ` → ~${mk.projected_value} by ${mk.projection_date}`
                         : ""}
@@ -246,7 +246,7 @@ export function FutureView({
           </ul>
           {data.inRangeCount > 0 && (
             <p className="pt-2 font-body text-xs text-muted">
-              The other {data.inRangeCount} markers are in range — momentum keeps
+              The other {data.inRangeCount} markers are in range, momentum keeps
               them there.
             </p>
           )}
@@ -256,7 +256,7 @@ export function FutureView({
           <Eyebrow>Where your markers are pointed</Eyebrow>
           <p className="font-body text-sm text-foreground/80">
             Everything on your last panel was in range. The goal for the next six
-            months: keep it that way — momentum is how.
+            months: keep it that way, momentum is how.
           </p>
         </Card>
       )}
@@ -269,7 +269,7 @@ export function FutureView({
             {data.interventions.map((iv) => (
               <li key={iv.id} className="font-body text-sm text-foreground/80">
                 <span className="font-medium text-foreground">{iv.label}</span>
-                <span className="text-muted"> — day {dayOf(iv.started_at)}. </span>
+                <span className="text-muted">, day {dayOf(iv.started_at)}. </span>
                 Your next panel is the readout.
               </li>
             ))}
@@ -288,8 +288,8 @@ export function FutureView({
           </p>
           <p className="font-body text-sm text-foreground/80">
             {data.retest.daysUntilDue > 0
-              ? `Around ${data.retest.dueDate}, a re-test shows what these months actually did — and earns +${POINTS.reTestUpload} iki points.`
-              : `It's been six months since your ${data.retest.lastPanelDate} panel. A re-test now shows what your habits did — and earns +${POINTS.reTestUpload} iki points.`}
+              ? `Around ${data.retest.dueDate}, a re-test shows what these months actually did, and earns +${POINTS.reTestUpload} iki points.`
+              : `It's been six months since your ${data.retest.lastPanelDate} panel. A re-test now shows what your habits did, and earns +${POINTS.reTestUpload} iki points.`}
           </p>
         </Card>
       )}

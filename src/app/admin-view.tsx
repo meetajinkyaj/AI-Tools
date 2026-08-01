@@ -165,13 +165,13 @@ interface AnalyticsData {
 /**
  * The backup tripwire, shown above the funnel.
  *
- * There are no database backups — a deliberate choice while the tester count is
+ * There are no database backups, a deliberate choice while the tester count is
  * tiny (`docs/RUNBOOK.md` §2b). The risk of that choice is that it gets
  * forgotten, so it is enforced next to the very number that expires it rather
  * than left in a document nobody re-reads.
  *
  * Two deliberately different voices. Under the threshold it is a quiet line of
- * text — the decision is sound and nagging about it would train the reader to
+ * text, the decision is sound and nagging about it would train the reader to
  * ignore this space. Over it, it is loud, because at that point real people's
  * health data is at stake and a muted note would be complicity.
  */
@@ -182,12 +182,12 @@ function BackupNotice({ risk }: { risk: AnalyticsData["backupRisk"] }) {
     return (
       <section className="flex flex-col gap-2 rounded-card border-2 border-accent bg-accent/10 p-4">
         <p className="font-label text-[0.65rem] uppercase tracking-[0.28em] text-accent">
-          Act now — database has no backups
+          Act now, database has no backups
         </p>
         <p className="font-body text-sm text-foreground">
           {risk.users} people have trusted this app with their health data, and
           none of it is backed up. If the database is lost, it is gone
-          permanently — there is no recovery path.
+          permanently, there is no recovery path.
         </p>
         <p className="font-body text-sm text-muted">
           This was an accepted risk below {risk.threshold} testers. That no
@@ -201,7 +201,7 @@ function BackupNotice({ risk }: { risk: AnalyticsData["backupRisk"] }) {
 
   return (
     <p className="font-body text-xs text-muted">
-      No database backups — accepted below {risk.threshold} testers ({risk.users}{" "}
+      No database backups, accepted below {risk.threshold} testers ({risk.users}{" "}
       now, {risk.headroom} to go). RUNBOOK §2b.
     </p>
   );
@@ -250,13 +250,13 @@ function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }
     );
 
   const f = data.funnel;
-  const pct = (n: number, of: number) => (of > 0 ? `${Math.round((n / of) * 100)}%` : "—");
+  const pct = (n: number, of: number) => (of > 0 ? `${Math.round((n / of) * 100)}%` : "-");
 
   return (
     <div className="flex flex-col gap-6">
       <BackupNotice risk={data.backupRisk} />
 
-      {/* Funnel — the checklist's core conversion metrics */}
+      {/* Funnel, the checklist's core conversion metrics */}
       <section className="flex flex-col gap-3">
         <Eyebrow>Funnel</Eyebrow>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -292,7 +292,7 @@ function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }
             <StatTile
               key={r.day}
               label={`Day ${r.day} retention`}
-              value={r.rate != null ? `${Math.round(r.rate * 100)}%` : "—"}
+              value={r.rate != null ? `${Math.round(r.rate * 100)}%` : "-"}
               sub={r.eligible > 0 ? `${r.retained} of ${r.eligible} eligible` : "no cohort yet"}
             />
           ))}
@@ -310,8 +310,8 @@ function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }
         </Card>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatTile label="No streak" value={String(data.streaks.none)} sub="users" />
-          <StatTile label="1–6 days" value={String(data.streaks.short)} sub="live streaks" />
-          <StatTile label="7–29 days" value={String(data.streaks.week)} sub="live streaks" />
+          <StatTile label="1-6 days" value={String(data.streaks.short)} sub="live streaks" />
+          <StatTile label="7-29 days" value={String(data.streaks.week)} sub="live streaks" />
           <StatTile label="30+ days" value={String(data.streaks.month)} sub="live streaks" />
         </div>
       </section>
@@ -352,7 +352,7 @@ function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }
                     <td className="max-w-[20rem] truncate px-4 py-2 text-foreground" title={e.message}>
                       {e.message}
                     </td>
-                    <td className="px-4 py-2 text-muted">{e.url ?? "—"}</td>
+                    <td className="px-4 py-2 text-muted">{e.url ?? "-"}</td>
                     <td className="px-4 py-2 text-muted">{e.user_id ? "signed in" : "pre-auth"}</td>
                   </tr>
                 ))}
@@ -439,11 +439,11 @@ const INVENTORY_OPTIONS = ["in_stock", "out_of_stock", "coming_soon"];
 // Reusable copy so admins pick a template instead of retyping the same lines.
 const REDEEM_PRESETS: { label: string; text: string }[] = [
   {
-    label: "Online — paste at checkout",
+    label: "Online, paste at checkout",
     text: "Enter this code at the partner's checkout to apply your discount. One use per code.",
   },
   {
-    label: "In-store — show at counter",
+    label: "In-store, show at counter",
     text: "Show this code at the partner's store counter to redeem. One use per code.",
   },
   {
@@ -651,7 +651,7 @@ function VoucherManager({ getToken }: { getToken: () => Promise<string | null> }
               <div className="flex min-w-0 flex-col">
                 <span className="font-body text-sm font-medium text-foreground">{it.name}</span>
                 <span className="font-body text-xs text-muted">
-                  {it.kind} · {it.partner ?? "—"}
+                  {it.kind} · {it.partner ?? "-"}
                   {it.kind === "voucher"
                     ? ` · ${it.points_cost} pts · ${it.codes_available}/${it.codes_total} codes`
                     : ""}
@@ -867,7 +867,7 @@ interface RosterUser {
   created_at: string;
   deleted: boolean;
   access_status: string; // 'waitlisted' | 'approved'
-  /** Has a self profile — the same test the app uses to skip onboarding. */
+  /** Has a self profile, the same test the app uses to skip onboarding. */
   onboarded: boolean;
   referral_code: string | null;
   points: number;
@@ -928,7 +928,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
         emailed === "sent"
           ? { text: "Approved, and emailed them.", ok: true }
           : emailed === "failed"
-            ? { text: "Approved — but the email failed. Tell them yourself.", ok: false }
+            ? { text: "Approved, but the email failed. Tell them yourself.", ok: false }
             : // "skipped" before the domain is verified, or when they were
               // already approved. Neither is a problem worth an alarm.
               { text: "Approved. No email sent.", ok: true },
@@ -1002,7 +1002,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
       </div>
     );
 
-  // Pending approvals first — that's the queue this table exists to serve.
+  // Pending approvals first, that's the queue this table exists to serve.
   const sorted = [...users].sort((a, b) =>
     a.access_status === b.access_status ? 0 : a.access_status === "waitlisted" ? -1 : 1,
   );
@@ -1096,7 +1096,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                           : "Cannot onboard until approved"
                       }
                     >
-                      <span aria-hidden>—</span>
+                      <span aria-hidden>-</span>
                       <span className="sr-only">Onboarding not complete</span>
                     </span>
                   )}
@@ -1116,7 +1116,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                               className={`${fieldClass} h-8 w-28 font-mono text-xs`}
                               value={editingCode.draft}
                               onChange={(e) =>
-                                // Same char rule the server applies — the field
+                                // Same char rule the server applies, the field
                                 // always shows exactly what will be saved.
                                 setEditingCode({
                                   ...editingCode,
@@ -1149,7 +1149,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                                 Will save as: <code className="font-mono">{normalized}</code>
                               </>
                             ) : (
-                              "3–16 letters/numbers"
+                              "3-16 letters/numbers"
                             )}
                           </span>
                         </div>
@@ -1158,7 +1158,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                   ) : (
                     <div className="flex items-center gap-2">
                       <code className="font-mono text-xs text-foreground">
-                        {u.referral_code ?? "—"}
+                        {u.referral_code ?? "-"}
                       </code>
                       <button
                         onClick={() => {
@@ -1181,7 +1181,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                 </td>
                 <td className="px-4 py-2">{u.points}</td>
                 <td className="px-4 py-2">{u.panels}</td>
-                <td className="px-4 py-2 text-muted">{u.last_checkin ?? "—"}</td>
+                <td className="px-4 py-2 text-muted">{u.last_checkin ?? "-"}</td>
                 <td className="px-4 py-2">{u.streak}</td>
               </tr>
             ))}
@@ -1230,11 +1230,11 @@ interface PartnerMember {
 }
 
 /**
- * Accelerated Points partners — create a code, watch its cohort.
+ * Accelerated Points partners, create a code, watch its cohort.
  *
  * The numbers that matter for a partnership are not the ones on the Users tab.
  * A partner conversation is about how many people a code brought, how many
- * actually started, and what the boost cost — so those sit together here.
+ * actually started, and what the boost cost, so those sit together here.
  */
 function PartnerManager({ getToken }: { getToken: () => Promise<string | null> }) {
   const [partners, setPartners] = useState<PartnerRow[]>([]);
@@ -1359,11 +1359,11 @@ function PartnerManager({ getToken }: { getToken: () => Promise<string | null> }
         <p className="font-body text-xs text-muted">
           {preview ? (
             <>
-              Link: <code className="font-mono">app.ikigaro.com/?ref={preview}</code> — 2× for 90
+              Link: <code className="font-mono">app.ikigaro.com/?ref={preview}</code>, 2× for 90
               days, then 1.5× or 1.25×, plus 150 welcome points.
             </>
           ) : (
-            "3–16 letters or numbers."
+            "3-16 letters or numbers."
           )}
         </p>
         <div>
@@ -1445,7 +1445,7 @@ function PartnerManager({ getToken }: { getToken: () => Promise<string | null> }
                       <td className="px-3 py-2">{m.iki_score}</td>
                       <td className="px-3 py-2">{m.points}</td>
                       <td className="px-3 py-2">{m.checkins}</td>
-                      <td className="px-3 py-2 text-muted">{m.last_checkin ?? "—"}</td>
+                      <td className="px-3 py-2 text-muted">{m.last_checkin ?? "-"}</td>
                     </tr>
                   ))}
                   {members.length === 0 && (

@@ -120,8 +120,8 @@ export async function POST(request: Request) {
    * A test send goes to the admin alone and is not recorded as a broadcast.
    *
    * It exists because there is no way to check an email after sending it, and
-   * every mistake worth catching — a broken sentence, a subject that reads
-   * badly in a list, a paragraph that collapsed — is obvious in an inbox and
+   * every mistake worth catching, a broken sentence, a subject that reads
+   * badly in a list, a paragraph that collapsed, is obvious in an inbox and
    * invisible in a compose box.
    */
   if (body.test === true) {
@@ -176,7 +176,7 @@ export async function POST(request: Request) {
 /**
  * Send the pending recipients of one broadcast, up to the per-run cap.
  *
- * Used for both the initial send and an explicit resume — they are the same
+ * Used for both the initial send and an explicit resume, they are the same
  * operation, which is why a partial send is an ordinary state rather than a
  * special case needing its own recovery path.
  */

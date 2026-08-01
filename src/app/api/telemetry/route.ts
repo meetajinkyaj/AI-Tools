@@ -5,7 +5,7 @@ import { todayUTC } from "@/lib/checkin";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
- * POST /api/telemetry — the app's lightweight beacon.
+ * POST /api/telemetry, the app's lightweight beacon.
  *
  *   { kind: "open" }                          -> one app_opened event per UTC day
  *                                                (authed only; powers retention)
@@ -15,7 +15,7 @@ import { createSupabaseAdmin } from "@/lib/supabase-admin";
  *
  * Fire-and-forget by design: responds 200 even when nothing is written, so a
  * telemetry hiccup can never surface as a user-facing failure. Unauthed error
- * payloads are hard-capped (sizes below) — acceptable surface for beta scale.
+ * payloads are hard-capped (sizes below), acceptable surface for beta scale.
  */
 
 const MAX_MESSAGE = 500;
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     if (body.kind === "open") {
       if (!privyUserId) return NextResponse.json({ ok: true });
-      // Only approved users count toward DAU/retention — waitlisted logins
+      // Only approved users count toward DAU/retention, waitlisted logins
       // seeing the waitlist screen aren't product activity.
       const { data: user } = await supabase
         .from("users")

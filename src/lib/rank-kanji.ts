@@ -1,5 +1,5 @@
 /**
- * The five Iki rank kanji — 芽 修 錬 師 道 — as vector outlines.
+ * The five Iki rank kanji, 芽 修 錬 師 道, as vector outlines.
  *
  * WHY NOT A FONT. The Iki Badges v3 spec says to await
  * `document.fonts.load('400 26px "Noto Sans JP"')` before painting, because
@@ -7,7 +7,7 @@
  * unfollowable here for the same reason it was for the 生き甲斐 motif:
  * `next/font/google` serves no Japanese subset for this family (only
  * cyrillic/latin/latin-ext/vietnamese), so honouring it means either
- * self-hosting the whole CJK family — megabytes for five glyphs — or a
+ * self-hosting the whole CJK family, megabytes for five glyphs, or a
  * third-party request in front of every badge paint, which is precisely what
  * the share pipeline exists to avoid.
  *
@@ -25,7 +25,7 @@
 
 import type { RankId } from "./iki-rank";
 
-/** Design units per em — the paths' coordinate space. */
+/** Design units per em, the paths' coordinate space. */
 export const KANJI_UNITS_PER_EM = 1000;
 
 /** Every glyph in this subset is full-width: one em advance. */
@@ -35,7 +35,7 @@ export const KANJI_ADVANCE = 1000;
  * Outline per rank, canvas y-down, alphabetic baseline at y = 0.
  *
  * To place at font-size S with the glyph centred on (cx, cy), scale by
- * S / KANJI_UNITS_PER_EM and translate by (cx - S/2, cy + S*0.36) — 0.36em
+ * S / KANJI_UNITS_PER_EM and translate by (cx - S/2, cy + S*0.36), 0.36em
  * being roughly half the cap height of these ideographs, which is what makes
  * a kanji look optically centred rather than sitting low.
  */
@@ -134,14 +134,14 @@ export const RANK_KANJI_CHAR: Record<RankId, string> = {
  * 生き甲斐 as FOUR SEPARATE outlines, for setting on a curve.
  *
  * `ikigai-motif.ts` already carries these glyphs, but as one concatenated
- * path on a straight baseline — right for the share backdrop, useless for the
+ * path on a straight baseline, right for the share backdrop, useless for the
  * pin, where each glyph needs its own position AND its own rotation around the
  * ring. Splitting them is the only way to set the phrase on an arc.
  *
  * WHY NOT <text> ON A textPath. That was the first cut, and it was wrong: the
  * ring is Marcellus, whose only subsets are latin and latin-ext. It has no CJK
  * at all, so the phrase rendered purely on whatever Japanese face the device
- * happened to have installed — correct on a Mac, tofu on a Windows machine
+ * happened to have installed, correct on a Mac, tofu on a Windows machine
  * without the JP language pack. A badge people post publicly is the last place
  * to leave that to chance.
  *

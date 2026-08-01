@@ -1,11 +1,10 @@
 # Ikigaro
 
-The Ikigaro health app — lab-report understanding, daily check-ins, and an
+The Ikigaro health app, lab-report understanding, daily check-ins, and an
 iki-points reward economy. Live at **app.ikigaro.com** (private beta), with the
 admin console at **admin.ikigaro.com**.
 
-> **New to this codebase?** Read [`docs/HANDOVER.md`](./docs/HANDOVER.md) first —
-> it's the orientation guide, and it links everything else in the right order.
+> **New to this codebase?** Read [`docs/HANDOVER.md`](./docs/HANDOVER.md) first, > it's the orientation guide, and it links everything else in the right order.
 
 Built with Next.js 16 (App Router), deployed to Cloudflare Workers via
 [OpenNext](https://opennext.js.org/cloudflare), on Supabase Postgres with Privy
@@ -13,7 +12,7 @@ email-OTP auth. The marketing site (`www.ikigaro.com`) is a separate repo,
 `meetajinkyaj/ikigaro-os`.
 
 > ⚠️ **This is Next.js 16**, which differs from most documentation and training
-> data — `middleware` is renamed `proxy`, among other breaking changes. Read
+> data, `middleware` is renamed `proxy`, among other breaking changes. Read
 > `node_modules/next/dist/docs/` before writing App Router code. See
 > [`AGENTS.md`](./AGENTS.md).
 
@@ -37,7 +36,7 @@ npm test             # vitest unit tests (162)
 npm run e2e          # playwright end-to-end, against a local build
 npm run e2e:staging  # playwright against the deployed staging app (what CI runs)
 
-npm run cf:build     # OpenNext/Workers build — catches Workers-only failures
+npm run cf:build     # OpenNext/Workers build, catches Workers-only failures
 npm run cf:preview   # build + run the worker locally in workerd
 npm run cf:deploy    # build + deploy to Cloudflare (CI does this; rarely manual)
 
@@ -53,13 +52,13 @@ node --env-file=.env.local scripts/test-supabase.mjs   # check Supabase connecti
 npm run lint && npx tsc --noEmit && npm test && npm run build && npm run cf:build
 ```
 
-`cf:build` is not redundant — code can build under Next and still fail on
+`cf:build` is not redundant, code can build under Next and still fail on
 Workers (typically by reaching for a Node runtime API).
 
 ## Environment variables
 
 Set in `.env.local` for development. In production these live in three separate
-stores — see [`docs/RUNBOOK.md`](./docs/RUNBOOK.md) §3, which explains which one
+stores, see [`docs/RUNBOOK.md`](./docs/RUNBOOK.md) §3, which explains which one
 each value belongs in and why putting it in the wrong one breaks things.
 
 | Variable | Scope | Purpose |
@@ -68,14 +67,14 @@ each value belongs in and why putting it in the wrong one breaks things.
 | `PRIVY_APP_SECRET` | server (secret) | Privy app secret |
 | `NEXT_PUBLIC_SUPABASE_URL` | client | Supabase project URL (public) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | client | Supabase anon key (public; RLS enforced) |
-| `SUPABASE_SERVICE_ROLE_KEY` | server (secret) | Bypasses RLS — server-only, never client |
+| `SUPABASE_SERVICE_ROLE_KEY` | server (secret) | Bypasses RLS, server-only, never client |
 | `ANTHROPIC_API_KEY` | server (secret) | Lab-report extraction |
 | `CRON_SECRET` | server (secret) | Authenticates the reminders cron caller |
 
 **Why some public values are hardcoded:** `NEXT_PUBLIC_*` variables are inlined
 at build time, and a missing one in CI ships a white screen (this happened). The
 Supabase URL, Privy app ID, and VAPID public key therefore have committed
-defaults in `src/lib/` — each is a public value, and each is env-overridable.
+defaults in `src/lib/`, each is a public value, and each is env-overridable.
 This is deliberate.
 
 ---
@@ -90,18 +89,18 @@ hand-rolled with `crypto.subtle` rather than using `jose` or
 not run on Cloudflare Workers.
 
 **Beta gate.** New signups land waitlisted. `resolveApprovedUserId`
-(`src/lib/app-user.ts`) is the single choke point — a waitlisted user resolves to
+(`src/lib/app-user.ts`) is the single choke point, a waitlisted user resolves to
 no user at every data route, so they can't read or write anything until an admin
 approves them.
 
 **Database.** Supabase Postgres; schema in `supabase/migrations/`. Every table
-has RLS enabled with **no policies** — all access goes through the server with
+has RLS enabled with **no policies**, all access goes through the server with
 the service-role key.
 
 **Extraction.** The model transcribes numbers off the lab PDF onto a ~83-marker
 catalog; `src/lib/biomarkers.ts` then deterministically recomputes every flag,
 band, and derived marker. **The model never decides clinical meaning.** The user
-confirms extracted values before anything is saved — that human step is the
+confirms extracted values before anything is saved, that human step is the
 accuracy guard.
 
 **Hosting.** Cloudflare Workers via OpenNext (`wrangler.jsonc`,
@@ -113,7 +112,7 @@ deploys.
 | Area | File |
 |---|---|
 | Interpretation engine (flags, bands, units, derived markers) | `src/lib/biomarkers.ts` |
-| Points economy — the only place values live | `src/lib/points.ts` |
+| Points economy, the only place values live | `src/lib/points.ts` |
 | Extraction prompt + Anthropic client | `src/lib/extraction.ts`, `src/lib/anthropic.ts` |
 | Beta gate / admin auth | `src/lib/app-user.ts`, `src/lib/admin-auth.ts` |
 | Trends · Future You · analytics · reminders · referrals | `src/lib/trends.ts`, `future.ts`, `analytics.ts`, `reminders.ts`, `referral.ts` |
@@ -128,7 +127,7 @@ A fuller map is in [`docs/PROJECT_STATUS.md`](./docs/PROJECT_STATUS.md) §6.
 ## Database migrations
 
 Apply `supabase/migrations/*.sql` in filename order via the Supabase SQL editor
-or CLI. All are idempotent — safe to re-run.
+or CLI. All are idempotent, safe to re-run.
 
 | Migration | What it adds |
 |---|---|
@@ -163,7 +162,7 @@ or CLI. All are idempotent — safe to re-run.
 > **Clinical safety:** reference ranges seeded into `biomarker_catalog` are
 > common, unvalidated adult intervals used to bootstrap the schema (every row is
 > flagged `is_validated = false`). They must be reviewed by a qualified
-> professional — and localized per partner lab — before any use beyond
+> professional, and localized per partner lab, before any use beyond
 > educational. See [`docs/REFERENCE_DATA.md`](./docs/REFERENCE_DATA.md).
 
 ---
@@ -186,4 +185,4 @@ or CLI. All are idempotent — safe to re-run.
 | [`docs/WEARABLE_DATA.md`](./docs/WEARABLE_DATA.md) | How several devices are merged into one series, and why we never average |
 | [`docs/EMAIL.md`](./docs/EMAIL.md) | Resend setup, the access-granted email, and how "send exactly once" is enforced |
 | [`docs/cowork/CURRENT.md`](./docs/cowork/CURRENT.md) | The single live Cowork task list, plus a ledger of what has already been applied |
-| [`AGENTS.md`](./AGENTS.md) | Next.js 16 conventions — read before writing App Router code |
+| [`AGENTS.md`](./AGENTS.md) | Next.js 16 conventions, read before writing App Router code |

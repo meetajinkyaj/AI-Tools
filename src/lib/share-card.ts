@@ -6,7 +6,7 @@
  * the user's photo NEVER leaves their device (we upload nothing), and there is
  * no image-generation service to run or pay for.
  *
- * WHAT GOES ON THE CARD is user-controlled — see `ShareFields`. Energy and
+ * WHAT GOES ON THE CARD is user-controlled, see `ShareFields`. Energy and
  * sleep are supported but default to OFF: someone posting to Instagram has not
  * consented to publish how they slept, and a share sheet is exactly where an
  * accidental disclosure becomes permanent. Streak, training and points are the
@@ -44,7 +44,7 @@ export type FormatId = "story" | "post" | "square";
 
 /**
  * `where` names the platforms each ratio is actually right for. Nobody thinks
- * in aspect ratios — they think "I want to put this on my story", and being
+ * in aspect ratios, they think "I want to put this on my story", and being
  * made to guess which of 9:16 / 4:5 / 1:1 means that is friction at the exact
  * moment we are asking someone to post.
  */
@@ -95,15 +95,15 @@ export interface ShareCardInput {
   activities: string[];
   /**
    * The same activities as internal type keys, e.g. ["running", "gym"]. Used
-   * only to pick which tonal backdrop the picker opens on — never rendered, so
+   * only to pick which tonal backdrop the picker opens on, never rendered, so
    * that the card can't leak an internal identifier onto someone's timeline.
    */
   exerciseTypes: string[];
-  /** 1–5, or null if not recorded. */
+  /** 1-5, or null if not recorded. */
   energy: number | null;
   /** Hours, or null. */
   sleepHours: number | null;
-  /** Personal invite code — the growth loop; empty string hides the line. */
+  /** Personal invite code, the growth loop; empty string hides the line. */
   inviteCode: string;
   date: Date;
 }
@@ -128,12 +128,12 @@ export function shortDate(date: Date): string {
 }
 
 export function energyLabel(energy: number | null): string {
-  if (energy === null) return "—";
+  if (energy === null) return "-";
   return `${energy} of 5`;
 }
 
 export function sleepLabel(hours: number | null): string {
-  if (hours === null) return "—";
+  if (hours === null) return "-";
   // One decimal only when it isn't a whole number: "7h", "7.5h".
   const rounded = Math.round(hours * 10) / 10;
   return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}h`;
@@ -150,8 +150,7 @@ export interface StatTile {
   /**
    * True when the value is a figure rather than prose.
    *
-   * Cormorant Garamond ships OLD-STYLE figures — "1" renders as a Roman "I" —
-   * so numbers are set in Marcellus instead, which has lining figures. Deciding
+   * Cormorant Garamond ships OLD-STYLE figures, "1" renders as a Roman "I", * so numbers are set in Marcellus instead, which has lining figures. Deciding
    * this per FIELD rather than by sniffing for digits matters: "Walking /
    * Zone 2" contains a digit but is prose and belongs in the serif.
    */
@@ -188,14 +187,14 @@ export function statTiles(input: ShareCardInput, fields: ShareFields): StatTile[
 /* ------------------------- the closed-beta switch ------------------------ */
 
 /**
- * OFF DURING CLOSED BETA — TURN BACK ON AT ~20 TESTERS.
+ * OFF DURING CLOSED BETA. TURN BACK ON AT ~20 TESTERS.
  *
  * Access is invite-only right now, so a card advertising a join link points
  * strangers at a door that will not open: they would sign up, land on the
  * waitlist screen, and go away with that as their first impression of the
  * product. Better to spend that interest when it can actually be served.
  *
- * Nothing about the growth loop is deleted — `referralLink()`, code
+ * Nothing about the growth loop is deleted, `referralLink()`, code
  * generation, attribution and the milestone rewards all still work, and the
  * invite code remains visible inside the app for anyone who wants to pass it
  * on deliberately. This flag only governs what a *shared image* broadcasts.
@@ -208,7 +207,7 @@ export function statTiles(input: ShareCardInput, fields: ShareFields): StatTile[
 export const INVITE_LINK_ON_SHARED_CARDS = false;
 
 /**
- * Bottom-right of the card — the reason sharing is worth building, when it is
+ * Bottom-right of the card, the reason sharing is worth building, when it is
  * switched on. Empty string means "draw nothing", which is the closed-beta
  * state; the wordmark in the masthead still identifies the card as Ikigaro.
  *
@@ -217,8 +216,7 @@ export const INVITE_LINK_ON_SHARED_CARDS = false;
  * `ikigaro.com/join · CODE`, a URL that does not exist and 404s: anyone who
  * typed it in landed nowhere, and the referral never attributed.
  *
- * The scheme is dropped for legibility, but nothing else is reformatted —
- * see the renderer for why the case matters.
+ * The scheme is dropped for legibility, but nothing else is reformatted, * see the renderer for why the case matters.
  */
 const HOST_PREFIX = "https://";
 const APP_HOST = "app.ikigaro.com";
@@ -237,7 +235,7 @@ export function inviteLine(inviteCode: string): string {
  * `text` of a share, and the image-first ones (Instagram in particular) drop
  * it. WhatsApp, Telegram, X, LinkedIn, Slack and email all keep it, which is
  * where a link is worth the most anyway. The card still carries the printed
- * link for everywhere else — this is an upgrade, not a replacement.
+ * link for everywhere else, this is an upgrade, not a replacement.
  */
 export function shareCaption(input: ShareCardInput): string {
   const streak =
@@ -265,7 +263,7 @@ export function shareFileName(date: Date, template: TemplateId): string {
 /* ------------------------- Ledger's week strip --------------------------- */
 
 export interface WeekDay {
-  /** Single-letter weekday initial, Monday-agnostic — derived from the date. */
+  /** Single-letter weekday initial, Monday-agnostic, derived from the date. */
   initial: string;
   /** True when we know the user checked in that day. */
   filled: boolean;

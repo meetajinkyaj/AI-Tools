@@ -1,7 +1,7 @@
 import "server-only";
 
 /**
- * Minimal Anthropic Messages API client — a thin `fetch` wrapper, no SDK, so it
+ * Minimal Anthropic Messages API client, a thin `fetch` wrapper, no SDK, so it
  * runs on Cloudflare Workers without Node built-ins (same reasoning as our
  * hand-rolled Privy verification). Used to read biomarker values off a lab PDF.
  *
@@ -25,7 +25,7 @@ const REQUEST_TIMEOUT_MS = 55_000;
 
 export class AnthropicError extends Error {}
 export class AnthropicNotConfiguredError extends AnthropicError {}
-/** Transient failures (429/500/529, network) — caller may tell the user to retry. */
+/** Transient failures (429/500/529, network), caller may tell the user to retry. */
 export class AnthropicOverloadedError extends AnthropicError {}
 
 function isRetryableStatus(status: number): boolean {
@@ -81,8 +81,8 @@ export async function extractMarkers(params: {
     stream: true,
     // Extraction is transcription, not reasoning. On models where thinking is
     // on by default (e.g. Sonnet 5 runs adaptive thinking when `thinking` is
-    // omitted), the model would spend many seconds — and much of the output
-    // budget — "thinking" over a ~18k-token report before emitting a value,
+    // omitted), the model would spend many seconds, and much of the output
+    // budget, "thinking" over a ~18k-token report before emitting a value,
     // which pushed the call past our timeout. Turn it off for a fast, direct read.
     thinking: { type: "disabled" },
     messages: [{ role: "user", content }],
@@ -123,13 +123,13 @@ async function streamOnce(apiKey: string, body: string): Promise<string> {
     });
   } catch (err) {
     clearTimeout(timer);
-    // A timeout abort won't get faster on retry — surface it directly.
+    // A timeout abort won't get faster on retry, surface it directly.
     if (controller.signal.aborted) {
       throw new AnthropicError(
         `Anthropic request timed out after ${REQUEST_TIMEOUT_MS}ms`,
       );
     }
-    // Other network failures are transient — allow one retry.
+    // Other network failures are transient, allow one retry.
     throw new AnthropicOverloadedError(
       `Anthropic request did not complete: ${err instanceof Error ? err.message : String(err)}`,
     );

@@ -4,12 +4,12 @@
 -- nothing else. The person finds out by opening the app and noticing it works,
 -- which means the gap between "approved" and "actually using it" is however
 -- long it takes them to wander back. The waitlist screen even promises "when
--- your access opens, this screen becomes the app" — true only if they happen to
+-- your access opens, this screen becomes the app", true only if they happen to
 -- be looking at it.
 --
 -- WHY A COLUMN AND NOT JUST SENDING. Sending is easy; sending exactly once is
 -- the hard part. Without a record, any retry, double-click on Approve, or
--- re-run of an admin action mails the same person again — and the one email we
+-- re-run of an admin action mails the same person again, and the one email we
 -- send in this product's entire life should not arrive twice.
 --
 -- WHY IT IS NULLABLE AND CLEARED ON RE-WAITLIST. A user who is put back on the

@@ -5,7 +5,7 @@ import type { ProviderId } from "./types";
  * Merging several devices into one series per metric.
  *
  * A user can connect every provider at once, and many will connect two or three
- * — a ring for sleep, a watch for training, a scale for weight. So on any given
+ *, a ring for sleep, a watch for training, a scale for weight. So on any given
  * day the same metric can arrive from several sources at once, and something
  * has to decide what "your sleep on the 4th" actually is.
  *
@@ -17,8 +17,8 @@ import type { ProviderId } from "./types";
  *
  * WHAT WE DO INSTEAD: pick one source per metric per day, by a ranked
  * preference, falling back down the list whenever the preferred device has
- * nothing for that day. The win from multiple devices is COVERAGE — filling the
- * nights the ring was charging — not consensus.
+ * nothing for that day. The win from multiple devices is COVERAGE, filling the
+ * nights the ring was charging, not consensus.
  *
  * Every merged point carries the source it came from, so the UI can say where
  * a number is from and a user can reconcile it against the vendor's own app.
@@ -118,7 +118,7 @@ function rankOf(metric: MetricKey, provider: string): number {
  * Postgres `numeric` arrives as a STRING over PostgREST.
  *
  * Comparing or charting it without parsing gives lexical ordering and NaN
- * arithmetic — "9" > "10" — which is the kind of bug that looks like bad data
+ * arithmetic, "9" > "10", which is the kind of bug that looks like bad data
  * rather than bad code.
  */
 function toNumber(v: number | string): number | null {
@@ -174,7 +174,7 @@ export function mergeMetrics(rows: MetricRow[]): MergedSeries[] {
     });
   }
 
-  // Stable, vocabulary order — so the same metrics appear in the same place
+  // Stable, vocabulary order, so the same metrics appear in the same place
   // every time rather than shuffling with whatever synced last.
   const order = Object.keys(METRICS) as MetricKey[];
   return out.sort((a, b) => order.indexOf(a.metric) - order.indexOf(b.metric));
@@ -195,7 +195,7 @@ export function recentAverage(series: MergedSeries | undefined, days: number): n
  * MEASURED BEATS REMEMBERED. Habit momentum currently uses the sleep hours a
  * user types into their check-in, which is an estimate made after the fact by
  * someone who was asleep for it. When a device is connected we have the real
- * thing, so it takes precedence — and returning null when no device has
+ * thing, so it takes precedence, and returning null when no device has
  * reported keeps the self-reported path untouched for everyone else.
  */
 export function measuredSleepHours(

@@ -14,7 +14,7 @@ import {
 } from "@/lib/trends";
 
 /**
- * Doctor-ready summary for the authenticated user's self profile — everything
+ * Doctor-ready summary for the authenticated user's self profile, everything
  * the one-page PDF needs: who, the latest panel's out-of-range markers, movement
  * since baseline, and lifestyle context (check-ins + logged interventions).
  *
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       .eq("id", profileId)
       .maybeSingle();
 
-    // Panels (distinct time points) — most recent save per test date.
+    // Panels (distinct time points), most recent save per test date.
     const { data: panels } = await supabase
       .from("biomarker_panels")
       .select("id, test_date, lab_name, created_at")
@@ -138,7 +138,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       profile: {
-        name: profile?.display_name || profile?.full_name || "—",
+        name: profile?.display_name || profile?.full_name || "-",
         dob: profile?.date_of_birth ?? null,
         sex: profile?.biological_sex ?? null,
       },

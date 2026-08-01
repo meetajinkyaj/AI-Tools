@@ -1,5 +1,5 @@
 /**
- * Canvas rendering for the share card — Stone and Ledger, per the Claude
+ * Canvas rendering for the share card. Stone and Ledger, per the Claude
  * Design spec.
  *
  * Layout is expressed as three blocks (masthead / hero / footer) laid out with
@@ -61,13 +61,13 @@ interface Ctx {
   rule: string;
   /**
    * True when a tonal backdrop is the ground. The backdrops are warm and
-   * mid-dark by construction, which changes what can be drawn on them — see
+   * mid-dark by construction, which changes what can be drawn on them, see
    * the accent and week-strip choices below.
    */
   onBackdrop: boolean;
 }
 
-/** The wordmark, drawn rather than loaded — no asset to ship or 404. */
+/** The wordmark, drawn rather than loaded, no asset to ship or 404. */
 function drawWordmark(c: Ctx, x: number, baseline: number, size: number) {
   const { ctx } = c;
   ctx.font = `500 ${size}px ${c.display}`;
@@ -135,7 +135,7 @@ function drawFooter(c: Ctx, input: ShareCardInput, pad: number) {
     ctx.fillText("生き甲斐", pad, y);
   }
 
-  // Empty during the closed beta — see INVITE_LINK_ON_SHARED_CARDS. Drawing
+  // Empty during the closed beta, see INVITE_LINK_ON_SHARED_CARDS. Drawing
   // an empty string is harmless but pointless, and the guard makes the absence
   // deliberate rather than incidental.
   const invite = inviteLine(input.inviteCode);
@@ -147,7 +147,7 @@ function drawFooter(c: Ctx, input: ShareCardInput, pad: number) {
   // code itself is already uppercase by construction (`cleanReferralInput`),
   // so the line still reads as intended.
   //
-  // Set in `muted` rather than `faint` — one step up from the quietest tone on
+  // Set in `muted` rather than `faint`, one step up from the quietest tone on
   // the card. It shares the bottom-right corner with the backdrop motif, and
   // this is the one line someone has to be able to read and type: a link they
   // cannot make out is the same as no link.
@@ -254,7 +254,7 @@ function drawStone(c: Ctx, input: ShareCardInput, fields: ShareFields) {
   const heroBottom = Math.min(c.h - pad - footerBlockH, c.h * 0.66);
 
   if (fields.streak) {
-    // Marcellus, not the display serif — see StatTile.numeric for why.
+    // Marcellus, not the display serif, see StatTile.numeric for why.
     const numSize = fitFontSize(
       (size) => {
         ctx.font = `400 ${size}px ${c.label}`;
@@ -346,7 +346,7 @@ function drawLedger(c: Ctx, input: ShareCardInput, fields: ShareFields) {
   /* hero: streak number with a label stack beside it */
   let y = pad + 200 * c.k;
   if (fields.streak) {
-    // Marcellus, not the display serif — see StatTile.numeric for why.
+    // Marcellus, not the display serif, see StatTile.numeric for why.
     const numSize = fitFontSize(
       (size) => {
         ctx.font = `400 ${size}px ${c.label}`;
@@ -394,11 +394,11 @@ function drawLedger(c: Ctx, input: ShareCardInput, fields: ShareFields) {
     const barY = stripTop + 30 * c.k;
 
     // Terracotta bars read strongly on Ledger's own brown, and vanish into a
-    // warm backdrop (1.4–1.9:1 on Movement and Stillness). There the fill goes
+    // warm backdrop (1.4-1.9:1 on Movement and Stillness). There the fill goes
     // linen and today keeps Clay Ember, which now separates from its
     // neighbours by hue rather than fighting the ground for it.
     // Held at just over half strength on purpose. Solid linen reads as seven
-    // blank placeholders rather than a filled week — what has to carry is the
+    // blank placeholders rather than a filled week, what has to carry is the
     // difference between a filled bar and an empty one, not the bar's own
     // weight against the ground.
     const filledBar = c.onBackdrop ? "rgba(251,249,245,0.55)" : PALETTE.terracotta;
@@ -508,7 +508,7 @@ export async function drawShareCard(
   canvas.width = width;
   canvas.height = height;
 
-  // A photo wins if both are somehow set — the user picked it more recently
+  // A photo wins if both are somehow set, the user picked it more recently
   // and it is the more specific intent.
   const ground = photo ? "photo" : backdrop ? "backdrop" : "flat";
   const dark = template === "ledger" || ground !== "flat";
@@ -526,8 +526,8 @@ export async function drawShareCard(
     faint: dark ? "rgba(251,249,245,0.5)" : PALETTE.stoneFaint,
     // A warm accent on a warm ground disappears. Measured against the six
     // backdrops at the positions the accent actually occupies, Clay scores
-    // 1.38:1 on Stillness and 1.55:1 on Movement — invisible. Clay Ember only
-    // reaches 2.4–2.7:1 there, still under the 3:1 floor, and nothing else in
+    // 1.38:1 on Stillness and 1.55:1 on Movement, invisible. Clay Ember only
+    // reaches 2.4-2.7:1 there, still under the 3:1 floor, and nothing else in
     // the palette is both warm and light enough. So on a backdrop the accent
     // gives way to linen (4.6:1 at worst) rather than being tuned. Photos keep
     // Clay: their scrim runs at full strength, which leaves it the headroom a
@@ -557,7 +557,7 @@ export async function drawShareCard(
     drawBackdrop(ctx, backdrop, width, height);
     // The spec keeps the card's existing scrim over a backdrop, but at full
     // strength it flattens all six into the same near-black and the point of
-    // having six is lost. They are already dark by construction — a photo
+    // having six is lost. They are already dark by construction, a photo
     // scrim exists to survive an arbitrary bright upload, which is not a
     // problem a known palette has. A third of it is enough to seat the type.
     drawScrim(ctx, width, height, 0.34);

@@ -4,7 +4,7 @@ import "server-only";
  * Sending mail, via Resend's HTTP API.
  *
  * HTTP rather than SMTP because this runs on a Cloudflare Worker, which has no
- * TCP sockets — `nodemailer` and every SMTP library cannot run here at all.
+ * TCP sockets, `nodemailer` and every SMTP library cannot run here at all.
  * Resend's REST endpoint is a plain `fetch`, which is the whole integration.
  *
  * FAILING SOFT IS THE POINT. Every caller is doing something else that matters
@@ -13,7 +13,7 @@ import "server-only";
  * and no caller is allowed to make its own success conditional on ours.
  *
  * NOT CONFIGURED IS NOT AN ERROR. Before the domain is verified there is no
- * API key, and the app must run exactly as it does today — approvals work,
+ * API key, and the app must run exactly as it does today, approvals work,
  * nothing is sent, nothing is logged as broken. `emailConfigured()` is the
  * switch, and it is off by default.
  */
@@ -25,7 +25,7 @@ const RESEND_ENDPOINT = "https://api.resend.com/emails";
  *
  * `team@ikigaro.com` is a real Hostinger mailbox, which is the part that
  * matters: the message tells the reader to reply to it. Because this address
- * receives, no separate `EMAIL_REPLY_TO` is needed — replies go to `From` by
+ * receives, no separate `EMAIL_REPLY_TO` is needed, replies go to `From` by
  * default. Overriding this with an address nobody reads would quietly turn
  * "just reply to this email" into a lie.
  */

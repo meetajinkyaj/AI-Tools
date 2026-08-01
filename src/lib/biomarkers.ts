@@ -89,7 +89,7 @@ export function isQualitative(entry: CatalogEntry): boolean {
   return entry.result_kind === "qualitative";
 }
 
-/** One entered marker value — numeric or qualitative, with an optional range override. */
+/** One entered marker value, numeric or qualitative, with an optional range override. */
 export interface ReadingInput {
   marker_key: string;
   value: number | null;
@@ -304,20 +304,20 @@ function round(n: number, dp = 0): number {
 
 /**
  * Some labs (e.g. FITTR) report cell counts in raw cells/µL, but our catalog's
- * canonical unit is a scaled unit — 10^3/µL for WBC & platelets, million/µL for
- * RBC. Left as-is, a WBC of 6870 gets compared to a 3.4–10.8 range and flags
+ * canonical unit is a scaled unit, 10^3/µL for WBC & platelets, million/µL for
+ * RBC. Left as-is, a WBC of 6870 gets compared to a 3.4-10.8 range and flags
  * "high" when it's actually normal (6.87). When a value's magnitude clearly
  * indicates the raw-count unit, scale it to the catalog unit.
  *
  * `threshold` sits well above any plausible canonical value and well below any
- * raw-count value, so the mapping is unambiguous and idempotent — an
+ * raw-count value, so the mapping is unambiguous and idempotent, an
  * already-canonical value passes through untouched. To support another marker,
  * add a row here (see docs/REFERENCE_DATA.md).
  */
 const COUNT_SCALES: Record<string, { factor: number; threshold: number }> = {
-  wbc: { factor: 1000, threshold: 200 }, // canonical ~3–11, raw ~4000–11000
-  platelets: { factor: 1000, threshold: 3000 }, // canonical ~150–450, raw ~150000+
-  rbc: { factor: 1_000_000, threshold: 100 }, // canonical ~4–6, raw ~4.7M
+  wbc: { factor: 1000, threshold: 200 }, // canonical ~3-11, raw ~4000-11000
+  platelets: { factor: 1000, threshold: 3000 }, // canonical ~150-450, raw ~150000+
+  rbc: { factor: 1_000_000, threshold: 100 }, // canonical ~4-6, raw ~4.7M
 };
 
 /** Scale a raw cell-count value to the catalog's canonical unit when needed. */

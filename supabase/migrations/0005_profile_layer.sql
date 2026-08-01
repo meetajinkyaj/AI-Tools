@@ -1,10 +1,10 @@
--- 0005: Profile layer — the family-vault foundation.
+-- 0005: Profile layer, the family-vault foundation.
 --
 -- Health data has always hung off `user_id`. This migration inserts a Profile
 -- BETWEEN the user and all health data: a user can have multiple profiles
 -- (self, parent, spouse, child…), and every panel / reading / check-in / points
 -- row now also carries `profile_id`. The multi-profile UI ships later, but doing
--- the schema now — while data is tiny — avoids a painful backfill migration on
+-- the schema now, while data is tiny, avoids a painful backfill migration on
 -- production data. `user_id` is kept alongside `profile_id` (account-level
 -- ownership + auth checks); `profile_id` is the health-ownership axis.
 --

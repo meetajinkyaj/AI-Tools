@@ -17,7 +17,7 @@ import { ReauthRequired, type OAuthTokens, type ProviderId, type WearableProvide
  *     and not a nicety: miss it and the connection keeps working until the
  *     access token expires, then dies permanently, hours later, with nothing in
  *     the logs tying the failure to the cause. The write-back below is
- *     unconditional for exactly that reason — we never reason about whether
+ *     unconditional for exactly that reason, we never reason about whether
  *     *this* vendor rotates.
  *
  *   - PERSIST BEFORE USE. The new tokens are written before the data call is
@@ -32,7 +32,7 @@ import { ReauthRequired, type OAuthTokens, type ProviderId, type WearableProvide
  */
 
 const MAX_FAILURES = 5;
-/** Refresh a little early — a token that expires mid-request is a failed sync. */
+/** Refresh a little early, a token that expires mid-request is a failed sync. */
 const EXPIRY_SKEW_SECONDS = 120;
 
 export interface ConnectionRow {
@@ -85,7 +85,7 @@ export async function requestTokens(
   const res = await fetch(p.tokenUrl, { method: "POST", headers, body });
   const text = await res.text();
   if (!res.ok) {
-    // A refresh rejected with 4xx means the grant is gone — the user revoked
+    // A refresh rejected with 4xx means the grant is gone, the user revoked
     // access at the vendor, or a rotated token was lost. Either way only
     // re-consent fixes it, so say so rather than retrying forever.
     if (res.status >= 400 && res.status < 500) {
@@ -133,7 +133,7 @@ export async function persistTokens(
     ...extra,
   };
   // Only overwrite the refresh token when the vendor actually sent one. Some
-  // return it on every refresh (rotation), some only at first grant — blanking
+  // return it on every refresh (rotation), some only at first grant, blanking
   // it in the second case would destroy the connection.
   if (tokens.refreshToken) {
     patch.refresh_token_enc = await encryptToken(tokens.refreshToken);
@@ -172,7 +172,7 @@ async function accessTokenFor(conn: ConnectionRow): Promise<string> {
   });
 
   // Persisted BEFORE the token is used. If the caller's data fetch then fails,
-  // the rotated refresh token is already banked — the other order silently
+  // the rotated refresh token is already banked, the other order silently
   // throws away a valid credential every time a vendor has a bad minute.
   await persistTokens(conn.id, tokens);
   return tokens.accessToken;
@@ -184,7 +184,7 @@ async function accessTokenFor(conn: ConnectionRow): Promise<string> {
  * Upsert a batch of normalized metrics.
  *
  * Conflict target is (user, provider, date, metric), so re-syncing a window
- * corrects rather than duplicates — which is what makes the nightly overlapping
+ * corrects rather than duplicates, which is what makes the nightly overlapping
  * window safe, and what lets a vendor revise last night's sleep score without
  * leaving us holding both answers.
  */
@@ -240,7 +240,7 @@ export async function syncConnection(conn: ConnectionRow): Promise<SyncResult> {
   const provider = PROVIDERS[conn.provider];
   const supabase = createSupabaseAdmin();
 
-  // Garmin is push-only — there is no endpoint to poll. Skipping is correct,
+  // Garmin is push-only, there is no endpoint to poll. Skipping is correct,
   // not a failure, so it must not touch the failure counter.
   if (!provider.fetchRange) {
     return { provider: conn.provider, stored: 0, status: "skipped" };
@@ -275,7 +275,7 @@ export async function syncConnection(conn: ConnectionRow): Promise<SyncResult> {
     const message = err instanceof Error ? err.message : String(err);
 
     if (err instanceof ReauthRequired) {
-      // The user has to act. Mark it and stop trying — repeated calls with a
+      // The user has to act. Mark it and stop trying, repeated calls with a
       // dead grant are how you get rate limited by a vendor for nothing.
       await supabase
         .from("wearable_connections")
@@ -323,7 +323,7 @@ export async function syncUser(userId: string): Promise<SyncResult[]> {
  * Bounded per run rather than "everything", so one run cannot exceed the
  * Worker's CPU budget as the user count grows. Ordering by `last_sync_at`
  * ascending with nulls first means new connections sync immediately and nobody
- * can be starved — the longest-waiting is always next.
+ * can be starved, the longest-waiting is always next.
  */
 export async function syncDue(limit = 50): Promise<SyncResult[]> {
   const supabase = createSupabaseAdmin();

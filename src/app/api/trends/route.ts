@@ -61,7 +61,7 @@ export async function GET(request: Request) {
       .limit(MAX_PANELS);
 
     // A trend needs two distinct time points, not two panel rows. Re-uploading
-    // the same report (same test date) is one point in time — collapse duplicate
+    // the same report (same test date) is one point in time, collapse duplicate
     // dates to the most recent save so a repeated upload doesn't look like change.
     type PanelRow = { id: string; test_date: string | null; created_at: string };
     const dateKey = (p: PanelRow) => (p.test_date ?? p.created_at).slice(0, 10);

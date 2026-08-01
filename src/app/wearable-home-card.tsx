@@ -10,13 +10,13 @@ import { Card, Eyebrow } from "./ui";
  * WHY IT IS HERE AS WELL AS IN SETTINGS. These are two different jobs and only
  * one of them belongs in Settings. Connecting a device is a thing you do once,
  * and nobody browses Settings looking for a feature they do not yet know
- * exists — so discovery has to live where people already are, which is Home.
+ * exists, so discovery has to live where people already are, which is Home.
  * Managing connections afterwards (which are on, when they last synced,
  * disconnecting one) is a thing you go looking for, and that is exactly what
  * Settings is for.
  *
  * So: the pitch is here, the controls are there. The full provider list is NOT
- * duplicated — this card links across rather than repeating it, because two
+ * duplicated, this card links across rather than repeating it, because two
  * copies of the same list is two things to keep in step.
  *
  * It disappears the moment anything is connected. A prompt to do something you
@@ -67,7 +67,7 @@ export function WearableHomeCard({
   }, [load]);
 
   if (!data || dismissed) return null;
-  // Already syncing something — the pitch is done, get it off the screen.
+  // Already syncing something, the pitch is done, get it off the screen.
   if (data.connections.length > 0) return null;
 
   const live = data.available.length;

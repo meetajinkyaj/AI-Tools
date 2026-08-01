@@ -39,7 +39,7 @@ export const EXERCISE_TYPE_LABELS: Record<ExerciseType, string> = {
   boxing: "Boxing / Martial arts",
 };
 
-/** Training-stimulus category per type — consumed by the Future You model. */
+/** Training-stimulus category per type, consumed by the Future You model. */
 export const EXERCISE_CATEGORY: Record<ExerciseType, string> = {
   walking: "low_cardio",
   running: "cardio",
@@ -70,7 +70,7 @@ export const DURATION_LABELS: Record<DurationBucket, string> = {
 
 export const DURATION_HINTS: Record<DurationBucket, string> = {
   short: "<30m",
-  medium: "30–60m",
+  medium: "30-60m",
   long: "60m+",
 };
 

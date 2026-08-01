@@ -1,19 +1,18 @@
 /**
- * 生き甲斐 ("ikigai") — the motif that sits behind every tonal share backdrop,
+ * 生き甲斐 ("ikigai"), the motif that sits behind every tonal share backdrop,
  * as vector outlines rather than text.
  *
  * WHY NOT A FONT. The design spec calls for Noto Sans JP and warns that the
  * canvas silently draws tofu if the face has not resolved. Both ways of
  * honouring that are bad here: `next/font/google` offers no Japanese subset
  * for this family (only cyrillic/latin/latin-ext/vietnamese), so it would
- * self-host the entire CJK family — megabytes — for four glyphs; and fetching
+ * self-host the entire CJK family, megabytes, for four glyphs; and fetching
  * a subset from Google Fonts at runtime would put a third-party request in
  * front of every card render, which is the one thing this feature was built to
  * avoid.
  *
  * Four fixed glyphs at one fixed tracking are artwork, not text. As outlines
- * they cost 2.4 kB, need no loading, and render identically on every device —
- * the tofu failure mode stops existing rather than being guarded against.
+ * they cost 2.4 kB, need no loading, and render identically on every device, * the tofu failure mode stops existing rather than being guarded against.
  *
  * PROVENANCE. Noto Sans JP Regular (v56, SIL Open Font License 1.1), from the
  * four-glyph subset Google Fonts serves for
@@ -24,7 +23,7 @@
  * fontTools' SVGPathPen with Transform(1, 0, 0, -1, penX, 0).
  */
 
-/** Design units per em — the path's coordinate space. */
+/** Design units per em, the path's coordinate space. */
 export const MOTIF_UNITS_PER_EM = 1000;
 
 /** Total advance of the four glyphs including inter-glyph tracking, in ems. */

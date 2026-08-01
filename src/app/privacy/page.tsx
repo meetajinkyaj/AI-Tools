@@ -36,7 +36,7 @@ export default function PrivacyPage() {
         </li>
         <li>
           <strong>Profile.</strong> Name, date of birth, biological sex,
-          primary goal, activity level, and — if you choose to add them — known
+          primary goal, activity level, and, if you choose to add them, known
           health conditions, country, and city.
         </li>
         <li>
@@ -63,7 +63,7 @@ export default function PrivacyPage() {
         <li>Provide and personalize the Service, including biomarker reports, progress trends, rewards, and the &ldquo;Future You&rdquo; projection.</li>
         <li>Operate the iki-points rewards program.</li>
         <li>Maintain security, prevent abuse, and debug problems.</li>
-        <li>Communicate with you about the Service, and — only if you opt in — send occasional product updates.</li>
+        <li>Communicate with you about the Service, and, only if you opt in, send occasional product updates.</li>
         <li>Comply with legal obligations and enforce our Terms.</li>
       </ul>
       <p>
@@ -81,7 +81,7 @@ export default function PrivacyPage() {
           Ikigaro is a consumer wellness product, not a healthcare provider or
           insurer, and is generally <strong>not</strong> a HIPAA
           &ldquo;covered entity.&rdquo; HIPAA therefore does not usually govern
-          this data — but consumer-health-privacy laws may.
+          this data, but consumer-health-privacy laws may.
         </li>
         <li>
           Where they apply, we aim to honor consumer health-data laws such as
@@ -107,7 +107,7 @@ export default function PrivacyPage() {
         <li>
           <strong>Redemption partners.</strong> If you redeem iki points, we
           share the minimum needed to fulfill that redemption (for example, to
-          issue a discount code) — never your health data.
+          issue a discount code), never your health data.
         </li>
         <li>
           <strong>Legal &amp; safety.</strong> Where required by law, or to
@@ -124,7 +124,7 @@ export default function PrivacyPage() {
       <p>
         Data is stored in Supabase (Postgres and storage). Every table has
         row-level security enabled with no public policies, so application data
-        is reachable only by our server using a privileged key — never directly
+        is reachable only by our server using a privileged key, never directly
         by the browser or the public. We apply reasonable technical and
         organizational safeguards; however, no method of transmission or storage
         is completely secure.

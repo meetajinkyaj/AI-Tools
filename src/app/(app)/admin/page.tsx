@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 /**
  * The admin console.
  *
- * The host split — app.ikigaro.com/admin → the Cloudflare Access-gated
- * admin.ikigaro.com — is a **config redirect** (`next.config.ts`), not a
+ * The host split, app.ikigaro.com/admin → the Cloudflare Access-gated
+ * admin.ikigaro.com, is a **config redirect** (`next.config.ts`), not a
  * `redirect()` call here. Doing it in the page does not work: this page
  * streams, and in a streaming context Next emits a client-side redirect
  * instruction rather than an HTTP one, so the response is a 200 that only a

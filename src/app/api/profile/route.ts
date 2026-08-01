@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   try {
     const userId = await resolveUserId(privyUserId);
     if (!userId) {
-      // User row not created yet (sync hasn't run) — treat as no profile.
+      // User row not created yet (sync hasn't run), treat as no profile.
       return NextResponse.json({ profile: null });
     }
 

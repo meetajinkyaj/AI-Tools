@@ -11,7 +11,7 @@ import { POINTS, REFERRAL_MAX_TOTAL } from "./points";
  *
  * WHY THIS EXISTS. `docs/FAQ.md` opens by calling itself "the canonical copy"
  * for the points economy. It was not: the Trends screen interpolates its copy
- * from `POINTS` and so is always right, while the FAQ is typed by hand — and it
+ * from `POINTS` and so is always right, while the FAQ is typed by hand, and it
  * sat claiming "250 points at 30 days" for weeks after that value became 150.
  * Nobody noticed, because nothing was checking. A wrong number in user-facing
  * copy about a reward is worse than a missing one.
@@ -74,7 +74,7 @@ describe("the rank ladder in the docs matches the code", () => {
 
   it("never prints the secret rank's name or threshold in user-facing copy", () => {
     // The FAQ is read by users. Naming Grandmaster or its number here would
-    // give away the surprise as completely as leaking it in the UI did — and
+    // give away the surprise as completely as leaking it in the UI did, and
     // that leak already happened once, in the "next rank" line.
     const secret = RANKS.find((r) => r.secret)!;
     expect(secret.id).toBe("grandmaster");

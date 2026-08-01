@@ -5,7 +5,7 @@ import { PUBLIC_APP_ENV } from "@/lib/app-env";
  * mistake staging for the live app (or report a "bug" from the wrong one).
  *
  * Server-rendered from a build-time constant, so there is no hydration mismatch
- * and nothing to load — on production it compiles away to nothing at all.
+ * and nothing to load, on production it compiles away to nothing at all.
  *
  * Deliberately `pointer-events-none`: it must never intercept a tap, and it is
  * intentionally not dismissible.

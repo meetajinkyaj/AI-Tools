@@ -2,13 +2,12 @@ import type { EmailMessage } from "../email";
 import { socialsHtml, socialsText } from "./socials";
 
 /**
- * The "you're in" email — the only mail this product sends today.
+ * The "you're in" email, the only mail this product sends today.
  *
  * IT EXISTS BECAUSE THE WAITLIST SCREEN MAKES A PROMISE. It says "when your
  * access opens, this screen becomes the app", which is only true for someone
  * who happens to be looking at it. Without this email, being approved is a
- * silent event and the person discovers it whenever they next wander back —
- * which for most people is never.
+ * silent event and the person discovers it whenever they next wander back, * which for most people is never.
  *
  * WHAT IT DELIBERATELY DOES NOT DO:
  *
@@ -31,7 +30,7 @@ function appOrigin(): string {
  *
  * The only interpolated value is a user-supplied display name. Someone whose
  * profile name is `<script>` should get an odd-looking email, not a broken one
- * — and mail clients are a genuinely hostile rendering environment.
+ *, and mail clients are a genuinely hostile rendering environment.
  */
 function escapeHtml(s: string): string {
   return s
@@ -61,7 +60,7 @@ export function accessGrantedEmail(opts: {
   const url = appOrigin();
   const socialText = socialsText();
 
-  // Plain text is not a fallback nobody reads — it is what keeps this out of
+  // Plain text is not a fallback nobody reads, it is what keeps this out of
   // spam, and what some clients show by default.
   const text = [
     greeting,
@@ -71,14 +70,14 @@ export function accessGrantedEmail(opts: {
     "A good first few minutes:",
     "",
     "  1. Do your first daily check-in. It takes under a minute and starts your streak.",
-    "  2. Upload a recent blood panel if you have one — that is what Trends and Future You are built on.",
+    "  2. Upload a recent blood panel if you have one. That is what Trends and Future You are built on.",
     "",
     `Open Ikigaro: ${url}`,
     "",
     "We are letting people in a few at a time so everyone gets proper attention.",
     "If something is broken or confusing, just reply to this email.",
     "",
-    "— Ajinkya",
+    "Ajinkya",
     "Ikigaro",
     ...(socialText.length > 0 ? ["", ...socialText] : []),
     "",
@@ -104,7 +103,7 @@ export function accessGrantedEmail(opts: {
       <p style="margin:0 0 8px;font-size:15px;line-height:1.6;">A good first few minutes:</p>
       <ol style="margin:0 0 24px;padding-left:20px;font-size:15px;line-height:1.7;">
         <li>Do your first daily check-in. It takes under a minute and starts your streak.</li>
-        <li>Upload a recent blood panel if you have one &mdash; that&rsquo;s what Trends and Future You are built on.</li>
+        <li>Upload a recent blood panel if you have one. That&rsquo;s what Trends and Future You are built on.</li>
       </ol>
 
       <p style="margin:0 0 28px;">
@@ -117,7 +116,7 @@ export function accessGrantedEmail(opts: {
       </p>
 
       <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">
-        &mdash; Ajinkya<br />Ikigaro
+        Ajinkya<br />Ikigaro
       </p>
 
       <div style="padding-top:16px;border-top:1px solid #e5e0d8;">

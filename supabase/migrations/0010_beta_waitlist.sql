@@ -1,7 +1,7 @@
--- 0010: Beta waitlist — gate app access behind an approval.
+-- 0010: Beta waitlist, gate app access behind an approval.
 --
--- New signups land as 'waitlisted' (they can log in via Privy — which verifies
--- their email — but see only the waitlist screen and can't touch health-data
+-- New signups land as 'waitlisted' (they can log in via Privy, which verifies
+-- their email, but see only the waitlist screen and can't touch health-data
 -- APIs). An admin flips them to 'approved' in the console's Users tab.
 --
 -- The backfill (everyone who signed up BEFORE the gate keeps access) runs

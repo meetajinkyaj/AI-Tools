@@ -169,8 +169,8 @@ describe("severityFromBand", () => {
     { label: "High", low: 160, severity: "high" },
   ];
   it("uses the band's severity when a band is present (pill agrees with callout)", () => {
-    // LDL 107.77 flags 'high' vs a 0–100 range, but sits in the 'Near optimal'
-    // (borderline) band — the band should win so the two labels agree.
+    // LDL 107.77 flags 'high' vs a 0-100 range, but sits in the 'Near optimal'
+    // (borderline) band, the band should win so the two labels agree.
     expect(severityFromBand("high", bandFor(107.77, ldlBands))).toBe("borderline");
     expect(severityFromBand("high", bandFor(180, ldlBands))).toBe("high");
     expect(severityFromBand("in_range", bandFor(80, ldlBands))).toBe("optimal");
@@ -231,7 +231,7 @@ describe("computeDerived", () => {
   });
 });
 
-describe("validatePanelInput — qualitative & range override", () => {
+describe("validatePanelInput, qualitative & range override", () => {
   it("accepts a qualitative reading and a lab range override", () => {
     const r = validatePanelInput({
       readings: [
