@@ -32,7 +32,7 @@ npm run dev                        # http://localhost:3000
 npm run dev          # local dev server
 npm run build        # next build
 npm run lint         # eslint
-npm test             # vitest unit tests (162)
+npm test             # vitest unit tests
 npm run e2e          # playwright end-to-end, against a local build
 npm run e2e:staging  # playwright against the deployed staging app (what CI runs)
 
@@ -146,6 +146,10 @@ or CLI. All are idempotent, safe to re-run.
 | `0013_points_rank_split` | `users.iki_score` + `best_streak`, ledger `base_amount`/`multiplier`, `partners`, and the `invite_codes` shared namespace |
 | `0014_rls_on_partners_and_invite_codes` | RLS on the two tables 0013 added |
 | `0015_wearable_connections` | Cloud wearable OAuth grants (encrypted tokens) + normalized daily metrics |
+| `0016_device_requests` | User-submitted "which device should we add next" requests |
+| `0017_access_granted_email` | `users.access_granted_email_at`, so the "you're in" email sends exactly once |
+| `0018_broadcasts` | Announcements: `broadcasts` + `broadcast_recipients`, plus `email_opt_out` and `unsubscribe_token` on `users` |
+| `0019_broadcast_app_button` | `broadcasts.include_app_button`, making the "Open Ikigaro" button opt-in |
 
 > **Migration-first, always.** Run the migration on production *before* merging
 > code that depends on it. Code reading a column that doesn't exist yet takes the
@@ -183,6 +187,7 @@ or CLI. All are idempotent, safe to re-run.
 | [`docs/WEARABLES.md`](./docs/WEARABLES.md) | Wearable integrations: how sync runs, why tokens are encrypted, adding a provider |
 | [`docs/WEARABLES_APPLICATIONS.md`](./docs/WEARABLES_APPLICATIONS.md) | The registration checklist: every form, the exact redirect URIs and scopes to paste |
 | [`docs/WEARABLE_DATA.md`](./docs/WEARABLE_DATA.md) | How several devices are merged into one series, and why we never average |
+| [`docs/GARMIN_AUDIT.md`](./docs/GARMIN_AUDIT.md) | Garmin push correctness: what is already handled, what is blocked on portal access |
 | [`docs/EMAIL.md`](./docs/EMAIL.md) | Resend setup, the access-granted email, and how "send exactly once" is enforced |
 | [`docs/cowork/CURRENT.md`](./docs/cowork/CURRENT.md) | The single live Cowork task list, plus a ledger of what has already been applied |
 | [`AGENTS.md`](./AGENTS.md) | Next.js 16 conventions, read before writing App Router code |

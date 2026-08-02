@@ -19,7 +19,7 @@ takes an afternoon. Start these now so the wait runs in parallel with the rest:
 | Provider | Where | What they ask for |
 |---|---|---|
 | **Garmin** | Garmin Developer Program → Health API | Company details, use case, expected user volume, privacy policy URL |
-| **Ultrahuman** | Ultrahuman partnership channel → UltraSignal | Use case, user base, how the data will be used |
+| **Ultrahuman** | Developer portal at `vision.ultrahuman.com/developer-docs` (log in to create an OAuth app) | Use case, user base, how the data will be used |
 
 Both will want `https://app.ikigaro.com/privacy` and a clear sentence about what
 we do with the data. "Show users their own sleep and recovery alongside their
@@ -27,6 +27,61 @@ lab panels; never sold, never used for advertising" is accurate and is the
 answer they are looking for.
 
 ---
+
+
+### Ultrahuman: two auth paths, and one unresolved question
+
+**Everything in this section about OAuth is UNVERIFIED.** The public page at
+`vision.ultrahuman.com/developer-docs` ends with *"Want to access your personal
+tokens and create OAuth apps? Login to view authenticated documentation"*, so
+the OAuth endpoints, scopes and response shapes are behind a login we do not
+have. Nothing below should be treated as settled until someone reads the
+authenticated docs.
+
+**Path A, personal API token.** Documented publicly. A token from the developer
+portal plus, optionally, the target user's email. The data owner authorises the
+developer by entering a sharing code in the Ultrahuman app under Profile →
+Settings → Partner ID. The public docs show the metrics request taking a `date`
+(`YYYY-MM-DD`) **or** an epoch start/end pair, and an `Authorization` header
+carrying the token.
+
+This path is useful for validating the adapter against real payloads before
+OAuth credentials exist, but it needs a physical ring and a portal account. We
+have neither, so it is not currently available to us.
+
+**Path B, OAuth 2.0.** What we intend to ship, because it is the only path that
+scales past one person: authorisation code flow, server-side token exchange,
+refresh tokens, access tokens reportedly expiring in about a week.
+
+#### The naming question, unresolved
+
+One source describes UltraSignal as a **raw signal** platform (PPG,
+accelerometer, temperature streams, applied for with a loaned developer kit)
+and treats the "Partner API" as a separate daily-metrics product. But the page
+at `vision.ultrahuman.com/developer-docs` is itself **titled "UltraSignal API
+Documentation"** and documents sleep, activity, recovery and glucose metrics,
+not raw streams.
+
+Both readings are recorded here because we cannot currently tell which is
+right, and asserting either would be inventing vendor behaviour. Resolve it by
+logging into the portal.
+
+#### Our adapter is very likely wrong
+
+`src/lib/wearables/providers.ts` was written from assumption rather than from
+documentation, and at least one part of it disagrees with the public docs:
+
+| | What our code does | What the docs show |
+|---|---|---|
+| Metrics query | `?start_date=&end_date=` (a range) | `date` for one day, or an epoch pair |
+| Scopes | `read:metrics`, `read:sleep` | reported elsewhere as `profile`, `ring_data`, `cgm_data` |
+| Endpoint | `/api/v1/metrics` | reported elsewhere as `/api/partners/v1/user_data/metrics` |
+
+If the single-`date` shape is correct then `syncWindowDays: 7` implies seven
+calls rather than one, and `fetchRange` needs rewriting. **Do not "fix" this
+from the table above.** Two of those three rows are themselves unverified.
+Correct it once the authenticated docs are readable, and capture a real
+response as a fixture at the same time.
 
 ## The self-serve four
 

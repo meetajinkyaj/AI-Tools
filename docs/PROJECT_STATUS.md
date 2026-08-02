@@ -466,6 +466,17 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   threshold is the whole safety margin**: past it, losing the data ends the
   beta rather than inconveniencing it. Fix is $25/mo (Supabase Pro → daily
   backups, 7-day retention). See `RUNBOOK.md` §2b.
+- **Ultrahuman adapter is unverified guesswork.** Written from assumption, not
+  documentation. The public docs show the metrics call taking a single `date`
+  or an epoch pair, while our `fetchRange` sends `start_date`/`end_date`, so it
+  very likely does not work as written. The OAuth endpoints and scopes sit
+  behind a portal login nobody has. Correct it against real docs, and capture a
+  real response as a fixture, before trusting a line of it. See
+  [`WEARABLES.md`](./WEARABLES.md).
+- **Garmin: deregistration and permission-change pushes are silently dropped.**
+  A compliance gap, not a nicety: our handler reads only `dailies`, `sleeps`
+  and `hrv`, so a user revoking consent at Garmin's end is acknowledged and
+  ignored. Plan and blockers in [`GARMIN_AUDIT.md`](./GARMIN_AUDIT.md).
 - **Migration runner in CI** (`supabase db push` against prod on merge to
   `main`), replacing the current hand-application step. Migrations 0013-0019
   were each pasted into the Supabase SQL Editor by a human and verified with

@@ -77,7 +77,26 @@ rewards or partner logic.
 
 Do these before anything else so the review clock runs while you do the rest.
 
-### ☐ Garmin. Health API
+### ☑ Garmin. Health API + Activity API. SUBMITTED 2 August 2026
+
+**Status:** submitted, awaiting response. Do not resubmit.
+
+The Garmin Connect Developer Program "Access Request Form" page renders no
+form, only a header and a "stay tuned" line, so it is not the route in. We
+submitted through the **wellness partner form** at
+`garmin.com/en-IN/forms/wellnesspartner/` and followed up by email to
+`connect-support@developer.garmin.com`.
+
+Garmin's published turnaround is confirmation within two business days, then a
+typical integration of one to four weeks. If no confirmation has arrived after
+two business days, chase the email address above rather than resubmitting the
+form.
+
+**Registered when access arrives:**
+
+- **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/garmin`
+- **Push URL:** `https://app.ikigaro.com/api/wearables/garmin-push?key=<GARMIN_PUSH_SECRET>`
+  (substitute the real value from the password manager; never write it here)
 
 - **Where:** Garmin Developer Portal → Health API → request access
 - **Extra fields they ask for:** company/entity name, expected user volume
@@ -104,7 +123,24 @@ you need this value again on Garmin's form.
 > Garmin is push-only, there is no way to poll it. Data arrives when a user's
 > watch next syncs, which is why the push URL matters as much as the OAuth one.
 
-### ☐ Ultrahuman. UltraSignal / Partner API
+### ☑ Ultrahuman: form submitted 2 August 2026, but it is the WRONG FORM
+
+**Status:** we submitted "Become a partner" at `ultrahuman.com/us/partners/`.
+
+⚠️ **That form is the enterprise sales funnel**, aimed at research institutions,
+healthcare providers, sports teams, gyms and companies deploying rings at
+scale. It is not the route to API credentials, and a reply from it is unlikely
+to be about the API. No harm done, but do not wait on it.
+
+**The actual route is the developer portal** at
+`vision.ultrahuman.com/developer-docs`. OAuth app creation appears to be
+self-serve once logged in ("Login to view authenticated documentation"), which
+would make this an afternoon rather than a multi-week review. Nobody has logged
+in yet, so that is unconfirmed.
+
+**Before writing any Ultrahuman code**, read
+[`WEARABLES.md`](./WEARABLES.md): our adapter was written from assumption and
+at least its query shape disagrees with the public documentation.
 
 - **Where:** Ultrahuman developer docs → apply, or the partnership channel
 - **Extra fields:** use case, user base size, how the data will be used
