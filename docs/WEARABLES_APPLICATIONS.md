@@ -22,6 +22,38 @@ sends, so paste them rather than retyping.
 | Platform | Web application |
 | OAuth grant type | Authorization code |
 
+**"Web application" is correct, and stays correct after the native apps ship.**
+The field describes where the OAuth *client* runs, not where the user is. Ours
+is a confidential server-side client: the secret lives on the Cloudflare Worker
+(`clientCreds()` in `src/lib/wearables/sync.ts`), the redirect lands on our
+domain, and the token exchange is server to server.
+
+The iOS and Android apps will do what the web app does today: open a browser to
+our `/api/wearables/connect`, the user consents at the vendor, the vendor
+redirects to our callback, our Worker exchanges the code. The phone never talks
+to a vendor directly and never holds a secret. From the vendor's side the
+traffic is identical either way, so **no form needs resubmitting**: same client
+id, same secret, same redirect URI.
+
+The native apps exist for Apple HealthKit and Android Health Connect, which are
+on-device APIs with no OAuth and no vendor registration at all. They add a data
+source without touching any of the six applications below.
+
+> **Do not register the native app as its own OAuth client.** That would be a
+> separate public client with PKCE and a custom-scheme redirect
+> (`ikigaro://callback`), which several vendors treat as a whole new
+> application. A native client cannot keep a secret, it would triple the
+> credentials to manage, and refresh-token rotation would have to be solved
+> on-device instead of once on the server.
+
+If a form asks which platforms the app is *available* on, as a marketing or
+review question rather than an OAuth client type, answer
+**"Web today; iOS and Android planned"**.
+
+**What does require going back to a vendor:** changing the redirect URI host,
+requesting additional scopes, or a post-beta production-access review (Garmin
+and Fitbit both do this, and it is about volume, not platform).
+
 **Description** (fits most "what does your app do" boxes):
 
 > Ikigaro is a longevity and performance app. Users upload their blood panels
