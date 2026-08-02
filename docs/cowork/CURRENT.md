@@ -6,7 +6,7 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-07-30. **One task pending: migration 0019.**
+Last updated: 2026-07-30. **No task is pending.**
 
 ---
 
@@ -20,6 +20,7 @@ Last updated: 2026-07-30. **One task pending: migration 0019.**
 | `0016_device_requests` | Applied 2026-07-30, verified. 8 columns, RLS on with 0 policies, unique `(user_id, device_key)` index present, table empty, `users`/`wearable_connections` counts unchanged. |
 | `0017_access_granted_email` | Applied 2026-07-30, verified. `users.access_granted_email_at` present and nullable, 0 of 4 users stamped, access breakdown unchanged. |
 | `0018_broadcasts` | Applied 2026-07-30, verified. Both tables live, RLS on with 0 policies, `broadcast_recipients_unique` present, 4/4/4 unique unsubscribe tokens, 0 opted out, access breakdown unchanged. |
+| `0019_broadcast_app_button` | Applied 2026-07-30, verified. `broadcasts.include_app_button` boolean, not null, default false; 0 rows with it set; `users` and `broadcast_recipients` unchanged. The SQL Editor spinner hung during this run, so completion was confirmed from a second connection rather than from the UI. |
 
 | Configuration | Status |
 |---|---|
@@ -42,72 +43,9 @@ verified live.**
 
 ---
 
-# PENDING TASK, paste everything below the line into Cowork
+# PENDING TASK
 
-**Must run BEFORE the app-button PR is merged.** The code writes a column that
-does not exist yet.
-
----
-
-Apply migration `0019_broadcast_app_button` to production, then verify.
-
-The file is `supabase/migrations/0019_broadcast_app_button.sql`. It adds **one
-column** to the existing `broadcasts` table:
-`include_app_button boolean not null default false`.
-
-That is the whole migration. No new table, no backfill, no change to any
-existing value. It makes the "Open Ikigaro" button in announcements opt-in
-instead of always-on.
-
-## Apply
-
-Supabase dashboard, SQL Editor, paste the file, Run.
-
-## Verify, please paste the output
-
-**1. The column exists with the right default**
-
-```sql
-select column_name, data_type, is_nullable, column_default
-from information_schema.columns
-where table_name = 'broadcasts' and column_name = 'include_app_button';
-```
-
-Expect one row: `boolean`, `is_nullable = NO`, default `false`.
-
-**2. No existing announcement was switched on**
-
-```sql
-select count(*) as broadcasts,
-       count(*) filter (where include_app_button) as with_button
-from broadcasts;
-```
-
-`with_button` must be **0**. Anything else would mean an already-sent
-announcement now claims to have carried a button it did not.
-
-**3. Nothing else moved**
-
-```sql
-select count(*) from users;
-select count(*) from broadcast_recipients;
-```
-
-Tell me both numbers; they should be unchanged.
-
-## Do not
-
-- Do not send any announcement. I will test with "Send test to me".
-- Do not insert or edit rows in `broadcasts` or `broadcast_recipients`.
-- Do not paste keys, tokens or connection strings into chat.
-
-## Report back
-
-The output of all three checks. Once confirmed I will merge the code.
-
----
-
-## After that, nothing is pending
+**Nothing.** Everything that needed production access is done.
 
 Two things are waiting on the founder rather than on Cowork:
 
@@ -119,6 +57,12 @@ Two things are waiting on the founder rather than on Cowork:
   spend decision (Pro, $25/mo), deliberately deferred until ~20 testers, not
   an oversight. It is the largest standing risk in the stack.
 
+A note for whoever applies the next migration: on 0019 the SQL Editor's
+"Running..." spinner froze and never cleared. Do not re-click Run. Check the
+real database state from a second connection first, both that the change
+landed and that nothing is still in flight or blocked. A frozen spinner says
+nothing about whether the statement committed. Replacing this step with a CI
+runner is on the deferred list in `../PROJECT_STATUS.md` §8.
 
 ## Later, as each provider's credentials arrive
 

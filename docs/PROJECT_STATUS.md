@@ -466,6 +466,24 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   threshold is the whole safety margin**: past it, losing the data ends the
   beta rather than inconveniencing it. Fix is $25/mo (Supabase Pro → daily
   backups, 7-day retention). See `RUNBOOK.md` §2b.
+- **Migration runner in CI** (`supabase db push` against prod on merge to
+  `main`), replacing the current hand-application step. Migrations 0013-0019
+  were each pasted into the Supabase SQL Editor by a human and verified with
+  hand-written checks. That has worked without incident, but the failure mode
+  showed itself on 0019: the editor's "Running..." spinner froze and never
+  cleared, leaving it genuinely ambiguous whether the statement had committed,
+  was still running, or was blocked on a lock. Re-clicking Run would have been
+  the wrong move; it was resolved by probing the live database from a second
+  connection. **The risk is not a bad migration, it is ambiguity about whether
+  one ran.** A runner removes the step and the ambiguity together, and makes
+  migrate-then-merge an ordering the pipeline enforces rather than one a person
+  has to remember.
+  _Needs:_ a service-role credential in CI, and a rollback story (forward-only
+  fix-up migrations are probably the honest answer at this size).
+  _Trigger:_ whenever a migration must run under time pressure, or a second
+  person can deploy, or roughly when the backup decision expires at ~20
+  testers, whichever comes first. Both become worth paying for at the same
+  moment: when a mistake costs something real.
 - **Scaling levers** (~10k users): OCR vendor, prompt caching, batch API,
   async queue, `docs/SCALING.md`.
 - **Admin roll-ups aggregate in application memory**, `/api/admin/users`,
