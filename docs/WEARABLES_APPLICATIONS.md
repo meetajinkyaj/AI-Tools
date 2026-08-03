@@ -73,9 +73,15 @@ rewards or partner logic.
 
 ---
 
-## 1. Start these two FIRST, they take 1-4 weeks
+## 1. Garmin first, because only Garmin makes you wait
 
-Do these before anything else so the review clock runs while you do the rest.
+Garmin is the one approval queue here, one to four weeks, so file it before
+anything else and let the clock run while you do the rest.
+
+**Ultrahuman is no longer in this category.** It was believed to need approval;
+it does not. Creating the OAuth app is self-serve and takes an afternoon. It is
+kept in this section only because the submitted-form history below is worth
+recording.
 
 ### ☑ Garmin. Health API + Activity API. SUBMITTED 2 August 2026
 
@@ -104,12 +110,9 @@ form.
   types you need
 - **Data types to request:** Dailies (steps, resting heart rate, calories),
   Sleep, HRV
-- **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/garmin`
 - **Scope:** `HEALTH_EXPORT`
-- **Also register the push URL** (they will ask, or ask later):
-  `https://app.ikigaro.com/api/wearables/garmin-push?key=<GARMIN_PUSH_SECRET>`
 
-Generate that secret first so you have it to hand, **URL-safe**, because it
+The push secret is already generated first so you have it to hand, **URL-safe**, because it
 travels in a query string where `+` legally means a space. Hex is the easiest
 way; any plain alphanumeric value is equally fine:
 
@@ -133,19 +136,28 @@ scale. It is not the route to API credentials, and a reply from it is unlikely
 to be about the API. No harm done, but do not wait on it.
 
 **The actual route is the developer portal** at
-`vision.ultrahuman.com/developer-docs`. OAuth app creation appears to be
-self-serve once logged in ("Login to view authenticated documentation"), which
-would make this an afternoon rather than a multi-week review. Nobody has logged
-in yet, so that is unconfirmed.
+`vision.ultrahuman.com`, and as of 2026-08-03 this is **confirmed self-serve**:
+creating an OAuth application is an in-portal modal with no review, no queue
+and no wait-time wording anywhere. Ultrahuman is an afternoon, not a multi-week
+approval, so it does not belong in the "start these first" section at all.
 
-**Before writing any Ultrahuman code**, read
-[`WEARABLES.md`](./WEARABLES.md): our adapter was written from assumption and
-at least its query shape disagrees with the public documentation.
+**Create the app with:**
 
-- **Where:** Ultrahuman developer docs → apply, or the partnership channel
-- **Extra fields:** use case, user base size, how the data will be used
+- **App name:** `Ikigaro`
 - **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/ultrahuman`
-- **Scopes:** `read:metrics`, `read:sleep`
+  (the form takes **one**, so it has to be right first time)
+- **Scopes:** tick **Ring Data Access** and **Profile Access**. Leave **CGM
+  Data Access** unticked: glucose arrives on the same endpoint when granted, we
+  store none of it, and asking for data we will not use is how a consent screen
+  stops being read.
+
+Then set `ULTRAHUMAN_CLIENT_ID` and `ULTRAHUMAN_CLIENT_SECRET` as Worker
+secrets and it appears in Settings on its own.
+
+The adapter was rewritten against the authenticated docs on 2026-08-03. The
+facts worth knowing before touching it, including the two places Ultrahuman's
+own documentation contradicts itself, are in
+[`WEARABLES.md`](./WEARABLES.md).
 
 ---
 

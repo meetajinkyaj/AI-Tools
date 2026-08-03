@@ -30,6 +30,44 @@ import type { ProviderId, WearableProvider } from "./types";
  * nothing, check their changelog before debugging this file.
  */
 
+/**
+ * Every date from `start` to `end` inclusive, as YYYY-MM-DD.
+ *
+ * Needed because Ultrahuman's OAuth metrics endpoint takes a single `date` and
+ * has no range form, so a window is a loop rather than one call.
+ */
+function daysBetween(start: string, end: string): string[] {
+  const out: string[] = [];
+  const from = Date.parse(`${start}T00:00:00Z`);
+  const to = Date.parse(`${end}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return out;
+  // Guard against a mistaken window turning into thousands of requests.
+  for (let t = from, i = 0; t <= to && i < 40; t += 86_400_000, i += 1) {
+    out.push(new Date(t).toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+/**
+ * Ultrahuman's metrics payload.
+ *
+ * Modelled on their documented example rather than guessed. The awkward part
+ * is that `metrics` is a date-keyed map of arrays of typed entries, and the
+ * value lives under a different key depending on the entry: `value` for
+ * scalars, `avg` for averaged series, `total` for steps.
+ */
+interface UltrahumanEntryObject {
+  value?: unknown;
+  avg?: unknown;
+  total?: unknown;
+}
+
+interface UltrahumanMetricsResponse {
+  data?: {
+    metrics?: Record<string, { type?: string; object?: UltrahumanEntryObject }[]>;
+  };
+}
+
 function push(
   out: DailyMetric[],
   metric: MetricKey,
@@ -336,42 +374,112 @@ const ultrahuman: WearableProvider = {
   blurb: "Sleep, recovery and HRV from the Ultrahuman Ring.",
   clientIdEnv: "ULTRAHUMAN_CLIENT_ID",
   clientSecretEnv: "ULTRAHUMAN_CLIENT_SECRET",
-  authorizeUrl: "https://partner.ultrahuman.com/oauth/authorize",
-  tokenUrl: "https://partner.ultrahuman.com/oauth/token",
-  scopes: ["read:metrics", "read:sleep"],
+
+  // British spelling, and a dedicated auth host. Ultrahuman's own spec text
+  // says "/authorize" while every worked example uses "/authorise"; the
+  // examples win here, because they are what their integrations actually call.
+  // If consent ever 404s, try the American spelling before assuming anything
+  // else is wrong.
+  authorizeUrl: "https://auth.ultrahuman.com/authorise",
+  tokenUrl: "https://partner.ultrahuman.com/api/partners/oauth/token",
+
+  // Minimum that does the job. `ring_data` is the data itself; `profile` is
+  // required by /user_info, which is the ONLY way to learn the Ultrahuman user
+  // id, because unlike every other vendor here their token response carries no
+  // user identifier at all.
+  //
+  // `cgm_data` is deliberately NOT requested. It exists, and glucose comes back
+  // on this same endpoint when granted, but we store no glucose, and asking a
+  // user for data we will not use is how a consent screen stops being read.
+  scopes: ["profile", "ring_data"],
   tokenAuth: "body",
-  // Documented explicitly by Ultrahuman: each refresh returns a NEW refresh
-  // token and retires the old one. Miss the write-back and the connection
-  // survives exactly one more refresh before dying silently.
+
+  // Confirmed in their docs, not assumed: "next time you refresh the tokens
+  // make sure to use the newly granted refresh token".
   refreshRotates: true,
-  syncWindowDays: 7,
+
+  // DELIBERATELY SHORT, because this endpoint takes ONE DAY PER REQUEST. Seven
+  // days would be seven subrequests per user per sync, and the sweep runs up to
+  // 50 users per invocation, which is how a Worker hits its subrequest ceiling.
+  // Three days still covers a missed night plus a late correction.
+  syncWindowDays: 3,
   requiresApproval: true,
+
   async fetchRange({ accessToken, start, end }) {
     const out: DailyMetric[] = [];
-    const api = "https://partner.ultrahuman.com/api/v1";
+    const api = "https://partner.ultrahuman.com/api/partners/v1";
 
-    const res = await providerFetch<{
-      data?: {
-        date?: string;
-        sleep?: { total_sleep_minutes?: number; sleep_index?: number };
-        recovery?: { score?: number; hrv?: number; resting_heart_rate?: number };
-        activity?: { steps?: number; active_calories?: number };
-        temperature?: { deviation_c?: number };
-      }[];
-    }>("ultrahuman", `${api}/metrics?start_date=${start}&end_date=${end}`, { accessToken });
+    // One request per day. `date` is the only parameter this endpoint accepts:
+    // there is no range form on the OAuth API. (The separate personal-token API
+    // does accept start_epoch/end_epoch, but that is a different host, a
+    // different auth header, and not what we ship.)
+    for (const day of daysBetween(start, end)) {
+      let res: UltrahumanMetricsResponse;
+      try {
+        res = await providerFetch<UltrahumanMetricsResponse>(
+          "ultrahuman",
+          `${api}/user_data/metrics?date=${day}`,
+          { accessToken },
+        );
+      } catch {
+        // One missing day must not abandon the rest of the window. A ring that
+        // was off the charger for a night simply has nothing for that date.
+        continue;
+      }
 
-    for (const d of res.data ?? []) {
-      const day = d.date;
-      push(out, "sleep_minutes", day, num(d.sleep?.total_sleep_minutes), "ultrahuman");
-      const idx = num(d.sleep?.sleep_index);
-      if (idx !== undefined) push(out, "sleep_score", day, clampScore(idx), "ultrahuman");
-      const rec = num(d.recovery?.score);
-      if (rec !== undefined) push(out, "readiness_score", day, clampScore(rec), "ultrahuman");
-      push(out, "hrv", day, num(d.recovery?.hrv), "ultrahuman");
-      push(out, "resting_heart_rate", day, num(d.recovery?.resting_heart_rate), "ultrahuman");
-      push(out, "steps", day, num(d.activity?.steps), "ultrahuman");
-      push(out, "active_calories", day, num(d.activity?.active_calories), "ultrahuman");
-      push(out, "temperature_deviation", day, num(d.temperature?.deviation_c), "ultrahuman");
+      // `data.metrics` is a map keyed by date string, each holding an array of
+      // { type, object } entries. Not a flat object, and not an array of days.
+      for (const [date, entries] of Object.entries(res.data?.metrics ?? {})) {
+        const by = new Map<string, UltrahumanEntryObject>();
+        for (const e of entries ?? []) {
+          if (e?.type && e.object) by.set(e.type, e.object);
+        }
+        const val = (t: string) => num(by.get(t)?.value);
+        const avg = (t: string) => num(by.get(t)?.avg);
+
+        // Seconds in their payload ("unit": "seconds"), minutes in ours.
+        const sleepSecs = val("total_sleep");
+        if (sleepSecs !== undefined) {
+          push(out, "sleep_minutes", date, secondsToMinutes(sleepSecs), "ultrahuman");
+        }
+
+        const sleepScore = val("sleep_score");
+        if (sleepScore !== undefined) {
+          push(out, "sleep_score", date, clampScore(sleepScore), "ultrahuman");
+        }
+
+        // Two HRV figures exist. `avg_sleep_hrv` is the overnight one, which is
+        // what a recovery reading means and what every other adapter here
+        // reports; `hrv` is an all-day average. Prefer overnight, fall back.
+        const hrv = val("avg_sleep_hrv") ?? avg("hrv");
+        push(out, "hrv", date, hrv, "ultrahuman");
+
+        // Same pattern: `sleep_rhr` is the sleeping figure, `night_rhr` carries
+        // its value in `avg` rather than `value`.
+        const rhr = val("sleep_rhr") ?? avg("night_rhr");
+        push(out, "resting_heart_rate", date, rhr, "ultrahuman");
+
+        const recovery = val("recovery_index");
+        if (recovery !== undefined) {
+          push(out, "readiness_score", date, clampScore(recovery), "ultrahuman");
+        }
+
+        // Daily total, not the per-reading average.
+        push(out, "steps", date, num(by.get("steps")?.total), "ultrahuman");
+        push(out, "spo2", date, avg("spo2"), "ultrahuman");
+        push(out, "vo2max", date, val("vo2_max"), "ultrahuman");
+
+        // A deviation, and legitimately negative. Distinct from `temp` and
+        // `average_body_temperature`, which are absolute skin readings.
+        push(out, "temperature_deviation", date, val("temperature_deviation"), "ultrahuman");
+
+        // NOT AVAILABLE, deliberately absent rather than forgotten:
+        //   active_calories   no calories field exists anywhere in the payload;
+        //                     `active_minutes` is minutes and not the same thing
+        //   respiratory_rate  not reported
+        //   weight_kg,
+        //   body_fat_pct      a ring cannot measure either
+      }
     }
     return out;
   },

@@ -29,59 +29,78 @@ answer they are looking for.
 ---
 
 
-### Ultrahuman: two auth paths, and one unresolved question
+### Ultrahuman: two APIs, and which one we ship
 
-**Everything in this section about OAuth is UNVERIFIED.** The public page at
-`vision.ultrahuman.com/developer-docs` ends with *"Want to access your personal
-tokens and create OAuth apps? Login to view authenticated documentation"*, so
-the OAuth endpoints, scopes and response shapes are behind a login we do not
-have. Nothing below should be treated as settled until someone reads the
-authenticated docs.
+**Verified against the authenticated docs on 2026-08-03.** Everything here is
+read from Ultrahuman's own documentation, not inferred.
 
-**Path A, personal API token.** Documented publicly. A token from the developer
-portal plus, optionally, the target user's email. The data owner authorises the
-developer by entering a sharing code in the Ultrahuman app under Profile →
-Settings → Partner ID. The public docs show the metrics request taking a `date`
-(`YYYY-MM-DD`) **or** an epoch start/end pair, and an `Authorization` header
-carrying the token.
+There are **two separate APIs**, with different hosts, different Authorization
+header formats and different query parameters. An adapter written against one
+will not work against the other.
 
-This path is useful for validating the adapter against real payloads before
-OAuth credentials exist, but it needs a physical ring and a portal account. We
-have neither, so it is not currently available to us.
-
-**Path B, OAuth 2.0.** What we intend to ship, because it is the only path that
-scales past one person: authorisation code flow, server-side token exchange,
-refresh tokens, access tokens reportedly expiring in about a week.
-
-#### The naming question, unresolved
-
-One source describes UltraSignal as a **raw signal** platform (PPG,
-accelerometer, temperature streams, applied for with a loaned developer kit)
-and treats the "Partner API" as a separate daily-metrics product. But the page
-at `vision.ultrahuman.com/developer-docs` is itself **titled "UltraSignal API
-Documentation"** and documents sleep, activity, recovery and glucose metrics,
-not raw streams.
-
-Both readings are recorded here because we cannot currently tell which is
-right, and asserting either would be inventing vendor behaviour. Resolve it by
-logging into the portal.
-
-#### Our adapter is very likely wrong
-
-`src/lib/wearables/providers.ts` was written from assumption rather than from
-documentation, and at least one part of it disagrees with the public docs:
-
-| | What our code does | What the docs show |
+| | **OAuth API** (what we ship) | **Personal token API** |
 |---|---|---|
-| Metrics query | `?start_date=&end_date=` (a range) | `date` for one day, or an epoch pair |
-| Scopes | `read:metrics`, `read:sleep` | reported elsewhere as `profile`, `ring_data`, `cgm_data` |
-| Endpoint | `/api/v1/metrics` | reported elsewhere as `/api/partners/v1/user_data/metrics` |
+| Metrics path | `/api/partners/v1/user_data/metrics` | `partner.ultrahuman.com/api/v1/partner/daily_metrics` |
+| Auth header | `Authorization: Bearer <token>` | `Authorization: <token>`, **bare, no Bearer** |
+| Date params | `date` only, one day per request | `date`, or `start_epoch`/`end_epoch` (≤ 7 days) |
+| Obtained by | authorize, then token exchange | a button in the portal |
 
-If the single-`date` shape is correct then `syncWindowDays: 7` implies seven
-calls rather than one, and `fetchRange` needs rewriting. **Do not "fix" this
-from the table above.** Two of those three rows are themselves unverified.
-Correct it once the authenticated docs are readable, and capture a real
-response as a fixture at the same time.
+We ship the OAuth API: it is the only one that works for anybody other than the
+account holder. The personal-token API is useful for validating against real
+data before credentials exist, but it needs a ring and a portal login.
+
+**OAuth app creation is self-serve.** An in-portal modal, no review and no
+queue, which makes Ultrahuman an afternoon rather than a multi-week wait. The
+form takes a **single** redirect URI, so get it right first time:
+`https://app.ikigaro.com/api/wearables/callback/ultrahuman`.
+
+#### Facts that cost something if you get them wrong
+
+- **The refresh token rotates.** Documented explicitly: *"next time you refresh
+  the tokens make sure to use the newly granted refresh token"*. Our
+  `persistTokens` writes it back unconditionally, which is why this is safe.
+- **Sleep is in SECONDS** (`"unit": "seconds"`), so `total_sleep: 25500` is 7h05m.
+- **`active_calories` does not exist.** No calories field appears anywhere in
+  their payload. `active_minutes` is minutes and is not a substitute.
+- **The response is not flat.** `data.metrics` is a **map keyed by date**, each
+  holding an **array of `{type, object}`** entries, and the value lives under a
+  different key per entry: `value` for scalars, `avg` for averaged series,
+  `total` for steps.
+- **Two HRVs and two resting heart rates.** `avg_sleep_hrv` versus `hrv`, and
+  `sleep_rhr` versus `night_rhr`. We take the overnight one in both cases,
+  because that is what a recovery figure means.
+- **Two sleep scores.** A top-level `sleep_score` entry and a nested
+  `sleep.object.score`, which are different numbers. We use the top-level one.
+- **`temperature_deviation` is signed** and legitimately negative. Distinct
+  from `temp` and `average_body_temperature`, which are absolute.
+
+#### Two things their docs contradict themselves on
+
+1. **Token lifetime.** The prose says tokens "are valid for a week", the field
+   block says `86400 seconds (1 day)`, and the response says
+   `"expires_in": 86399`. We trust `expires_in` from the response and refresh
+   early, which is what `accessTokenFor` already does. Nothing is hard-coded.
+2. **The authorize path spelling.** Their spec text says `/authorize`; every
+   worked example uses `/authorise` on `auth.ultrahuman.com`. We follow the
+   examples. If consent ever 404s, try the other spelling before assuming
+   anything else is wrong.
+
+#### One thing still unverified
+
+The **host** for the OAuth token and metrics paths. The docs give the paths
+(`/api/partners/oauth/token`, `/api/partners/v1/user_data/metrics`) without
+repeating the host. We use `partner.ultrahuman.com`, matching both the
+`/api/partners/` prefix and the host the personal-token API uses. Confirm it
+with the first real token exchange.
+
+#### CGM
+
+Glucose arrives on the **same** endpoint, gated by the `cgm_data` scope:
+`glucose`, `average_glucose`, `glucose_variability`, `hba1c`, `time_in_target`,
+`metabolic_score`, all in mg/dL. **We do not request that scope**, because we
+store none of it, and asking a user for data we will not use is how a consent
+screen stops being read. If glucose ever becomes a feature, the scope is the
+only change needed on their side.
 
 ## The self-serve four
 
