@@ -73,11 +73,54 @@ rewards or partner logic.
 
 ---
 
-## 1. Start these two FIRST, they take 1-4 weeks
+## 1. The two that were meant to need approval, and no longer do
 
-Do these before anything else so the review clock runs while you do the rest.
+Neither of these is a queue to wait in any more, for opposite reasons.
 
-### ☐ Garmin. Health API
+**Ultrahuman** turned out to be self-serve: creating the OAuth app is an
+in-portal modal with no review. Done on 2026-08-03.
+
+**Garmin** has paused new API access reviews indefinitely, with no timeline. So
+there is nothing to wait for there either, just a recheck every quarter.
+
+**Every provider we can ship is therefore self-serve.** The only thing between
+us and working wearable data is registering the remaining four and owning a
+device.
+
+### ☑ Garmin. Health API + Activity API. SUBMITTED 2 August 2026
+
+**Status: PAUSED AT GARMIN'S END, indefinitely.** Do not resubmit, and do not
+wait on this.
+
+Garmin replied on 2026-08-03:
+
+> "we have temporarily paused the review and approval of new API access
+> requests and are unable to provide a specific timeline for when new
+> application processing will resume"
+
+**So Garmin is out of the plan for now.** The adapter, the push endpoint and the
+audit in [`GARMIN_AUDIT.md`](./GARMIN_AUDIT.md) all stay as they are: nothing is
+wasted, and none of it is blocking anything else. When the queue reopens, the
+integration is already written.
+
+**Recheck roughly every three months.** Nothing else to do in between: there is
+no queue position to hold and no form to resubmit. Reply to the existing thread
+with `connect-support@developer.garmin.com` rather than starting a new request,
+so the original submission date is preserved if they honour it.
+
+Everything below is what to register **if and when** access is granted.
+
+The Garmin Connect Developer Program "Access Request Form" page renders no
+form, only a header and a "stay tuned" line, so it is not the route in. We
+submitted through the **wellness partner form** at
+`garmin.com/en-IN/forms/wellnesspartner/` and followed up by email to
+`connect-support@developer.garmin.com`.
+
+**Registered when access arrives:**
+
+- **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/garmin`
+- **Push URL:** `https://app.ikigaro.com/api/wearables/garmin-push?key=<GARMIN_PUSH_SECRET>`
+  (substitute the real value from the password manager; never write it here)
 
 - **Where:** Garmin Developer Portal → Health API → request access
 - **Extra fields they ask for:** company/entity name, expected user volume
@@ -85,31 +128,52 @@ Do these before anything else so the review clock runs while you do the rest.
   types you need
 - **Data types to request:** Dailies (steps, resting heart rate, calories),
   Sleep, HRV
-- **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/garmin`
 - **Scope:** `HEALTH_EXPORT`
-- **Also register the push URL** (they will ask, or ask later):
-  `https://app.ikigaro.com/api/wearables/garmin-push?key=<GARMIN_PUSH_SECRET>`
 
-Generate that secret first so you have it to hand, **URL-safe**, because it
-travels in a query string where `+` legally means a space. Hex is the easiest
-way; any plain alphanumeric value is equally fine:
+`GARMIN_PUSH_SECRET` is **already generated and set**, and saved in the password
+manager, which is where to get it for their form. Cloudflare cannot show it to
+you again.
 
-```bash
-openssl rand -hex 32
-```
-
-Save it to your password manager. Cloudflare secrets cannot be read back, and
-you need this value again on Garmin's form.
+It is deliberately URL-safe (hex), because it travels in a query string where a
+`+` legally means a space. A base64 secret would arrive with spaces where the
+plusses were, never match, and make every push look like Garmin being broken
+rather than a config bug.
 
 > Garmin is push-only, there is no way to poll it. Data arrives when a user's
 > watch next syncs, which is why the push URL matters as much as the OAuth one.
 
-### ☐ Ultrahuman. UltraSignal / Partner API
+### ☑ Ultrahuman: form submitted 2 August 2026, but it is the WRONG FORM
 
-- **Where:** Ultrahuman developer docs → apply, or the partnership channel
-- **Extra fields:** use case, user base size, how the data will be used
-- **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/ultrahuman`
-- **Scopes:** `read:metrics`, `read:sleep`
+**Status:** we submitted "Become a partner" at `ultrahuman.com/us/partners/`.
+
+⚠️ **That form is the enterprise sales funnel**, aimed at research institutions,
+healthcare providers, sports teams, gyms and companies deploying rings at
+scale. It is not the route to API credentials, and a reply from it is unlikely
+to be about the API. No harm done, but do not wait on it.
+
+**The actual route is the developer portal** at
+`vision.ultrahuman.com`, and as of 2026-08-03 this is **confirmed self-serve**:
+creating an OAuth application is an in-portal modal with no review, no queue
+and no wait-time wording anywhere. Ultrahuman is an afternoon, not a multi-week
+approval, so it does not belong in the "start these first" section at all.
+
+**☑ App created 2026-08-03**, named `ikigaro`, with all three scopes: **Ring
+Data**, **CGM Data** and **Profile**.
+
+CGM is requested deliberately. Glucose is the one wearable signal that moves
+against a blood panel on the axis the panel actually measures, which makes it
+worth more to us than any recovery score. A user without an M1 simply has no
+glucose entries. What we store from it, and why the CGM-estimated HbA1c is kept
+well away from the lab one, is in [`WEARABLES.md`](./WEARABLES.md).
+
+**Remaining:** set `ULTRAHUMAN_CLIENT_ID` and `ULTRAHUMAN_CLIENT_SECRET` as
+Worker secrets, from the portal's OAuth Applications page. Ultrahuman then
+appears in Settings on its own. Nothing else to switch on.
+
+The adapter was rewritten against the authenticated docs on 2026-08-03. The
+facts worth knowing before touching it, including the two places Ultrahuman's
+own documentation contradicts itself, are in
+[`WEARABLES.md`](./WEARABLES.md).
 
 ---
 

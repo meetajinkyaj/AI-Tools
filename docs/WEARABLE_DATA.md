@@ -59,7 +59,7 @@ using it.
 
 ## The ranking, and what it is based on
 
-Three orderings cover every metric. The rankings reflect **what each device is
+Four orderings cover every metric. The rankings reflect **what each device is
 built to measure**, not any view about which brand is better.
 
 | Family | Order | Why |
@@ -67,10 +67,59 @@ built to measure**, not any view about which brand is better.
 | Sleep, HRV, readiness, resting HR, SpO2, respiratory rate, temperature | Oura → Ultrahuman → Whoop → Garmin → Fitbit → Withings | A ring or band worn all night beats a watch that may not be worn to bed at all |
 | Steps, active calories, VO₂ max | Garmin → Fitbit → Whoop → Oura → Ultrahuman → Withings | Wrist devices worn all day beat rings, which systematically under-count steps |
 | Weight, body fat | Withings → Fitbit → Garmin → Oura → Ultrahuman → Whoop | A scale is the only device here that measures body composition; the rest relay or infer it |
+| Glucose average, variability, time in target, estimated HbA1c, metabolic score | Ultrahuman → Oura → Whoop → Garmin → Fitbit → Withings | Only Ultrahuman reports glucose at all today. The ordering exists because every metric needs one, and "whoever actually reports it" is the right answer when a second CGM appears |
 
 An unranked provider, one added to the adapters and forgotten here, sorts
 last rather than being dropped. It gets used when it is the only source, which
 degrades gracefully instead of silently losing data. There is a test for this.
+
+`metabolic_score` is ranked like the rest, but it is the one key in the
+vocabulary that is **not a quantity**: it is one vendor's composite on an
+arbitrary 0-100 scale. A second vendor's 72 would not mean Ultrahuman's 72.
+Treat it as a single-source series that is only ever compared to its own
+history.
+
+---
+
+## When a blood panel and a device describe the same thing
+
+CGM support put wearable data and lab data on the same axis for the first time,
+and the intuitive rule, **"blood beats wearable"**, turns out to be wrong in at
+least one place. The per-pair table is
+[`src/lib/wearables/biomarker-overlap.ts`](../src/lib/wearables/biomarker-overlap.ts),
+and it is the thing to read before putting any device number next to a marker.
+
+The principle is **not instrument seniority. It is: prefer whatever measured
+the quantity directly.** Everything else is an estimate, however good the
+instrument that produced it.
+
+| Device metric | Blood marker | Which one wins | Why |
+|---|---|---|---|
+| `hba1c_estimated` | `hba1c` | **The blood panel** | A lab measures glycated haemoglobin directly over about three months. The CGM figure is inferred from a few weeks of averages. |
+| `glucose_avg` | `hba1c_eag` | **The device** | The inversion. `hba1c_eag` is not measured: it is lab HbA1c run through a population regression (`28.7 x hba1c - 46.7`, `biomarkers.ts`), and individual glycation rates vary enough to put a given person well off the line. A CGM measures mean glucose directly, thousands of times a day. |
+| `glucose_avg` | `glucose_fasting` | **Neither** | Same unit, different quantity, which is the trap. Fasting glucose is one timepoint after an overnight fast; a CGM average is a 24-hour mean including every meal. |
+| `metabolic_score` | `hba1c` | **Neither** | A category error rather than a disagreement. One is a vendor composite, the other a measured value with clinical thresholds. |
+
+Three rules follow from that table.
+
+**Respect the period.** HbA1c integrates roughly three months; a CGM average
+covers the days the sensor was worn. Two numbers describing different windows
+are not in conflict, and treating them as if they were manufactures a
+disagreement that does not exist.
+
+**Never merge across instrument classes.** Same reason `merge.ts` never averages
+two devices: a blended number is one nobody measured and nobody can reconcile
+against either source. `merge.ts` resolves *device vs device* and stops there.
+
+**Show disagreement rather than resolving it.** When lab-derived eAG and a CGM
+average diverge, the gap is the interesting part. It is the thing worth taking
+to a doctor, and smoothing it away deletes the only signal in the comparison.
+
+`biomarker-overlap.ts` is a **record, not a resolver**: nothing merges these
+today. It exists so the first person to chart a device metric beside a marker
+has to read the rule before they can. Its `preferBiomarker()` returns `null` for
+non-comparable pairs, and callers must read that as "show both, separately",
+never as "no preference, pick either".
 
 ---
 

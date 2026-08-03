@@ -19,7 +19,7 @@ takes an afternoon. Start these now so the wait runs in parallel with the rest:
 | Provider | Where | What they ask for |
 |---|---|---|
 | **Garmin** | Garmin Developer Program → Health API | Company details, use case, expected user volume, privacy policy URL |
-| **Ultrahuman** | Ultrahuman partnership channel → UltraSignal | Use case, user base, how the data will be used |
+| **Ultrahuman** | Developer portal at `vision.ultrahuman.com/developer-docs` (log in to create an OAuth app) | Use case, user base, how the data will be used |
 
 Both will want `https://app.ikigaro.com/privacy` and a clear sentence about what
 we do with the data. "Show users their own sleep and recovery alongside their
@@ -27,6 +27,123 @@ lab panels; never sold, never used for advertising" is accurate and is the
 answer they are looking for.
 
 ---
+
+
+### Ultrahuman: two APIs, and which one we ship
+
+**Verified against the authenticated docs on 2026-08-03.** Everything here is
+read from Ultrahuman's own documentation, not inferred.
+
+There are **two separate APIs**, with different hosts, different Authorization
+header formats and different query parameters. An adapter written against one
+will not work against the other.
+
+| | **OAuth API** (what we ship) | **Personal token API** |
+|---|---|---|
+| Metrics path | `/api/partners/v1/user_data/metrics` | `partner.ultrahuman.com/api/v1/partner/daily_metrics` |
+| Auth header | `Authorization: Bearer <token>` | `Authorization: <token>`, **bare, no Bearer** |
+| Date params | `date` only, one day per request | `date`, or `start_epoch`/`end_epoch` (≤ 7 days) |
+| Obtained by | authorize, then token exchange | a button in the portal |
+
+We ship the OAuth API: it is the only one that works for anybody other than the
+account holder. The personal-token API is useful for validating against real
+data before credentials exist, but it needs a ring and a portal login.
+
+**OAuth app creation is self-serve.** An in-portal modal, no review and no
+queue, which makes Ultrahuman an afternoon rather than a multi-week wait. The
+form takes a **single** redirect URI, so get it right first time:
+`https://app.ikigaro.com/api/wearables/callback/ultrahuman`.
+
+#### Facts that cost something if you get them wrong
+
+- **The refresh token rotates.** Documented explicitly: *"next time you refresh
+  the tokens make sure to use the newly granted refresh token"*. Our
+  `persistTokens` writes it back unconditionally, which is why this is safe.
+- **Sleep is in SECONDS** (`"unit": "seconds"`), so `total_sleep: 25500` is 7h05m.
+- **`active_calories` does not exist.** No calories field appears anywhere in
+  their payload. `active_minutes` is minutes and is not a substitute.
+- **The response is not flat.** `data.metrics` is a **map keyed by date**, each
+  holding an **array of `{type, object}`** entries, and the value lives under a
+  different key per entry: `value` for scalars, `avg` for averaged series,
+  `total` for steps.
+- **Two HRVs and two resting heart rates.** `avg_sleep_hrv` versus `hrv`, and
+  `sleep_rhr` versus `night_rhr`. We take the overnight one in both cases,
+  because that is what a recovery figure means.
+- **Two sleep scores.** A top-level `sleep_score` entry and a nested
+  `sleep.object.score`, which are different numbers. We use the top-level one.
+- **`temperature_deviation` is signed** and legitimately negative. Distinct
+  from `temp` and `average_body_temperature`, which are absolute.
+
+#### Two things their docs contradict themselves on
+
+1. **Token lifetime.** The prose says tokens "are valid for a week", the field
+   block says `86400 seconds (1 day)`, and the response says
+   `"expires_in": 86399`. We trust `expires_in` from the response and refresh
+   early, which is what `accessTokenFor` already does. Nothing is hard-coded.
+2. **The authorize path spelling.** Their spec text says `/authorize`; every
+   worked example uses `/authorise` on `auth.ultrahuman.com`. We follow the
+   examples. If consent ever 404s, try the other spelling before assuming
+   anything else is wrong.
+
+#### One thing still unverified
+
+The **host** for the OAuth token and metrics paths. The docs give the paths
+(`/api/partners/oauth/token`, `/api/partners/v1/user_data/metrics`) without
+repeating the host. We use `partner.ultrahuman.com`, matching both the
+`/api/partners/` prefix and the host the personal-token API uses. Confirm it
+with the first real token exchange.
+
+#### CGM: requested, and stored as daily summaries only
+
+Glucose arrives on the **same** endpoint, gated by the `cgm_data` scope, from
+an Ultrahuman M1. We request that scope: glucose is the one wearable signal
+that moves against a blood panel on the axis the panel actually measures, which
+makes it worth more to us than any recovery score. A user without a CGM simply
+has no glucose entries, so the scope costs them nothing.
+
+**Five daily summaries are stored**, not the trace:
+
+| Their key | Ours | Note |
+|---|---|---|
+| `average_glucose` | `glucose_avg` | mg/dL |
+| `glucose_variability` | `glucose_variability` | coefficient of variation, % |
+| `time_in_target` | `glucose_time_in_target` | % of day in range |
+| `hba1c` | **`hba1c_estimated`** | see below |
+| `metabolic_score` | `metabolic_score` | 0-100, and not a quantity, see below |
+
+The raw `glucose` entry is a reading every few minutes. That is a time series
+and does not belong in a table whose grain is one row per day per metric, and
+nothing we analyse needs it: what moves with a lab panel is the day's average,
+spread and control, not the shape of one afternoon.
+
+##### The estimated HbA1c is not the lab HbA1c
+
+Stored under its own key on purpose. A lab HbA1c measures glycated haemoglobin
+directly and integrates roughly three months; a CGM estimate is derived from a
+few weeks of averages, and the two legitimately disagree. Our biomarker catalog
+already holds a real, measured `hba1c` from blood panels.
+
+Letting a device estimate share that key would let it silently stand in for a
+clinical value, which is the single worst thing this integration could do. A
+test asserts the adapter never emits the bare `hba1c` key.
+
+Which of the two wins where they overlap, and the one pair where the device
+beats the blood panel, is in
+[`WEARABLE_DATA.md`](./WEARABLE_DATA.md#when-a-blood-panel-and-a-device-describe-the-same-thing).
+
+##### `metabolic_score` is the odd one out
+
+Every other key in our vocabulary is a quantity: steps are steps whoever counts
+them. This is Ultrahuman's own composite on an arbitrary 0-100 scale, so a
+second vendor's 72 would not mean their 72.
+
+It is stored anyway, because it is the number a CGM user actually looks at each
+day, and because a score that moves while the underlying average holds steady is
+worth seeing. The constraint is what it must never do: it is single-source by
+nature, never merged across providers, and never compared to a lab value. It is
+recorded as `prefer: "neither"` against `hba1c` in
+[`biomarker-overlap.ts`](../src/lib/wearables/biomarker-overlap.ts) precisely
+because it sits next to glucose in the UI and invites that comparison.
 
 ## The self-serve four
 
