@@ -8,7 +8,7 @@ import {
   type DailyMetric,
   type MetricKey,
 } from "./metrics";
-import type { ProviderId, WearableProvider } from "./types";
+import { PROVIDER_NAMES, type ProviderId, type WearableProvider } from "./types";
 
 /**
  * The six cloud wearable adapters.
@@ -98,7 +98,7 @@ interface OuraDoc {
 
 const oura: WearableProvider = {
   id: "oura",
-  name: "Oura",
+  name: PROVIDER_NAMES.oura,
   blurb: "Sleep, readiness and HRV from your Oura ring.",
   clientIdEnv: "OURA_CLIENT_ID",
   clientSecretEnv: "OURA_CLIENT_SECRET",
@@ -154,7 +154,7 @@ const oura: WearableProvider = {
 
 const fitbit: WearableProvider = {
   id: "fitbit",
-  name: "Fitbit",
+  name: PROVIDER_NAMES.fitbit,
   blurb: "Steps, sleep and resting heart rate from Fitbit.",
   clientIdEnv: "FITBIT_CLIENT_ID",
   clientSecretEnv: "FITBIT_CLIENT_SECRET",
@@ -220,7 +220,7 @@ interface WhoopCycle {
 
 const whoop: WearableProvider = {
   id: "whoop",
-  name: "Whoop",
+  name: PROVIDER_NAMES.whoop,
   blurb: "Recovery, strain and sleep performance from Whoop.",
   clientIdEnv: "WHOOP_CLIENT_ID",
   clientSecretEnv: "WHOOP_CLIENT_SECRET",
@@ -287,7 +287,7 @@ const whoop: WearableProvider = {
 
 const withings: WearableProvider = {
   id: "withings",
-  name: "Withings",
+  name: PROVIDER_NAMES.withings,
   blurb: "Weight, body composition and sleep from Withings scales and watches.",
   clientIdEnv: "WITHINGS_CLIENT_ID",
   clientSecretEnv: "WITHINGS_CLIENT_SECRET",
@@ -339,7 +339,7 @@ const withings: WearableProvider = {
 
 const garmin: WearableProvider = {
   id: "garmin",
-  name: "Garmin",
+  name: PROVIDER_NAMES.garmin,
   blurb: "Steps, sleep, stress and HRV from Garmin watches.",
   clientIdEnv: "GARMIN_CLIENT_ID",
   clientSecretEnv: "GARMIN_CLIENT_SECRET",
@@ -370,7 +370,7 @@ const garmin: WearableProvider = {
 
 const ultrahuman: WearableProvider = {
   id: "ultrahuman",
-  name: "Ultrahuman",
+  name: PROVIDER_NAMES.ultrahuman,
   blurb: "Sleep, recovery and HRV from the Ultrahuman Ring.",
   clientIdEnv: "ULTRAHUMAN_CLIENT_ID",
   clientSecretEnv: "ULTRAHUMAN_CLIENT_SECRET",

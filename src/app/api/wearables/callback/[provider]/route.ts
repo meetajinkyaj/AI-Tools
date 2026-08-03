@@ -45,6 +45,18 @@ export async function GET(
   // The state must also match the path we were called on, or a state minted
   // for one vendor could be replayed against another's callback.
   if (!state || !code || state.provider !== providerParam) {
+    // The user still gets nothing but a redirect, but WE need to be able to
+    // tell this apart from a failed token exchange: both end at the same URL,
+    // and without this line the difference is invisible in the logs. The
+    // reason is named, the state itself is never logged.
+    //
+    // `bad-or-expired-state` most often means the 15-minute TTL elapsed while
+    // the consent screen sat open, which looks exactly like a broken
+    // integration and is not one.
+    console.error(
+      `wearable callback rejected for ${providerParam} before exchange:`,
+      !code ? "no-code" : !state ? "bad-or-expired-state" : "provider-mismatch",
+    );
     return NextResponse.redirect(connectResultUrl("failed", providerParam));
   }
 

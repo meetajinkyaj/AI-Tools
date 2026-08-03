@@ -1,5 +1,5 @@
-import { METRICS, type MetricKey } from "./metrics";
-import type { ProviderId } from "./types";
+import { METRICS, VENDOR_SPECIFIC, type MetricKey } from "./metrics";
+import { PROVIDER_NAMES, type ProviderId } from "./types";
 
 /**
  * Merging several devices into one series per metric.
@@ -125,6 +125,26 @@ export interface MergedSeries {
   sources: ProviderId[];
 }
 
+/**
+ * The label a series carries, with the vendor named when the number is theirs.
+ *
+ * "Metabolic score" reads like a fact about the body. "Metabolic score
+ * (Ultrahuman)" reads like what it is: one company's formula. The tag is added
+ * here rather than in each chart, so no consumer can forget it and no future
+ * screen has to rediscover the reason.
+ *
+ * Only for `VENDOR_SPECIFIC` metrics, and only when exactly one provider
+ * contributed. Two vendors' composites in one series should never happen (the
+ * ranking picks one per day), and if it somehow did, a single vendor's name on
+ * the label would be a worse lie than no name at all.
+ */
+export function seriesLabel(metric: MetricKey, sources: readonly ProviderId[]): string {
+  const base = METRICS[metric].label;
+  if (!VENDOR_SPECIFIC.has(metric) || sources.length !== 1) return base;
+  const name = PROVIDER_NAMES[sources[0]];
+  return name ? `${base} (${name})` : base;
+}
+
 function rankOf(metric: MetricKey, provider: string): number {
   const i = SOURCE_RANK[metric].indexOf(provider as ProviderId);
   // Unknown providers sort last rather than being dropped: a provider added to
@@ -187,7 +207,7 @@ export function mergeMetrics(rows: MetricRow[]): MergedSeries[] {
     out.push({
       metric,
       unit: METRICS[metric].unit,
-      label: METRICS[metric].label,
+      label: seriesLabel(metric, contributing),
       points,
       sources: contributing,
     });
