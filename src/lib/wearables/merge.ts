@@ -83,6 +83,7 @@ export const SOURCE_RANK: Record<MetricKey, ProviderId[]> = {
   glucose_variability: CGM_FIRST,
   glucose_time_in_target: CGM_FIRST,
   hba1c_estimated: CGM_FIRST,
+  metabolic_score: CGM_FIRST,
   sleep_minutes: SLEEP_FIRST,
   sleep_score: SLEEP_FIRST,
   hrv: SLEEP_FIRST,

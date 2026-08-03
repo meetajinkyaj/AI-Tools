@@ -61,6 +61,18 @@ export const METRICS = {
    * integration could do.
    */
   hba1c_estimated: { unit: "%", label: "Estimated HbA1c", precision: 1 },
+  /**
+   * A vendor's own composite of how the day's glucose behaved. 0-100.
+   *
+   * UNLIKE EVERY OTHER KEY HERE, THIS ONE IS NOT A QUANTITY. Steps are steps
+   * whoever counts them; a metabolic score is one company's formula, and a
+   * second vendor's 72 would not mean what Ultrahuman's 72 means. It is kept
+   * because it is the one number a CGM user actually looks at daily, and
+   * because a score that moves while the underlying average does not is worth
+   * seeing. It must never be merged across providers or compared to a lab
+   * value: see `biomarker-overlap.ts`.
+   */
+  metabolic_score: { unit: "score", label: "Metabolic score", precision: 0 },
 } as const;
 
 export type MetricKey = keyof typeof METRICS;

@@ -486,15 +486,20 @@ const ultrahuman: WearableProvider = {
         // mistaken for the lab HbA1c our biomarker catalog already holds.
         push(out, "hba1c_estimated", date, val("hba1c"), "ultrahuman");
 
+        // Ultrahuman's own composite, not a measurement of anything. Clamped
+        // like any other score, and single-vendor by nature: nothing else here
+        // computes one, and if something did it would not be the same number.
+        const metabolic = val("metabolic_score");
+        if (metabolic !== undefined) {
+          push(out, "metabolic_score", date, clampScore(metabolic), "ultrahuman");
+        }
+
         // NOT AVAILABLE, deliberately absent rather than forgotten:
         //   active_calories   no calories field exists anywhere in the payload;
         //                     `active_minutes` is minutes and not the same thing
         //   respiratory_rate  not reported
         //   weight_kg,
         //   body_fat_pct      a ring cannot measure either
-        //   metabolic_score   a proprietary composite with no cross-vendor
-        //                     meaning and nothing to merge it against. Cheap to
-        //                     add later; awkward to remove once charted.
       }
     }
     return out;

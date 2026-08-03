@@ -167,6 +167,7 @@ describe("reading their documented payload", () => {
       glucose_variability: 18,
       glucose_time_in_target: 76,
       hba1c_estimated: 5.1,
+      metabolic_score: 72,
     });
   });
 
