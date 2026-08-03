@@ -218,27 +218,57 @@ afterwards.
 **Losing or rotating it** costs every connected user a reconnect. Recoverable,
 and far better than the alternative, so rotate only if you believe it leaked.
 
-**Base64url and missing padding are accepted**, and fold to the same bytes as
-the standard spelling, so re-spelling the secret cannot orphan tokens already
-stored under the other form. Whitespace around the value is trimmed.
+**Base64url, missing padding and embedded whitespace are all accepted**, and
+fold to the same bytes as the standard spelling, so re-spelling the secret
+cannot orphan tokens already stored under the other form.
 
-> **The bug that taught us this, 2026-08-03.** The key was decoded with a bare
-> `atob`, which on Workers rejects `-`, `_` and unpadded input. A key that was
-> merely spelled base64url threw `InvalidCharacterError` from inside
-> `encryptToken`, which sits in the OAuth callback *after* the token exchange
-> has already succeeded. It surfaced as
-> `wearable callback failed for ultrahuman: ... invalid base64-encoded data`,
-> which reads like the vendor rejected us and sent an entire investigation to
-> Ultrahuman's token endpoint. Nothing was wrong with Ultrahuman.
->
-> Two fixes, both in `crypto.ts`. The decoder now folds base64url like
-> `oauth-state.ts` always did: two decoders in one directory, one tolerant and
-> one strict, with the strict one holding the encryption key, was the real
-> defect. And `wearableKeyProblem()` now checks the key at
-> `/api/wearables/connect`, so a bad key returns 503 **before** the user is sent
-> to a vendor, instead of after they have read a consent screen and tapped
-> Approve for nothing. The reason is logged; the user sees a plain sentence,
-> because a base64 complaint is not theirs to act on.
+### The 2026-08-03 incident, and the wrong turn in the middle of it
+
+Worth reading in full, because the wrong turn is the instructive part.
+
+**Symptom.** Connecting Ultrahuman redirected to `?wearable=failed`. The log
+said:
+
+```
+wearable callback failed for ultrahuman: InvalidCharacterError: atob() called
+with invalid base64-encoded data.
+```
+
+That reads like the vendor rejected us, and it sent the first round of
+investigation to Ultrahuman's token endpoint. **Nothing was ever wrong with
+Ultrahuman.** The token exchange had already succeeded; the throw came from
+`encryptToken`, one step later, decoding `WEARABLE_TOKEN_KEY`.
+
+**The wrong turn.** The key was decoded with a bare `atob`, which on Workers
+rejects `-`, `_` and unpadded input, so the obvious hypothesis was that the key
+was merely *spelled* base64url. The decoder was made tolerant, which was the
+right change for a real defect (two decoders in one directory,
+`oauth-state.ts`'s tolerant one and this strict one, with the strict one holding
+the encryption key), **but it was not the cure, and the hypothesis was never
+tested before being acted on.** It could not be tested, because the shell-row
+bug below meant no connect was attempted again until two rounds later.
+
+**The actual cause.** The key is not base64 at all. The tolerant decoder rejects
+it too. Encryption with that key had therefore never once worked, which is why
+nothing was ever stored and why rotating it cost nothing.
+
+**Three fixes came out of it, and all three were worth having:**
+
+1. **The tolerant decoder.** Correct on its own merits, and it is what
+   `oauth-state.ts` always did.
+2. **`wearableKeyProblem()` at `/api/wearables/connect`.** A bad key now returns
+   503 **before** the user is sent to a vendor, rather than after they have read
+   a consent screen and tapped Approve for nothing. This is the guard that
+   finally surfaced the real cause, in one line, at the front door.
+3. **The message says which failure it is:** an out-of-alphabet character (not
+   base64 at all, no decoder will ever read it) versus a bad length (base64 but
+   truncated). Those need different actions, and conflating them is exactly what
+   produced the wrong turn. Neither branch names a character or a length, so
+   nothing about the key leaks into the logs.
+
+**The lesson worth keeping:** the first plausible explanation for an
+`InvalidCharacterError` was a spelling difference, and it was wrong. A guard
+that reports *which* precondition failed would have said so immediately.
 
 ---
 

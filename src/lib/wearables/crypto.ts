@@ -90,8 +90,14 @@ function toBase64(bytes: Uint8Array): string {
  * as `Uint8Array<ArrayBufferLike>`, which could in principle be a
  * SharedArrayBuffer and so is not assignable to Web Crypto's `BufferSource`.
  */
+function fold(s: string): string {
+  // Whitespace is stripped rather than trimmed: `atob` ignores it anywhere, so
+  // a key that arrived wrapped across lines is not a malformed key.
+  return s.replace(/\s+/g, "").replace(/-/g, "+").replace(/_/g, "/");
+}
+
 function fromBase64(s: string): Uint8Array<ArrayBuffer> | null {
-  const folded = s.trim().replace(/-/g, "+").replace(/_/g, "/");
+  const folded = fold(s);
   const padded = folded + "=".repeat((4 - (folded.length % 4)) % 4);
   let bin: string;
   try {
@@ -112,8 +118,17 @@ function fromBase64(s: string): Uint8Array<ArrayBuffer> | null {
 function keyProblem(material: string): string | null {
   const bytes = fromBase64(material);
   if (!bytes) {
+    // WHICH of the two failures it is, because they mean different things and
+    // guessing wrong cost a round. An out-of-alphabet character means the value
+    // is not base64 at all, so no amount of decoder tolerance will ever read
+    // it. A bad length means it is base64 but truncated. Neither branch names
+    // a character or a length, so nothing about the key leaks.
+    const alphabet = /^[A-Za-z0-9+/]*=*$/.test(fold(material))
+      ? "its length is not a valid base64 length, so it is probably truncated"
+      : "it contains characters that are not base64 or base64url, so it is not " +
+        "a base64 key at all and no decoder will read it";
     return (
-      "is not decodable as base64. Generate a fresh one with " +
+      `cannot be decoded: ${alphabet}. Generate a fresh one with ` +
       "`openssl rand -base64 32` and set it as a Worker Secret."
     );
   }

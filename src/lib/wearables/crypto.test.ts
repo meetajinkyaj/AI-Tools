@@ -161,9 +161,27 @@ describe("the key itself", () => {
     expect(wearableKeyProblem()).toBeNull();
   });
 
+  it("separates a non-base64 key from a truncated one", () => {
+    // These need different actions and were conflated once, which sent an
+    // investigation looking for a decoder bug when the key was simply not
+    // base64. "abcde" is a valid base64 alphabet at an impossible length.
+    process.env.WEARABLE_TOKEN_KEY = "abcde";
+    expect(wearableKeyProblem()).toMatch(/probably truncated/);
+
+    process.env.WEARABLE_TOKEN_KEY = "abcd!!!!";
+    expect(wearableKeyProblem()).toMatch(/not base64 or base64url/);
+  });
+
+  it("accepts a key wrapped across lines", () => {
+    // atob ignores whitespace anywhere, so a pasted key that picked up a line
+    // break is not a malformed key.
+    process.env.WEARABLE_TOKEN_KEY = `${KEY_A.slice(0, 20)}\n${KEY_A.slice(20)}`;
+    expect(wearableKeyProblem()).toBeNull();
+  });
+
   it("names an undecodable key instead of throwing base64 at the caller", async () => {
     process.env.WEARABLE_TOKEN_KEY = "not valid base64 !!!";
-    expect(wearableKeyProblem()).toMatch(/not decodable as base64/);
+    expect(wearableKeyProblem()).toMatch(/not base64 or base64url/);
     // And the throw from the encrypt path says which secret, not which builtin.
     await expect(encryptToken("rt_x")).rejects.toThrow(/WEARABLE_TOKEN_KEY/);
   });
