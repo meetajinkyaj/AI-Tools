@@ -6,9 +6,8 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-03. **One task is pending:** redeploy and retry the
-Ultrahuman connect. The failure is diagnosed and fixed in code. See
-[PENDING TASK](#pending-task) below.
+Last updated: 2026-08-03. **One task is pending:** reconnect Ultrahuman once,
+after the shell-row fix deploys. See [PENDING TASK](#pending-task) below.
 
 ---
 
@@ -35,6 +34,7 @@ Ultrahuman connect. The failure is diagnosed and fixed in code. See
 
 | Verification | Status |
 |---|---|
+| First real wearable connection | **Not yet achieved.** The `atob` fix deployed clean, but the row on production turned out to be the pre-fix failed attempt: a shell with `status = 'active'` and no credentials, which the card rendered as Disconnect. Found by reading `connected_at`, which the upsert refreshes and which had not moved. The token host, `/authorise` spelling, scope strings and redirect URI are still proven by the successful code exchange that preceded the encryption failure. The metrics endpoint remains unproven. |
 | Wearables UI on production | Confirmed live 2026-07-30 on `app.ikigaro.com`. Settings shows **Connected devices** with the coming-soon copy and Apple Health / Google Health Connect listed; Home shows the **Your devices** card. No Connect buttons on either surface, correct, since no provider credentials exist yet. Dismiss ✕ persists across reload. No app console errors. |
 
 | Repo hygiene | Status |
@@ -49,56 +49,66 @@ is outstanding.
 
 # PENDING TASK
 
-## Redeploy, then retry the Ultrahuman connect
+## Reconnect Ultrahuman once, after the shell-row fix deploys
 
-**The cause is found and fixed in code. It was never Ultrahuman.**
+**Your read was right, and it found a real bug.** The row you queried was the
+**pre-fix failed attempt**, not a successful connect. `connected_at` is part of
+the upsert payload, so a successful reconnect would have refreshed it; it did
+not, which means no successful connect ever ran.
 
-The log line you pulled was the whole answer:
+What the old code did: wrote the connection row, then wrote the tokens as a
+**second statement**. Encryption threw in between. Production was left with a
+row saying `status = 'active'` and no credentials at all. The card rendered
+**Disconnect**, nothing could ever sync, and `last_error` stayed null because no
+sync had failed. It looked like success from every angle.
 
-```
-wearable callback failed for ultrahuman: InvalidCharacterError: atob() called
-with invalid base64-encoded data.
-```
-
-That is not the vendor rejecting us. **The token exchange had already
-succeeded.** The throw came from `encryptToken`, one step later, while decoding
-`WEARABLE_TOKEN_KEY` so the tokens could be stored. `atob` on Workers rejects
-the base64url alphabet (`-`, `_`) and unpadded input, and the key is spelled in
-a form it refuses. Ultrahuman was never the problem, and neither were the client
-id, the secret, the redirect URI or the state.
-
-**The decoder now folds base64url and pads, so the existing key works as-is.**
-Nothing needs re-entering, regenerating or rotating. Do not touch
-`WEARABLE_TOKEN_KEY`: rotating it would cost every connected user a reconnect
-for no reason.
+Both halves are now fixed: the credentials are encrypted first and written in
+the **same statement** as the row, so no half-connection can exist; and a row
+with no access token is filtered out of the connections API, so the existing
+shell row reads as "not connected" rather than offering a Disconnect button for
+nothing.
 
 ### What to do
 
-1. **Confirm the fix is deployed.** Cloudflare → Workers & Pages → `ai-tools` →
-   Deployments. The active version must include the commit
-   "Decode the wearable key the way every other decoder here does".
-2. **Retry the connect.** `app.ikigaro.com` → Profile → Connected devices →
-   Ultrahuman → Connect → Approve.
-3. **Expected:** the button becomes **Connected**, and the card shows
-   Ultrahuman with no data. **An empty connection is the correct result**, there
-   is no ring on the account yet.
+1. **Confirm the deploy.** `ai-tools` → Deployments, active version includes
+   "Write a wearable connection and its credentials in one statement".
+2. **Load Profile → Connected devices.** Ultrahuman should now show
+   **Connect**, not Disconnect. That is the shell row correctly disappearing.
+3. **Connect → Approve**, briskly, inside two minutes.
+4. **Then re-run the same query as last time.**
 
-### What to report
+```sql
+select provider, status, failure_count, last_sync_at, connected_at, last_error,
+       external_user_id is not null as has_external_id,
+       access_token_enc is not null as has_access_token,
+       refresh_token_enc is not null as has_refresh_token,
+       expires_at
+from wearable_connections
+where provider = 'ultrahuman';
+```
 
-- Did the button flip to Connected?
-- Search Observability → Logs for `wearable` and paste anything at level
-  `error`. There should be none.
+### What a healthy row looks like now
 
-**If it fails again**, the log now distinguishes the cases properly, so send the
-exact line and nothing else:
-
-| Line | Meaning |
+| Column | Expected |
 |---|---|
-| `wearable connect refused: WEARABLE_TOKEN_KEY ...` | The key is genuinely unusable, not merely oddly spelled. The message says whether it failed to decode or decoded to the wrong length. It never contains the key. |
-| `wearable callback rejected for ultrahuman before exchange: ...` | Never reached the exchange. One of `no-code`, `bad-or-expired-state`, `provider-mismatch`. |
-| `wearable callback failed for ultrahuman: ...` | The exchange ran and something after it failed. The message carries the vendor's status and response body. |
+| `has_access_token` | **true**. If this is false again, stop and report: the fix did not take. |
+| `has_refresh_token` | true |
+| `expires_at` | roughly 24 hours out |
+| `connected_at` | your new attempt, not `14:25:52` |
+| `last_sync_at` | **set**, even with no ring |
 
-**Do not change code, add logging, or edit secrets.** Report the line.
+**`last_sync_at` is the one to watch.** A sync that runs and finds nothing still
+stamps it. If it is set, the metrics endpoint host is confirmed too, which is
+the last unproven guess in the adapter. If it is null with `last_error`
+populated, paste the error: that is the metrics host, and a code fix.
+
+### Also worth a quick look
+
+There is now a **confirmation dialog** on Disconnect. If you happen to tap it,
+Cancel should close it and change nothing. Do not confirm it.
+
+**Do not click "Sync now" before running the query**, it overwrites the evidence
+from the connect.
 
 ---
 

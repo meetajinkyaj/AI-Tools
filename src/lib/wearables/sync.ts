@@ -117,20 +117,19 @@ export async function requestTokens(
   };
 }
 
-/** Write tokens back, encrypted. Used by both connect and refresh. */
-export async function persistTokens(
-  connectionId: string,
-  tokens: OAuthTokens,
-  extra: Record<string, unknown> = {},
-) {
-  const supabase = createSupabaseAdmin();
+/**
+ * The encrypted-credential half of a connection row.
+ *
+ * Separated from the write so `connect` can put it in the SAME statement that
+ * creates the row. See `persistTokens` for why that matters.
+ */
+export async function tokenColumns(tokens: OAuthTokens): Promise<Record<string, unknown>> {
   const patch: Record<string, unknown> = {
     access_token_enc: await encryptToken(tokens.accessToken),
     expires_at: tokens.expiresIn
       ? new Date(Date.now() + tokens.expiresIn * 1000).toISOString()
       : null,
     updated_at: new Date().toISOString(),
-    ...extra,
   };
   // Only overwrite the refresh token when the vendor actually sent one. Some
   // return it on every refresh (rotation), some only at first grant, blanking
@@ -140,7 +139,27 @@ export async function persistTokens(
   }
   if (tokens.scope) patch.scopes = tokens.scope;
   if (tokens.externalUserId) patch.external_user_id = tokens.externalUserId;
+  return patch;
+}
 
+/**
+ * Write tokens back, encrypted. The REFRESH path only.
+ *
+ * Connect does not use this: it folds `tokenColumns` into its own upsert, so
+ * the row and its credentials are one statement. Two statements produced a real
+ * incident on 2026-08-03. The row was written, encryption then threw, and the
+ * result was a connection with `status = 'active'` and no tokens at all: the UI
+ * showed "Disconnect", nothing could ever sync, and `last_error` was null
+ * because no sync had failed. A row that says connected without credentials is
+ * worse than no row, because it looks like success to everybody.
+ */
+export async function persistTokens(
+  connectionId: string,
+  tokens: OAuthTokens,
+  extra: Record<string, unknown> = {},
+) {
+  const supabase = createSupabaseAdmin();
+  const patch = { ...(await tokenColumns(tokens)), ...extra };
   await supabase.from("wearable_connections").update(patch).eq("id", connectionId);
 }
 

@@ -85,13 +85,31 @@ form takes a **single** redirect URI, so get it right first time:
    examples. If consent ever 404s, try the other spelling before assuming
    anything else is wrong.
 
-#### One thing still unverified
+#### The token host is confirmed. The metrics host is not.
 
-The **host** for the OAuth token and metrics paths. The docs give the paths
-(`/api/partners/oauth/token`, `/api/partners/v1/user_data/metrics`) without
-repeating the host. We use `partner.ultrahuman.com`, matching both the
-`/api/partners/` prefix and the host the personal-token API uses. Confirm it
-with the first real token exchange.
+Their docs give both paths without repeating the host, so we guessed
+`partner.ultrahuman.com` from the `/api/partners/` prefix and the personal-token
+API.
+
+**`/api/partners/oauth/token` on that host is now proven**, by a real code
+exchange on 2026-08-03: a live connection completed and stored tokens. Also
+proven by the same round trip: the `/authorise` spelling, the three scope
+strings, the redirect URI, and that their token response carries no user
+identifier (so `profile` scope and `/user_info` really are the only way to learn
+who connected).
+
+**`/api/partners/v1/user_data/metrics` is still unproven.** It shares a host
+with the token endpoint, which is suggestive and not evidence: a vendor
+splitting auth from data across hosts is ordinary. The first successful sync
+settles it.
+
+> **Do not read "no data" as "the endpoint works".** `fetchRange` catches each
+> day's request individually and continues, so a wrong host, a 404 and an empty
+> ring all produce the same empty result. What tells the two apart is
+> `wearable_connections.last_sync_at`: a sync that ran and found nothing still
+> stamps it. A null stamp on a connected account means the sync did not
+> complete, and the reason is in `last_error` on the same row, not in the
+> Worker logs.
 
 #### CGM: requested, and stored as daily summaries only
 

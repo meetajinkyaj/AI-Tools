@@ -34,7 +34,13 @@ export async function GET(request: Request) {
     .from("wearable_connections")
     .select("id, provider, status, last_sync_at, connected_at")
     .eq("user_id", userId)
-    .neq("status", "revoked");
+    .neq("status", "revoked")
+    // A row with no access token is not a connection, whatever its status
+    // says. Connect writes the row and its credentials in one statement now,
+    // so this cannot be produced any more, but one such row exists in
+    // production from before that fix and rows like it must read as "not
+    // connected" rather than offering a Disconnect button for nothing.
+    .not("access_token_enc", "is", null);
 
   return NextResponse.json({
     enabled: true,

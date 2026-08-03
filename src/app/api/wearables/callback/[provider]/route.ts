@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { verifyState } from "@/lib/wearables/oauth-state";
 import { isProviderId, PROVIDERS } from "@/lib/wearables/providers";
-import { persistTokens, requestTokens, syncConnection } from "@/lib/wearables/sync";
+import { requestTokens, syncConnection, tokenColumns } from "@/lib/wearables/sync";
 import { callbackUrl, connectResultUrl } from "@/lib/wearables/urls";
 import type { ConnectionRow } from "@/lib/wearables/sync";
 
@@ -69,8 +69,20 @@ export async function GET(
 
     const supabase = createSupabaseAdmin();
 
+    // ENCRYPT BEFORE WRITING ANYTHING. This is the step that threw on
+    // 2026-08-03, and doing it first means a failure here leaves no trace at
+    // all, rather than a row claiming to be connected with no credentials in
+    // it. Nothing below can half-succeed.
+    const credentials = await tokenColumns(tokens);
+
     // Upsert on (user, provider): reconnecting replaces the old grant in place
     // instead of leaving a second row that also thinks it should be syncing.
+    //
+    // The credentials go in the SAME statement. Writing the row and then the
+    // tokens is two statements with no transaction around them, and the gap is
+    // exactly where the incident lived: the row said `active`, held no tokens,
+    // rendered as "Disconnect", and could never sync. `last_error` stayed null
+    // because no sync had failed, so it looked like success from every angle.
     const { data: row, error } = await supabase
       .from("wearable_connections")
       .upsert(
@@ -81,7 +93,7 @@ export async function GET(
           failure_count: 0,
           last_error: null,
           connected_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          ...credentials,
         },
         { onConflict: "user_id,provider" },
       )
@@ -90,24 +102,14 @@ export async function GET(
 
     if (error || !row) throw new Error(error?.message ?? "connection upsert failed");
 
-    await persistTokens(row.id as string, tokens);
-
     // Pull immediately so the user sees data on the screen they land on, rather
     // than an empty card and no idea whether it worked. Failure here is not
     // failure of the connection, the nightly sweep will retry.
     //
-    // RE-READ THE ROW FIRST. `row` is what the upsert returned, which is the
-    // state BEFORE the tokens were written. Syncing that copy finds no
-    // credentials, raises ReauthRequired, and marks the connection `expired`, // so every successful connect would immediately present itself as broken.
+    // `row` now carries the credentials, because they were part of the same
+    // write, so there is nothing to re-read.
     if (PROVIDERS[providerParam].fetchRange) {
-      const { data: withTokens } = await supabase
-        .from("wearable_connections")
-        .select("*")
-        .eq("id", row.id as string)
-        .single();
-      if (withTokens) {
-        await syncConnection(withTokens as ConnectionRow).catch(() => undefined);
-      }
+      await syncConnection(row as ConnectionRow).catch(() => undefined);
     }
 
     return NextResponse.redirect(connectResultUrl("connected", providerParam));
