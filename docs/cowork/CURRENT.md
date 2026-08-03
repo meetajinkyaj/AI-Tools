@@ -6,8 +6,9 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-03. **One task is pending:** set the two Ultrahuman
-Worker secrets. See [PENDING TASK](#pending-task) below.
+Last updated: 2026-08-03. **One task is pending:** read the Worker log line
+that says why the Ultrahuman token exchange is failing. See
+[PENDING TASK](#pending-task) below.
 
 ---
 
@@ -29,6 +30,7 @@ Worker secrets. See [PENDING TASK](#pending-task) below.
 | `GARMIN_PUSH_SECRET` | Set on prod `ai-tools` 2026-07-30, URL-safe alphanumeric, saved to the founder's password manager. Needed again on Garmin's application form. |
 | `RESEND_API_KEY` | Set on prod `ai-tools` 2026-07-30 as a **Secret** (survives deploys, plaintext vars are replaced by `wrangler.jsonc` on every deploy). Sending-access-only key, scoped to `ikigaro.com`. |
 | Resend domain | `ikigaro.com` verified 2026-07-30 as the **root** domain (not `send.ikigaro.com`), so `From: team@ikigaro.com` is valid. Records are subdomain-scoped in Cloudflare; the existing Hostinger SPF/MX/DKIM/DMARC were left untouched and no second SPF was added. |
+| `ULTRAHUMAN_CLIENT_ID` / `ULTRAHUMAN_CLIENT_SECRET` | Set on prod `ai-tools` 2026-08-03 as Secrets. Confirmed working for the authorize half: consent renders and returns a valid `code`. The token exchange then fails, which is the open task below. |
 | `EMAIL_FROM` / `EMAIL_REPLY_TO` | **Deliberately unset, do not add them.** The code defaults to `Ajinkya from Ikigaro <team@ikigaro.com>`, a real Hostinger mailbox that receives, so replies go to `From` by default. Setting these as dashboard plaintext vars would be wiped on the next deploy anyway. |
 
 | Verification | Status |
@@ -39,69 +41,82 @@ Worker secrets. See [PENDING TASK](#pending-task) below.
 |---|---|
 | Branch cleanup | 2026-07-30: all 30 stale branches deleted, leaving only `main`. **"Automatically delete head branches" is now enabled** in Settings → General, so merged PRs clean up after themselves, do not let this pile up again. |
 
-**No database work is pending, both base secrets are set, and the UI is
-verified live.**
+**No database work is pending, and the UI is verified live.** Ultrahuman's
+OAuth app is registered and its consent screen works; only the token exchange
+is outstanding.
 
 ---
 
 # PENDING TASK
 
-## Set the two Ultrahuman secrets on the production Worker
+## Find out why the Ultrahuman token exchange is failing
 
-The founder has both values in hand from the Ultrahuman developer portal
-(`vision.ultrahuman.com`, app named `ikigaro`). Nothing else is needed to make
-Ultrahuman appear in the app.
+**The secrets are set and the authorize half works.** Consent returns a valid
+`code` to `/api/wearables/callback/ultrahuman`, which only happens when the
+client id, the scopes and the redirect URI are all accepted. The callback then
+redirects to `/?wearable=failed&provider=ultrahuman`.
 
-**Where:** Cloudflare dashboard → Workers & Pages → **`ai-tools`** → Settings →
-Variables and Secrets.
+**The reason is already in the logs. It is not swallowed.** Read this before
+changing anything: the previous session's report said the failure is logged
+without a reason, and that is not what the code does.
+[`callback/[provider]/route.ts`](../../src/app/api/wearables/callback/[provider]/route.ts)
+catches and calls `console.error`, `wrangler.jsonc` has `observability.enabled`,
+and `requestTokens` in
+[`sync.ts`](../../src/lib/wearables/sync.ts) puts the HTTP status and the first
+200 characters of Ultrahuman's own response body into the error message. So
+Ultrahuman's exact complaint is already being written to the Worker logs. **No
+code change is needed to diagnose this.**
 
-**Add two, both as type Secret, not as plaintext Variable:**
+### Step 1: read the log line
 
-| Name | Where the value comes from |
+In Cloudflare, Workers & Pages → `ai-tools` → **Observability → Logs**, search
+the window covering the failed attempt for:
+
+```
+wearable callback
+```
+
+Exactly one of two lines will be there, and which one it is decides everything:
+
+| Line | Meaning |
 |---|---|
-| `ULTRAHUMAN_CLIENT_ID` | Ultrahuman portal → OAuth Applications → `ikigaro` |
-| `ULTRAHUMAN_CLIENT_SECRET` | same page, the secret half |
+| `wearable callback failed for ultrahuman: <message>` | The token exchange ran and Ultrahuman rejected it. **The message contains their status code and response body.** Paste it verbatim. |
+| `wearable callback rejected for ultrahuman before exchange: <reason>` | It never got as far as the exchange. Reason is one of `no-code`, `bad-or-expired-state`, `provider-mismatch`. |
 
-**Secret, not Variable, and this matters.** `wrangler.jsonc` declares the
-plaintext vars, so anything added to the dashboard as a Variable is wiped on the
-next deploy. Secrets are not in that file and survive. This is the same reason
-`RESEND_API_KEY` and `WEARABLE_TOKEN_KEY` are Secrets.
+**`bad-or-expired-state` is the likely one if the consent screen sat open.** The
+signed state has a **15 minute TTL**, so approving after a pause fails exactly
+this way and looks identical in the browser to a broken integration. It is not
+one. Just retry the whole flow briskly, Connect through to Approve inside a
+couple of minutes.
 
-**Do not paste either value into chat, a commit, or any file.** Cowork should
-not handle them at all: if the dashboard step cannot be done without seeing the
-values, stop and hand the click-path back to the founder instead.
+**If neither line appears at all**, the log retention window has rolled past the
+attempt. Retry the flow once and look again immediately.
 
-**Then redeploy** so the Worker picks them up. Either push any commit to `main`,
-or use the dashboard's "Deploy" on the latest version. Secrets do not apply to
-an already-running version.
+### Step 2: report, do not fix
 
-### How to verify, without a ring
+Send back the exact line. Nothing beyond that. Each reason points at a different
+fix and three of the four are one-line code changes that belong in the repo, not
+in the dashboard:
 
-1. Open `https://app.ikigaro.com/settings` as an approved user.
-2. Under **Connected devices**, **Ultrahuman** should now be listed **with a
-   Connect button**. The other five stay button-less: a provider only renders
-   its Connect button when both halves of its credentials exist. Ultrahuman
-   appearing and nothing else changing is the whole test.
-3. Click Connect. It should bounce to `auth.ultrahuman.com` and show a real
-   consent screen naming `ikigaro` and three permissions: **Profile**, **Ring
-   Data**, **CGM Data**.
-4. **Stop there and report back. Do not complete the consent.** There is no ring
-   on the account yet, so a connection would be an empty one, and the useful
-   information is entirely in what the consent screen says.
+- `401` / `invalid_client` → the client secret value. Re-copy both halves from
+  the Ultrahuman portal, watching for a trailing newline or the two being
+  swapped, re-enter as Secrets, redeploy, retry.
+- `404` → the token **host** is wrong. This is the one thing we recorded as
+  unverified: their docs give the path `/api/partners/oauth/token` without
+  repeating the host, and we assumed `partner.ultrahuman.com`. A code fix.
+- `invalid_grant` / `invalid_request` → the exchange parameters. A code fix.
+- `bad-or-expired-state` → not a bug. Retry faster.
 
-### What to report
+**Do not add logging, edit the Worker's code, or try alternative hosts.** The
+information needed is already being written; the job here is to read it.
 
-- Did the Connect button appear for Ultrahuman, and only for Ultrahuman?
-- Did the consent screen load, or did it 404?
-- Exactly which permissions it lists.
+### If it turns out to be the secret values
 
-**If the consent page 404s**, the likely cause is the authorize path spelling.
-Ultrahuman's spec text says `/authorize` while every worked example uses
-`/authorise`, and we follow the examples. Report the 404 with the full URL from
-the address bar rather than trying alternatives; it is a one-line change here.
-
-**If the button does not appear**, the redeploy did not happen or a name is
-misspelled. Both names are case-sensitive and take no prefix.
+Re-entering them is fine and is the cheap first test when the log says `401` or
+`invalid_client`. Same rules as before: type **Secret**, not plaintext Variable
+(`wrangler.jsonc` replaces plaintext vars on every deploy), and **never paste
+either value into chat, a commit, or any file.** Redeploy afterwards, secrets do
+not apply to an already-running version.
 
 ---
 

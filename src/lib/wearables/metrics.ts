@@ -77,6 +77,22 @@ export const METRICS = {
 
 export type MetricKey = keyof typeof METRICS;
 
+/**
+ * Metrics that are one vendor's formula rather than a measured quantity.
+ *
+ * Steps are steps whoever counts them, so "Steps" is an honest label on its
+ * own. A metabolic score is not: it is a proprietary composite, and a second
+ * vendor's 72 would not mean this vendor's 72. So these are never shown without
+ * saying whose they are, and `mergeMetrics` puts the provider in the label
+ * rather than leaving it to each chart to remember.
+ *
+ * Adding a metric here is a labelling decision, not a storage one. The row is
+ * stored the same way either way.
+ */
+export const VENDOR_SPECIFIC: ReadonlySet<MetricKey> = new Set<MetricKey>([
+  "metabolic_score",
+]);
+
 export const METRIC_KEYS = Object.keys(METRICS) as MetricKey[];
 
 export function isMetricKey(k: string): k is MetricKey {

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { measuredSleepHours, mergeMetrics, recentAverage, SOURCE_RANK, type MetricRow } from "./merge";
 import { METRIC_KEYS } from "./metrics";
-import { PROVIDER_IDS } from "./providers";
+import { PROVIDER_IDS, PROVIDERS } from "./providers";
+import { PROVIDER_NAMES } from "./types";
 
 /**
  * The merge is where multiple devices either become one coherent picture or a
@@ -193,5 +194,40 @@ describe("feeding the momentum model", () => {
     const merged = mergeMetrics([row("oura", today, "steps", 9_000)]);
     expect(recentAverage(merged[0], 30)).toBe(9_000);
     expect(recentAverage(undefined, 30)).toBeNull();
+  });
+});
+
+describe("naming whose number it is", () => {
+  it("tags a vendor composite with the vendor", () => {
+    // "Metabolic score" reads like a fact about the body. It is not: it is one
+    // company's formula, and the label has to say so.
+    const merged = mergeMetrics([row("ultrahuman", "2026-07-04", "metabolic_score", 72)]);
+    expect(merged[0].label).toBe("Metabolic score (Ultrahuman)");
+  });
+
+  it("leaves real quantities unqualified", () => {
+    // Steps are steps whoever counted them. Tagging every series would make
+    // the tag noise, and noise is not read.
+    const merged = mergeMetrics([row("oura", "2026-07-04", "steps", 9_000)]);
+    expect(merged[0].label).toBe("Steps");
+  });
+
+  it("drops the tag rather than crediting one vendor for two", () => {
+    // Cannot happen today, the ranking picks one source per day. If it ever
+    // did, one name on a mixed series would be worse than no name.
+    const merged = mergeMetrics([
+      row("ultrahuman", "2026-07-04", "metabolic_score", 72),
+      row("oura", "2026-07-05", "metabolic_score", 64),
+    ]);
+    expect(merged[0].sources).toHaveLength(2);
+    expect(merged[0].label).toBe("Metabolic score");
+  });
+
+  it("keeps the display names identical to the ones in Settings", () => {
+    // Two spellings of the same device is a user with no way to tell they are
+    // the same device.
+    for (const id of PROVIDER_IDS) {
+      expect(PROVIDERS[id].name).toBe(PROVIDER_NAMES[id]);
+    }
   });
 });

@@ -19,6 +19,23 @@ export type ProviderId =
   | "garmin"
   | "ultrahuman";
 
+/**
+ * Display names, in one place because two places drift.
+ *
+ * `providers.ts` reads its `name` from here, and so does the merge when it has
+ * to tag a series with whose number it is. If these ever diverge, a user sees
+ * one spelling in Settings and another on a chart, and has no way to know they
+ * are the same device.
+ */
+export const PROVIDER_NAMES: Record<ProviderId, string> = {
+  oura: "Oura",
+  fitbit: "Fitbit",
+  whoop: "Whoop",
+  withings: "Withings",
+  garmin: "Garmin",
+  ultrahuman: "Ultrahuman",
+};
+
 export interface OAuthTokens {
   accessToken: string;
   /**
