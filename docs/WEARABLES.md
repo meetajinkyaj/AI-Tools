@@ -93,14 +93,42 @@ repeating the host. We use `partner.ultrahuman.com`, matching both the
 `/api/partners/` prefix and the host the personal-token API uses. Confirm it
 with the first real token exchange.
 
-#### CGM
+#### CGM: requested, and stored as daily summaries only
 
-Glucose arrives on the **same** endpoint, gated by the `cgm_data` scope:
-`glucose`, `average_glucose`, `glucose_variability`, `hba1c`, `time_in_target`,
-`metabolic_score`, all in mg/dL. **We do not request that scope**, because we
-store none of it, and asking a user for data we will not use is how a consent
-screen stops being read. If glucose ever becomes a feature, the scope is the
-only change needed on their side.
+Glucose arrives on the **same** endpoint, gated by the `cgm_data` scope, from
+an Ultrahuman M1. We request that scope: glucose is the one wearable signal
+that moves against a blood panel on the axis the panel actually measures, which
+makes it worth more to us than any recovery score. A user without a CGM simply
+has no glucose entries, so the scope costs them nothing.
+
+**Four daily summaries are stored**, not the trace:
+
+| Their key | Ours | Note |
+|---|---|---|
+| `average_glucose` | `glucose_avg` | mg/dL |
+| `glucose_variability` | `glucose_variability` | coefficient of variation, % |
+| `time_in_target` | `glucose_time_in_target` | % of day in range |
+| `hba1c` | **`hba1c_estimated`** | see below |
+
+The raw `glucose` entry is a reading every few minutes. That is a time series
+and does not belong in a table whose grain is one row per day per metric, and
+nothing we analyse needs it: what moves with a lab panel is the day's average,
+spread and control, not the shape of one afternoon.
+
+`metabolic_score` is deliberately skipped. It is a proprietary composite with no
+cross-vendor meaning and nothing to merge it against. Cheap to add later,
+awkward to remove once it is on a chart.
+
+##### The estimated HbA1c is not the lab HbA1c
+
+Stored under its own key on purpose. A lab HbA1c measures glycated haemoglobin
+directly and integrates roughly three months; a CGM estimate is derived from a
+few weeks of averages, and the two legitimately disagree. Our biomarker catalog
+already holds a real, measured `hba1c` from blood panels.
+
+Letting a device estimate share that key would let it silently stand in for a
+clinical value, which is the single worst thing this integration could do. A
+test asserts the adapter never emits the bare `hba1c` key.
 
 ## The self-serve four
 

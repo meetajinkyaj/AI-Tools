@@ -64,7 +64,25 @@ const SCALE_FIRST: ProviderId[] = [
   "whoop",
 ];
 
+/**
+ * Only one vendor here reports glucose at all, so this ordering is nearly
+ * theoretical. It exists because every metric needs a ranking, and because
+ * "whoever reports it" is the right answer when a second CGM source appears.
+ */
+const CGM_FIRST: ProviderId[] = [
+  "ultrahuman",
+  "oura",
+  "whoop",
+  "garmin",
+  "fitbit",
+  "withings",
+];
+
 export const SOURCE_RANK: Record<MetricKey, ProviderId[]> = {
+  glucose_avg: CGM_FIRST,
+  glucose_variability: CGM_FIRST,
+  glucose_time_in_target: CGM_FIRST,
+  hba1c_estimated: CGM_FIRST,
   sleep_minutes: SLEEP_FIRST,
   sleep_score: SLEEP_FIRST,
   hrv: SLEEP_FIRST,

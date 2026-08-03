@@ -49,9 +49,13 @@ verified live.**
 
 Two things are waiting on the founder rather than on Cowork:
 
-- **Wearable vendor applications**, see
-  [`../WEARABLES_APPLICATIONS.md`](../WEARABLES_APPLICATIONS.md). Nothing can
-  be configured until credentials arrive.
+- **Wearable provider credentials.** Ultrahuman's OAuth app is created, so
+  `ULTRAHUMAN_CLIENT_ID` and `ULTRAHUMAN_CLIENT_SECRET` can be set on the
+  `ai-tools` Worker whenever the founder pastes them, and Ultrahuman then
+  appears in Settings on its own. The other four (Oura, Fitbit, Whoop,
+  Withings) are self-serve and take an afternoon each. Garmin is paused at
+  their end indefinitely. See
+  [`../WEARABLES_APPLICATIONS.md`](../WEARABLES_APPLICATIONS.md).
 - **Supabase backups.** The production database is on the Free plan: no
   backups, no point-in-time recovery. Worst case is total loss. This is a
   spend decision (Pro, $25/mo), deliberately deferred until ~20 testers, not

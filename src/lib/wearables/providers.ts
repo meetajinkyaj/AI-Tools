@@ -383,15 +383,16 @@ const ultrahuman: WearableProvider = {
   authorizeUrl: "https://auth.ultrahuman.com/authorise",
   tokenUrl: "https://partner.ultrahuman.com/api/partners/oauth/token",
 
-  // Minimum that does the job. `ring_data` is the data itself; `profile` is
-  // required by /user_info, which is the ONLY way to learn the Ultrahuman user
-  // id, because unlike every other vendor here their token response carries no
-  // user identifier at all.
+  // `ring_data` is the ring itself. `profile` is required by /user_info, which
+  // is the ONLY way to learn the Ultrahuman user id, because unlike every other
+  // vendor here their token response carries no user identifier at all.
   //
-  // `cgm_data` is deliberately NOT requested. It exists, and glucose comes back
-  // on this same endpoint when granted, but we store no glucose, and asking a
-  // user for data we will not use is how a consent screen stops being read.
-  scopes: ["profile", "ring_data"],
+  // `cgm_data` unlocks glucose from the M1, on this same endpoint. Requested
+  // because glucose is genuinely analytical for us: it is the one wearable
+  // signal that moves against a blood panel on the same axis the panel
+  // measures. A user without a CGM simply has no glucose entries, so asking for
+  // the scope costs them nothing.
+  scopes: ["profile", "ring_data", "cgm_data"],
   tokenAuth: "body",
 
   // Confirmed in their docs, not assumed: "next time you refresh the tokens
@@ -473,12 +474,27 @@ const ultrahuman: WearableProvider = {
         // `average_body_temperature`, which are absolute skin readings.
         push(out, "temperature_deviation", date, val("temperature_deviation"), "ultrahuman");
 
+        // Glucose, present only when the user wears an M1 and granted
+        // `cgm_data`. Daily summaries only: the raw `glucose` entry is a
+        // reading every few minutes, which is a time series and does not
+        // belong at a one-row-per-day grain.
+        push(out, "glucose_avg", date, val("average_glucose"), "ultrahuman");
+        push(out, "glucose_variability", date, val("glucose_variability"), "ultrahuman");
+        push(out, "glucose_time_in_target", date, val("time_in_target"), "ultrahuman");
+
+        // CGM-ESTIMATED, and stored under its own key so it can never be
+        // mistaken for the lab HbA1c our biomarker catalog already holds.
+        push(out, "hba1c_estimated", date, val("hba1c"), "ultrahuman");
+
         // NOT AVAILABLE, deliberately absent rather than forgotten:
         //   active_calories   no calories field exists anywhere in the payload;
         //                     `active_minutes` is minutes and not the same thing
         //   respiratory_rate  not reported
         //   weight_kg,
         //   body_fat_pct      a ring cannot measure either
+        //   metabolic_score   a proprietary composite with no cross-vendor
+        //                     meaning and nothing to merge it against. Cheap to
+        //                     add later; awkward to remove once charted.
       }
     }
     return out;

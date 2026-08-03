@@ -33,6 +33,10 @@ const fixture = {
         { type: "temperature_deviation", object: { value: -0.2, unit: "°C" } },
         { type: "average_body_temperature", object: { value: 36.4, unit: "°C" } },
         { type: "glucose", object: { values: [{ timestamp: 1746057600, value: 82 }] } },
+        { type: "average_glucose", object: { title: "Average Glucose (mg/dL)", value: 99 } },
+        { type: "glucose_variability", object: { title: "Glucose Variability (%)", value: 18 } },
+        { type: "time_in_target", object: { title: "Time in Target (%)", value: 76 } },
+        { type: "metabolic_score", object: { title: "Metabolic Score", value: 72 } },
         { type: "hba1c", object: { value: 5.1 } },
       ],
     },
@@ -58,15 +62,12 @@ afterEach(() => {
 describe("what we ask Ultrahuman for", () => {
   it("uses the documented scope strings, not invented ones", () => {
     // `read:metrics` / `read:sleep` were made up. These three are the real
-    // vocabulary, and only two of them are ours to ask for.
-    expect(uh.scopes).toEqual(["profile", "ring_data"]);
+    // vocabulary.
+    expect(uh.scopes).toEqual(["profile", "ring_data", "cgm_data"]);
   });
 
-  it("does not request CGM access we have nowhere to put", () => {
-    // Glucose comes back on this same endpoint when granted. We store none of
-    // it, and asking for data we will not use is how a consent screen stops
-    // being read.
-    expect(uh.scopes).not.toContain("cgm_data");
+  it("requests CGM, because glucose is the one signal a blood panel shares an axis with", () => {
+    expect(uh.scopes).toContain("cgm_data");
   });
 
   it("keeps profile scope, which is load-bearing", () => {
@@ -157,11 +158,36 @@ describe("reading their documented payload", () => {
     expect(out.some((m) => m.metric === "active_calories")).toBe(false);
   });
 
-  it("stores no glucose, even though it arrives", async () => {
+  it("stores the daily glucose summaries", async () => {
     mockOnce(fixture);
     const out = await uh.fetchRange!({ accessToken: "t", externalUserId: null, start: "2025-05-01", end: "2025-05-01" });
-    const metrics = out.map((m) => m.metric);
-    for (const k of metrics) expect(k).not.toMatch(/glucose|hba1c/);
+    const by = Object.fromEntries(out.map((m) => [m.metric, m.value]));
+    expect(by).toMatchObject({
+      glucose_avg: 99,
+      glucose_variability: 18,
+      glucose_time_in_target: 76,
+      hba1c_estimated: 5.1,
+    });
+  });
+
+  it("keeps the estimated HbA1c away from the lab one", async () => {
+    // Our biomarker catalog holds a real, measured `hba1c` from blood panels.
+    // A CGM estimate integrates weeks, not months, and the two legitimately
+    // disagree. Storing it under the plain key would let a device estimate
+    // silently stand in for a clinical value.
+    mockOnce(fixture);
+    const out = await uh.fetchRange!({ accessToken: "t", externalUserId: null, start: "2025-05-01", end: "2025-05-01" });
+    expect(out.some((m) => m.metric === "hba1c_estimated")).toBe(true);
+    expect(out.some((m) => (m.metric as string) === "hba1c")).toBe(false);
+  });
+
+  it("does not store the raw glucose trace", async () => {
+    // `glucose` is a reading every few minutes. That is a time series and does
+    // not belong at a one-row-per-day grain.
+    mockOnce(fixture);
+    const out = await uh.fetchRange!({ accessToken: "t", externalUserId: null, start: "2025-05-01", end: "2025-05-01" });
+    // 17 fixture entries, but only the daily scalars we named become metrics.
+    expect(out.length).toBeLessThan(17);
   });
 
   it("uses the date key from the payload, not the date requested", async () => {

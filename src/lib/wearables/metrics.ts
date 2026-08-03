@@ -32,6 +32,35 @@ export const METRICS = {
   vo2max: { unit: "ml/kg/min", label: "VO₂ max", precision: 1 },
   weight_kg: { unit: "kg", label: "Weight", precision: 1 },
   body_fat_pct: { unit: "%", label: "Body fat", precision: 1 },
+
+  /* ----------------------------- glucose (CGM) ---------------------------- */
+  /*
+   * From a continuous glucose monitor, currently Ultrahuman's M1 reported
+   * through the same daily endpoint as their ring data.
+   *
+   * DAILY SUMMARIES, NOT THE TRACE. A CGM produces a reading every few minutes.
+   * That belongs in a time-series store, not in a table whose grain is one row
+   * per day per metric, and none of the analysis we do needs it: what moves
+   * with a lab panel is the day's average, spread and control, not the shape of
+   * one afternoon.
+   */
+  glucose_avg: { unit: "mg/dL", label: "Average glucose", precision: 0 },
+  /** Coefficient of variation. How much glucose swings, independent of level. */
+  glucose_variability: { unit: "%", label: "Glucose variability", precision: 1 },
+  /** Share of the day spent inside the target range. */
+  glucose_time_in_target: { unit: "%", label: "Time in target", precision: 0 },
+  /**
+   * CGM-ESTIMATED HbA1c. NOT the lab value, and never to be shown beside one
+   * without saying so.
+   *
+   * A lab HbA1c measures glycated haemoglobin directly and integrates roughly
+   * three months. This is derived from a few weeks of CGM averages, and the two
+   * legitimately disagree. Our biomarker catalog already carries a real `hba1c`
+   * from blood panels; conflating them would let a device estimate silently
+   * overwrite a measured clinical value, which is the single worst thing this
+   * integration could do.
+   */
+  hba1c_estimated: { unit: "%", label: "Estimated HbA1c", precision: 1 },
 } as const;
 
 export type MetricKey = keyof typeof METRICS;

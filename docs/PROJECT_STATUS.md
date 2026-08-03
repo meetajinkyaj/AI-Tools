@@ -470,6 +470,13 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   A compliance gap, not a nicety: our handler reads only `dailies`, `sleeps`
   and `hrv`, so a user revoking consent at Garmin's end is acknowledged and
   ignored. Plan and blockers in [`GARMIN_AUDIT.md`](./GARMIN_AUDIT.md).
+- **Garmin is out of the plan for now, at Garmin's end.** They replied
+  2026-08-03 that they have "temporarily paused the review and approval of new
+  API access requests" with no timeline. Nothing to resubmit and no queue
+  position to hold. The adapter, push endpoint and
+  [`GARMIN_AUDIT.md`](./GARMIN_AUDIT.md) all stay: none of it blocks anything,
+  and the integration is written for whenever the queue reopens. **Recheck
+  roughly quarterly**, by replying to the existing support thread.
 - **Migration runner in CI** (`supabase db push` against prod on merge to
   `main`), replacing the current hand-application step. Migrations 0013-0019
   were each pasted into the Supabase SQL Editor by a human and verified with
