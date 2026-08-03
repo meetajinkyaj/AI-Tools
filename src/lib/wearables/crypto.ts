@@ -52,12 +52,9 @@ async function getKey(): Promise<CryptoKey> {
   // Re-derive if the secret changed under us (it does across deploys/tests).
   if (cachedKey && cachedFrom === material) return cachedKey;
 
-  const bytes = fromBase64(material);
-  if (bytes.length !== 32) {
-    throw new Error(
-      `${KEY_ENV} must be 32 bytes of base64 (openssl rand -base64 32); got ${bytes.length}`,
-    );
-  }
+  const problem = keyProblem(material);
+  if (problem) throw new Error(`${KEY_ENV} ${problem}`);
+  const bytes = fromBase64(material)!;
   const key = await crypto.subtle.importKey("raw", bytes, { name: "AES-GCM" }, false, [
     "encrypt",
     "decrypt",
@@ -74,17 +71,73 @@ function toBase64(bytes: Uint8Array): string {
 }
 
 /**
- * Returns a Uint8Array backed by a real ArrayBuffer.
+ * Base64 to bytes, tolerating the base64url alphabet and absent padding.
+ * Returns null when the input is not decodable at all.
  *
- * `Uint8Array.from` is typed as `Uint8Array<ArrayBufferLike>`, which could in
- * principle be a SharedArrayBuffer and so is not assignable to Web Crypto's
- * `BufferSource`. Allocating the buffer explicitly pins the type.
+ * WHY TOLERANT. `atob` on Workers is strict: it rejects `-` and `_`, and
+ * rejects a length that is not a multiple of four. Plenty of ordinary ways to
+ * produce a 32-byte secret give exactly those, and a key generator that emits
+ * base64url is not doing anything wrong. This decoder previously threw
+ * `InvalidCharacterError` from deep inside `encryptToken`, which surfaced as
+ * "wearable callback failed" with a message about base64 and no indication that
+ * a SECRET, not the vendor, was the problem. That cost an afternoon.
+ *
+ * `oauth-state.ts` has always folded base64url the same way. Two decoders in
+ * one directory, one tolerant and one strict, with the strict one holding the
+ * encryption key, was the actual defect.
+ *
+ * Returns a Uint8Array backed by a real ArrayBuffer: `Uint8Array.from` is typed
+ * as `Uint8Array<ArrayBufferLike>`, which could in principle be a
+ * SharedArrayBuffer and so is not assignable to Web Crypto's `BufferSource`.
  */
-function fromBase64(s: string): Uint8Array<ArrayBuffer> {
-  const bin = atob(s);
+function fromBase64(s: string): Uint8Array<ArrayBuffer> | null {
+  const folded = s.trim().replace(/-/g, "+").replace(/_/g, "/");
+  const padded = folded + "=".repeat((4 - (folded.length % 4)) % 4);
+  let bin: string;
+  try {
+    bin = atob(padded);
+  } catch {
+    return null;
+  }
   const out = new Uint8Array(new ArrayBuffer(bin.length));
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
+}
+
+/**
+ * What is wrong with a candidate key, or null if nothing is.
+ *
+ * Never includes the value or any part of it: this string reaches logs.
+ */
+function keyProblem(material: string): string | null {
+  const bytes = fromBase64(material);
+  if (!bytes) {
+    return (
+      "is not decodable as base64. Generate a fresh one with " +
+      "`openssl rand -base64 32` and set it as a Worker Secret."
+    );
+  }
+  if (bytes.length !== 32) {
+    return (
+      `decoded to ${bytes.length} bytes; AES-256 needs 32 bytes. ` +
+      "Generate one with `openssl rand -base64 32`."
+    );
+  }
+  return null;
+}
+
+/**
+ * Is the configured key actually usable? Null when it is, a reason when not.
+ *
+ * Exported so a caller can refuse BEFORE sending a user to a vendor's consent
+ * screen. Discovering an unusable key after the user has already approved at
+ * Ultrahuman means they did the work and we threw it away.
+ */
+export function wearableKeyProblem(): string | null {
+  const raw = process.env[KEY_ENV];
+  if (!raw) return `${KEY_ENV} is not set.`;
+  const problem = keyProblem(raw);
+  return problem ? `${KEY_ENV} ${problem}` : null;
 }
 
 /**
@@ -120,6 +173,7 @@ export async function decryptToken(stored: string | null): Promise<string | null
   try {
     const iv = fromBase64(stored.slice(0, sep));
     const cipher = fromBase64(stored.slice(sep + 1));
+    if (!iv || !cipher) return null;
     const key = await getKey();
     const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, cipher);
     return new TextDecoder().decode(plain);

@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { decryptToken, encryptToken, wearablesConfigured } from "./crypto";
+import {
+  decryptToken,
+  encryptToken,
+  wearableKeyProblem,
+  wearablesConfigured,
+} from "./crypto";
 import { signState, verifyState } from "./oauth-state";
 
 /**
@@ -119,5 +124,62 @@ describe("the OAuth state parameter", () => {
     const a = await signState(USER, "oura");
     const b = await signState(USER, "oura");
     expect(a).not.toBe(b);
+  });
+});
+
+describe("the key itself", () => {
+  /**
+   * THE BUG THIS EXISTS FOR. `atob` on Workers rejects the base64url alphabet
+   * and unpadded input. The key was decoded with a bare `atob` deep inside
+   * `encryptToken`, so a key that was merely spelled base64url threw
+   * `InvalidCharacterError` from the middle of the OAuth callback. It surfaced
+   * as "wearable callback failed for ultrahuman: ... invalid base64-encoded
+   * data", which reads like the vendor rejected us, and sent the investigation
+   * at Ultrahuman's token endpoint instead of at our own secret.
+   */
+
+  // Same 32 bytes as KEY_A, spelled base64url and unpadded.
+  const KEY_A_URLSAFE = KEY_A.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+  it("accepts a base64url key, unpadded", async () => {
+    process.env.WEARABLE_TOKEN_KEY = KEY_A_URLSAFE;
+    expect(wearableKeyProblem()).toBeNull();
+    expect(await decryptToken(await encryptToken("rt_x"))).toBe("rt_x");
+  });
+
+  it("treats base64url and standard spellings as the same key", async () => {
+    // Not a cosmetic point: if they decoded differently, re-spelling the secret
+    // would silently orphan every token already stored under the other form.
+    const stored = await encryptToken("rt_same");
+    process.env.WEARABLE_TOKEN_KEY = KEY_A_URLSAFE;
+    expect(await decryptToken(stored)).toBe("rt_same");
+  });
+
+  it("tolerates a trailing newline from a paste", async () => {
+    process.env.WEARABLE_TOKEN_KEY = `${KEY_A}\n`;
+    expect(wearableKeyProblem()).toBeNull();
+  });
+
+  it("names an undecodable key instead of throwing base64 at the caller", async () => {
+    process.env.WEARABLE_TOKEN_KEY = "not valid base64 !!!";
+    expect(wearableKeyProblem()).toMatch(/not decodable as base64/);
+    // And the throw from the encrypt path says which secret, not which builtin.
+    await expect(encryptToken("rt_x")).rejects.toThrow(/WEARABLE_TOKEN_KEY/);
+  });
+
+  it("names a wrong-length key, with the length it got", async () => {
+    process.env.WEARABLE_TOKEN_KEY = "YWJjZA=="; // 4 bytes
+    expect(wearableKeyProblem()).toMatch(/4 bytes/);
+  });
+
+  it("reports a missing key without pretending it is malformed", () => {
+    delete process.env.WEARABLE_TOKEN_KEY;
+    expect(wearableKeyProblem()).toMatch(/is not set/);
+  });
+
+  it("never puts the key material in the reason, which is logged", () => {
+    process.env.WEARABLE_TOKEN_KEY = "sup3rsecret-but-not-base64-!!!";
+    const reason = wearableKeyProblem()!;
+    expect(reason).not.toContain("sup3rsecret");
   });
 });
