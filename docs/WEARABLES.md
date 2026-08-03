@@ -200,6 +200,28 @@ afterwards.
 **Losing or rotating it** costs every connected user a reconnect. Recoverable,
 and far better than the alternative, so rotate only if you believe it leaked.
 
+**Base64url and missing padding are accepted**, and fold to the same bytes as
+the standard spelling, so re-spelling the secret cannot orphan tokens already
+stored under the other form. Whitespace around the value is trimmed.
+
+> **The bug that taught us this, 2026-08-03.** The key was decoded with a bare
+> `atob`, which on Workers rejects `-`, `_` and unpadded input. A key that was
+> merely spelled base64url threw `InvalidCharacterError` from inside
+> `encryptToken`, which sits in the OAuth callback *after* the token exchange
+> has already succeeded. It surfaced as
+> `wearable callback failed for ultrahuman: ... invalid base64-encoded data`,
+> which reads like the vendor rejected us and sent an entire investigation to
+> Ultrahuman's token endpoint. Nothing was wrong with Ultrahuman.
+>
+> Two fixes, both in `crypto.ts`. The decoder now folds base64url like
+> `oauth-state.ts` always did: two decoders in one directory, one tolerant and
+> one strict, with the strict one holding the encryption key, was the real
+> defect. And `wearableKeyProblem()` now checks the key at
+> `/api/wearables/connect`, so a bad key returns 503 **before** the user is sent
+> to a vendor, instead of after they have read a consent screen and tapped
+> Approve for nothing. The reason is logged; the user sees a plain sentence,
+> because a base64 complaint is not theirs to act on.
+
 ---
 
 ## Why the tokens are encrypted when the health data is not

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
 import { resolveApprovedUserId } from "@/lib/app-user";
+import { wearableKeyProblem } from "@/lib/wearables/crypto";
 import { signState } from "@/lib/wearables/oauth-state";
 import { PROVIDERS, isProviderId, providerConfigured } from "@/lib/wearables/providers";
 import { callbackUrl } from "@/lib/wearables/urls";
@@ -23,6 +24,20 @@ export async function GET(request: Request) {
   const providerId = new URL(request.url).searchParams.get("provider");
   if (!providerId || !isProviderId(providerId)) {
     return NextResponse.json({ error: "Unknown provider" }, { status: 400 });
+  }
+
+  // CHECKED BEFORE THE VENDOR, NOT AFTER. Storing a grant needs a usable
+  // encryption key, and finding out it is unusable in the callback means the
+  // user has already read a consent screen and tapped Approve for nothing. The
+  // reason is logged for us; the user gets a plain sentence, since a base64
+  // complaint is not theirs to act on.
+  const keyProblem = wearableKeyProblem();
+  if (keyProblem) {
+    console.error(`wearable connect refused: ${keyProblem}`);
+    return NextResponse.json(
+      { error: "Device connections aren't available right now." },
+      { status: 503 },
+    );
   }
 
   const provider = PROVIDERS[providerId];
