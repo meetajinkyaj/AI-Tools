@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { ConfirmDialog, type ConfirmRequest } from "./confirm-dialog";
 import { DeviceSuggest } from "./device-suggest";
 import { Card, Eyebrow, primaryButtonClass, secondaryButtonClass } from "./ui";
 
@@ -73,6 +74,7 @@ export function WearableSettings({
   const [data, setData] = useState<Payload | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
 
   /**
    * Read the OAuth result off the URL and clear it.
@@ -160,10 +162,31 @@ export function WearableSettings({
         headers: { Authorization: `Bearer ${token}` },
       });
       await load();
+      setConfirm(null);
       setMessage(`${provider} disconnected.`);
     } finally {
       setBusy(null);
     }
+  };
+
+  /**
+   * Disconnecting is one tap next to a row of other taps, and it is not
+   * undoable by tapping again: reconnecting means another round trip through
+   * the vendor's consent screen. The dialog is here for the fat finger, and it
+   * says what actually happens, which is that the authorisation is deleted and
+   * the readings already pulled are kept.
+   */
+  const askDisconnect = (provider: string, name: string) => {
+    setMessage(null);
+    setConfirm({
+      title: `Disconnect ${name}?`,
+      body:
+        `We'll stop pulling new data from ${name} and delete the permission it ` +
+        "gave us. Readings already synced stay in your Trends. You can " +
+        `reconnect any time, which means signing in to ${name} again.`,
+      confirmLabel: "Disconnect",
+      onConfirm: () => void disconnect(provider),
+    });
   };
 
   const syncNow = async () => {
@@ -244,7 +267,7 @@ export function WearableSettings({
               {conn && !needsReauth ? (
                 <button
                   type="button"
-                  onClick={() => void disconnect(p.id)}
+                  onClick={() => askDisconnect(p.id, p.name)}
                   disabled={busy !== null}
                   className={`${secondaryButtonClass} shrink-0 text-xs`}
                 >
@@ -278,6 +301,14 @@ export function WearableSettings({
       </div>
 
       <DeviceSuggest getToken={getToken} />
+
+      {confirm && (
+        <ConfirmDialog
+          request={confirm}
+          busy={busy !== null}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
     </Card>
   );
 }

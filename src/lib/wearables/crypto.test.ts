@@ -6,6 +6,7 @@ import {
   wearableKeyProblem,
   wearablesConfigured,
 } from "./crypto";
+import { tokenColumns } from "./sync";
 import { signState, verifyState } from "./oauth-state";
 
 /**
@@ -181,5 +182,55 @@ describe("the key itself", () => {
     process.env.WEARABLE_TOKEN_KEY = "sup3rsecret-but-not-base64-!!!";
     const reason = wearableKeyProblem()!;
     expect(reason).not.toContain("sup3rsecret");
+  });
+});
+
+describe("the credential columns a connection is written with", () => {
+  /**
+   * THE INCIDENT THIS EXISTS FOR, 2026-08-03. The callback wrote the connection
+   * row and its tokens as two separate statements with no transaction around
+   * them. Encryption threw between the two, and production was left holding a
+   * row with `status = 'active'`, no access token, no refresh token, no expiry,
+   * and `last_error` null because no sync had ever failed. The UI rendered
+   * "Disconnect". It looked like success from every angle available to a user
+   * or to us.
+   *
+   * The fix is ordering: encrypt first, then write once. These assert the shape
+   * that makes the single write possible.
+   */
+
+  it("carries everything the row needs to be usable", async () => {
+    const cols = await tokenColumns({
+      accessToken: "at_1",
+      refreshToken: "rt_1",
+      expiresIn: 3600,
+      scope: "profile ring_data",
+      externalUserId: "uh_42",
+    });
+    expect(await decryptToken(cols.access_token_enc as string)).toBe("at_1");
+    expect(await decryptToken(cols.refresh_token_enc as string)).toBe("rt_1");
+    expect(cols.scopes).toBe("profile ring_data");
+    expect(cols.external_user_id).toBe("uh_42");
+    expect(Date.parse(cols.expires_at as string)).toBeGreaterThan(Date.now());
+  });
+
+  it("never emits a plaintext token", async () => {
+    const cols = await tokenColumns({ accessToken: "at_secret", refreshToken: "rt_secret" });
+    expect(JSON.stringify(cols)).not.toContain("at_secret");
+    expect(JSON.stringify(cols)).not.toContain("rt_secret");
+  });
+
+  it("omits the refresh token rather than blanking it when the vendor sends none", async () => {
+    // Several vendors return a refresh token only at first grant. Writing null
+    // over a good one on a later refresh would kill the connection.
+    const cols = await tokenColumns({ accessToken: "at_1" });
+    expect("refresh_token_enc" in cols).toBe(false);
+  });
+
+  it("throws before producing any column when the key is unusable", async () => {
+    // This is the ordering that matters. If it throws here, the caller has
+    // nothing to write, so no half-connection can reach the database.
+    process.env.WEARABLE_TOKEN_KEY = "not base64 !!!";
+    await expect(tokenColumns({ accessToken: "at_1" })).rejects.toThrow(/WEARABLE_TOKEN_KEY/);
   });
 });

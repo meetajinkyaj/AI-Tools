@@ -6,9 +6,8 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-03. **One task is pending:** read why the first
-Ultrahuman sync did not stamp `last_sync_at`. The connect itself works. See
-[PENDING TASK](#pending-task) below.
+Last updated: 2026-08-03. **One task is pending:** reconnect Ultrahuman once,
+after the shell-row fix deploys. See [PENDING TASK](#pending-task) below.
 
 ---
 
@@ -35,7 +34,7 @@ Ultrahuman sync did not stamp `last_sync_at`. The connect itself works. See
 
 | Verification | Status |
 |---|---|
-| First real wearable connection | Ultrahuman OAuth completed end to end 2026-08-03 on `app.ikigaro.com`. Tokens exchanged and stored, card shows Disconnect, zero errors in the Worker logs after the fix deployed. This also proves the token host and path, the `/authorise` spelling, the three scope strings and the redirect URI, all of which were previously guesses. The metrics endpoint is still unproven. |
+| First real wearable connection | **Not yet achieved.** The `atob` fix deployed clean, but the row on production turned out to be the pre-fix failed attempt: a shell with `status = 'active'` and no credentials, which the card rendered as Disconnect. Found by reading `connected_at`, which the upsert refreshes and which had not moved. The token host, `/authorise` spelling, scope strings and redirect URI are still proven by the successful code exchange that preceded the encryption failure. The metrics endpoint remains unproven. |
 | Wearables UI on production | Confirmed live 2026-07-30 on `app.ikigaro.com`. Settings shows **Connected devices** with the coming-soon copy and Apple Health / Google Health Connect listed; Home shows the **Your devices** card. No Connect buttons on either surface, correct, since no provider credentials exist yet. Dismiss ✕ persists across reload. No app console errors. |
 
 | Repo hygiene | Status |
@@ -50,35 +49,36 @@ is outstanding.
 
 # PENDING TASK
 
-## Read why the first Ultrahuman sync did not complete
+## Reconnect Ultrahuman once, after the shell-row fix deploys
 
-**The connect itself is done and working, do not retry it.** OAuth completed on
-2026-08-03, tokens are stored, and the card shows Disconnect. That half is
-finished and needs nothing further.
+**Your read was right, and it found a real bug.** The row you queried was the
+**pre-fix failed attempt**, not a successful connect. `connected_at` is part of
+the upsert payload, so a successful reconnect would have refreshed it; it did
+not, which means no successful connect ever ran.
 
-**The open question is the subtext "not synced yet".** That string means one
-thing exactly: `wearable_connections.last_sync_at` is null. It is not a neutral
-"no data yet" message. A sync that ran and found nothing, which is the expected
-result with no ring on the account, **still stamps `last_sync_at`**. A null
-stamp means the sync did not finish.
+What the old code did: wrote the connection row, then wrote the tokens as a
+**second statement**. Encryption threw in between. Production was left with a
+row saying `status = 'active'` and no credentials at all. The card rendered
+**Disconnect**, nothing could ever sync, and `last_error` stayed null because no
+sync had failed. It looked like success from every angle.
 
-**Nothing about this is in the Worker logs, and that is by design.** Sync
-failures are written to the connection row rather than to the console, so that
-one user's dead grant cannot flood the logs during the nightly sweep. So "0
-errors in Observability" is consistent with a failed sync and does not rule one
-out.
+Both halves are now fixed: the credentials are encrypted first and written in
+the **same statement** as the row, so no half-connection can exist; and a row
+with no access token is filtered out of the connections API, so the existing
+shell row reads as "not connected" rather than offering a Disconnect button for
+nothing.
 
-### The query
+### What to do
 
-Supabase → SQL Editor. Read-only, changes nothing:
+1. **Confirm the deploy.** `ai-tools` → Deployments, active version includes
+   "Write a wearable connection and its credentials in one statement".
+2. **Load Profile → Connected devices.** Ultrahuman should now show
+   **Connect**, not Disconnect. That is the shell row correctly disappearing.
+3. **Connect → Approve**, briskly, inside two minutes.
+4. **Then re-run the same query as last time.**
 
 ```sql
-select provider,
-       status,
-       failure_count,
-       last_sync_at,
-       connected_at,
-       last_error,
+select provider, status, failure_count, last_sync_at, connected_at, last_error,
        external_user_id is not null as has_external_id,
        access_token_enc is not null as has_access_token,
        refresh_token_enc is not null as has_refresh_token,
@@ -87,40 +87,28 @@ from wearable_connections
 where provider = 'ultrahuman';
 ```
 
-Then, to see whether anything at all landed:
+### What a healthy row looks like now
 
-```sql
-select count(*) as rows, min(metric_date) as oldest, max(metric_date) as newest
-from wearable_daily_metrics
-where provider = 'ultrahuman';
-```
-
-### What to report
-
-The full first row, **except** `last_error` needs care: paste it verbatim, but
-if it contains anything that looks like a token or a long random string, replace
-that part with `...`. It should not, the message is a status code and the first
-200 characters of Ultrahuman's response body, but check before pasting.
-
-### What each answer means, so you know what you are looking at
-
-| What you see | Reading |
+| Column | Expected |
 |---|---|
-| `last_sync_at` set after all | The UI was stale when checked. Nothing is wrong. Say so. |
-| `status = 'expired'`, `last_error` mentions reauth | The stored token could not be used. Serious, and the opposite of what the successful connect implies. |
-| `last_error` contains `404` | Likely the metrics **host** or path, the one thing still recorded as unproven. A code fix, not a dashboard fix. |
-| `failure_count = 1` with some other message | Whatever the message says. Send it. |
-| `last_error` null and `last_sync_at` null | The immediate post-connect sync never ran at all. Also a code question. |
+| `has_access_token` | **true**. If this is false again, stop and report: the fix did not take. |
+| `has_refresh_token` | true |
+| `expires_at` | roughly 24 hours out |
+| `connected_at` | your new attempt, not `14:25:52` |
+| `last_sync_at` | **set**, even with no ring |
 
-**Do not click "Sync now", change code, or touch any secret.** Clicking Sync now
-overwrites `last_error` with a fresh attempt and destroys the evidence from the
-connect. Read the row first.
+**`last_sync_at` is the one to watch.** A sync that runs and finds nothing still
+stamps it. If it is set, the metrics endpoint host is confirmed too, which is
+the last unproven guess in the adapter. If it is null with `last_error`
+populated, paste the error: that is the metrics host, and a code fix.
 
-### Not needed: a clean Disconnect and reconnect
+### Also worth a quick look
 
-You offered one. Skip it, and your reasoning for hesitating was right. It would
-cost a real reconnect to re-prove something already proven, and it would clear
-the very row we now want to read.
+There is now a **confirmation dialog** on Disconnect. If you happen to tap it,
+Cancel should close it and change nothing. Do not confirm it.
+
+**Do not click "Sync now" before running the query**, it overwrites the evidence
+from the connect.
 
 ---
 
