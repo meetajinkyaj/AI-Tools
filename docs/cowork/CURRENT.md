@@ -6,7 +6,8 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-07-30. **No task is pending.**
+Last updated: 2026-08-03. **One task is pending:** set the two Ultrahuman
+Worker secrets. See [PENDING TASK](#pending-task) below.
 
 ---
 
@@ -45,16 +46,70 @@ verified live.**
 
 # PENDING TASK
 
-**Nothing.** Everything that needed production access is done.
+## Set the two Ultrahuman secrets on the production Worker
+
+The founder has both values in hand from the Ultrahuman developer portal
+(`vision.ultrahuman.com`, app named `ikigaro`). Nothing else is needed to make
+Ultrahuman appear in the app.
+
+**Where:** Cloudflare dashboard → Workers & Pages → **`ai-tools`** → Settings →
+Variables and Secrets.
+
+**Add two, both as type Secret, not as plaintext Variable:**
+
+| Name | Where the value comes from |
+|---|---|
+| `ULTRAHUMAN_CLIENT_ID` | Ultrahuman portal → OAuth Applications → `ikigaro` |
+| `ULTRAHUMAN_CLIENT_SECRET` | same page, the secret half |
+
+**Secret, not Variable, and this matters.** `wrangler.jsonc` declares the
+plaintext vars, so anything added to the dashboard as a Variable is wiped on the
+next deploy. Secrets are not in that file and survive. This is the same reason
+`RESEND_API_KEY` and `WEARABLE_TOKEN_KEY` are Secrets.
+
+**Do not paste either value into chat, a commit, or any file.** Cowork should
+not handle them at all: if the dashboard step cannot be done without seeing the
+values, stop and hand the click-path back to the founder instead.
+
+**Then redeploy** so the Worker picks them up. Either push any commit to `main`,
+or use the dashboard's "Deploy" on the latest version. Secrets do not apply to
+an already-running version.
+
+### How to verify, without a ring
+
+1. Open `https://app.ikigaro.com/settings` as an approved user.
+2. Under **Connected devices**, **Ultrahuman** should now be listed **with a
+   Connect button**. The other five stay button-less: a provider only renders
+   its Connect button when both halves of its credentials exist. Ultrahuman
+   appearing and nothing else changing is the whole test.
+3. Click Connect. It should bounce to `auth.ultrahuman.com` and show a real
+   consent screen naming `ikigaro` and three permissions: **Profile**, **Ring
+   Data**, **CGM Data**.
+4. **Stop there and report back. Do not complete the consent.** There is no ring
+   on the account yet, so a connection would be an empty one, and the useful
+   information is entirely in what the consent screen says.
+
+### What to report
+
+- Did the Connect button appear for Ultrahuman, and only for Ultrahuman?
+- Did the consent screen load, or did it 404?
+- Exactly which permissions it lists.
+
+**If the consent page 404s**, the likely cause is the authorize path spelling.
+Ultrahuman's spec text says `/authorize` while every worked example uses
+`/authorise`, and we follow the examples. Report the 404 with the full URL from
+the address bar rather than trying alternatives; it is a one-line change here.
+
+**If the button does not appear**, the redeploy did not happen or a name is
+misspelled. Both names are case-sensitive and take no prefix.
+
+---
 
 Two things are waiting on the founder rather than on Cowork:
 
-- **Wearable provider credentials.** Ultrahuman's OAuth app is created, so
-  `ULTRAHUMAN_CLIENT_ID` and `ULTRAHUMAN_CLIENT_SECRET` can be set on the
-  `ai-tools` Worker whenever the founder pastes them, and Ultrahuman then
-  appears in Settings on its own. The other four (Oura, Fitbit, Whoop,
-  Withings) are self-serve and take an afternoon each. Garmin is paused at
-  their end indefinitely. See
+- **The remaining wearable credentials.** Oura, Fitbit, Whoop and Withings are
+  self-serve and take an afternoon each. Garmin is paused at their end
+  indefinitely. See
   [`../WEARABLES_APPLICATIONS.md`](../WEARABLES_APPLICATIONS.md).
 - **Supabase backups.** The production database is on the Free plan: no
   backups, no point-in-time recovery. Worst case is total loss. This is a
