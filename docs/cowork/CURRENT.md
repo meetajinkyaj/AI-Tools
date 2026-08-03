@@ -6,8 +6,8 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-03. **One task is pending:** redeploy and retry the
-Ultrahuman connect. The failure is diagnosed and fixed in code. See
+Last updated: 2026-08-03. **One task is pending:** read why the first
+Ultrahuman sync did not stamp `last_sync_at`. The connect itself works. See
 [PENDING TASK](#pending-task) below.
 
 ---
@@ -35,6 +35,7 @@ Ultrahuman connect. The failure is diagnosed and fixed in code. See
 
 | Verification | Status |
 |---|---|
+| First real wearable connection | Ultrahuman OAuth completed end to end 2026-08-03 on `app.ikigaro.com`. Tokens exchanged and stored, card shows Disconnect, zero errors in the Worker logs after the fix deployed. This also proves the token host and path, the `/authorise` spelling, the three scope strings and the redirect URI, all of which were previously guesses. The metrics endpoint is still unproven. |
 | Wearables UI on production | Confirmed live 2026-07-30 on `app.ikigaro.com`. Settings shows **Connected devices** with the coming-soon copy and Apple Health / Google Health Connect listed; Home shows the **Your devices** card. No Connect buttons on either surface, correct, since no provider credentials exist yet. Dismiss ✕ persists across reload. No app console errors. |
 
 | Repo hygiene | Status |
@@ -49,56 +50,77 @@ is outstanding.
 
 # PENDING TASK
 
-## Redeploy, then retry the Ultrahuman connect
+## Read why the first Ultrahuman sync did not complete
 
-**The cause is found and fixed in code. It was never Ultrahuman.**
+**The connect itself is done and working, do not retry it.** OAuth completed on
+2026-08-03, tokens are stored, and the card shows Disconnect. That half is
+finished and needs nothing further.
 
-The log line you pulled was the whole answer:
+**The open question is the subtext "not synced yet".** That string means one
+thing exactly: `wearable_connections.last_sync_at` is null. It is not a neutral
+"no data yet" message. A sync that ran and found nothing, which is the expected
+result with no ring on the account, **still stamps `last_sync_at`**. A null
+stamp means the sync did not finish.
 
+**Nothing about this is in the Worker logs, and that is by design.** Sync
+failures are written to the connection row rather than to the console, so that
+one user's dead grant cannot flood the logs during the nightly sweep. So "0
+errors in Observability" is consistent with a failed sync and does not rule one
+out.
+
+### The query
+
+Supabase → SQL Editor. Read-only, changes nothing:
+
+```sql
+select provider,
+       status,
+       failure_count,
+       last_sync_at,
+       connected_at,
+       last_error,
+       external_user_id is not null as has_external_id,
+       access_token_enc is not null as has_access_token,
+       refresh_token_enc is not null as has_refresh_token,
+       expires_at
+from wearable_connections
+where provider = 'ultrahuman';
 ```
-wearable callback failed for ultrahuman: InvalidCharacterError: atob() called
-with invalid base64-encoded data.
+
+Then, to see whether anything at all landed:
+
+```sql
+select count(*) as rows, min(metric_date) as oldest, max(metric_date) as newest
+from wearable_daily_metrics
+where provider = 'ultrahuman';
 ```
-
-That is not the vendor rejecting us. **The token exchange had already
-succeeded.** The throw came from `encryptToken`, one step later, while decoding
-`WEARABLE_TOKEN_KEY` so the tokens could be stored. `atob` on Workers rejects
-the base64url alphabet (`-`, `_`) and unpadded input, and the key is spelled in
-a form it refuses. Ultrahuman was never the problem, and neither were the client
-id, the secret, the redirect URI or the state.
-
-**The decoder now folds base64url and pads, so the existing key works as-is.**
-Nothing needs re-entering, regenerating or rotating. Do not touch
-`WEARABLE_TOKEN_KEY`: rotating it would cost every connected user a reconnect
-for no reason.
-
-### What to do
-
-1. **Confirm the fix is deployed.** Cloudflare → Workers & Pages → `ai-tools` →
-   Deployments. The active version must include the commit
-   "Decode the wearable key the way every other decoder here does".
-2. **Retry the connect.** `app.ikigaro.com` → Profile → Connected devices →
-   Ultrahuman → Connect → Approve.
-3. **Expected:** the button becomes **Connected**, and the card shows
-   Ultrahuman with no data. **An empty connection is the correct result**, there
-   is no ring on the account yet.
 
 ### What to report
 
-- Did the button flip to Connected?
-- Search Observability → Logs for `wearable` and paste anything at level
-  `error`. There should be none.
+The full first row, **except** `last_error` needs care: paste it verbatim, but
+if it contains anything that looks like a token or a long random string, replace
+that part with `...`. It should not, the message is a status code and the first
+200 characters of Ultrahuman's response body, but check before pasting.
 
-**If it fails again**, the log now distinguishes the cases properly, so send the
-exact line and nothing else:
+### What each answer means, so you know what you are looking at
 
-| Line | Meaning |
+| What you see | Reading |
 |---|---|
-| `wearable connect refused: WEARABLE_TOKEN_KEY ...` | The key is genuinely unusable, not merely oddly spelled. The message says whether it failed to decode or decoded to the wrong length. It never contains the key. |
-| `wearable callback rejected for ultrahuman before exchange: ...` | Never reached the exchange. One of `no-code`, `bad-or-expired-state`, `provider-mismatch`. |
-| `wearable callback failed for ultrahuman: ...` | The exchange ran and something after it failed. The message carries the vendor's status and response body. |
+| `last_sync_at` set after all | The UI was stale when checked. Nothing is wrong. Say so. |
+| `status = 'expired'`, `last_error` mentions reauth | The stored token could not be used. Serious, and the opposite of what the successful connect implies. |
+| `last_error` contains `404` | Likely the metrics **host** or path, the one thing still recorded as unproven. A code fix, not a dashboard fix. |
+| `failure_count = 1` with some other message | Whatever the message says. Send it. |
+| `last_error` null and `last_sync_at` null | The immediate post-connect sync never ran at all. Also a code question. |
 
-**Do not change code, add logging, or edit secrets.** Report the line.
+**Do not click "Sync now", change code, or touch any secret.** Clicking Sync now
+overwrites `last_error` with a fresh attempt and destroys the evidence from the
+connect. Read the row first.
+
+### Not needed: a clean Disconnect and reconnect
+
+You offered one. Skip it, and your reasoning for hesitating was right. It would
+cost a real reconnect to re-prove something already proven, and it would clear
+the very row we now want to read.
 
 ---
 
