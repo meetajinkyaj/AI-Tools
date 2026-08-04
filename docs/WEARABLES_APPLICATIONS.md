@@ -87,6 +87,14 @@ there is nothing to wait for there either, just a recheck every quarter.
 us and working wearable data is registering the remaining four and owning a
 device.
 
+> **Audit the adapter before you register.** Every one of these was written
+> from assumption in a single sitting, before any vendor documentation was in
+> hand. Ultrahuman's turned out wrong in almost every particular, and Whoop's
+> was silently dropping sleep entirely. Both were found by reading the vendor's
+> published docs against the code, which takes an hour and is far cheaper than
+> finding out after a member has connected. Oura, Fitbit and Withings have not
+> had this treatment yet.
+
 ### ☑ Garmin. Health API + Activity API. SUBMITTED 2 August 2026
 
 **Status: PAUSED AT GARMIN'S END, indefinitely.** Do not resubmit, and do not
@@ -198,12 +206,26 @@ own documentation contradicts itself, are in
 
 ### ☐ Whoop
 
-- **Where:** `developer.whoop.com` → create an app
+**Do this one next.** The adapter was audited against Whoop's published v2
+documentation on 2026-08-04 and four real bugs were fixed before any account
+was connected, so this is the best-verified integration we have that has not
+yet been switched on. Details in [`WEARABLES.md`](./WEARABLES.md).
+
+- **Where:** `developer.whoop.com` → Developer Dashboard → create an App
 - **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/whoop`
-- **Scopes:** `read:recovery`, `read:sleep`, `read:cycles`, `read:profile`,
-  `offline`
-- `offline` is the one that matters, without it Whoop issues no refresh token
+- **Scopes to tick, exactly these four:** `read:sleep`, `read:recovery`,
+  `read:cycles`, `offline`
+- **Do NOT tick `read:profile`.** It returns the member's name and email, we
+  call no profile endpoint, and Whoop's own guidance is to request only what
+  the app uses. The scope list must match the code
+  (`src/lib/wearables/providers.ts`) or the consent screen will ask for access
+  we never exercise.
+- `offline` is the one that matters: without it Whoop issues no refresh token
   and every connection dies within the hour.
+- You can create up to 5 Apps on one account, so a separate staging App later
+  is free.
+
+Client id and secret appear immediately after creation. No review, no queue.
 
 ### ☐ Withings
 
