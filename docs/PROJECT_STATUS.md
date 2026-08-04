@@ -466,6 +466,17 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   threshold is the whole safety margin**: past it, losing the data ends the
   beta rather than inconveniencing it. Fix is $25/mo (Supabase Pro → daily
   backups, 7-day retention). See `RUNBOOK.md` §2b.
+- **Disconnect does not revoke at the vendor.** It deletes our copy of the
+  credentials, so we can never call the vendor again, but the authorisation the
+  user granted still stands in their vendor account. Confirmed on production
+  2026-08-04: a disconnect and reconnect went straight to the consent screen
+  with no sign-in. That is correct OAuth and not a bug, and the dialog copy was
+  fixed to stop promising a sign-in. Several vendors (Oura, Fitbit, Whoop)
+  document a revoke endpoint and calling it on disconnect would be strictly
+  better, both for the user's expectation of "disconnected" and for the data-use
+  promise made on their application forms. Deferred rather than guessed at,
+  because it is a different endpoint and payload per vendor and none of them is
+  verified. Worth doing when there is a second provider live.
 - **Garmin: deregistration and permission-change pushes are silently dropped.**
   A compliance gap, not a nicety: our handler reads only `dailies`, `sleeps`
   and `hrv`, so a user revoking consent at Garmin's end is acknowledged and

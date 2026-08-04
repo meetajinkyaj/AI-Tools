@@ -175,6 +175,14 @@ export function WearableSettings({
    * the vendor's consent screen. The dialog is here for the fat finger, and it
    * says what actually happens, which is that the authorisation is deleted and
    * the readings already pulled are kept.
+   *
+   * "APPROVING ACCESS AGAIN", NOT "SIGNING IN AGAIN". An earlier version
+   * promised a sign-in, and a real reconnect went straight to the consent
+   * screen with no credentials asked for. That is correct OAuth, not a bug:
+   * disconnecting deletes OUR copy of the permission and touches neither the
+   * user's session at the vendor nor the grant recorded in their vendor
+   * account. A sign-in only appears when that session has lapsed, so promising
+   * one is wrong more often than it is right.
    */
   const askDisconnect = (provider: string, name: string) => {
     setMessage(null);
@@ -183,7 +191,7 @@ export function WearableSettings({
       body:
         `We'll stop pulling new data from ${name} and delete the permission it ` +
         "gave us. Readings already synced stay in your Trends. You can " +
-        `reconnect any time, which means signing in to ${name} again.`,
+        `reconnect any time by approving access at ${name} again.`,
       confirmLabel: "Disconnect",
       onConfirm: () => void disconnect(provider),
     });
