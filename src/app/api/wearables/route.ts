@@ -90,6 +90,14 @@ export async function DELETE(request: Request) {
   // Delete the grant outright rather than flagging it: keeping a row that
   // still holds a live refresh token for someone who asked us to disconnect is
   // the wrong default, and the metrics they already synced are unaffected.
+  //
+  // WE DO NOT REVOKE AT THE VENDOR, and nothing here pretends otherwise. Our
+  // copy of the credentials is destroyed, so we cannot call the vendor again
+  // whatever happens; but the authorisation the user granted still exists in
+  // their vendor account, which is why reconnecting goes straight to consent
+  // with no sign-in. Several vendors document a revoke endpoint and calling it
+  // would be strictly better. It is on the deferred list in
+  // docs/PROJECT_STATUS.md §8 rather than guessed at per vendor.
   const { error } = await supabase
     .from("wearable_connections")
     .delete()
