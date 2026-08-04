@@ -189,20 +189,39 @@ own documentation contradicts itself, are in
 
 ### ☐ Oura
 
+Audited 2026-08-04. **Blood oxygen was never arriving**, because the `spo2`
+scope was not requested and the field was read from the wrong collection.
+
 - **Where:** `cloud.ouraring.com` → your account → OAuth applications → New
 - **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/oura`
-- **Scopes:** `daily`, `heartrate`, `personal`
+- **Scopes to tick, exactly these three:** `daily`, `heartrate`, `spo2`
+- **Do NOT tick `personal`.** It returns gender, age, height and weight, and we
+  call no personal endpoint. It was previously requested and never read.
 - Gives you a client id and secret immediately.
 
+The member can toggle individual scopes off at the consent screen, so anything
+listed that we do not use is both noise and a worse first impression.
+
 ### ☐ Fitbit
+
+Audited 2026-08-04. **Naps were overwriting whole nights**, and three of the six
+requested scopes were never read by anything.
 
 - **Where:** `dev.fitbit.com` → Manage → Register an app
 - **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/fitbit`
 - **OAuth 2.0 Application Type:** `Server` (not Client or Personal. Personal
   only ever reads your own account, which is not what we are building)
-- **Scopes:** `activity`, `heartrate`, `sleep`, `oxygen_saturation`, `weight`,
-  `profile`
+- **Scopes to tick, exactly these three:** `activity`, `heartrate`, `sleep`
+- **Do NOT tick `oxygen_saturation`, `weight` or `profile`.** None of them is
+  read. SpO2 in particular lives on its own Fitbit collection that we do not
+  call; adding it later means putting the scope back, which is free now and
+  costs a re-consent once anybody is connected.
 - **Default Access Type:** `Read Only`
+
+**Fitbit contributes three metrics:** steps, resting heart rate and sleep
+duration. Not a sleep score: Fitbit's real one is not on the public API, and
+the `efficiency` figure that was standing in for it is a different quantity.
+See [`WEARABLES.md`](./WEARABLES.md).
 
 ### ☐ Whoop
 

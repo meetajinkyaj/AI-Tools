@@ -104,7 +104,23 @@ const oura: WearableProvider = {
   clientSecretEnv: "OURA_CLIENT_SECRET",
   authorizeUrl: "https://cloud.ouraring.com/oauth/authorize",
   tokenUrl: "https://api.ouraring.com/oauth/token",
-  scopes: ["daily", "heartrate", "personal"],
+  // Oura publishes eight scopes: email, personal, daily, heartrate, workout,
+  // tag, session, spo2. Ask for four of them and no more, since the member
+  // sees this list and can toggle each one off.
+  //
+  // `spo2` WAS MISSING and is why blood oxygen never appeared: it gates a
+  // separate `daily_spo2` collection, and the old code looked for a
+  // `spo2_percentage` field on the sleep document, where no such field exists.
+  //
+  // `personal` was dropped. It exposes gender, age, height and weight, and we
+  // call no personal endpoint at all.
+  //
+  // `heartrate` is kept although we never call `/heartrate` directly. Their
+  // docs are not explicit about whether the HRV and resting-heart-rate fields
+  // on the sleep document sit behind it, and losing those silently is much
+  // worse than carrying one scope we may not need. Same reasoning as Whoop's
+  // `read:cycles`.
+  scopes: ["daily", "heartrate", "spo2"],
   tokenAuth: "body",
   refreshRotates: true,
   syncWindowDays: 7,
@@ -113,10 +129,14 @@ const oura: WearableProvider = {
     const base = "https://api.ouraring.com/v2/usercollection";
     const qs = `start_date=${start}&end_date=${end}`;
 
-    const [sleep, readiness, activity] = await Promise.all([
+    // These collections return `next_token` when truncated. A 7-day window is
+    // one document per day, so it is never reached; widen `syncWindowDays` and
+    // pagination has to be handled first.
+    const [sleep, readiness, activity, spo2] = await Promise.all([
       providerFetch<{ data?: OuraDoc[] }>("oura", `${base}/daily_sleep?${qs}`, { accessToken }),
       providerFetch<{ data?: OuraDoc[] }>("oura", `${base}/daily_readiness?${qs}`, { accessToken }),
       providerFetch<{ data?: OuraDoc[] }>("oura", `${base}/daily_activity?${qs}`, { accessToken }),
+      providerFetch<{ data?: OuraDoc[] }>("oura", `${base}/daily_spo2?${qs}`, { accessToken }),
     ]);
 
     for (const d of sleep.data ?? []) push(out, "sleep_score", d.day, num(d.score), "oura");
@@ -126,6 +146,13 @@ const oura: WearableProvider = {
     for (const d of activity.data ?? []) {
       push(out, "steps", d.day, num(d.steps), "oura");
       push(out, "active_calories", d.day, num(d.active_calories), "oura");
+    }
+
+    // Blood oxygen is its OWN collection, not a field on the sleep document.
+    // This is the correction: `spo2_percentage` was being read off `/sleep`,
+    // where it does not exist, so the metric was never emitted.
+    for (const d of spo2.data ?? []) {
+      push(out, "spo2", d.day, num(d.spo2_percentage?.average), "oura");
     }
 
     // Detailed sleep carries the physiology; it is a separate collection.
@@ -142,7 +169,7 @@ const oura: WearableProvider = {
       if (secs !== undefined) push(out, "sleep_minutes", day, secondsToMinutes(secs), "oura");
       push(out, "hrv", day, num(d.average_hrv), "oura");
       push(out, "resting_heart_rate", day, num(d.lowest_heart_rate), "oura");
-      push(out, "spo2", day, num(d.spo2_percentage?.average), "oura");
+      // NOT spo2 here. It comes from `daily_spo2` above.
     }
     return out;
   },
@@ -160,7 +187,13 @@ const fitbit: WearableProvider = {
   clientSecretEnv: "FITBIT_CLIENT_SECRET",
   authorizeUrl: "https://www.fitbit.com/oauth2/authorize",
   tokenUrl: "https://api.fitbit.com/oauth2/token",
-  scopes: ["activity", "heartrate", "sleep", "oxygen_saturation", "weight", "profile"],
+  // THREE SCOPES REMOVED, all of them dead: `profile` (we call no profile
+  // endpoint), `weight` (no body endpoint), and `oxygen_saturation` (Fitbit
+  // serves SpO2 from its own `/spo2/date/...` collection, which we do not
+  // call). Every one of them appeared on the consent screen asking for access
+  // we never exercised. Adding SpO2 later means putting the scope back, which
+  // is free now and costs a re-consent once anyone is connected.
+  scopes: ["activity", "heartrate", "sleep"],
   // Fitbit rejects credentials in the body and requires Basic.
   tokenAuth: "basic",
   refreshRotates: true,
@@ -185,15 +218,33 @@ const fitbit: WearableProvider = {
       push(out, "resting_heart_rate", d.dateTime, num(d.value?.restingHeartRate), "fitbit");
     }
 
+    // `${api}.2` is api.fitbit.com/1.2: sleep is the one collection still on
+    // 1.2 while everything else here is on 1.
     const sleep = await providerFetch<{
-      sleep?: { dateOfSleep?: string; minutesAsleep?: number; efficiency?: number }[];
+      sleep?: {
+        dateOfSleep?: string;
+        minutesAsleep?: number;
+        efficiency?: number;
+        /** False for naps. Fitbit logs those as separate records. */
+        isMainSleep?: boolean;
+      }[];
     }>("fitbit", `${api}.2/user/-/sleep/date/${start}/${end}.json`, { accessToken });
     for (const s of sleep.sleep ?? []) {
+      if (!s || typeof s !== "object") continue;
+      // NAPS SHARE A DATE WITH THE NIGHT. The metrics upsert is keyed on
+      // (user, provider, date, metric), so an afternoon nap arriving after the
+      // night would replace it outright and the day would read as 40 minutes
+      // of sleep. Same trap as Whoop's `nap` flag.
+      if (s.isMainSleep === false) continue;
       push(out, "sleep_minutes", s.dateOfSleep, num(s.minutesAsleep), "fitbit");
-      // Fitbit has no "sleep score" in the public API; efficiency is the
-      // closest 0-100 analogue and is labelled as such in the UI.
-      const eff = num(s.efficiency);
-      if (eff !== undefined) push(out, "sleep_score", s.dateOfSleep, clampScore(eff), "fitbit");
+
+      // NO SLEEP SCORE FROM FITBIT, deliberately. `efficiency` is time asleep
+      // over time in bed, which is a different quantity from a sleep score:
+      // Fitbit's own Sleep Score is a composite and is not exposed on the
+      // public API at all. Publishing efficiency under `sleep_score` would put
+      // a number next to Oura's that means something else, that the member
+      // cannot reconcile against Fitbit's own app, and that is not even
+      // labelled the same thing there. Better to contribute nothing.
     }
     return out;
   },

@@ -6,8 +6,8 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-04. **No task is pending.** Ultrahuman connects, stores
-tokens and syncs.
+Last updated: 2026-08-04. **One task is pending:** register the Whoop developer
+App and set its two secrets. See [PENDING TASK](#pending-task) below.
 
 ---
 
@@ -49,20 +49,133 @@ is outstanding.
 
 # PENDING TASK
 
-**Nothing.** The Ultrahuman integration works end to end and everything that
-needed production access is done.
+## Register the Whoop developer App, and set its two secrets
 
-The remaining work is code and founder decisions, not ops. Do not re-run the
-connect, do not click "Sync now", and do not touch `WEARABLE_TOKEN_KEY` again.
+Self-serve, no review, no queue. The founder is not technical, so **walk them
+through it screen by screen rather than describing it**. Two values come out of
+this and you must not handle either of them yourself.
+
+### What you can do, and what you cannot
+
+**You can:** navigate `developer.whoop.com`, read the forms aloud, say exactly
+which boxes to tick, and confirm afterwards that Whoop appears in the app.
+
+**You cannot:** create the Whoop account, and you must never take the Client
+Secret. If a step cannot be done without the secret passing through you, stop
+and hand the founder the exact click path instead.
+
+### 1. Get into the dashboard
+
+`developer.whoop.com` → sign in with the founder's WHOOP member account. It is
+the same login as the WHOOP phone app; there is no separate developer signup.
+If they have no WHOOP account, one has to be created first and that needs them.
+
+Then: **Developer Dashboard** → **Create App**.
+
+### 2. Fill the form
+
+Read these out one at a time and let them type.
+
+| Field | What to put |
+|---|---|
+| App name | `Ikigaro` |
+| Contact email | the founder's email |
+| Privacy policy | `https://app.ikigaro.com/privacy` |
+| Redirect URI | `https://app.ikigaro.com/api/wearables/callback/whoop` |
+
+**The redirect URI must match byte for byte.** No trailing slash, no `www`, all
+lowercase. Every OAuth vendor rejects a mismatch with the same unhelpful
+`invalid redirect_uri` and nothing else to go on. Copy it, do not retype it.
+
+### 3. The scopes, which is the step that actually matters
+
+**Tick exactly these four:**
+
+- ☑ `read:sleep`
+- ☑ `read:recovery`
+- ☑ `read:cycles`
+- ☑ `offline`
+
+**Leave everything else unticked**, in particular:
+
+- ☐ `read:profile` (returns the member's name and email, we never read it)
+- ☐ `read:workout`
+- ☐ `read:body_measurement`
+
+Two reasons this is not a detail. **`offline` is load-bearing**: without it
+Whoop issues no refresh token and every connection dies within the hour, which
+looks like a broken integration a day later rather than a missed checkbox now.
+And **the scope list must match the code** (`src/lib/wearables/providers.ts`),
+because anything ticked here appears on the consent screen asking members for
+access we never use.
+
+Then **Create**.
+
+### 4. The two credentials
+
+Whoop shows a **Client ID** and a **Client Secret** immediately after creation.
+
+**Do not paste either into chat, a commit, or any file. Do not read the secret
+back to confirm it.** Tell the founder to copy them straight into Cloudflare,
+and to save the secret in their password manager at the same time, because
+Whoop may not show it again.
+
+Cloudflare → Workers & Pages → **`ai-tools`** → Settings → **Variables and
+Secrets** → Add:
+
+| Name | Type |
+|---|---|
+| `WHOOP_CLIENT_ID` | **Secret** |
+| `WHOOP_CLIENT_SECRET` | **Secret** |
+
+**Type Secret, not plaintext Variable.** `wrangler.jsonc` declares the plaintext
+vars and replaces them on every deploy, so a Variable would silently vanish at
+the next push. Secrets survive. Same reason `RESEND_API_KEY` and
+`WEARABLE_TOKEN_KEY` are Secrets.
+
+**Then redeploy.** Secrets do not apply to an already-running version. Either
+push any commit to `main` or use the dashboard's Deploy on the latest version.
+
+### 5. Verify, and stop
+
+1. `app.ikigaro.com` → **Profile** → **Connected devices**.
+2. **Whoop should now appear with a Connect button.** Ultrahuman keeps its
+   Disconnect. The other four stay button-less, since a provider only renders
+   when both halves of its credentials exist. Whoop appearing and nothing else
+   changing is the whole test.
+3. Press **Connect**. It should reach Whoop's consent screen, which must list
+   **exactly four permissions** matching the four ticked above.
+4. **Stop there. Do not approve** unless the founder owns a Whoop band, since
+   an empty connection tells us nothing and costs a reconnect to clear.
+
+### What to report
+
+- Did Whoop appear, and only Whoop?
+- Did the consent screen load, and which permissions did it list?
+- If it lists `read:profile` or anything else beyond the four, say so: the App
+  was created with the wrong scopes and it is a two-minute fix in the dashboard.
+
+### If it goes wrong
+
+| Symptom | Cause |
+|---|---|
+| No Whoop in Connected devices | The redeploy did not happen, or a secret name is misspelled. Both names are case-sensitive with no prefix. |
+| `invalid redirect_uri` at Whoop | The redirect URI does not match byte for byte. Compare it against the value above, character by character. |
+| "Device connections aren't available right now" | Not a Whoop problem. That is the `WEARABLE_TOKEN_KEY` guard, and the Worker log line says exactly what is wrong with it. |
+
+**Do not touch `WEARABLE_TOKEN_KEY`, and do not disconnect Ultrahuman.**
 
 ---
 
 Two things are waiting on the founder rather than on Cowork:
 
-- **The remaining wearable credentials.** Oura, Fitbit, Whoop and Withings are
-  self-serve and take an afternoon each. Garmin is paused at their end
-  indefinitely. See
-  [`../WEARABLES_APPLICATIONS.md`](../WEARABLES_APPLICATIONS.md).
+- **The remaining wearable credentials.** Whoop is the pending task above.
+  Oura and Fitbit are self-serve and their adapters have now been audited, so
+  they are ready to register whenever there is an afternoon; the exact scopes
+  to tick are in [`../WEARABLES_APPLICATIONS.md`](../WEARABLES_APPLICATIONS.md)
+  and matter, since three of Fitbit's old six were dead. Withings is the one
+  adapter still unaudited: do not register it before it has been read against
+  their docs. Garmin is paused at their end indefinitely.
 - **Supabase backups.** The production database is on the Free plan: no
   backups, no point-in-time recovery. Worst case is total loss. This is a
   spend decision (Pro, $25/mo), deliberately deferred until ~20 testers, not
