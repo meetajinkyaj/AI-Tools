@@ -6,9 +6,8 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-03. **One task is pending:** regenerate
-`WEARABLE_TOKEN_KEY`, which is not valid base64 and has never worked, then
-connect Ultrahuman. See [PENDING TASK](#pending-task) below.
+Last updated: 2026-08-04. **No task is pending.** Ultrahuman connects, stores
+tokens and syncs.
 
 ---
 
@@ -26,7 +25,7 @@ connect Ultrahuman. See [PENDING TASK](#pending-task) below.
 
 | Configuration | Status |
 |---|---|
-| `WEARABLE_TOKEN_KEY` | Set on prod `ai-tools` 2026-07-30, but the value is **not valid base64**, so token encryption has never worked and nothing has ever been stored under it. Being regenerated, see the pending task. Not set on `ikigaro-reminders` or staging, correct. Note it is used two ways: base64-decoded as an AES key, and as a plain string to derive the OAuth state HMAC. Only the first was broken, which is why consent and callbacks worked throughout. |
+| `WEARABLE_TOKEN_KEY` | **Regenerated 2026-08-04** and verified working: tokens now encrypt and store. The original value set 2026-07-30 was not valid base64, so encryption had never once worked and nothing was ever stored under it, which is why rotating cost nothing. Not set on `ikigaro-reminders` or staging, correct. Note it is used two ways: base64-decoded as an AES key, and as a plain string to derive the OAuth state HMAC. Only the first was ever broken, which is why consent and callbacks worked throughout. |
 | `GARMIN_PUSH_SECRET` | Set on prod `ai-tools` 2026-07-30, URL-safe alphanumeric, saved to the founder's password manager. Needed again on Garmin's application form. |
 | `RESEND_API_KEY` | Set on prod `ai-tools` 2026-07-30 as a **Secret** (survives deploys, plaintext vars are replaced by `wrangler.jsonc` on every deploy). Sending-access-only key, scoped to `ikigaro.com`. |
 | Resend domain | `ikigaro.com` verified 2026-07-30 as the **root** domain (not `send.ikigaro.com`), so `From: team@ikigaro.com` is valid. Records are subdomain-scoped in Cloudflare; the existing Hostinger SPF/MX/DKIM/DMARC were left untouched and no second SPF was added. |
@@ -35,7 +34,7 @@ connect Ultrahuman. See [PENDING TASK](#pending-task) below.
 
 | Verification | Status |
 |---|---|
-| First real wearable connection | **Not yet achieved.** The `atob` fix deployed clean, but the row on production turned out to be the pre-fix failed attempt: a shell with `status = 'active'` and no credentials, which the card rendered as Disconnect. Found by reading `connected_at`, which the upsert refreshes and which had not moved. The token host, `/authorise` spelling, scope strings and redirect URI are still proven by the successful code exchange that preceded the encryption failure. The metrics endpoint remains unproven. |
+| First real wearable connection | **Achieved 2026-08-04**, after the key was regenerated. `?wearable=connected` for the first time; row has `status active`, `failure_count 0`, both tokens stored, `expires_at` 24h out, `last_error` null, and `last_sync_at` stamped by the app's own post-connect sync. This proves the token host, the metrics host, the `/authorise` spelling, the scope strings and the redirect URI. `external_user_id` is null and expected to be: `/user_info` is not called. Earlier note, kept because it explains the trail: **Not yet achieved.** The `atob` fix deployed clean, but the row on production turned out to be the pre-fix failed attempt: a shell with `status = 'active'` and no credentials, which the card rendered as Disconnect. Found by reading `connected_at`, which the upsert refreshes and which had not moved. The token host, `/authorise` spelling, scope strings and redirect URI are still proven by the successful code exchange that preceded the encryption failure. The metrics endpoint remains unproven. |
 | Wearables UI on production | Confirmed live 2026-07-30 on `app.ikigaro.com`. Settings shows **Connected devices** with the coming-soon copy and Apple Health / Google Health Connect listed; Home shows the **Your devices** card. No Connect buttons on either surface, correct, since no provider credentials exist yet. Dismiss ✕ persists across reload. No app console errors. |
 
 | Repo hygiene | Status |
@@ -50,95 +49,11 @@ is outstanding.
 
 # PENDING TASK
 
-## Regenerate `WEARABLE_TOKEN_KEY`, then connect Ultrahuman
+**Nothing.** The Ultrahuman integration works end to end and everything that
+needed production access is done.
 
-**Read this first: the "do not touch `WEARABLE_TOKEN_KEY`" instruction from
-earlier rounds is withdrawn.** It was right when it was given and its premise
-turned out to be false. Rotating it now costs nothing.
-
-### What the 503 actually proved
-
-The guard's message is correct and the guard is not stricter than the decoder.
-There is exactly **one** decoder in the codebase and both paths use it. So:
-
-**The key is not base64. Encryption with it has never once worked.** Not before
-the fix, not after. That is why the only connection row on production has no
-tokens in it.
-
-Which means the usual reason not to rotate, that every connected user would have
-to reconnect, does not apply: **there is nothing encrypted under this key.**
-`wearable_daily_metrics` has zero rows and the one connection row holds no
-credentials. Rotating loses nothing.
-
-The guard also did exactly its job. It refused **before** sending anyone to
-Ultrahuman's consent screen, instead of after.
-
-### 1. Generate a new key
-
-Run this and copy the single line it prints:
-
-```bash
-openssl rand -base64 32
-```
-
-It must be the **base64** form, not `-hex`. A hex string decodes to 48 bytes and
-the guard will reject it for the wrong length.
-
-**Never paste the value into chat, a commit, or any file.** If you cannot set it
-without the value passing through you, stop and hand the click path to the
-founder.
-
-### 2. Replace the secret
-
-Cloudflare → Workers & Pages → **`ai-tools`** → Settings → Variables and Secrets
-→ `WEARABLE_TOKEN_KEY` → Edit. Type **Secret**, not plaintext Variable.
-
-**Then redeploy.** Secrets do not apply to an already-running version.
-
-### 3. Connect
-
-1. Profile → Connected devices. **Connect** should be enabled and clicking it
-   should now go to Ultrahuman rather than showing "Device connections aren't
-   available right now".
-2. **Approve, briskly**, inside two minutes.
-3. Then run the query. **Do not click "Sync now" first**, it overwrites the
-   evidence.
-
-```sql
-select provider, status, failure_count, last_sync_at, connected_at, last_error,
-       external_user_id is not null as has_external_id,
-       access_token_enc is not null as has_access_token,
-       refresh_token_enc is not null as has_refresh_token,
-       expires_at
-from wearable_connections
-where provider = 'ultrahuman';
-```
-
-### What a healthy row looks like
-
-| Column | Expected |
-|---|---|
-| `has_access_token` | **true**. This is the one that has never yet been true. |
-| `has_refresh_token` | true |
-| `expires_at` | roughly 24 hours out |
-| `connected_at` | your new attempt, not `14:25:52` |
-| `last_sync_at` | **set**, even with no ring |
-
-**`last_sync_at` is the prize.** A sync that runs and finds nothing still stamps
-it, so a set value confirms the metrics endpoint host, which is the last
-unproven guess left in the adapter. Null with `last_error` populated means the
-host is wrong: paste the error.
-
-### If the 503 comes back
-
-The message now says which of two things is wrong, and they need different
-actions:
-
-| Message | Meaning |
-|---|---|
-| `...it contains characters that are not base64 or base64url...` | The value is not base64. Something mangled it in transit. Generate again and re-paste carefully. |
-| `...its length is not a valid base64 length, so it is probably truncated...` | It got cut off. Check the whole line was copied. |
-| `...decoded to N bytes; AES-256 needs 32 bytes...` | Valid base64, wrong size. Almost always `-hex` instead of `-base64`. |
+The remaining work is code and founder decisions, not ops. Do not re-run the
+connect, do not click "Sync now", and do not touch `WEARABLE_TOKEN_KEY` again.
 
 ---
 

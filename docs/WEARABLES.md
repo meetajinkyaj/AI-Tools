@@ -85,31 +85,44 @@ form takes a **single** redirect URI, so get it right first time:
    examples. If consent ever 404s, try the other spelling before assuming
    anything else is wrong.
 
-#### The token host is confirmed. The metrics host is not.
+#### Both hosts are confirmed now
 
 Their docs give both paths without repeating the host, so we guessed
 `partner.ultrahuman.com` from the `/api/partners/` prefix and the personal-token
 API.
 
-**`/api/partners/oauth/token` on that host is now proven**, by a real code
-exchange on 2026-08-03: a live connection completed and stored tokens. Also
+**`/api/partners/oauth/token` on that host is proven**, by a real code exchange
+on 2026-08-04: a live connection completed, stored tokens, and synced. Also
 proven by the same round trip: the `/authorise` spelling, the three scope
 strings, the redirect URI, and that their token response carries no user
-identifier (so `profile` scope and `/user_info` really are the only way to learn
-who connected).
+identifier.
 
-**`/api/partners/v1/user_data/metrics` is still unproven.** It shares a host
-with the token endpoint, which is suggestive and not evidence: a vendor
-splitting auth from data across hosts is ordinary. The first successful sync
-settles it.
+**On that last point: `profile` scope is requested and not yet used.** We never
+call `/user_info`, so `external_user_id` is null on Ultrahuman connections, and
+nothing reads it. That is expected rather than a fault, and there is a test
+pinning it. The scope is held rather than dropped because changing a scope list
+forces every live connection back through consent, and paying that twice, once
+to remove it and once to add it back when `/user_info` is wired up, is worse
+than carrying one unused scope. Wire it up when there is a reason to: an
+identifier for vendor support conversations, or a webhook that needs to name a
+user.
 
-> **Do not read "no data" as "the endpoint works".** `fetchRange` catches each
-> day's request individually and continues, so a wrong host, a 404 and an empty
-> ring all produce the same empty result. What tells the two apart is
-> `wearable_connections.last_sync_at`: a sync that ran and found nothing still
-> stamps it. A null stamp on a connected account means the sync did not
-> complete, and the reason is in `last_error` on the same row, not in the
-> Worker logs.
+**`/api/partners/v1/user_data/metrics` is now proven too**, by the first
+successful sync on 2026-08-04.
+
+> **A set `last_sync_at` did NOT originally prove this, and it was claimed that
+> it did.** `fetchRange` caught each day's request individually and continued,
+> so a wrong host, a 404 and a ring that was never worn all returned the same
+> empty array. `storeMetrics` stored nothing, and `syncConnection` then recorded
+> a **success** and stamped `last_sync_at`. A completely broken integration
+> would have reported itself healthy forever.
+>
+> That hole is closed: if **every** day in the window fails, the adapter throws
+> instead of returning empty, so the failure reaches `last_error` and the
+> failure counter. A `last_sync_at` stamp now means at least one request
+> genuinely succeeded, which is what makes it evidence. A `ReauthRequired` is
+> also rethrown immediately rather than counted as a missing day, since a
+> revoked grant is not an empty one.
 
 #### CGM: requested, and stored as daily summaries only
 

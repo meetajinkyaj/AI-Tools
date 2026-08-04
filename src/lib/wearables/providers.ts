@@ -8,7 +8,7 @@ import {
   type DailyMetric,
   type MetricKey,
 } from "./metrics";
-import { PROVIDER_NAMES, type ProviderId, type WearableProvider } from "./types";
+import { PROVIDER_NAMES, ReauthRequired, type ProviderId, type WearableProvider } from "./types";
 
 /**
  * The six cloud wearable adapters.
@@ -383,9 +383,19 @@ const ultrahuman: WearableProvider = {
   authorizeUrl: "https://auth.ultrahuman.com/authorise",
   tokenUrl: "https://partner.ultrahuman.com/api/partners/oauth/token",
 
-  // `ring_data` is the ring itself. `profile` is required by /user_info, which
-  // is the ONLY way to learn the Ultrahuman user id, because unlike every other
-  // vendor here their token response carries no user identifier at all.
+  // `ring_data` is the ring itself.
+  //
+  // `profile` is REQUESTED BUT NOT YET USED, which is a deliberate exception to
+  // "never ask for a scope you do not need". Unlike every other vendor here,
+  // Ultrahuman's token response carries no user identifier at all, and their
+  // /user_info endpoint (which needs this scope) is the only way to learn one.
+  // We do not call it yet, so `external_user_id` stays null for Ultrahuman
+  // connections and nothing depends on it: `fetchRange` below never reads it.
+  //
+  // The scope is kept rather than dropped because changing a scope list forces
+  // every existing connection back through consent, and it is cheaper to hold
+  // one unused scope than to pay that twice, once to remove it and once to add
+  // it back when /user_info is wired up. See docs/WEARABLES.md.
   //
   // `cgm_data` unlocks glucose from the M1, on this same endpoint. Requested
   // because glucose is genuinely analytical for us: it is the one wearable
@@ -410,11 +420,15 @@ const ultrahuman: WearableProvider = {
     const out: DailyMetric[] = [];
     const api = "https://partner.ultrahuman.com/api/partners/v1";
 
+    const days = daysBetween(start, end);
+    let failed = 0;
+    let lastFailure = "";
+
     // One request per day. `date` is the only parameter this endpoint accepts:
     // there is no range form on the OAuth API. (The separate personal-token API
     // does accept start_epoch/end_epoch, but that is a different host, a
     // different auth header, and not what we ship.)
-    for (const day of daysBetween(start, end)) {
+    for (const day of days) {
       let res: UltrahumanMetricsResponse;
       try {
         res = await providerFetch<UltrahumanMetricsResponse>(
@@ -422,9 +436,14 @@ const ultrahuman: WearableProvider = {
           `${api}/user_data/metrics?date=${day}`,
           { accessToken },
         );
-      } catch {
+      } catch (err) {
+        // A dead grant is not a missing day. Swallowing it would report a
+        // revoked connection as "synced, no data" forever.
+        if (err instanceof ReauthRequired) throw err;
         // One missing day must not abandon the rest of the window. A ring that
         // was off the charger for a night simply has nothing for that date.
+        failed += 1;
+        lastFailure = err instanceof Error ? err.message : String(err);
         continue;
       }
 
@@ -501,6 +520,27 @@ const ultrahuman: WearableProvider = {
         //   weight_kg,
         //   body_fat_pct      a ring cannot measure either
       }
+    }
+
+    /*
+     * EVERY DAY FAILING IS NOT "NO DATA". It is the endpoint not answering.
+     *
+     * Per-day `continue` is right for a ring that was on the charger, and it
+     * was silently wrong for everything else: a bad host, a wrong path or a
+     * vendor outage produced an empty array, `storeMetrics` stored nothing,
+     * and `syncConnection` then recorded a SUCCESS and stamped `last_sync_at`.
+     * A completely broken integration reported itself healthy forever, and
+     * nothing in the database or the logs said otherwise.
+     *
+     * That mattered concretely: a set `last_sync_at` was read as proof the
+     * metrics host was right, which it never was. Throwing here is what makes
+     * that stamp mean something, because now it can only appear when at least
+     * one request actually succeeded.
+     */
+    if (days.length > 0 && failed === days.length) {
+      throw new Error(
+        `ultrahuman metrics returned nothing for all ${days.length} day(s): ${lastFailure}`,
+      );
     }
     return out;
   },
