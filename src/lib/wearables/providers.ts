@@ -203,19 +203,54 @@ const fitbit: WearableProvider = {
 /* Whoop                                                                       */
 /* -------------------------------------------------------------------------- */
 
-interface WhoopCycle {
+/**
+ * Whoop's v2 sleep record, modelled on their documented example.
+ *
+ * THE SHAPE THAT BIT US: `stage_summary` lives INSIDE `score`, not beside it.
+ * The first version of this adapter read `sleep.stage_summary`, which is always
+ * undefined, so `sleep_minutes` was never emitted at all. Nothing failed and
+ * nothing logged; the metric was simply absent, which is the hardest kind of
+ * wrong to notice.
+ */
+interface WhoopSleep {
+  id?: string;
+  start?: string;
   end?: string;
+  /** Naps are separate records from the night. See fetchRange. */
+  nap?: boolean;
+  /** "SCORED" | "PENDING_SCORE" | "UNSCORABLE". Only the first has a score. */
+  score_state?: string;
   score?: {
-    strain?: number;
-    average_heart_rate?: number;
+    stage_summary?: {
+      total_in_bed_time_milli?: number;
+      total_awake_time_milli?: number;
+      total_no_data_time_milli?: number;
+      total_light_sleep_time_milli?: number;
+      total_slow_wave_sleep_time_milli?: number;
+      total_rem_sleep_time_milli?: number;
+    };
+    respiratory_rate?: number;
+    sleep_performance_percentage?: number;
+    sleep_efficiency_percentage?: number;
+  };
+}
+
+/** Whoop's v2 recovery record. Field names verified against their docs. */
+interface WhoopRecovery {
+  cycle_id?: number;
+  sleep_id?: string;
+  created_at?: string;
+  score_state?: string;
+  score?: {
+    /** True during a new member's first weeks, when the score is not yet meaningful. */
+    user_calibrating?: boolean;
+    recovery_score?: number;
     resting_heart_rate?: number;
     hrv_rmssd_milli?: number;
-    sleep_performance_percentage?: number;
-    recovery_score?: number;
     spo2_percentage?: number;
-    respiratory_rate?: number;
+    /** ABSOLUTE skin temperature, not a deviation from baseline. Not mapped. */
+    skin_temp_celsius?: number;
   };
-  stage_summary?: { total_in_bed_time_milli?: number; total_awake_time_milli?: number };
 }
 
 const whoop: WearableProvider = {
@@ -226,56 +261,97 @@ const whoop: WearableProvider = {
   clientSecretEnv: "WHOOP_CLIENT_SECRET",
   authorizeUrl: "https://api.prod.whoop.com/oauth/oauth2/auth",
   tokenUrl: "https://api.prod.whoop.com/oauth/oauth2/token",
-  scopes: [
-    "read:recovery",
-    "read:sleep",
-    "read:cycles",
-    "read:profile",
-    "offline",
-  ],
+  // ONLY WHAT WE READ. Whoop's own guidance is to request nothing more, and a
+  // consent screen listing access we never use is both worse to read and worse
+  // to justify. `read:profile` was dropped for exactly that reason: it returns
+  // the member's name and email and we call no profile endpoint.
+  //
+  // `read:cycles` is kept despite our not calling /cycle directly, because
+  // Whoop's own recovery documentation says recovery is reached "through the
+  // Cycle endpoints in the V2 API". Cheap insurance against a 403 that would
+  // otherwise cost a re-consent from every connected member.
+  //
+  // `offline` is the one that matters: without it Whoop issues no refresh
+  // token and every connection dies within the hour.
+  scopes: ["read:sleep", "read:recovery", "read:cycles", "offline"],
   tokenAuth: "body",
   refreshRotates: true,
   syncWindowDays: 7,
   async fetchRange({ accessToken, start, end }) {
     const out: DailyMetric[] = [];
-    const api = "https://api.prod.whoop.com/developer/v1";
+    // v2. Their v1 to v2 guide maps every path we use one for one, v1 webhooks
+    // are already removed, and new features land on v2 first.
+    const api = "https://api.prod.whoop.com/developer/v2";
     const range = `start=${start}T00:00:00.000Z&end=${end}T23:59:59.999Z`;
 
-    const sleep = await providerFetch<{ records?: WhoopCycle[] }>(
+    // 25 is the documented maximum for these collections. A 7-day window is
+    // well inside it, so `next_token` is not followed; widen `syncWindowDays`
+    // and this needs pagination first.
+    const sleep = await providerFetch<{ records?: WhoopSleep[] }>(
       "whoop",
       `${api}/activity/sleep?${range}&limit=25`,
       { accessToken },
     );
     for (const s of sleep.records ?? []) {
+      // A null or non-object element must not take down the whole sync, and
+      // "the vendor sent something odd" is a normal day.
+      if (!s || typeof s !== "object") continue;
+      // NAPS ARE SEPARATE RECORDS and share the day with the night they
+      // adjoin. Keeping them would emit two `sleep_minutes` for one date, and
+      // since the upsert is keyed on (user, provider, date, metric) the last
+      // one written wins: a 20-minute nap would silently replace a full night.
+      if (s.nap) continue;
+      // Anything not SCORED has no usable score. PENDING_SCORE and UNSCORABLE
+      // both appear in normal use.
+      if (s.score_state && s.score_state !== "SCORED") continue;
+
       const day = s.end ? dayOf(s.end) : undefined;
-      const inBed = num(s.stage_summary?.total_in_bed_time_milli);
-      const awake = num(s.stage_summary?.total_awake_time_milli);
-      if (inBed !== undefined) {
-        // Whoop reports time in bed and awake; asleep is the difference. Using
-        // in-bed directly would systematically overstate sleep against every
-        // other provider in the same chart.
-        const asleepMs = Math.max(0, inBed - (awake ?? 0));
+      const stages = s.score?.stage_summary;
+
+      // ASLEEP IS THE SUM OF THE STAGES, not in-bed minus awake. Whoop reports
+      // `total_no_data_time_milli` as well, so the subtraction quietly counts
+      // sensor gaps as sleep. Adding the three real stages is exact.
+      const light = num(stages?.total_light_sleep_time_milli) ?? 0;
+      const deep = num(stages?.total_slow_wave_sleep_time_milli) ?? 0;
+      const rem = num(stages?.total_rem_sleep_time_milli) ?? 0;
+      const asleepMs = light + deep + rem;
+      if (asleepMs > 0) {
         push(out, "sleep_minutes", day, Math.round(asleepMs / 60000), "whoop");
       }
+
       const perf = num(s.score?.sleep_performance_percentage);
       if (perf !== undefined) push(out, "sleep_score", day, clampScore(perf), "whoop");
       push(out, "respiratory_rate", day, num(s.score?.respiratory_rate), "whoop");
     }
 
-    const recovery = await providerFetch<{ records?: (WhoopCycle & { created_at?: string })[] }>(
+    const recovery = await providerFetch<{ records?: WhoopRecovery[] }>(
       "whoop",
       `${api}/recovery?${range}&limit=25`,
       { accessToken },
     );
     for (const r of recovery.records ?? []) {
-      const day = r.created_at ? dayOf(r.created_at) : r.end ? dayOf(r.end) : undefined;
+      if (!r || typeof r !== "object") continue;
+      if (r.score_state && r.score_state !== "SCORED") continue;
+      // Recovery is computed on waking, so `created_at` is the morning it
+      // describes, which is the same day every other adapter keys a night to.
+      const day = r.created_at ? dayOf(r.created_at) : undefined;
+
+      // WHILE CALIBRATING, the recovery score is not yet meaningful: Whoop
+      // flags it themselves during a new member's first weeks. The underlying
+      // measurements are real and are kept; only the composite is skipped.
       const score = num(r.score?.recovery_score);
       // Whoop's recovery answers the same question as Oura's readiness, so it
       // normalizes onto the same key rather than inventing a second one.
-      if (score !== undefined) push(out, "readiness_score", day, clampScore(score), "whoop");
+      if (score !== undefined && r.score?.user_calibrating !== true) {
+        push(out, "readiness_score", day, clampScore(score), "whoop");
+      }
       push(out, "hrv", day, num(r.score?.hrv_rmssd_milli), "whoop");
       push(out, "resting_heart_rate", day, num(r.score?.resting_heart_rate), "whoop");
       push(out, "spo2", day, num(r.score?.spo2_percentage), "whoop");
+
+      // NOT MAPPED: `skin_temp_celsius` is an absolute reading, while our
+      // `temperature_deviation` is a difference from the wearer's own
+      // baseline. Charting one as the other would put ~33 next to ~-0.2.
     }
     return out;
   },

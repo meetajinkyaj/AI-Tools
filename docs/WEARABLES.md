@@ -176,6 +176,44 @@ recorded as `prefer: "neither"` against `hba1c` in
 [`biomarker-overlap.ts`](../src/lib/wearables/biomarker-overlap.ts) precisely
 because it sits next to glucose in the UI and invites that comparison.
 
+### Whoop, audited 2026-08-04 before anyone connected
+
+Checked against Whoop's published v2 documentation. **Four real bugs, one of
+them silent and total**, all fixed before registration rather than after a
+member had connected. Recorded because the same audit is still owed to Oura,
+Fitbit and Withings.
+
+| Was | Is | Consequence if left |
+|---|---|---|
+| `sleep.stage_summary` | `sleep.score.stage_summary` | **`sleep_minutes` was never emitted at all.** Nothing threw, nothing logged, the metric was simply absent |
+| `/developer/v1` | `/developer/v2` | v1 webhooks are already removed and new features land on v2 first |
+| asleep = in-bed minus awake | asleep = light + deep + REM | `total_no_data_time_milli` counted sensor gaps as sleep |
+| naps included | naps skipped | The upsert is keyed on (user, provider, date, metric), so a 20 minute nap arriving after the night would **replace** it |
+
+Three smaller ones from the same pass: records with `score_state` other than
+`SCORED` are skipped, since `PENDING_SCORE` and `UNSCORABLE` both occur in
+normal use; the recovery score is withheld while `user_calibrating` is true,
+because Whoop themselves say it is not yet meaningful in a new member's first
+weeks, though the raw heart-rate and HRV figures are kept; and a null element in
+a records array no longer throws, which a test caught.
+
+**`skin_temp_celsius` is deliberately not mapped.** Whoop reports an absolute
+skin temperature, around 33, while our `temperature_deviation` is a difference
+from the wearer's own baseline, around -0.2. They are different quantities and
+charting one as the other is not a rounding error.
+
+**Scopes are `read:sleep`, `read:recovery`, `read:cycles`, `offline`.**
+`read:profile` was dropped: it returns the member's name and email and we call
+no profile endpoint. `read:cycles` is kept although we do not call `/cycle`,
+because Whoop's recovery documentation says recovery is reached "through the
+Cycle endpoints in the V2 API", and a 403 there would cost a re-consent from
+every connected member. `offline` is the load-bearing one: without it Whoop
+issues no refresh token and every connection dies within the hour.
+
+**Pagination is not followed.** 25 is the documented maximum for these
+collections and a 7 day window is well inside it. Widen `syncWindowDays` and
+`next_token` has to be handled first.
+
 ## The self-serve four
 
 Register a developer app with each, then set the two env vars.
