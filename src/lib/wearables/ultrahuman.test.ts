@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
 import { PROVIDERS } from "./providers";
+import { ReauthRequired } from "./types";
 
 /**
  * Ultrahuman adapter, built against their documented payload.
@@ -70,11 +71,28 @@ describe("what we ask Ultrahuman for", () => {
     expect(uh.scopes).toContain("cgm_data");
   });
 
-  it("keeps profile scope, which is load-bearing", () => {
+  it("keeps profile scope, which is requested ahead of its use", () => {
     // Their token response carries NO user identifier, unlike every other
-    // vendor here, so /user_info is the only way to learn who connected, and
-    // it needs this scope.
+    // vendor here, so /user_info is the only way to learn who connected, and it
+    // needs this scope. WE DO NOT CALL IT YET. The scope is held because
+    // changing a scope list forces every live connection back through consent,
+    // and paying that twice to remove and re-add it is worse than carrying one
+    // unused scope. `external_user_id` being null for Ultrahuman is therefore
+    // expected, not a fault.
     expect(uh.scopes).toContain("profile");
+  });
+
+  it("does not depend on an external user id it never fetches", async () => {
+    // The guard on the above: if the adapter ever starts reading
+    // externalUserId, the null it gets today becomes a silent bug.
+    mockOnce(fixture);
+    const out = await uh.fetchRange!({
+      accessToken: "t",
+      externalUserId: null,
+      start: "2025-05-01",
+      end: "2025-05-01",
+    });
+    expect(out.length).toBeGreaterThan(0);
   });
 
   it("knows the refresh token rotates", () => {
@@ -214,6 +232,26 @@ describe("awkward responses", () => {
     );
     const out = await uh.fetchRange!({ accessToken: "t", externalUserId: null, start: "2025-05-01", end: "2025-05-02" });
     expect(out.length).toBeGreaterThan(0);
+  });
+
+  it("fails the sync when EVERY day fails, rather than reporting no data", async () => {
+    // The whole window failing is the endpoint not answering: a bad host, a
+    // wrong path, an outage. Returning [] made syncConnection record a success
+    // and stamp last_sync_at, so a completely broken integration reported
+    // itself healthy forever.
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 404 })));
+    await expect(
+      uh.fetchRange!({ accessToken: "t", externalUserId: null, start: "2025-05-01", end: "2025-05-02" }),
+    ).rejects.toThrow(/all 2 day/);
+  });
+
+  it("surfaces a dead grant instead of counting it as a missing day", async () => {
+    // A revoked connection must reach the sweep as ReauthRequired so the user
+    // is asked to reconnect, not be swallowed as "no data for that date".
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 401 })));
+    await expect(
+      uh.fetchRange!({ accessToken: "t", externalUserId: null, start: "2025-05-01", end: "2025-05-02" }),
+    ).rejects.toThrow(ReauthRequired);
   });
 
   it("returns nothing for an empty payload rather than throwing", async () => {
