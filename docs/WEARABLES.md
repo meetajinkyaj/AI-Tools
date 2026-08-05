@@ -214,6 +214,50 @@ issues no refresh token and every connection dies within the hour.
 collections and a 7 day window is well inside it. Widen `syncWindowDays` and
 `next_token` has to be handled first.
 
+### Whoop: `request_unauthorized` is a dashboard problem, not a code one
+
+Recorded because the error text points the wrong way and cost a round of
+investigation.
+
+**Symptom.** Connect reaches Whoop's real sign-in, the member signs in, and the
+browser comes straight back to our callback with **no consent screen**:
+
+```
+/api/wearables/callback/whoop?error=request_unauthorized
+  &error_description=The request could not be authorized
+  &error_hint=Check that you provided valid credentials in the right format.
+```
+
+"Check that you provided valid credentials" reads like our client id or scope
+string is malformed. **It is not.** Two things rule that out. An unknown or
+malformed scope returns `invalid_scope`, and a member declining returns
+`access_denied`; neither is what came back. And the same client id got as far
+as Whoop's sign-in page, which it could not do if it were unrecognised.
+
+**The two real causes, both on Whoop's side of the dashboard:**
+
+1. **A new Whoop app starts in development mode**, and in that mode it can only
+   be authorised by WHOOP accounts explicitly added as **Test Users** on the
+   app. A member who is not on that list signs in successfully and is then
+   bounced with exactly this error. Adding the founder's own WHOOP account to
+   the app's test users is the fix. Going fully public is a separate Whoop
+   review, and is not needed for beta.
+2. **Whoop requires an active WHOOP membership**, both to develop on the
+   platform and, plausibly, to grant data scopes at all. Their overview states
+   it in the first line: *"You must have a WHOOP membership to develop an app on
+   the Developer Platform."* An account with no membership and no band may not
+   be able to complete the grant.
+
+**Do not change the authorize URL or the scope list to chase this.** Both were
+audited against Whoop's published v2 documentation on 2026-08-04, and the four
+scope strings are the ones Whoop publishes. The scope list is the first thing
+that looks guilty and it is not.
+
+**Verification is the same as any other provider:** a `whoop` row appears in
+`wearable_connections` with both tokens and a stamped `last_sync_at`. Until a
+member on the test-user list with a band completes the flow, the Whoop token
+exchange and storage path remains unexercised.
+
 ### Oura and Fitbit, audited 2026-08-04
 
 Same pass as Whoop, same result. **Four of four adapters audited so far were
