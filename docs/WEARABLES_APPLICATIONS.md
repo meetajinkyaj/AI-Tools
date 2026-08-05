@@ -202,6 +202,13 @@ scope was not requested and the field was read from the wrong collection.
 The member can toggle individual scopes off at the consent screen, so anything
 listed that we do not use is both noise and a worse first impression.
 
+**Oura caps at ten users too**, exactly like Whoop, and it is their own
+documented default: *"By default, API Applications have a ten user limit. If you
+want to release your application to a wider audience, your application needs to
+be approved."* Unlike Whoop's form, Oura's review is submitted from the
+application's own page, so it is at least a button rather than a queue you
+cannot see into. Submit once the first real member has connected.
+
 ### ☐ Fitbit
 
 Audited 2026-08-04. **Naps were overwriting whole nights**, and three of the six

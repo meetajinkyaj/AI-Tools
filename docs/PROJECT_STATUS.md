@@ -466,7 +466,14 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   threshold is the whole safety margin**: past it, losing the data ends the
   beta rather than inconveniencing it. Fix is $25/mo (Supabase Pro → daily
   backups, 7-day retention). See `RUNBOOK.md` §2b.
-- **Whoop is capped at 10 members until approved, and approval has no
+- **Whoop AND Oura are both capped at 10 users until approved.** Two of the
+  four self-serve providers, so this is the shape of the space rather than one
+  vendor being awkward. Oura state it plainly: *"By default, API Applications
+  have a ten user limit."* Their review is submitted from the application's own
+  page, which is at least visible, unlike Whoop's. Ultrahuman has no such cap
+  and is the only uncapped provider we can ship today, which is worth
+  remembering when deciding which device to recommend to testers.
+- **Whoop's approval in particular has no
   timeline.** From Whoop's own approval page: an app can be used for development
   immediately with a limit of 10 WHOOP members. Their community forum carries
   several developers reporting submissions from March onward with no approval,

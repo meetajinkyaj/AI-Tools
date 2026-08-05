@@ -6,8 +6,8 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-04. **No task is pending.** Ultrahuman is connected and
-syncing; Whoop is registered and waiting on a tester with a band.
+Last updated: 2026-08-04. **One task is pending:** register the Oura developer
+application and set its two secrets. See [PENDING TASK](#pending-task).
 
 ---
 
@@ -52,21 +52,108 @@ is outstanding.
 
 # PENDING TASK
 
-**Nothing.** Everything that needs production access is done.
+## Register the Oura developer application, and set its two secrets
 
-The Whoop investigation is closed and the answer was **not** a dashboard change.
-There is no Test Users whitelist to add anybody to: Whoop allow **any WHOOP
-member** to authorise a development-mode app, up to ten of them, and the
-"10 REMAINING TEST USERS" badge is a counter rather than a managed list. That
-was confirmed by reading the dashboard and then Whoop's own approval page, and
-it corrects an earlier task in this file that asked for a whitelist entry.
+Self-serve, no review, client id and secret immediately. The adapter was audited
+against Oura's documentation on 2026-08-04 and two real bugs were fixed before
+this registration, so the scope list below is the one the code actually uses.
+**Walk the founder through it screen by screen**, they are not technical.
 
-**Whoop is blocked on a person with an active WHOOP membership and a working
-band.** Nothing in the dashboard, the secrets or the code can move it. Same
-shape as Ultrahuman waiting on a ring.
+### What you can do, and what you cannot
 
-Do not retry the Whoop connect from the founder's account: it will reproduce
-`request_unauthorized` every time, and each attempt is noise in the logs.
+**You can:** navigate `cloud.ouraring.com`, read the form out, say exactly what
+goes in each field, and confirm afterwards that Oura appears in the app.
+
+**You cannot:** create the Oura account, and you must never take the Client
+Secret. If a step needs the secret to pass through you, stop and hand the
+founder the click path instead.
+
+### 1. Sign in
+
+`cloud.ouraring.com`, using the same account as the Oura phone app. There is no
+separate developer signup. Then find **My Applications**, and press **New
+Application**.
+
+### 2. Fill the form
+
+| Field | What to put |
+|---|---|
+| Application name | `Ikigaro` |
+| Website | `https://app.ikigaro.com` |
+| Redirect URI | `https://app.ikigaro.com/api/wearables/callback/oura` |
+| Privacy policy | `https://app.ikigaro.com/privacy` |
+
+**The redirect URI must match byte for byte.** No trailing slash, no `www`, all
+lowercase. Copy it rather than retyping it: every vendor rejects a mismatch with
+the same unhelpful `invalid redirect_uri` and nothing else to go on.
+
+### 3. The scopes, which is the step that matters
+
+Oura publishes eight. **Tick exactly these three:**
+
+- ☑ `daily`
+- ☑ `heartrate`
+- ☑ `spo2`
+
+**Leave the other five unticked**, in particular:
+
+- ☐ `personal` (returns gender, age, height and weight, which we never read)
+- ☐ `email`
+- ☐ `workout`, ☐ `tag`, ☐ `session`
+
+`spo2` is easy to skip and matters: it gates a separate collection, and without
+it blood oxygen never arrives at all. That was a real bug found in the audit.
+`personal` is the one to be careful **not** to tick.
+
+The member can toggle individual scopes off at the consent screen, so anything
+we ask for and never use is both noise and a worse first impression.
+
+### 4. The two credentials
+
+Oura shows a **Client ID** and **Client Secret** immediately.
+
+**Do not paste either into chat, a commit, or any file. Do not read the secret
+back to confirm it.** The founder copies them straight into Cloudflare and into
+their password manager at the same time.
+
+Cloudflare → Workers & Pages → **`ai-tools`** → Settings → Variables and Secrets:
+
+| Name | Type |
+|---|---|
+| `OURA_CLIENT_ID` | **Secret** |
+| `OURA_CLIENT_SECRET` | **Secret** |
+
+**Type Secret, not plaintext Variable.** `wrangler.jsonc` declares the plaintext
+vars and replaces them on every deploy, so a Variable silently vanishes at the
+next push. **Then redeploy**, since secrets do not apply to a running version.
+
+### 5. Verify, and stop
+
+1. `app.ikigaro.com` → Profile → Connected devices.
+2. **Oura should appear with a Connect button.** Ultrahuman keeps Disconnect,
+   Whoop keeps Connect, the rest stay button-less. Oura appearing and nothing
+   else changing is the whole test.
+3. Press **Connect**. It should reach Oura's consent screen, listing **three**
+   permissions matching the three ticked above.
+4. **Stop there. Do not approve** unless the founder owns an Oura ring: an empty
+   connection tells us nothing and costs a reconnect to clear.
+
+### What to report
+
+- Did Oura appear, and only Oura?
+- Did the consent screen load, and exactly which permissions did it list?
+- If it lists `personal` or anything beyond the three, say so: the application
+  was created with the wrong scopes, and it is a two-minute fix on its page.
+
+### Worth knowing
+
+**Oura caps at ten users** until the application is approved, the same as Whoop.
+Their own docs: *"By default, API Applications have a ten user limit."* Review is
+submitted from the application's own page once we have a real member connected.
+Nothing to do about it now, just do not be surprised by it later.
+
+**Do not touch `WEARABLE_TOKEN_KEY`, the Whoop or Ultrahuman secrets, or the
+Ultrahuman connection**, which is healthy and syncing.
 
 ---
 
