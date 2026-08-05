@@ -6,9 +6,8 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-04. **Two tasks are pending:** read why the Whoop connect
-returned without a consent screen, then reconnect Ultrahuman. See
-[PENDING TASK](#pending-task) below.
+Last updated: 2026-08-04. **One task is pending:** add the founder's WHOOP
+account as a Test User on the Whoop app. See [PENDING TASK](#pending-task).
 
 ---
 
@@ -36,6 +35,8 @@ returned without a consent screen, then reconnect Ultrahuman. See
 
 | Verification | Status |
 |---|---|
+| Ultrahuman reconnected | 2026-08-04, after the row was lost to a Disconnect. Connect and Approve went straight through, and the card shows Disconnect with "synced just now". Healthy. |
+| Whoop, connect blocked | 2026-08-04. Secrets are set and valid, and Connect reaches Whoop's real sign-in. Whoop then returns `request_unauthorized` with no code, which is the development-mode test-user gate, not a credential or scope fault. See the pending task. |
 | First real wearable connection | **Achieved 2026-08-04**, after the key was regenerated. `?wearable=connected` for the first time; row has `status active`, `failure_count 0`, both tokens stored, `expires_at` 24h out, `last_error` null, and `last_sync_at` stamped by the app's own post-connect sync. This proves the token host, the metrics host, the `/authorise` spelling, the scope strings and the redirect URI. `external_user_id` is null and expected to be: `/user_info` is not called. Earlier note, kept because it explains the trail: **Not yet achieved.** The `atob` fix deployed clean, but the row on production turned out to be the pre-fix failed attempt: a shell with `status = 'active'` and no credentials, which the card rendered as Disconnect. Found by reading `connected_at`, which the upsert refreshes and which had not moved. The token host, `/authorise` spelling, scope strings and redirect URI are still proven by the successful code exchange that preceded the encryption failure. The metrics endpoint remains unproven. |
 | Wearables UI on production | Confirmed live 2026-07-30 on `app.ikigaro.com`. Settings shows **Connected devices** with the coming-soon copy and Apple Health / Google Health Connect listed; Home shows the **Your devices** card. No Connect buttons on either surface, correct, since no provider credentials exist yet. Dismiss ✕ persists across reload. No app console errors. |
 
@@ -51,50 +52,68 @@ is outstanding.
 
 # PENDING TASK
 
-## Find out why the Whoop connect returned without a consent screen
+## Add the founder's WHOOP account as a Test User on the Whoop app
 
-Whoop is registered, both secrets are set, and pressing Connect reaches Whoop's
-real sign-in. After signing in the browser came **back to the app with no
-consent screen and no `whoop` row**. That is the open question.
+**This is a dashboard change, not a code change.** The error text points the
+wrong way, so read this before acting on it.
 
-**Read the logs before touching anything.** Cloudflare → Workers & Pages →
-`ai-tools` → Observability → Logs, search:
+What came back from Whoop after sign-in:
 
 ```
-wearable
+error=request_unauthorized
+error_description=The request could not be authorized
+error_hint=Check that you provided valid credentials in the right format.
 ```
 
-Exactly one of these lines will be there, and each means something different:
+That reads like our client id or scope string is wrong. **It is not.** A
+malformed scope returns `invalid_scope`, a member declining returns
+`access_denied`, and neither is what came back. The same client id also got as
+far as Whoop's sign-in page, which it could not do if Whoop did not recognise
+it.
 
-| Line | Meaning |
-|---|---|
-| `wearable callback failed for whoop: <message>` | The exchange ran and something after it failed. The message carries Whoop's status and response body. Paste it verbatim. |
-| `wearable callback rejected for whoop before exchange: bad-or-expired-state` | The signed state expired. It has a 15 minute TTL, so a slow sign-in does this. **Not a bug.** Retry the whole flow briskly. |
-| `wearable callback rejected for whoop before exchange: no-code` | Whoop redirected back without an authorization code, which usually means the member declined or the scope list was rejected. |
-| Nothing at all | The browser never reached our callback, so the problem is at Whoop's end. Send the full URL from the address bar at the moment it came back. |
+**A new Whoop app starts in development mode**, and in that mode only WHOOP
+accounts explicitly added as **Test Users** can authorise it. Anyone else signs
+in fine and is then bounced with exactly this error.
 
-**Report the exact line and stop.** Do not add logging, change code, or edit
-secrets. Each cause has a different fix and three of the four are code changes.
+### What to do
 
-## Then: reconnect Ultrahuman
+1. `developer-dashboard.whoop.com` → team **Ikigaro** → app **Ikigaro**.
+2. Find the section for **Test Users** (it may be called Test Members, Allowed
+   Users, or sit under app settings or a Development/Access tab). If you cannot
+   find it, say so and describe what tabs the app page does have, rather than
+   guessing at another cause.
+3. **Add the founder's own WHOOP account**, by the email their WHOOP membership
+   is under.
+4. Retry: `app.ikigaro.com` → Profile → Connected devices → Whoop → Connect →
+   sign in.
 
-`wearable_connections` is empty, so Ultrahuman needs connecting again. This is
-**not** the migration truncate it was thought to be: no migration in the repo
-drops, truncates or deletes from that table, `0015` creates it with
-`create table if not exists`, and no migration has been applied since `0019`.
+**Expected:** a consent screen listing **exactly four** permissions, matching
+`read:sleep`, `read:recovery`, `read:cycles` and offline access.
 
-**The only code path that removes a row is `DELETE /api/wearables`**, which is
-what the Disconnect button calls, and it deletes outright by design. So the row
-went because Disconnect was pressed. Nothing is wrong and nothing is at risk on
-the next deploy.
+**Stop at the consent screen and report.** Do not approve unless the founder
+actually has a WHOOP band, since an empty connection tells us nothing and costs
+a reconnect to clear.
 
-1. `app.ikigaro.com` → Profile → Connected devices → Ultrahuman → Connect →
-   Approve, briskly.
-2. Confirm the card shows Disconnect and a sync time.
+### The second possible cause, if test users does not fix it
 
-**Do not press Disconnect again** unless you mean it: it is a real
-disconnection, not a UI reset, and reconnecting costs a trip through the
-vendor's consent screen.
+Whoop's own overview opens with *"You must have a WHOOP membership to develop an
+app on the Developer Platform."* An account with no active membership may not be
+able to grant data scopes at all. If adding the test user changes nothing,
+**check whether the founder's WHOOP account has an active membership**, and
+report that rather than trying anything else.
+
+### What NOT to do
+
+**Do not suggest changing the authorize URL or the scope list.** Both were
+audited against Whoop's published v2 documentation on 2026-08-04, and the four
+scope strings are the ones Whoop publishes. The scope list is the first thing
+that looks guilty here and it is not the cause.
+
+`read:workout` being ticked on the app is harmless: our code decides what the
+consent screen asks for, so that scope is granted but dormant.
+
+**Do not touch `WEARABLE_TOKEN_KEY`, the Whoop secrets, or the Ultrahuman
+connection**, which is healthy and syncing.
 
 ---
 

@@ -56,6 +56,17 @@ const COMING_SOON = [
   { name: "Google Health Connect", blurb: "Sleep, steps and heart rate from Android." },
 ];
 
+/**
+ * The vendor's display name, never its lowercase id.
+ *
+ * Provider ids are lowercase because they travel in URLs. "ultrahuman" in a
+ * sentence reads as a typo, and the server already sends the proper name for
+ * every configured provider, so there is no reason to guess at capitalisation.
+ */
+function brandName(payload: Payload | null, providerId: string): string {
+  return payload?.available.find((p) => p.id === providerId)?.name ?? "your device";
+}
+
 function whenSynced(iso: string | null): string {
   if (!iso) return "not synced yet";
   const mins = Math.round((Date.now() - Date.parse(iso)) / 60000);
@@ -85,41 +96,52 @@ export function WearableSettings({
    * rule that catches it), and computing it during render instead would
    * mismatch hydration, because the server has no URL params to read.
    */
-  const consumeOAuthResult = (): string | null => {
+  const consumeOAuthResult = (): { result: string; provider: string } | null => {
     const params = new URLSearchParams(window.location.search);
     const result = params.get("wearable");
     if (!result) return null;
-    const provider = params.get("provider") ?? "device";
+    const provider = params.get("provider") ?? "";
 
     params.delete("wearable");
     params.delete("provider");
     const qs = params.toString();
     window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
 
-    return result === "connected"
-      ? `${provider} connected.`
-      : `Couldn't connect ${provider}. Please try again.`;
+    return { result, provider };
   };
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<Payload | null> => {
     try {
       const token = await getToken();
-      if (!token) return;
+      if (!token) return null;
       const res = await fetch("/api/wearables", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return;
-      setData((await res.json()) as Payload);
+      if (!res.ok) return null;
+      const payload = (await res.json()) as Payload;
+      setData(payload);
+      return payload;
     } catch {
       /* the rest of Settings still works */
+      return null;
     }
   }, [getToken]);
 
   useEffect(() => {
     void (async () => {
-      const result = consumeOAuthResult();
-      await load();
-      if (result) setMessage(result);
+      const outcome = consumeOAuthResult();
+      const payload = await load();
+
+      // SUCCESS SAYS NOTHING. The row two lines below already reads "Ultrahuman
+      // ... Disconnect ... synced just now", so a banner announcing the same
+      // thing is noise sitting above the evidence for it.
+      //
+      // FAILURE STILL SPEAKS, because there is nothing else to see: the row
+      // looks exactly as it did before the attempt, and silence there reads as
+      // the button not working.
+      if (outcome && outcome.result !== "connected") {
+        setMessage(`Couldn't connect ${brandName(payload, outcome.provider)}. Please try again.`);
+      }
     })();
   }, [load]);
 
@@ -152,7 +174,7 @@ export function WearableSettings({
     }
   };
 
-  const disconnect = async (provider: string) => {
+  const disconnect = async (provider: string, name: string) => {
     setBusy(provider);
     try {
       const token = await getToken();
@@ -163,7 +185,10 @@ export function WearableSettings({
       });
       await load();
       setConfirm(null);
-      setMessage(`${provider} disconnected.`);
+      // Unlike connecting, this one IS worth saying. The row it refers to has
+      // just changed from Disconnect to Connect, and confirming that the
+      // permission was deleted is the reassurance the action was for.
+      setMessage(`${name} disconnected.`);
     } finally {
       setBusy(null);
     }
@@ -193,7 +218,7 @@ export function WearableSettings({
         "gave us. Readings already synced stay in your Trends. You can " +
         `reconnect any time by approving access at ${name} again.`,
       confirmLabel: "Disconnect",
-      onConfirm: () => void disconnect(provider),
+      onConfirm: () => void disconnect(provider, name),
     });
   };
 
