@@ -214,6 +214,47 @@ issues no refresh token and every connection dies within the hour.
 collections and a 7 day window is well inside it. Widen `syncWindowDays` and
 `next_token` has to be handled first.
 
+### Oura and Fitbit, audited 2026-08-04
+
+Same pass as Whoop, same result. **Four of four adapters audited so far were
+wrong**, and in each case the failure mode was a metric that silently never
+appeared rather than anything that broke.
+
+**Oura: blood oxygen was never arriving.** Two causes at once. `spo2` is one of
+Oura's eight scopes and was not requested; and `spo2_percentage` was being read
+off the `/sleep` document, where no such field exists. It lives on the separate
+`daily_spo2` collection, which we now call. `personal` was dropped from the
+scope list: it returns gender, age, height and weight, and we call no personal
+endpoint.
+
+`heartrate` is kept although we never call `/heartrate` directly. Oura's docs
+are not explicit about whether the HRV and resting-heart-rate fields on the
+sleep document sit behind it, and losing those silently is much worse than
+carrying a scope we may not need. Same judgement as Whoop's `read:cycles`, and
+worth revisiting once somebody is connected and it can be tested rather than
+guessed.
+
+**Fitbit: naps were overwriting whole nights.** Fitbit logs a nap as its own
+sleep record with the same `dateOfSleep` as the night. Because the metrics
+upsert is keyed on (user, provider, date, metric), whichever arrived last won,
+so a 40 minute afternoon nap could replace a 7 hour night. `isMainSleep` is now
+required. This is the identical trap Whoop's `nap` flag sets, found in two
+vendors independently.
+
+**Fitbit no longer publishes a sleep score.** `efficiency` was standing in for
+one. It is time asleep over time in bed, which is a different quantity: Fitbit's
+actual Sleep Score is a composite and is not on the public API at all. Under our
+own key it would have sat in the same series as Oura's score meaning something
+else, unreconcilable against Fitbit's own app, where it is not even called the
+same thing. Contributing nothing is the honest answer. Fitbit gives us steps,
+resting heart rate and sleep duration.
+
+Three Fitbit scopes were dropped as dead: `profile`, `weight` and
+`oxygen_saturation`. Adding SpO2 later means putting that last one back, which
+is free before anyone connects and costs a re-consent afterwards.
+
+**Withings is the only adapter never audited.** Treat it as unverified.
+
 ## The self-serve four
 
 Register a developer app with each, then set the two env vars.
