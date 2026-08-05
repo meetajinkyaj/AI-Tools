@@ -241,8 +241,21 @@ function avg(nums: number[]): number | null {
 }
 
 /**
- * Summarize recent check-ins: averages over the last `window` days, and the
- * change vs the `window` before that. Expects points newest-first or any order.
+ * Summarize recent check-ins: averages over the last `window` DAYS, and the
+ * change vs the `window` days before that. Order of `points` does not matter.
+ *
+ * A MISSED DAY IS ABSENT, NEVER A ZERO. Only days that were actually logged
+ * enter the average, and the divisor is how many of those there are, so
+ * skipping a day cannot drag the number down. Averaging in a zero would read
+ * as "you slept 0 hours" and would be the single most misleading thing this
+ * card could do.
+ *
+ * THE WINDOW IS CALENDAR DAYS, NOT "THE LAST N CHECK-INS". It used to be the
+ * latter, which had two problems: with gaps, "7d" silently described a longer
+ * stretch, and the delta compared two spans of unequal length, so a quiet
+ * fortnight was measured against a busy week and the change was meaningless.
+ * Counting back from the newest check-in rather than from today keeps the card
+ * stable for someone returning after a break, instead of emptying it out.
  */
 export function summarizeCheckins(
   points: CheckinPoint[],
@@ -251,8 +264,36 @@ export function summarizeCheckins(
   const sorted = [...points].sort((a, b) =>
     a.checkin_date < b.checkin_date ? 1 : -1,
   ); // newest first
-  const recent = sorted.slice(0, window);
-  const prior = sorted.slice(window, window * 2);
+
+  const newest = sorted[0]?.checkin_date;
+  /**
+   * `days` before `from`, or null if `from` is not a real date.
+   *
+   * The null matters: an unparseable date would otherwise throw from inside
+   * `toISOString` and take down the whole Trends response over one bad row.
+   * Falling back to counting check-ins is a worse window but a working card.
+   */
+  const dayBefore = (from: string, days: number): string | null => {
+    const ms = Date.parse(`${from}T00:00:00Z`);
+    if (!Number.isFinite(ms)) return null;
+    return new Date(ms - days * 86_400_000).toISOString().slice(0, 10);
+  };
+
+  // Inclusive of the newest day, so a 7-day window is the newest date and the
+  // six before it.
+  const recentFrom = newest ? dayBefore(newest, window - 1) : null;
+  const priorFrom = newest ? dayBefore(newest, window * 2 - 1) : null;
+
+  const recent =
+    recentFrom === null
+      ? sorted.slice(0, window)
+      : sorted.filter((p) => p.checkin_date >= recentFrom);
+  const prior =
+    recentFrom === null || priorFrom === null
+      ? sorted.slice(window, window * 2)
+      : sorted.filter(
+          (p) => p.checkin_date >= priorFrom && p.checkin_date < recentFrom,
+        );
 
   const energyOf = (ps: CheckinPoint[]) =>
     avg(ps.map((p) => p.energy_score).filter((n): n is number => n != null));

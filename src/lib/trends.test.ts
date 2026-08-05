@@ -97,10 +97,10 @@ describe("summarizeCheckins", () => {
     // 14 days: recent 7 avg energy 4, prior 7 avg energy 3.
     const points: CheckinPoint[] = [];
     for (let i = 0; i < 7; i++) {
-      points.push({ checkin_date: `2026-05-${14 - i}`, energy_score: 4, sleep_hours: 7.5, training_logged: i % 2 === 0 });
+      points.push({ checkin_date: `2026-05-${String(14 - i).padStart(2, "0")}`, energy_score: 4, sleep_hours: 7.5, training_logged: i % 2 === 0 });
     }
     for (let i = 0; i < 7; i++) {
-      points.push({ checkin_date: `2026-05-0${7 - i}`, energy_score: 3, sleep_hours: 7 });
+      points.push({ checkin_date: `2026-05-${String(7 - i).padStart(2, "0")}`, energy_score: 3, sleep_hours: 7 });
     }
     const t = summarizeCheckins(points);
     expect(t.count).toBe(14);
@@ -116,5 +116,91 @@ describe("summarizeCheckins", () => {
     ]);
     expect(t.avgEnergy).toBe(4);
     expect(t.energyDelta).toBeNull();
+  });
+
+  it("falls back to counting check-ins if a date is malformed", () => {
+    // Real dates come from a Postgres `date` column and are always ISO, but a
+    // throw here would take down the whole Trends response over one bad row.
+    const t = summarizeCheckins([
+      { checkin_date: "not-a-date", energy_score: 4, sleep_hours: 8 },
+    ]);
+    expect(t.avgEnergy).toBe(4);
+  });
+
+  it("A MISSED DAY IS NOT A ZERO", () => {
+    // The thing a user actually worries about: skipping a day and having it
+    // averaged in as "you slept 0 hours". Six 8-hour nights in a 7-day window
+    // average 8, not 6.86.
+    const points: CheckinPoint[] = [
+      { checkin_date: "2026-05-14", energy_score: 4, sleep_hours: 8 },
+      { checkin_date: "2026-05-13", energy_score: 4, sleep_hours: 8 },
+      // 12th skipped entirely.
+      { checkin_date: "2026-05-11", energy_score: 4, sleep_hours: 8 },
+      { checkin_date: "2026-05-10", energy_score: 4, sleep_hours: 8 },
+      { checkin_date: "2026-05-09", energy_score: 4, sleep_hours: 8 },
+      { checkin_date: "2026-05-08", energy_score: 4, sleep_hours: 8 },
+    ];
+    expect(summarizeCheckins(points).avgSleep).toBe(8);
+  });
+
+  it("does not average in a check-in that logged no sleep figure", () => {
+    // Logging energy but leaving sleep blank is not sleeping zero hours.
+    const t = summarizeCheckins([
+      { checkin_date: "2026-05-14", energy_score: 4, sleep_hours: 8 },
+      { checkin_date: "2026-05-13", energy_score: 2, sleep_hours: null },
+    ]);
+    expect(t.avgSleep).toBe(8);
+    expect(t.avgEnergy).toBe(3);
+  });
+
+  it("measures seven calendar days, not the last seven check-ins", () => {
+    // With gaps these differ, and the old behaviour made "7d" describe a
+    // stretch of arbitrary length. Eight check-ins spread over 30 days: only
+    // those inside the 7 days ending at the newest one count.
+    const points: CheckinPoint[] = [
+      { checkin_date: "2026-05-14", energy_score: 5, sleep_hours: 8 },
+      { checkin_date: "2026-05-10", energy_score: 5, sleep_hours: 8 },
+      { checkin_date: "2026-04-28", energy_score: 1, sleep_hours: 4 },
+      { checkin_date: "2026-04-20", energy_score: 1, sleep_hours: 4 },
+    ];
+    const t = summarizeCheckins(points);
+    // Only the 14th and 10th are within 7 days of the 14th.
+    expect(t.avgEnergy).toBe(5);
+    // `count` stays the honest total logged, which is what the card says.
+    expect(t.count).toBe(4);
+  });
+
+  it("compares two windows of equal length, so the delta means something", () => {
+    // Days 8 to 14 against days 1 to 7, regardless of how many check-ins fall
+    // in each. Previously a quiet fortnight was measured against a busy week.
+    const points: CheckinPoint[] = [
+      { checkin_date: "2026-05-14", energy_score: 4, sleep_hours: 8 },
+      { checkin_date: "2026-05-13", energy_score: 4, sleep_hours: 8 },
+      { checkin_date: "2026-05-05", energy_score: 2, sleep_hours: 6 },
+    ];
+    const t = summarizeCheckins(points);
+    expect(t.avgEnergy).toBe(4);
+    expect(t.energyDelta).toBe(2); // 4 - 2
+    expect(t.sleepDelta).toBe(2); // 8 - 6
+  });
+
+  it("counts training days inside the window only", () => {
+    const points: CheckinPoint[] = [
+      { checkin_date: "2026-05-14", energy_score: 4, sleep_hours: 8, training_logged: true },
+      { checkin_date: "2026-05-13", energy_score: 4, sleep_hours: 8, training_logged: true },
+      { checkin_date: "2026-04-01", energy_score: 4, sleep_hours: 8, training_logged: true },
+    ];
+    // The April one is outside the week, and the card labels this "this week".
+    expect(summarizeCheckins(points).trainingDays).toBe(2);
+  });
+
+  it("stays populated for someone returning after a long break", () => {
+    // The window counts back from the newest check-in, not from today, so a
+    // gap does not empty the card and leave a returning user with nothing.
+    const t = summarizeCheckins([
+      { checkin_date: "2020-01-02", energy_score: 4, sleep_hours: 8 },
+      { checkin_date: "2020-01-01", energy_score: 4, sleep_hours: 8 },
+    ]);
+    expect(t.avgSleep).toBe(8);
   });
 });
