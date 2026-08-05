@@ -6,8 +6,8 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-04. **One task is pending:** add the founder's WHOOP
-account as a Test User on the Whoop app. See [PENDING TASK](#pending-task).
+Last updated: 2026-08-04. **One task is pending:** register the Oura developer
+application and set its two secrets. See [PENDING TASK](#pending-task).
 
 ---
 
@@ -36,7 +36,7 @@ account as a Test User on the Whoop app. See [PENDING TASK](#pending-task).
 | Verification | Status |
 |---|---|
 | Ultrahuman reconnected | 2026-08-04, after the row was lost to a Disconnect. Connect and Approve went straight through, and the card shows Disconnect with "synced just now". Healthy. |
-| Whoop, connect blocked | 2026-08-04. Secrets are set and valid, and Connect reaches Whoop's real sign-in. Whoop then returns `request_unauthorized` with no code, which is the development-mode test-user gate, not a credential or scope fault. See the pending task. |
+| Whoop, connect blocked | 2026-08-04. Secrets are set and valid, and Connect reaches Whoop's real sign-in. Whoop then returns `request_unauthorized` with no code. **Confirmed not a credential, scope or config fault**, and not a whitelist: Whoop allow any WHOOP member to authorise a development-mode app up to a limit of ten, so there is nothing to add anybody to. It is blocked on the signing-in account having an active WHOOP membership, which the founder's band-less account does not. Needs a tester with a band. |
 | First real wearable connection | **Achieved 2026-08-04**, after the key was regenerated. `?wearable=connected` for the first time; row has `status active`, `failure_count 0`, both tokens stored, `expires_at` 24h out, `last_error` null, and `last_sync_at` stamped by the app's own post-connect sync. This proves the token host, the metrics host, the `/authorise` spelling, the scope strings and the redirect URI. `external_user_id` is null and expected to be: `/user_info` is not called. Earlier note, kept because it explains the trail: **Not yet achieved.** The `atob` fix deployed clean, but the row on production turned out to be the pre-fix failed attempt: a shell with `status = 'active'` and no credentials, which the card rendered as Disconnect. Found by reading `connected_at`, which the upsert refreshes and which had not moved. The token host, `/authorise` spelling, scope strings and redirect URI are still proven by the successful code exchange that preceded the encryption failure. The metrics endpoint remains unproven. |
 | Wearables UI on production | Confirmed live 2026-07-30 on `app.ikigaro.com`. Settings shows **Connected devices** with the coming-soon copy and Apple Health / Google Health Connect listed; Home shows the **Your devices** card. No Connect buttons on either surface, correct, since no provider credentials exist yet. Dismiss ✕ persists across reload. No app console errors. |
 
@@ -52,68 +52,108 @@ is outstanding.
 
 # PENDING TASK
 
-## Add the founder's WHOOP account as a Test User on the Whoop app
+## Register the Oura developer application, and set its two secrets
 
-**This is a dashboard change, not a code change.** The error text points the
-wrong way, so read this before acting on it.
+Self-serve, no review, client id and secret immediately. The adapter was audited
+against Oura's documentation on 2026-08-04 and two real bugs were fixed before
+this registration, so the scope list below is the one the code actually uses.
+**Walk the founder through it screen by screen**, they are not technical.
 
-What came back from Whoop after sign-in:
+### What you can do, and what you cannot
 
-```
-error=request_unauthorized
-error_description=The request could not be authorized
-error_hint=Check that you provided valid credentials in the right format.
-```
+**You can:** navigate `cloud.ouraring.com`, read the form out, say exactly what
+goes in each field, and confirm afterwards that Oura appears in the app.
 
-That reads like our client id or scope string is wrong. **It is not.** A
-malformed scope returns `invalid_scope`, a member declining returns
-`access_denied`, and neither is what came back. The same client id also got as
-far as Whoop's sign-in page, which it could not do if Whoop did not recognise
-it.
+**You cannot:** create the Oura account, and you must never take the Client
+Secret. If a step needs the secret to pass through you, stop and hand the
+founder the click path instead.
 
-**A new Whoop app starts in development mode**, and in that mode only WHOOP
-accounts explicitly added as **Test Users** can authorise it. Anyone else signs
-in fine and is then bounced with exactly this error.
+### 1. Sign in
 
-### What to do
+`cloud.ouraring.com`, using the same account as the Oura phone app. There is no
+separate developer signup. Then find **My Applications**, and press **New
+Application**.
 
-1. `developer-dashboard.whoop.com` → team **Ikigaro** → app **Ikigaro**.
-2. Find the section for **Test Users** (it may be called Test Members, Allowed
-   Users, or sit under app settings or a Development/Access tab). If you cannot
-   find it, say so and describe what tabs the app page does have, rather than
-   guessing at another cause.
-3. **Add the founder's own WHOOP account**, by the email their WHOOP membership
-   is under.
-4. Retry: `app.ikigaro.com` → Profile → Connected devices → Whoop → Connect →
-   sign in.
+### 2. Fill the form
 
-**Expected:** a consent screen listing **exactly four** permissions, matching
-`read:sleep`, `read:recovery`, `read:cycles` and offline access.
+| Field | What to put |
+|---|---|
+| Application name | `Ikigaro` |
+| Website | `https://app.ikigaro.com` |
+| Redirect URI | `https://app.ikigaro.com/api/wearables/callback/oura` |
+| Privacy policy | `https://app.ikigaro.com/privacy` |
 
-**Stop at the consent screen and report.** Do not approve unless the founder
-actually has a WHOOP band, since an empty connection tells us nothing and costs
-a reconnect to clear.
+**The redirect URI must match byte for byte.** No trailing slash, no `www`, all
+lowercase. Copy it rather than retyping it: every vendor rejects a mismatch with
+the same unhelpful `invalid redirect_uri` and nothing else to go on.
 
-### The second possible cause, if test users does not fix it
+### 3. The scopes, which is the step that matters
 
-Whoop's own overview opens with *"You must have a WHOOP membership to develop an
-app on the Developer Platform."* An account with no active membership may not be
-able to grant data scopes at all. If adding the test user changes nothing,
-**check whether the founder's WHOOP account has an active membership**, and
-report that rather than trying anything else.
+Oura publishes eight. **Tick exactly these three:**
 
-### What NOT to do
+- ☑ `daily`
+- ☑ `heartrate`
+- ☑ `spo2`
 
-**Do not suggest changing the authorize URL or the scope list.** Both were
-audited against Whoop's published v2 documentation on 2026-08-04, and the four
-scope strings are the ones Whoop publishes. The scope list is the first thing
-that looks guilty here and it is not the cause.
+**Leave the other five unticked**, in particular:
 
-`read:workout` being ticked on the app is harmless: our code decides what the
-consent screen asks for, so that scope is granted but dormant.
+- ☐ `personal` (returns gender, age, height and weight, which we never read)
+- ☐ `email`
+- ☐ `workout`, ☐ `tag`, ☐ `session`
 
-**Do not touch `WEARABLE_TOKEN_KEY`, the Whoop secrets, or the Ultrahuman
-connection**, which is healthy and syncing.
+`spo2` is easy to skip and matters: it gates a separate collection, and without
+it blood oxygen never arrives at all. That was a real bug found in the audit.
+`personal` is the one to be careful **not** to tick.
+
+The member can toggle individual scopes off at the consent screen, so anything
+we ask for and never use is both noise and a worse first impression.
+
+### 4. The two credentials
+
+Oura shows a **Client ID** and **Client Secret** immediately.
+
+**Do not paste either into chat, a commit, or any file. Do not read the secret
+back to confirm it.** The founder copies them straight into Cloudflare and into
+their password manager at the same time.
+
+Cloudflare → Workers & Pages → **`ai-tools`** → Settings → Variables and Secrets:
+
+| Name | Type |
+|---|---|
+| `OURA_CLIENT_ID` | **Secret** |
+| `OURA_CLIENT_SECRET` | **Secret** |
+
+**Type Secret, not plaintext Variable.** `wrangler.jsonc` declares the plaintext
+vars and replaces them on every deploy, so a Variable silently vanishes at the
+next push. **Then redeploy**, since secrets do not apply to a running version.
+
+### 5. Verify, and stop
+
+1. `app.ikigaro.com` → Profile → Connected devices.
+2. **Oura should appear with a Connect button.** Ultrahuman keeps Disconnect,
+   Whoop keeps Connect, the rest stay button-less. Oura appearing and nothing
+   else changing is the whole test.
+3. Press **Connect**. It should reach Oura's consent screen, listing **three**
+   permissions matching the three ticked above.
+4. **Stop there. Do not approve** unless the founder owns an Oura ring: an empty
+   connection tells us nothing and costs a reconnect to clear.
+
+### What to report
+
+- Did Oura appear, and only Oura?
+- Did the consent screen load, and exactly which permissions did it list?
+- If it lists `personal` or anything beyond the three, say so: the application
+  was created with the wrong scopes, and it is a two-minute fix on its page.
+
+### Worth knowing
+
+**Oura caps at ten users** until the application is approved, the same as Whoop.
+Their own docs: *"By default, API Applications have a ten user limit."* Review is
+submitted from the application's own page once we have a real member connected.
+Nothing to do about it now, just do not be surprised by it later.
+
+**Do not touch `WEARABLE_TOKEN_KEY`, the Whoop or Ultrahuman secrets, or the
+Ultrahuman connection**, which is healthy and syncing.
 
 ---
 

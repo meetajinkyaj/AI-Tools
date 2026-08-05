@@ -1,20 +1,26 @@
-"""Builds the Ultrahuman tester briefing PDF.
+"""Builds the wearable tester briefing PDF.
 
-A one-page-ish handout for somebody who owns an Ultrahuman ring and might help
-us test the sync. Written for THEM, not for us: no SQL, no admin console, and
-nothing they cannot check on their own two screens.
+A two-page handout for somebody who owns an Oura ring, an Ultrahuman ring or a
+Whoop band and might help us test the sync. Written for THEM, not for us: no
+SQL, no admin console, and nothing they cannot check on their own two screens.
 
     pip install reportlab
     python3 scripts/build-tester-brief.py
 
-Output: docs/outreach/Ikigaro-Ultrahuman-tester-brief.pdf
+Output: docs/outreach/Ikigaro-wearable-tester-brief.pdf
 
-WHY THE FOUR CHECKS ARE THE FOUR CHECKS. Each one is a mapping decision made
-from Ultrahuman's documented example rather than from real data, and each has a
-plausible wrong answer: sleep arrives in seconds, steps live under `total` and
-not `avg`, there are two HRV fields and two sleep scores. A tester comparing
-these four against their own app is the cheapest way to find out which, if any,
-we read wrongly. See docs/WEARABLES.md.
+WHY THESE CHECKS ARE THESE CHECKS. Every one is a mapping decision made from a
+vendor's documented example rather than from real data, and every one has a
+plausible wrong answer. Four adapters have been audited against vendor docs and
+all four were wrong: sleep arriving in seconds and read as minutes, steps under
+`total` and read from `avg`, two HRV fields with only one meaning overnight, a
+nap silently replacing a whole night, blood oxygen read from a collection that
+does not carry it. A tester comparing a handful of numbers against their own
+app is the cheapest way to find the ones still hiding. See docs/WEARABLES.md.
+
+ONE DOCUMENT FOR THREE DEVICES on purpose. The instructions are identical apart
+from a per-device table, and three near-identical PDFs is how two of them go
+stale.
 """
 
 from reportlab.lib import colors
@@ -33,7 +39,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-OUT = "docs/outreach/Ikigaro-Ultrahuman-tester-brief.pdf"
+OUT = "docs/outreach/Ikigaro-wearable-tester-brief.pdf"
 
 INK = colors.HexColor("#1A1A1A")
 MUTED = colors.HexColor("#5F5F5F")
@@ -110,13 +116,14 @@ def band(title, rows):
 story = []
 
 # ---------------------------------------------------------------- header ----
-story.append(Paragraph("Help us test Ikigaro with your Ultrahuman ring", TITLE))
+story.append(Paragraph("Help us test Ikigaro with your ring or band", TITLE))
 story.append(Spacer(1, 4))
 story.append(Paragraph(
     "Ikigaro reads your blood panels and shows you your own trends over time. "
-    "We have just built Ultrahuman syncing, and it has never once run against "
-    "a real ring. Yours would be the first. About 10 minutes of setup, then "
-    "you wear your ring exactly as you already do.",
+    "We have just built device syncing for <b>Oura</b>, <b>Ultrahuman</b> and "
+    "<b>Whoop</b>, and it has never run against a real device. Yours would be "
+    "among the first. About 10 minutes of setup, then you wear your device "
+    "exactly as you already do.",
     SUB))
 
 story += rule()
@@ -124,14 +131,14 @@ story += rule()
 # ------------------------------------------------------------ what we get ----
 story.append(Paragraph("What we would read, and what we would not", H))
 story.append(Paragraph(
-    "Only the daily summaries Ultrahuman already computes: <b>sleep duration "
-    "and score, HRV, resting heart rate, recovery, steps, blood oxygen, VO2 max "
-    "and skin temperature deviation</b>. Plus, if you wear an M1 sensor, your "
-    "daily glucose average, variability, time in target and estimated HbA1c.",
+    "Only the daily summaries your device already computes: <b>sleep duration "
+    "and score, HRV, resting heart rate, recovery or readiness, steps and "
+    "blood oxygen</b>. On an Ultrahuman with an M1 sensor, also your daily "
+    "glucose average, variability and time in target.",
     BODY))
 story.append(Paragraph(
-    "We do not read your minute-by-minute glucose trace, your location, your "
-    "workouts or anything else in your account.",
+    "We do not read your workouts, your location, your minute-by-minute heart "
+    "rate or glucose traces, or anything else in your account.",
     BODY))
 story.append(Paragraph(
     "<b>Your data is shown only to you.</b> It is never sold, never shared with "
@@ -152,12 +159,16 @@ story.append(step(1, "Get in", [
     "signed up and we will approve you within a few minutes.",
 ]))
 
-story.append(step(2, "Connect the ring", [
+story.append(step(2, "Connect your device", [
     "In the app, go to <b>Profile</b>, then <b>Connected devices</b>, and press "
-    "<b>Connect</b> next to Ultrahuman.",
-    "Ultrahuman will ask you to approve access for <i>ikigaro</i>, listing "
-    "Profile, Ring Data and CGM Data. Press <b>Approve</b>. You come straight "
-    "back to Ikigaro.",
+    "<b>Connect</b> next to your device. Only devices we have finished setting "
+    "up appear there, so if yours is missing, tell us.",
+    "Your device's own site will ask you to approve access for <i>Ikigaro</i> "
+    "and list what it is granting. Press <b>Approve</b>. You come straight back "
+    "to Ikigaro.",
+    "<b>Whoop only:</b> this needs an active Whoop membership, not just an "
+    "account. If sign-in bounces you back without an approval screen, that is "
+    "the reason, and it is nothing you did wrong.",
 ]))
 
 story.append(step(3, "Wear it for one full night", [
@@ -166,12 +177,12 @@ story.append(step(3, "Wear it for one full night", [
     "shows nothing.",
 ]))
 
-story.append(step(4, "The next morning, compare four numbers", [
-    "Open your <b>Ultrahuman app</b> first and look at last night. Then open "
+story.append(step(4, "The next morning, compare the numbers", [
+    "Open <b>your device's own app</b> first and look at last night. Then open "
     "Ikigaro, go to <b>Profile &gt; Connected devices</b>, press <b>Sync now</b>, "
     "then go to <b>Trends</b> and find the <b>From your devices</b> card.",
-    "Check these four against each other. They should match, and the point of "
-    "the exercise is to find out if they do not.",
+    "Check these against each other. They should match, and the point of the "
+    "exercise is to find out where they do not.",
 ]))
 
 story.append(Spacer(1, 3))
@@ -179,22 +190,29 @@ story.append(Spacer(1, 3))
 # ----------------------------------------------------------- check table ----
 rows = [
     [Paragraph("In Ikigaro", CELLB),
-     Paragraph("Compare against, in the Ultrahuman app", CELLB),
+     Paragraph("Compare against, in your device's app", CELLB),
      Paragraph("What a mismatch would mean", CELLB)],
     [Paragraph("<b>Sleep</b>, shown like 7h 05m", CELL),
-     Paragraph("Your total sleep for the night", CELL),
-     Paragraph("We may be reading their number in the wrong unit", CELL)],
+     Paragraph("Your total sleep for the night, <b>not</b> your time in bed", CELL),
+     Paragraph("We may be reading their number in the wrong unit, or counting time you were awake", CELL)],
     [Paragraph("<b>HRV</b>", CELL),
-     Paragraph("Your <b>overnight</b> HRV, not the all-day figure", CELL),
-     Paragraph("There are two HRV numbers and we may have picked the wrong one", CELL)],
+     Paragraph("Your <b>overnight</b> HRV, not an all-day figure", CELL),
+     Paragraph("Most devices report two, and we may have picked the wrong one", CELL)],
+    [Paragraph("<b>Readiness</b>", CELL),
+     Paragraph("Oura: Readiness. Ultrahuman: Recovery. Whoop: Recovery", CELL),
+     Paragraph("These are one number to us, so a mismatch means we read the wrong field", CELL)],
     [Paragraph("<b>Steps</b>", CELL),
-     Paragraph("Your step count for the same day", CELL),
-     Paragraph("We may be reading an average instead of the daily total", CELL)],
+     Paragraph("Your step count for the same day. <b>Whoop does not count steps</b>, so it should be missing there", CELL),
+     Paragraph("We may be reading an average instead of a daily total", CELL)],
     [Paragraph("<b>Sleep score</b>", CELL),
-     Paragraph("Your sleep score for the night", CELL),
-     Paragraph("Ultrahuman reports two different sleep scores", CELL)],
+     Paragraph("Your sleep score. On Whoop, Sleep Performance", CELL),
+     Paragraph("Some devices report two different sleep scores", CELL)],
+    [Paragraph("<b>Blood oxygen</b>", CELL),
+     Paragraph("Your overnight average SpO2, if your device measures it", CELL),
+     Paragraph("This one was silently missing on Oura until recently", CELL)],
 ]
-t = Table(rows, colWidths=[42 * mm, 60 * mm, 68 * mm])
+# repeatRows keeps the header on page two, where this table splits.
+t = Table(rows, colWidths=[42 * mm, 60 * mm, 68 * mm], repeatRows=1)
 t.setStyle(TableStyle([
     ("VALIGN", (0, 0), (-1, -1), "TOP"),
     ("LINEBELOW", (0, 0), (-1, 0), 0.7, INK),
@@ -207,11 +225,15 @@ story.append(t)
 story.append(Spacer(1, 7))
 story.append(band("The failure we are actually hunting for", [
     "A number that is wrong but <i>looks</i> perfectly reasonable. If Ikigaro "
-    "says 7h 05m and your ring says 7h 05m, that is a pass. If Ikigaro says "
-    "7h 05m and your ring says 6h 10m, that is exactly the bug we need, and "
+    "says 7h 05m and your device says 7h 05m, that is a pass. If Ikigaro says "
+    "7h 05m and your device says 6h 10m, that is exactly the bug we need, and "
     "nothing about the number would have looked suspicious on its own.",
     "So please compare them side by side rather than judging whether each one "
     "seems plausible.",
+    "<b>If you nap, that is a gift.</b> Naps are logged separately from the "
+    "night, and on two of these devices we found that an afternoon nap could "
+    "quietly replace the whole night's sleep. A day where you napped is the "
+    "single most useful day you can send us.",
 ]))
 
 story += rule()
@@ -220,8 +242,8 @@ story += rule()
 story.append(Paragraph("What to send back", H))
 story.append(Paragraph(
     "A screenshot of the <b>From your devices</b> card in Ikigaro, and a "
-    "screenshot of the same day in your Ultrahuman app. That is the whole "
-    "report. If the four numbers match, say so and you are done.",
+    "screenshot of the same day in your device's own app. That is the whole "
+    "report. If the numbers match, say so and you are done.",
     BODY))
 story.append(Paragraph(
     "Tell us too if something felt broken or confusing, even if it is not on "
@@ -231,24 +253,33 @@ story.append(Paragraph(
 story.append(Spacer(1, 5))
 story.append(Paragraph("If something does not work", H))
 story.append(Paragraph(
-    "<b>No Ultrahuman option in Connected devices:</b> your account is probably "
-    "still on the waiting list. Tell us and we will approve it.",
+    "<b>Your device is not listed in Connected devices:</b> either your account "
+    "is still on the waiting list, or we have not finished setting that device "
+    "up. Either way, tell us.",
+    BODY))
+story.append(Paragraph(
+    "<b>Whoop bounces you back after sign-in, with no approval screen:</b> "
+    "Whoop only allows this for accounts with an active membership. Nothing "
+    "you did wrong, and nothing we can fix from our side.",
     BODY))
 story.append(Paragraph(
     "<b>The card says nothing has synced, or shows no numbers:</b> most likely "
-    "the ring has not uploaded to Ultrahuman yet. Open the Ultrahuman app "
-    "first, let it finish syncing your ring, then press Sync now in Ikigaro "
-    "again. If it is still empty after that, tell us: that is a real finding "
-    "and worth reporting.",
+    "your device has not uploaded to its own cloud yet. Open its app first, "
+    "let it finish syncing, then press Sync now in Ikigaro again. If it is "
+    "still empty after that, tell us: that is a real finding and worth "
+    "reporting.",
     BODY))
 story.append(Paragraph(
-    "<b>No glucose numbers:</b> expected, unless you wear an M1 sensor.",
+    "<b>Some numbers are missing:</b> often correct. Whoop does not count "
+    "steps, not every device measures blood oxygen, and glucose only appears "
+    "on an Ultrahuman with an M1 sensor. Tell us which are missing anyway, "
+    "since that is exactly the kind of gap we are looking for.",
     BODY))
 
 story.append(Spacer(1, 10))
 story.append(Paragraph(
     "Thank you. This is the last untested piece of the integration, and one "
-    "night of your ring's data settles it.",
+    "night of your device's data settles it.",
     BODY))
 story.append(Spacer(1, 3))
 story.append(Paragraph(

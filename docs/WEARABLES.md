@@ -214,49 +214,68 @@ issues no refresh token and every connection dies within the hour.
 collections and a 7 day window is well inside it. Widen `syncWindowDays` and
 `next_token` has to be handled first.
 
-### Whoop: `request_unauthorized` is a dashboard problem, not a code one
+### Whoop: blocked on an active WHOOP membership, and capped at 10
 
-Recorded because the error text points the wrong way and cost a round of
-investigation.
+**Not a code fault and not a config fault.** The app is correct: client id,
+secret, redirect URI and scopes all verified. Recorded in full because the error
+text points the wrong way and because the second finding changes what Whoop is
+worth to us.
 
-**Symptom.** Connect reaches Whoop's real sign-in, the member signs in, and the
-browser comes straight back to our callback with **no consent screen**:
+#### The error, and what it is not
 
 ```
-/api/wearables/callback/whoop?error=request_unauthorized
-  &error_description=The request could not be authorized
-  &error_hint=Check that you provided valid credentials in the right format.
+error=request_unauthorized
+error_description=The request could not be authorized
+error_hint=Check that you provided valid credentials in the right format.
 ```
 
-"Check that you provided valid credentials" reads like our client id or scope
-string is malformed. **It is not.** Two things rule that out. An unknown or
-malformed scope returns `invalid_scope`, and a member declining returns
-`access_denied`; neither is what came back. And the same client id got as far
-as Whoop's sign-in page, which it could not do if it were unrecognised.
+That reads as "your client id or scope string is malformed". **It is not.** A
+malformed scope returns `invalid_scope`, a member declining returns
+`access_denied`, and the same client id reached Whoop's sign-in page, which it
+could not do if Whoop did not recognise it.
 
-**The two real causes, both on Whoop's side of the dashboard:**
+> **A wrong turn worth recording.** The first explanation reached for was that a
+> development-mode app has a **Test Users whitelist** the member must be added
+> to. That came from a third-party write-up, was acted on before being checked
+> against Whoop's own documentation, and **is wrong**. There is no whitelist and
+> no such interface in the dashboard: only a non-clickable
+> "10 REMAINING TEST USERS" counter. This is the second time in this
+> integration that a plausible first explanation was acted on before being
+> verified. Check the vendor's own docs first.
 
-1. **A new Whoop app starts in development mode**, and in that mode it can only
-   be authorised by WHOOP accounts explicitly added as **Test Users** on the
-   app. A member who is not on that list signs in successfully and is then
-   bounced with exactly this error. Adding the founder's own WHOOP account to
-   the app's test users is the fix. Going fully public is a separate Whoop
-   review, and is not needed for beta.
-2. **Whoop requires an active WHOOP membership**, both to develop on the
-   platform and, plausibly, to grant data scopes at all. Their overview states
-   it in the first line: *"You must have a WHOOP membership to develop an app on
-   the Developer Platform."* An account with no membership and no band may not
-   be able to complete the grant.
+#### What actually gates it
 
-**Do not change the authorize URL or the scope list to chase this.** Both were
-audited against Whoop's published v2 documentation on 2026-08-04, and the four
-scope strings are the ones Whoop publishes. The scope list is the first thing
-that looks guilty and it is not.
+Whoop's overview opens with: *"You must have a WHOOP membership to develop an
+app on the Developer Platform."* Their approval page adds: *"Apps can be used
+for development immediately with a limit of 10 WHOOP members."*
 
-**Verification is the same as any other provider:** a `whoop` row appears in
-`wearable_connections` with both tokens and a stamped `last_sync_at`. Until a
-member on the test-user list with a band completes the flow, the Whoop token
-exchange and storage path remains unexercised.
+So authorisation is open to **any WHOOP member**, up to ten of them. The counter
+decrements as members connect; there is nothing to add anybody to. The founder's
+account has no band and therefore no active membership, which is why the sign-in
+bounces.
+
+**Whoop cannot be exercised from an account without an active membership.** It
+needs a person who owns a working WHOOP band, exactly as Ultrahuman needs
+someone with a ring.
+
+#### The cap is the strategic finding
+
+**Ten members, total, until Whoop approves the app**, and approval is not a
+formality. Whoop's public community forum carries multiple developers reporting
+submissions from March onward with *"no approval, no rejection, no timeline"*,
+including at least one platform describing almost exactly our use case, wearable
+data alongside quarterly lab work.
+
+What follows from that:
+
+- **Ten is fine for closed beta** and costs nothing to start.
+- **Ten is a wall**, and the process for lifting it currently resembles Garmin's:
+  submit, then wait indefinitely. Do not build a plan that assumes it lifts.
+- **Submit early anyway.** Approval requires having tested with at least one real
+  member, so the first Whoop tester is also what unblocks joining the queue. The
+  queue is long, so joining it sooner is free.
+- Ultrahuman has no equivalent cap, which makes it the better bet for anything
+  past the first ten Whoop users.
 
 ### Oura and Fitbit, audited 2026-08-04
 

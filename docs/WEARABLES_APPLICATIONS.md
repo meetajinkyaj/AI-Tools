@@ -202,6 +202,13 @@ scope was not requested and the field was read from the wrong collection.
 The member can toggle individual scopes off at the consent screen, so anything
 listed that we do not use is both noise and a worse first impression.
 
+**Oura caps at ten users too**, exactly like Whoop, and it is their own
+documented default: *"By default, API Applications have a ten user limit. If you
+want to release your application to a wider audience, your application needs to
+be approved."* Unlike Whoop's form, Oura's review is submitted from the
+application's own page, so it is at least a button rather than a queue you
+cannot see into. Submit once the first real member has connected.
+
 ### ☐ Fitbit
 
 Audited 2026-08-04. **Naps were overwriting whole nights**, and three of the six
@@ -223,7 +230,31 @@ duration. Not a sleep score: Fitbit's real one is not on the public API, and
 the `efficiency` figure that was standing in for it is a different quantity.
 See [`WEARABLES.md`](./WEARABLES.md).
 
-### ☐ Whoop
+### ☑ Whoop. REGISTERED 2026-08-04, blocked on a member with a band
+
+App `Ikigaro` created under team `Ikigaro` at `developer-dashboard.whoop.com`.
+Both secrets are set on the Worker and verified: Connect reaches Whoop's real
+sign-in with no error from our side. Nothing further to configure.
+
+**It cannot be tested from an account without an active WHOOP membership.**
+Whoop gates development-mode authorisation on being a WHOOP member, so the
+founder's band-less account bounces with `request_unauthorized`. This needs a
+person who owns a working band, exactly as Ultrahuman needs someone with a ring.
+
+**Two limits worth planning around**, both from Whoop's own approval page:
+
+- **Ten WHOOP members, total, until the app is approved.** Fine for closed beta,
+  a wall after it.
+- **Approval is a queue with no timeline.** Whoop's community forum carries
+  developers reporting submissions from March onward with no approval, no
+  rejection and no response. Treat it like Garmin: submit, then plan as though
+  it will not come.
+
+**Submit for approval as soon as the first real member connects**, since Whoop
+require having tested with at least one member before they will consider it, and
+the queue only gets longer.
+
+Original registration notes follow.
 
 **Do this one next.** The adapter was audited against Whoop's published v2
 documentation on 2026-08-04 and four real bugs were fixed before any account
