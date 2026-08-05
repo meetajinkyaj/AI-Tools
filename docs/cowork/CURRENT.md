@@ -6,8 +6,8 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-04. **One task is pending:** add the founder's WHOOP
-account as a Test User on the Whoop app. See [PENDING TASK](#pending-task).
+Last updated: 2026-08-04. **No task is pending.** Ultrahuman is connected and
+syncing; Whoop is registered and waiting on a tester with a band.
 
 ---
 
@@ -36,7 +36,7 @@ account as a Test User on the Whoop app. See [PENDING TASK](#pending-task).
 | Verification | Status |
 |---|---|
 | Ultrahuman reconnected | 2026-08-04, after the row was lost to a Disconnect. Connect and Approve went straight through, and the card shows Disconnect with "synced just now". Healthy. |
-| Whoop, connect blocked | 2026-08-04. Secrets are set and valid, and Connect reaches Whoop's real sign-in. Whoop then returns `request_unauthorized` with no code, which is the development-mode test-user gate, not a credential or scope fault. See the pending task. |
+| Whoop, connect blocked | 2026-08-04. Secrets are set and valid, and Connect reaches Whoop's real sign-in. Whoop then returns `request_unauthorized` with no code. **Confirmed not a credential, scope or config fault**, and not a whitelist: Whoop allow any WHOOP member to authorise a development-mode app up to a limit of ten, so there is nothing to add anybody to. It is blocked on the signing-in account having an active WHOOP membership, which the founder's band-less account does not. Needs a tester with a band. |
 | First real wearable connection | **Achieved 2026-08-04**, after the key was regenerated. `?wearable=connected` for the first time; row has `status active`, `failure_count 0`, both tokens stored, `expires_at` 24h out, `last_error` null, and `last_sync_at` stamped by the app's own post-connect sync. This proves the token host, the metrics host, the `/authorise` spelling, the scope strings and the redirect URI. `external_user_id` is null and expected to be: `/user_info` is not called. Earlier note, kept because it explains the trail: **Not yet achieved.** The `atob` fix deployed clean, but the row on production turned out to be the pre-fix failed attempt: a shell with `status = 'active'` and no credentials, which the card rendered as Disconnect. Found by reading `connected_at`, which the upsert refreshes and which had not moved. The token host, `/authorise` spelling, scope strings and redirect URI are still proven by the successful code exchange that preceded the encryption failure. The metrics endpoint remains unproven. |
 | Wearables UI on production | Confirmed live 2026-07-30 on `app.ikigaro.com`. Settings shows **Connected devices** with the coming-soon copy and Apple Health / Google Health Connect listed; Home shows the **Your devices** card. No Connect buttons on either surface, correct, since no provider credentials exist yet. Dismiss ✕ persists across reload. No app console errors. |
 
@@ -52,68 +52,21 @@ is outstanding.
 
 # PENDING TASK
 
-## Add the founder's WHOOP account as a Test User on the Whoop app
+**Nothing.** Everything that needs production access is done.
 
-**This is a dashboard change, not a code change.** The error text points the
-wrong way, so read this before acting on it.
+The Whoop investigation is closed and the answer was **not** a dashboard change.
+There is no Test Users whitelist to add anybody to: Whoop allow **any WHOOP
+member** to authorise a development-mode app, up to ten of them, and the
+"10 REMAINING TEST USERS" badge is a counter rather than a managed list. That
+was confirmed by reading the dashboard and then Whoop's own approval page, and
+it corrects an earlier task in this file that asked for a whitelist entry.
 
-What came back from Whoop after sign-in:
+**Whoop is blocked on a person with an active WHOOP membership and a working
+band.** Nothing in the dashboard, the secrets or the code can move it. Same
+shape as Ultrahuman waiting on a ring.
 
-```
-error=request_unauthorized
-error_description=The request could not be authorized
-error_hint=Check that you provided valid credentials in the right format.
-```
-
-That reads like our client id or scope string is wrong. **It is not.** A
-malformed scope returns `invalid_scope`, a member declining returns
-`access_denied`, and neither is what came back. The same client id also got as
-far as Whoop's sign-in page, which it could not do if Whoop did not recognise
-it.
-
-**A new Whoop app starts in development mode**, and in that mode only WHOOP
-accounts explicitly added as **Test Users** can authorise it. Anyone else signs
-in fine and is then bounced with exactly this error.
-
-### What to do
-
-1. `developer-dashboard.whoop.com` → team **Ikigaro** → app **Ikigaro**.
-2. Find the section for **Test Users** (it may be called Test Members, Allowed
-   Users, or sit under app settings or a Development/Access tab). If you cannot
-   find it, say so and describe what tabs the app page does have, rather than
-   guessing at another cause.
-3. **Add the founder's own WHOOP account**, by the email their WHOOP membership
-   is under.
-4. Retry: `app.ikigaro.com` → Profile → Connected devices → Whoop → Connect →
-   sign in.
-
-**Expected:** a consent screen listing **exactly four** permissions, matching
-`read:sleep`, `read:recovery`, `read:cycles` and offline access.
-
-**Stop at the consent screen and report.** Do not approve unless the founder
-actually has a WHOOP band, since an empty connection tells us nothing and costs
-a reconnect to clear.
-
-### The second possible cause, if test users does not fix it
-
-Whoop's own overview opens with *"You must have a WHOOP membership to develop an
-app on the Developer Platform."* An account with no active membership may not be
-able to grant data scopes at all. If adding the test user changes nothing,
-**check whether the founder's WHOOP account has an active membership**, and
-report that rather than trying anything else.
-
-### What NOT to do
-
-**Do not suggest changing the authorize URL or the scope list.** Both were
-audited against Whoop's published v2 documentation on 2026-08-04, and the four
-scope strings are the ones Whoop publishes. The scope list is the first thing
-that looks guilty here and it is not the cause.
-
-`read:workout` being ticked on the app is harmless: our code decides what the
-consent screen asks for, so that scope is granted but dormant.
-
-**Do not touch `WEARABLE_TOKEN_KEY`, the Whoop secrets, or the Ultrahuman
-connection**, which is healthy and syncing.
+Do not retry the Whoop connect from the founder's account: it will reproduce
+`request_unauthorized` every time, and each attempt is noise in the logs.
 
 ---
 
