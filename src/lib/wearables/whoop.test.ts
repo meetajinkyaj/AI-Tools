@@ -235,6 +235,80 @@ describe("reading their documented recovery record", () => {
   });
 });
 
+describe("Whoop workouts", () => {
+  /** Their documented workout example. */
+  const workout = {
+    id: "ecfc6a15-4661-442f-a9a4-f160dd7afae8",
+    v1_id: 1043,
+    start: "2022-04-24T02:25:44.774Z",
+    end: "2022-04-24T10:25:44.774Z",
+    sport_name: "running",
+    score_state: "SCORED",
+    score: {
+      strain: 8.2463,
+      average_heart_rate: 123,
+      max_heart_rate: 146,
+      kilojoule: 1569.34033203125,
+      distance_meter: 1772.77035916,
+    },
+    sport_id: 1,
+  };
+
+  it("CONVERTS KILOJOULES TO KCAL", async () => {
+    // Their energy field is kilojoules. Storing it in a kcal column would
+    // overstate every session by 4.184 and look merely like a keen athlete.
+    mock([], []);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ records: [workout] }), { status: 200 })),
+    );
+    const out = await whoop.fetchWorkouts!(range);
+    // 1569.34 kJ / 4.184 = 375 kcal.
+    expect(out[0].calories).toBe(375);
+  });
+
+  it("uses sport_name, since sport_id is retired", async () => {
+    // Their docs: sport_id "will not exist past 09/01/2025".
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ records: [workout] }), { status: 200 })),
+    );
+    const out = await whoop.fetchWorkouts!(range);
+    expect(out[0].activity).toBe("running");
+  });
+
+  it("keys a session to the day it started", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ records: [workout] }), { status: 200 })),
+    );
+    const out = await whoop.fetchWorkouts!(range);
+    expect(out[0].date).toBe("2022-04-24");
+    expect(out[0].externalId).toBe(workout.id);
+  });
+
+  it("keeps an unscored session but withholds its numbers", async () => {
+    // The session happened either way; only the measurements are missing.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({ records: [{ ...workout, score_state: "UNSCORABLE" }] }),
+          { status: 200 },
+        ),
+      ),
+    );
+    const out = await whoop.fetchWorkouts!(range);
+    expect(out).toHaveLength(1);
+    expect(out[0].strain).toBeUndefined();
+    expect(out[0].calories).toBeUndefined();
+  });
+
+  it("requests read:workout, without which none of this arrives", () => {
+    expect(whoop.scopes).toContain("read:workout");
+  });
+});
+
 describe("awkward responses", () => {
   it("returns nothing for empty collections rather than throwing", async () => {
     mock([], []);

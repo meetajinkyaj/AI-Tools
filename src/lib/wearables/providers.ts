@@ -8,7 +8,13 @@ import {
   type DailyMetric,
   type MetricKey,
 } from "./metrics";
-import { PROVIDER_NAMES, ReauthRequired, type ProviderId, type WearableProvider } from "./types";
+import {
+  PROVIDER_NAMES,
+  ReauthRequired,
+  type ProviderId,
+  type WearableProvider,
+  type WorkoutSession,
+} from "./types";
 
 /**
  * The six cloud wearable adapters.
@@ -83,6 +89,19 @@ function push(
 /* Oura                                                                        */
 /* -------------------------------------------------------------------------- */
 
+/** Oura's v2 workout document, from their generated schema. */
+interface OuraWorkout {
+  id?: string;
+  activity?: string;
+  calories?: number;
+  day?: string;
+  distance?: number;
+  end_datetime?: string;
+  intensity?: string;
+  source?: string;
+  start_datetime?: string;
+}
+
 interface OuraDoc {
   day?: string;
   score?: number;
@@ -127,7 +146,9 @@ const oura: WearableProvider = {
   // on the sleep document sit behind it, and losing those silently is much
   // worse than carrying one scope we may not need. Same reasoning as Whoop's
   // `read:cycles`.
-  scopes: ["daily", "heartrate", "spo2"],
+  // `workout` was added when workout sync landed. It is on Oura's published
+  // list of eight, so unlike Stress and Heart Health there is no guesswork.
+  scopes: ["daily", "heartrate", "spo2", "workout"],
   tokenAuth: "body",
   refreshRotates: true,
   syncWindowDays: 7,
@@ -231,6 +252,39 @@ const oura: WearableProvider = {
       push(out, "hrv", day, num(d.average_hrv), "oura");
       push(out, "resting_heart_rate", day, num(d.lowest_heart_rate), "oura");
       // NOT spo2 here. It comes from `daily_spo2` above.
+    }
+    return out;
+  },
+
+  /**
+   * Oura workouts. Shape from their generated v2 schema: `activity`, `calories`
+   * (already kcal), `distance` in metres, `intensity` as a label, and a
+   * `start_datetime`/`end_datetime` pair carrying a local offset.
+   *
+   * `day` is Oura's own answer for which day the session belongs to, so it is
+   * used rather than re-derived from the timestamp. A late-evening session is
+   * theirs to attribute, not ours to guess.
+   */
+  async fetchWorkouts({ accessToken, start, end }) {
+    const res = await providerFetch<{ data?: OuraWorkout[] }>(
+      "oura",
+      `https://api.ouraring.com/v2/usercollection/workout?start_date=${start}&end_date=${end}`,
+      { accessToken },
+    );
+    const out: WorkoutSession[] = [];
+    for (const w of res.data ?? []) {
+      if (!w?.id || !w.start_datetime || !w.end_datetime || !w.day) continue;
+      out.push({
+        externalId: w.id,
+        startedAt: w.start_datetime,
+        endedAt: w.end_datetime,
+        date: w.day,
+        activity: w.activity ?? undefined,
+        intensity: w.intensity ?? undefined,
+        calories: num(w.calories),
+        distanceM: num(w.distance),
+        source: w.source ?? undefined,
+      });
     }
     return out;
   },
@@ -347,6 +401,28 @@ interface WhoopSleep {
   };
 }
 
+/**
+ * Whoop's v2 workout record, from their documented example.
+ *
+ * `sport_id` is gone: their docs say it "will not exist past 09/01/2025", so
+ * `sport_name` is the only safe source for the activity.
+ */
+interface WhoopWorkout {
+  id?: string;
+  start?: string;
+  end?: string;
+  sport_name?: string;
+  score_state?: string;
+  score?: {
+    strain?: number;
+    average_heart_rate?: number;
+    max_heart_rate?: number;
+    /** KILOJOULES, not calories. Converted before it leaves this adapter. */
+    kilojoule?: number;
+    distance_meter?: number;
+  };
+}
+
 /** Whoop's v2 recovery record. Field names verified against their docs. */
 interface WhoopRecovery {
   cycle_id?: number;
@@ -385,7 +461,9 @@ const whoop: WearableProvider = {
   //
   // `offline` is the one that matters: without it Whoop issues no refresh
   // token and every connection dies within the hour.
-  scopes: ["read:sleep", "read:recovery", "read:cycles", "offline"],
+  // `read:workout` was added when workout sync landed, and is on Whoop's
+  // published scope list.
+  scopes: ["read:sleep", "read:recovery", "read:cycles", "read:workout", "offline"],
   tokenAuth: "body",
   refreshRotates: true,
   syncWindowDays: 7,
@@ -464,6 +542,51 @@ const whoop: WearableProvider = {
       // NOT MAPPED: `skin_temp_celsius` is an absolute reading, while our
       // `temperature_deviation` is a difference from the wearer's own
       // baseline. Charting one as the other would put ~33 next to ~-0.2.
+    }
+    return out;
+  },
+
+  /**
+   * Whoop workouts.
+   *
+   * TWO TRAPS, both from their documented payload. Energy is in KILOJOULES, so
+   * storing `kilojoule` in a kcal column would overstate every session by 4.184
+   * and look merely like an enthusiastic athlete. And `sport_id` is retired
+   * ("will not exist past 09/01/2025"), so `sport_name` is the only safe source
+   * for the activity.
+   *
+   * A workout is keyed to the day it STARTED. Whoop gives no `day` field, and a
+   * session that crosses midnight belongs to the day you began it, which is
+   * also how anybody describes their own training.
+   */
+  async fetchWorkouts({ accessToken, start, end }) {
+    const res = await providerFetch<{ records?: WhoopWorkout[] }>(
+      "whoop",
+      `https://api.prod.whoop.com/developer/v2/activity/workout` +
+        `?start=${start}T00:00:00.000Z&end=${end}T23:59:59.999Z&limit=25`,
+      { accessToken },
+    );
+    const out: WorkoutSession[] = [];
+    for (const w of res.records ?? []) {
+      if (!w || typeof w !== "object") continue;
+      if (!w.id || !w.start || !w.end) continue;
+      // PENDING_SCORE and UNSCORABLE both occur normally. The session is real
+      // either way, so it is stored; only the score fields are withheld.
+      const scored = w.score_state === undefined || w.score_state === "SCORED";
+      const kj = scored ? num(w.score?.kilojoule) : undefined;
+      out.push({
+        externalId: w.id,
+        startedAt: w.start,
+        endedAt: w.end,
+        date: dayOf(w.start),
+        activity: w.sport_name ?? undefined,
+        strain: scored ? num(w.score?.strain) : undefined,
+        // 1 kcal is 4.184 kJ.
+        calories: kj === undefined ? undefined : Math.round(kj / 4.184),
+        distanceM: scored ? num(w.score?.distance_meter) : undefined,
+        avgHeartRate: scored ? num(w.score?.average_heart_rate) : undefined,
+        maxHeartRate: scored ? num(w.score?.max_heart_rate) : undefined,
+      });
     }
     return out;
   },
