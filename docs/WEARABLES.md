@@ -331,6 +331,30 @@ response shape without owning the hardware.
 Not wired up. Worth an hour, and it would let the remaining Oura collections be
 mapped against real payloads instead of prose.
 
+### The sandbox check ran green on 2026-08-06, and what that does not mean
+
+First time any adapter in this repo has been checked against a vendor's real
+payload rather than their prose. **All nine collections returned data and every
+field path we read was present**, including `workout`, `daily_stress`,
+`daily_cardiovascular_age` and `vO2_max`.
+
+So the Oura mapping is right, which after four adapters that were wrong is
+worth saying plainly.
+
+> **It does NOT settle the Stress and Heart Health scope question, and the
+> first reading of the result said it did.** The sandbox accepts *any* string as
+> a bearer token, which means it enforces **no scopes at all**. A sandbox with
+> no scope enforcement cannot demonstrate scope enforcement. Those three
+> collections answering proves they exist and that we read them correctly; it
+> says nothing about whether a real member's grant will admit them.
+>
+> That question is settled only by a live connection, and until then the
+> defensive fetch in the adapter is what makes it not matter: if the scope is
+> absent the three metrics are missing and nothing else breaks.
+
+What the run did settle, beyond the field paths: GitHub's runners can reach
+`api.ouraring.com`, so this check runs unattended from now on.
+
 ### Two things the first live Oura connection taught us
 
 **Oura namespaces its scopes internally.** We request `daily heartrate spo2`,
