@@ -94,6 +94,71 @@ describe("Oura, the parts that were already right", () => {
   });
 });
 
+describe("Oura stress, cardiovascular age and VO2 max", () => {
+  /**
+   * Shapes taken from Oura's generated v2 schemas, not invented: `daily_stress`
+   * carries `stress_high` and `recovery_high` in SECONDS,
+   * `daily_cardiovascular_age` carries `vascular_age` in years, and `vO2_max`
+   * carries `vo2_max` under a path capitalised exactly that way.
+   */
+  it("converts the stress zones from seconds to minutes", async () => {
+    route({
+      "/daily_stress": {
+        data: [{ day: "2026-08-01", stress_high: 5_400, recovery_high: 12_600 }],
+      },
+    });
+    const out = await oura.fetchRange!(range);
+    const by = Object.fromEntries(out.map((m) => [m.metric, m.value]));
+    expect(by.stress_high_minutes).toBe(90);
+    expect(by.recovery_high_minutes).toBe(210);
+  });
+
+  it("reads vascular age and VO2 max", async () => {
+    route({
+      "/daily_cardiovascular_age": { data: [{ day: "2026-08-01", vascular_age: 34 }] },
+      "/vO2_max": { data: [{ day: "2026-08-01", vo2_max: 47.2 }] },
+    });
+    const out = await oura.fetchRange!(range);
+    const by = Object.fromEntries(out.map((m) => [m.metric, m.value]));
+    expect(by.vascular_age).toBe(34);
+    expect(by.vo2max).toBe(47.2);
+  });
+
+  it("SURVIVES A 403 ON AN OPTIONAL COLLECTION WITHOUT KILLING THE CONNECTION", async () => {
+    // The whole reason these three are fetched defensively. Oura's newer portal
+    // grants Stress and Heart Health separately and their OAuth scope strings
+    // are undocumented. providerFetch turns 403 into ReauthRequired, which the
+    // sweep treats as a dead grant, so an ungranted optional scope would ask the
+    // member to reconnect over one absent metric.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const u = String(url);
+        const optional =
+          u.includes("daily_stress") ||
+          u.includes("cardiovascular") ||
+          u.includes("vO2_max");
+        if (optional) return new Response("", { status: 403 });
+        return new Response(
+          JSON.stringify({ data: [{ day: "2026-08-01", score: 71 }] }),
+          { status: 200 },
+        );
+      }),
+    );
+    const out = await oura.fetchRange!(range);
+    // The baseline still lands, and nothing throws.
+    expect(out.some((m) => m.metric === "sleep_score")).toBe(true);
+    expect(out.some((m) => m.metric === "vascular_age")).toBe(false);
+  });
+
+  it("still fails loudly when a REQUIRED collection 403s", async () => {
+    // A genuinely revoked grant must still reach the sweep as ReauthRequired.
+    // The optional catch must not have swallowed that too.
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 403 })));
+    await expect(oura.fetchRange!(range)).rejects.toThrow();
+  });
+});
+
 /* ---------------------------------------------------------------- Fitbit ---- */
 
 const fitbit = PROVIDERS.fitbit;
