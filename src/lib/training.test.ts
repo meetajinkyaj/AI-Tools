@@ -254,6 +254,73 @@ describe("trainingLoad, reconciling the two sources", () => {
     expect(load.activities).toContain("Running");
     expect(load.activities).toContain("Gym / Weights");
   });
+
+  it("shows one chip when both sources named the same activity differently", () => {
+    // The bug this was written for: the ring says "Weight Training", the user
+    // tapped "Gym / Weights", and the card listed one gym hour twice under two
+    // names. The load arithmetic had it right and the chip row gave it away.
+    const load = trainingLoad(
+      {
+        workouts: [w("2026-08-07", 7, 50, "Weight Training")],
+        checkins: [c("2026-08-07", [{ type: "gym", duration: "long" }])],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities).toEqual(["Weight Training"]);
+  });
+
+  it("prints the device's word, which is the more specific one", () => {
+    // A ring reporting "Padel" against a check-in bucketed as "Racquet & team
+    // sports" is the case that decided this: our taxonomy is a set of buckets,
+    // and the vendor watched the actual session.
+    const both = trainingLoad(
+      {
+        workouts: [w("2026-08-07", 7, 60, "Padel")],
+        checkins: [c("2026-08-07", [{ type: "sports", duration: "long" }])],
+      },
+      "2026-08-07",
+    );
+    expect(both.activities).toEqual(["Padel"]);
+  });
+
+  it("keeps the check-in's word when no device saw that activity", () => {
+    const load = trainingLoad(
+      { checkins: [c("2026-08-07", [{ type: "sports", duration: "long" }])] },
+      "2026-08-07",
+    );
+    expect(load.activities).toEqual(["Racquet & team sports"]);
+  });
+
+  it("upgrades the wording once a device names an activity seen earlier", () => {
+    // Monday was logged by hand, Wednesday the ring caught it too. One chip,
+    // and the device's word for it.
+    const load = trainingLoad(
+      {
+        checkins: [
+          c("2026-08-03", [{ type: "gym", duration: "long" }]),
+          c("2026-08-05", [{ type: "gym", duration: "long" }]),
+        ],
+        workouts: [w("2026-08-05", 7, 50, "Weight Training")],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities).toEqual(["Weight Training"]);
+    expect(load.days).toBe(2);
+  });
+
+  it("keeps an activity it cannot place under the vendor's own name", () => {
+    // Rowing is not in our taxonomy and is not close to anything in it.
+    // Forcing it into a category would print a word that misdescribes it.
+    const load = trainingLoad(
+      {
+        workouts: [w("2026-08-07", 7, 30, "Rowing")],
+        checkins: [c("2026-08-07", [{ type: "gym", duration: "short" }])],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities).toContain("Rowing");
+    expect(load.activities).toContain("Gym / Weights");
+  });
 });
 
 /* -------------------------------------------------------------------------- */

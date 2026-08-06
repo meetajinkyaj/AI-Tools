@@ -4,6 +4,7 @@ import {
   type ExerciseEntry,
   isDurationBucket,
   isExerciseType,
+  matchExerciseType,
 } from "./exercises";
 import type { MergedSeries } from "./wearables/merge";
 
@@ -80,11 +81,30 @@ export interface TrainingLoad {
   sources: TrainingSource[];
 }
 
+/**
+ * One activity, as both a thing to count and a thing to print.
+ *
+ * THE TWO ARE NOT THE SAME STRING, and that is the point. `key` is what decides
+ * whether a ring's "Weight Training" and a check-in's "Gym / Weights" are the
+ * same activity; `label` is what the user reads. Keying on the display text
+ * showed one gym hour as two chips.
+ */
+interface ActivityRef {
+  key: string;
+  label: string;
+  fromCheckin: boolean;
+}
+
 /** What one day looked like from one source. */
 interface DayFacts {
   sessions: number;
   minutes: number;
-  activities: string[];
+  activities: ActivityRef[];
+}
+
+/** The key for an activity we could not place in our own taxonomy. */
+function rawKey(name: string): string {
+  return `raw:${name.toLowerCase()}`;
 }
 
 function toNumber(v: number | string | null | undefined): number | null {
@@ -108,11 +128,27 @@ function windowStart(endDate: string, windowDays: number): string | null {
   return new Date(endMs - (windowDays - 1) * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** A human label for one logged check-in activity. */
-function exerciseLabel(e: ExerciseEntry): string {
-  if (isExerciseType(e.type)) return EXERCISE_TYPE_LABELS[e.type];
+/** One logged check-in activity, as something to count and to print. */
+function checkinActivity(e: ExerciseEntry): ActivityRef | null {
+  if (isExerciseType(e.type)) {
+    return { key: e.type, label: EXERCISE_TYPE_LABELS[e.type], fromCheckin: true };
+  }
   // "other" carries its own free text; without one there is nothing to show.
-  return (e.label ?? "").trim();
+  const label = (e.label ?? "").trim();
+  return label ? { key: rawKey(label), label, fromCheckin: true } : null;
+}
+
+/**
+ * One device session's activity.
+ *
+ * The vendor's own word is kept for display and only the KEY is normalised, so
+ * "Padel" stays "Padel" on screen while still colliding with a check-in logged
+ * as "Racquet & team sports". Collapsing the label too would trade a specific
+ * word the vendor gave us for a vaguer one of ours.
+ */
+function deviceActivity(raw: string): ActivityRef {
+  const matched = matchExerciseType(raw);
+  return { key: matched ?? rawKey(raw), label: raw, fromCheckin: false };
 }
 
 /** Group device sessions by day. */
@@ -123,7 +159,7 @@ function deviceDays(workouts: WorkoutRow[]): Map<string, DayFacts> {
     day.sessions += 1;
     day.minutes += durationMinutes(w.started_at, w.ended_at) ?? 0;
     const a = (w.activity ?? "").trim();
-    if (a) day.activities.push(a);
+    if (a) day.activities.push(deviceActivity(a));
     out.set(w.workout_date, day);
   }
   return out;
@@ -152,8 +188,8 @@ function checkinDays(checkins: CheckinTrainingRow[]): Map<string, DayFacts> {
       // volume. Counting it as zero minutes is honest; inventing a median
       // would put a number on the screen the user never gave us.
       if (isDurationBucket(e.duration)) day.minutes += DURATION_MINUTES[e.duration];
-      const label = exerciseLabel(e);
-      if (label) day.activities.push(label);
+      const activity = checkinActivity(e);
+      if (activity) day.activities.push(activity);
     }
     out.set(c.checkin_date, day);
   }
@@ -205,8 +241,8 @@ export function trainingLoad(
   let sessions = 0;
   let minutes = 0;
   let minutesEstimated = false;
-  /** Days on which each activity name appeared, so a name counts once a day. */
-  const activityDays = new Map<string, { label: string; days: number }>();
+  /** Days on which each activity appeared, so one activity counts once a day. */
+  const activityDays = new Map<string, { label: string; days: number; fromCheckin: boolean }>();
 
   for (const day of allDays) {
     const d = fromDevice.get(day);
@@ -222,15 +258,32 @@ export function trainingLoad(
       minutesEstimated = true;
     }
 
-    // Union the names: a ring recording a run and a check-in logging weights on
-    // the same day are two real activities, not a contradiction to resolve.
-    const seen = new Set<string>();
-    for (const name of [...(d?.activities ?? []), ...(c?.activities ?? [])]) {
-      const key = name.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
+    // Union the activities: a ring recording a run and a check-in logging
+    // weights on the same day are two real activities, not a contradiction to
+    // resolve. The same activity seen by both is one, which is what the
+    // normalised key is for.
+    //
+    // WHEN BOTH NAMED IT, THE DEVICE'S WORD WINS. It observed the session where
+    // the check-in recalled it, which is the same reason its minutes win, and
+    // its word is usually the more specific one: a ring reporting "Padel"
+    // against a check-in bucketed as "Racquet & team sports" is the case that
+    // decided this.
+    const perDay = new Map<string, ActivityRef>();
+    for (const a of [...(d?.activities ?? []), ...(c?.activities ?? [])]) {
+      const seen = perDay.get(a.key);
+      if (!seen || (seen.fromCheckin && !a.fromCheckin)) perDay.set(a.key, a);
+    }
+
+    for (const [key, ref] of perDay) {
       const prev = activityDays.get(key);
-      activityDays.set(key, { label: prev?.label ?? name, days: (prev?.days ?? 0) + 1 });
+      const takeLabel = !prev || (prev.fromCheckin && !ref.fromCheckin);
+      activityDays.set(key, {
+        label: takeLabel ? ref.label : prev.label,
+        days: (prev?.days ?? 0) + 1,
+        // Only true while every sighting has come from a check-in, so the
+        // first device sighting can still upgrade the wording.
+        fromCheckin: (prev?.fromCheckin ?? true) && ref.fromCheckin,
+      });
     }
   }
 
@@ -472,12 +525,15 @@ export function reportedRecovery(
   // question is how recovered the person feels, and sleep is an input to that
   // rather than a second opinion on it.
   const score = energy + (sleep ?? 0);
+  // "energy and sleep are", "energy is". Getting this wrong is small and it is
+  // the kind of small that makes a health app read like a form letter.
+  const verb = basis.length > 1 ? "are" : "is";
   if (energy > 0 && score > 0) {
     return {
       direction: "recovering",
       source: "reported",
       basis,
-      summary: `Your reported ${basis.join(" and ")} is up on the previous ${recentDays} days.`,
+      summary: `Your reported ${basis.join(" and ")} ${verb} up on the previous ${recentDays} days.`,
     };
   }
   if (energy < 0 && score < 0) {
@@ -485,7 +541,7 @@ export function reportedRecovery(
       direction: "straining",
       source: "reported",
       basis,
-      summary: `Your reported ${basis.join(" and ")} is down on the previous ${recentDays} days.`,
+      summary: `Your reported ${basis.join(" and ")} ${verb} down on the previous ${recentDays} days.`,
     };
   }
   return {

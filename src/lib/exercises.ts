@@ -117,6 +117,80 @@ export function normalizeActivities(input: unknown): string[] {
   return out;
 }
 
+/**
+ * Vendor activity names that mean one of our types, longest-specific first.
+ *
+ * WHY THIS IS NEEDED. Six vendors disagree about the taxonomy, and the check-in
+ * has a seventh. Oura says `weight_training`, Whoop says `Weightlifting`,
+ * Fitbit says `Weights` and the user tapped "Gym / Weights". Those are one
+ * activity, and the Training card showed them as separate chips until this
+ * existed: somebody who logs a session AND wears a ring saw their single gym
+ * hour listed twice, under two names, which is the same double-count the load
+ * arithmetic works hard to avoid.
+ *
+ * MATCHED ON SUBSTRINGS, and the ORDER MATTERS. "gymnastics" contains "gym",
+ * so gymnastics is tested first; the same trap waits for anything sharing a
+ * stem. Add new entries above the broader ones, not at the end.
+ *
+ * NO MATCH IS A FINE ANSWER. "Rowing" and "Elliptical" are neither in our
+ * taxonomy nor close to it, and they keep the vendor's own word rather than
+ * being forced into a category that would misdescribe them.
+ */
+const VENDOR_ACTIVITY_KEYWORDS: readonly (readonly [ExerciseType, readonly string[]])[] = [
+  ["crossfit", ["crossfit"]],
+  ["hyrox", ["hyrox"]],
+  // Before "gym", which is a substring of "gymnastics".
+  ["gymnastics", ["gymnastic", "calisthenic"]],
+  ["boxing", ["box", "martial", "karate", "judo", "jiu", "muay", "mma", "wrestl"]],
+  ["yoga_mobility", ["yoga", "pilates", "mobility", "stretch", "barre"]],
+  ["swimming", ["swim"]],
+  ["cycling", ["cycl", "bike", "biking", "spinning", "peloton"]],
+  ["running", ["run", "jog", "treadmill", "sprint"]],
+  ["hiking", ["hik", "ruck", "trek", "trail"]],
+  ["walking", ["walk"]],
+  ["gym", ["weight", "strength", "resistance", "lifting", "gym"]],
+  ["functional", ["functional", "hiit", "circuit", "bootcamp", "interval"]],
+  [
+    "sports",
+    [
+      "tennis",
+      "padel",
+      "squash",
+      "badminton",
+      "pickleball",
+      "basketball",
+      "football",
+      "soccer",
+      "cricket",
+      "volleyball",
+      "hockey",
+      "rugby",
+      "baseball",
+      "golf",
+      "sport",
+    ],
+  ],
+];
+
+/**
+ * The type a vendor's free-text activity name means, or null if we cannot tell.
+ *
+ * Returning null is deliberate and common. Guessing a category for an activity
+ * we do not recognise would put a wrong word on the user's screen, which is
+ * worse than showing the vendor's.
+ */
+export function matchExerciseType(raw: string | null | undefined): ExerciseType | null {
+  if (typeof raw !== "string") return null;
+  // Vendors separate words with spaces, underscores and hyphens, sometimes in
+  // the same payload. Flatten them all before matching.
+  const s = raw.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (!s) return null;
+  for (const [type, keywords] of VENDOR_ACTIVITY_KEYWORDS) {
+    if (keywords.some((k) => s.includes(k))) return type;
+  }
+  return null;
+}
+
 export type ExercisesResult =
   | { ok: true; value: ExerciseEntry[] }
   | { ok: false; error: string };
