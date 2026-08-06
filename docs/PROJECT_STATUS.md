@@ -477,17 +477,21 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   threshold is the whole safety margin**: past it, losing the data ends the
   beta rather than inconveniencing it. Fix is $25/mo (Supabase Pro → daily
   backups, 7-day retention). See `RUNBOOK.md` §2b.
-- **Workout sync: NEXT UP, and the thesis is now written down.** `read:workout`
-  is granted on Whoop and `Workout` on Oura; neither is requested in code yet.
-  The founder's answer to "what is a workout for" is in
+- **Workout sync and the Training card: SHIPPED.** Sessions land in
+  `wearable_workouts` (migration 0020, applied to production), Oura and Whoop
+  both request the workout scope, and the Training and recovery card is live in
+  Trends. The founder's answer to "what is a workout for" is in
   [`WEARABLE_DATA.md`](./WEARABLE_DATA.md): the causal path is indirect and
   slow, training drives eating and recovery behaviour, which moves markers over
   a panel cycle of roughly six months, so the near-term job is **training load
-  and recovery**, not a biomarker correlation nobody can yet demonstrate. Needs
-  a `wearable_workouts` table and a migration, because a workout is a session
-  and `wearable_daily_metrics` is one row per day per metric. Check-ins already
-  carry `training_logged`, so the load and recovery signal can be built from
-  data we hold today and gets sharper when device workouts arrive.
+  and recovery**, not a biomarker correlation nobody can yet demonstrate.
+  **The card reads the check-in first and the device second**, which is the part
+  worth remembering: the first cut read wearable sessions only, and with nobody
+  in the beta owning a ring it would have rendered for zero people. The two
+  sources are reconciled per day and never summed, minutes prefer the measured
+  reading over the duration bucket, and recovery is labelled "measured" or
+  "reported" so a self-report never borrows a device's credibility. Fitbit
+  workout sync is still outstanding.
 - **Withings is the only adapter never audited.** The other four were, and all
   four were wrong. It is a scale rather than a wearable, so it contributes
   weight and body fat and nothing to the training or recovery picture, which is

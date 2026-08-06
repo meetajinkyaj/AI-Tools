@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { POINTS, REFERRAL_MAX_TOTAL } from "@/lib/points";
 import type { CheckinTrend, MarkerDelta } from "@/lib/trends";
+import { TrainingCard } from "./training-card";
 import { Card, Eyebrow, PageHeader, primaryButtonClass } from "./ui";
 import { WearableTrends } from "./wearable-trends";
 
@@ -169,6 +170,12 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
           when nothing is connected or nothing has synced. */}
       <WearableTrends getToken={getToken} />
 
+      {/* What you did this week, and whether the body is absorbing it. Reads
+          the check-in first and a device second, so it works before anyone
+          owns a ring. Renders itself away on a week with no training and no
+          recovery signal. */}
+      <TrainingCard getToken={getToken} />
+
       {/* Outcome-verified rewards, the payoff moment */}
       {bonuses.length > 0 && (
         <Card className="flex flex-col gap-2 p-6">
@@ -220,9 +227,13 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
                 </span>
               </div>
             </div>
+            {/* Training days used to be counted here too. It now lives in the
+                Training card, which reconciles the check-in against any
+                connected device; two counts of the same week on one page
+                differ the moment a ring is connected, and the user has no way
+                to tell which one to believe. */}
             <p className="font-body text-xs text-muted">
-              {checkin.trend.count} check-in{checkin.trend.count === 1 ? "" : "s"} logged ·{" "}
-              {checkin.trend.trainingDays} training day{checkin.trend.trainingDays === 1 ? "" : "s"} this week
+              {checkin.trend.count} check-in{checkin.trend.count === 1 ? "" : "s"} logged
             </p>
           </div>
         )}
