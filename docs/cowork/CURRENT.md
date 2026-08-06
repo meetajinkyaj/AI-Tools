@@ -6,9 +6,10 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-06. **Three tasks are pending:** settle the
-duplicate-Ultrahuman question with one query, register Fitbit, and read one
-URL off Oura's own auth page. See [PENDING TASK](#pending-task).
+Last updated: 2026-08-06. **Four tasks are pending, and one of them blocks a
+merge:** apply migration 0021, settle the duplicate-Ultrahuman question with
+one query, register Fitbit, and read one URL off Oura's own auth page. See
+[PENDING TASK](#pending-task).
 
 ---
 
@@ -52,6 +53,50 @@ is outstanding.
 ---
 
 # PENDING TASK
+
+## 0. Apply migration 0021, BEFORE PR #104 is merged
+
+**This one gates a merge, so it goes first.** The code in PR #104 writes a
+column that does not exist yet on production. Merge before applying and every
+Fitbit workout sync fails on the insert.
+
+`supabase/migrations/0021_workout_auto_detected.sql`. One statement, additive,
+idempotent, safe to re-run:
+
+```sql
+alter table wearable_workouts
+  add column if not exists auto_detected boolean not null default false;
+```
+
+(The file also sets a `comment on column`, which is documentation and cannot
+affect data. Run the whole file.)
+
+**What it is for.** Fitbit's watch logs a "Walk" by itself after about fifteen
+minutes of movement, without the member asking. That is real and worth keeping,
+walking is good for you, but it is not a workout, and counting it would show
+somebody seven training days in a week they trained on none. The column records
+which sessions the member started and which the watch noticed, so the Training
+card can show both without confusing them.
+
+**Verify after running:**
+
+```sql
+select column_name, data_type, is_nullable, column_default
+from information_schema.columns
+where table_name = 'wearable_workouts' and column_name = 'auto_detected';
+
+select count(*) as total, count(*) filter (where auto_detected) as auto
+from wearable_workouts;
+```
+
+Expect one row from the first (`boolean`, `NO`, `false`), and the second to
+show every existing row at `auto` = 0. **No existing row should change
+meaning**: nothing but Fitbit ever sets this, and Fitbit is not connected yet.
+
+Report both results. Then say the migration is applied so #104 can merge.
+
+A reminder from 0019: if the SQL Editor's "Running..." spinner freezes, **do
+not re-click Run.** Check the real state from a second connection first.
 
 ## 1. Settle the duplicate-Ultrahuman question, which is probably not one
 

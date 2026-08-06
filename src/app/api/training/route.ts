@@ -79,7 +79,7 @@ export async function GET(request: Request) {
         .order("checkin_date", { ascending: true }),
       supabase
         .from("wearable_workouts")
-        .select("workout_date, started_at, ended_at, activity, strain, provider")
+        .select("workout_date, started_at, ended_at, activity, strain, provider, auto_detected")
         .eq("user_id", userId)
         .gte("workout_date", since)
         .order("workout_date", { ascending: true }),

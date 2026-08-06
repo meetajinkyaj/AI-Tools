@@ -23,12 +23,14 @@ const w = (
   startHour: number,
   minutes: number,
   activity?: string,
+  autoDetected = false,
 ): WorkoutRow => ({
   workout_date: date,
   started_at: `${date}T${String(startHour).padStart(2, "0")}:00:00Z`,
   ended_at: `${date}T${String(startHour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00Z`,
   activity,
   provider: "whoop",
+  auto_detected: autoDetected,
 });
 
 /** A check-in that logged activities. */
@@ -183,6 +185,94 @@ describe("trainingLoad, from check-ins", () => {
       "2026-08-07",
     );
     expect(load.minutes).toBe(0);
+  });
+});
+
+describe("trainingLoad, movement versus training", () => {
+  it("does not let a walk the watch noticed become a training day", () => {
+    // Fitbit's SmartTrack logs a Walk after about fifteen minutes, unasked.
+    // Counting those would hand somebody seven training days out of seven for
+    // a week they trained on none, and that is the headline number.
+    const load = trainingLoad(
+      {
+        workouts: [
+          w("2026-08-03", 8, 18, "Walk", true),
+          w("2026-08-04", 8, 22, "Walk", true),
+          w("2026-08-05", 8, 16, "Walk", true),
+        ],
+      },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(0);
+    expect(load.restDays).toBe(7);
+    expect(load.minutes).toBe(0);
+    expect(load.activities).toEqual([]);
+  });
+
+  it("keeps the walk rather than discarding it", () => {
+    // A walk is movement and movement counts for health. Throwing it away to
+    // protect the training number loses real data, which is what the first cut
+    // of the Fitbit adapter did.
+    const load = trainingLoad(
+      {
+        workouts: [
+          w("2026-08-03", 8, 18, "Walk", true),
+          w("2026-08-03", 18, 20, "Walk", true),
+          w("2026-08-05", 8, 16, "Walk", true),
+        ],
+      },
+      "2026-08-07",
+    );
+    expect(load.movement).toEqual({ sessions: 3, days: 2, minutes: 54 });
+  });
+
+  it("reports movement even on a week with no training at all", () => {
+    // A week of nothing but walks still has something to say, so the roll-up
+    // has to survive the empty-training early return.
+    const load = trainingLoad(
+      { workouts: [w("2026-08-07", 8, 25, "Walk", true)] },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(0);
+    expect(load.movement.sessions).toBe(1);
+  });
+
+  it("counts a session the member started, however short", () => {
+    // Intent is the line, not duration. Starting one says you meant it.
+    const load = trainingLoad(
+      { workouts: [w("2026-08-07", 7, 12, "Run", false)] },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(1);
+    expect(load.movement.sessions).toBe(0);
+  });
+
+  it("still counts the day when the member logged it themselves", () => {
+    // Somebody who considers their auto-detected hour a real session can say
+    // so at check-in, and their own judgment wins.
+    const load = trainingLoad(
+      {
+        workouts: [w("2026-08-07", 8, 55, "Walk", true)],
+        checkins: [c("2026-08-07", [{ type: "walking", duration: "long" }])],
+      },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(1);
+    expect(load.activities).toEqual(["Walking / Zone 2"]);
+    // The walk is still reported as movement; the two views do not erase
+    // each other, they answer different questions.
+    expect(load.movement.sessions).toBe(1);
+  });
+
+  it("treats a provider that does not say as member-started", () => {
+    // Oura, Whoop and Ultrahuman never set the flag. Absent means "they do not
+    // say", and the safe reading is the behaviour those rows already had.
+    const load = trainingLoad(
+      { workouts: [{ ...w("2026-08-07", 7, 45, "Run"), auto_detected: undefined }] },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(1);
+    expect(load.movement.sessions).toBe(0);
   });
 });
 

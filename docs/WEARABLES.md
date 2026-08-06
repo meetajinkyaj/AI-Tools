@@ -420,13 +420,37 @@ blank field is a gap; a wrong one is a lie in a health record.
 fifteen minutes of sustained movement, unasked. Left alone, a member who walks
 to the station twice a day would open the Training card and see seven training
 days out of seven, having trained on none of them: the headline number,
-inflated by us. Auto-detected sessions under twenty minutes are dropped;
-anything the member started themselves is kept whatever its length, because
-starting one is a statement of intent. Twenty rather than fifteen because
-SmartTrack's own floor is fifteen, and matching it would keep every one.
+inflated by us.
 
-This filter is the only place an adapter discards a session the vendor sent.
-It is one constant, `FITBIT_AUTO_MIN_MINUTES`, if it ever needs reversing.
+The first fix dropped short auto-detected sessions at the adapter. **That was
+half right and it threw away real data.** A walk is movement, and movement is
+most of what this app is about: everyday and load-bearing activity acts on
+bone, muscle, gut and metabolic health whether or not anybody would call it a
+workout. Deleting it meant the only signal we had for it never reached the
+database.
+
+So every session is stored and the distinction travels with it, in
+`wearable_workouts.auto_detected` (migration 0021).
+
+**Intent is the line, not duration.** Started by the member is training,
+because they meant it to be. Noticed by the device is movement. No per-sport
+thresholds to argue about, one sentence to explain to a user, and the judgment
+call sits where it belongs: somebody who considers their auto-detected hour a
+real session can log it at check-in, and `trainingLoad()` already reconciles
+the two sources per day, so their own view wins.
+
+`fitstar`, Fitbit's guided-workout app, counts as member-started. Only
+`auto_detected` does not.
+
+**False is right for every other provider.** Oura, Whoop and Ultrahuman never
+say how a session came to exist, so the column stays false for them: that is
+"they do not say", not "we know they did not", and it preserves exactly the
+behaviour those rows already had.
+
+The Training card shows movement on its own line, in its own words, never
+summed into the training numbers. Rest days are still counted against training
+only: a day spent walking is not a training day, and calling it one would undo
+the whole point of keeping them apart.
 
 #### The trap: VO2 max is a string, and sometimes a range
 

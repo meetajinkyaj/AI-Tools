@@ -375,24 +375,31 @@ export function fitbitDistanceMetres(
 }
 
 /**
- * Below this many minutes, an AUTO-DETECTED Fitbit activity is not a workout.
+ * Fitbit's `logType` values that mean the watch noticed it rather than the
+ * member starting it.
  *
- * WHY THIS EXISTS AND WHY IT IS FITBIT-ONLY. Oura and Whoop create a session
- * when somebody starts one. Fitbit's SmartTrack invents them: it watches for
- * sustained movement and logs a "Walk" after about fifteen minutes, unasked.
- * Left alone, a member who walks to the station twice a day would open the
- * Training card and see seven training days out of seven, having trained none
- * of them. The number people care about most on that card would be the number
- * we had quietly inflated.
+ * WHY THIS IS LABELLED AND NOT DISCARDED. Fitbit's SmartTrack logs a "Walk"
+ * after roughly fifteen minutes of sustained movement, unasked. The first cut
+ * of this adapter dropped short auto-detected sessions outright, so that a
+ * member who walks to the station twice a day would not open the Training card
+ * to seven training days out of seven, having trained on none.
  *
- * A session the member STARTED THEMSELVES is kept whatever its length, because
- * that is a statement of intent and a short deliberate session is still
- * training. Only Fitbit's own guesses have to clear the bar.
+ * That protected the training number by throwing away real data. A walk is
+ * movement, and movement is most of what this app is about; everyday activity
+ * acts on bone, muscle, gut and metabolic health whether or not anybody would
+ * call it a workout. So every session is stored, and the distinction travels
+ * with it.
  *
- * Twenty minutes rather than fifteen: SmartTrack's own floor is fifteen, so
- * fifteen would keep every one of them and defeat the point.
+ * INTENT IS THE LINE, NOT DURATION. Started by the member means training. Noticed
+ * by the device means movement. No per-sport thresholds to argue about, one
+ * sentence to explain, and somebody who considers their auto-detected hour a
+ * real session can log it at check-in, which the training view already
+ * reconciles per day.
+ *
+ * `fitstar` is Fitbit's own guided-workout app, which the member does start,
+ * so it is deliberately NOT here.
  */
-const FITBIT_AUTO_MIN_MINUTES = 20;
+const FITBIT_AUTO_LOG_TYPES = new Set(["auto_detected"]);
 
 const fitbit: WearableProvider = {
   id: "fitbit",
@@ -585,11 +592,8 @@ const fitbit: WearableProvider = {
       const date = a.startTime.slice(0, 10);
       if (date < start || date > end) continue;
 
-      const minutes = ms / 60_000;
-      const autoDetected = a.logType === "auto_detected";
-      if (autoDetected && minutes < FITBIT_AUTO_MIN_MINUTES) continue;
-
       out.push({
+        autoDetected: FITBIT_AUTO_LOG_TYPES.has(a.logType ?? ""),
         externalId: String(id),
         startedAt: a.startTime,
         endedAt: new Date(startMs + ms).toISOString(),

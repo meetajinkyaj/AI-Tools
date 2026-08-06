@@ -45,6 +45,28 @@ export interface WorkoutRow {
   /** Whoop only, 0-21. Never comparable to another vendor's number. */
   strain?: number | string | null;
   provider: string;
+  /**
+   * The device noticed this rather than the member starting it. Movement, not
+   * training. See `MOVEMENT` below for why the two are never added together.
+   */
+  auto_detected?: boolean | null;
+}
+
+/**
+ * What a device picked up without being asked.
+ *
+ * KEPT APART FROM TRAINING ON PURPOSE, and shown rather than hidden. A walk to
+ * the station is not a workout, and pretending it is would hand somebody seven
+ * training days for a week they trained none. It is also not nothing:
+ * everyday movement acts on bone, muscle, gut and metabolic health, and this
+ * app is a wellness picture rather than a gym log.
+ *
+ * So both numbers exist and neither borrows the other's meaning.
+ */
+export interface MovementLoad {
+  sessions: number;
+  days: number;
+  minutes: number;
 }
 
 /** One daily check-in, as the training view needs it. */
@@ -79,6 +101,11 @@ export interface TrainingLoad {
   restDays: number;
   /** Which sources contributed a day, in a stable order. */
   sources: TrainingSource[];
+  /**
+   * Sessions the device noticed rather than the member starting. Counted
+   * separately and never folded into the numbers above.
+   */
+  movement: MovementLoad;
 }
 
 /**
@@ -151,10 +178,11 @@ function deviceActivity(raw: string): ActivityRef {
   return { key: matched ?? rawKey(raw), label: raw, fromCheckin: false };
 }
 
-/** Group device sessions by day. */
+/** Group device sessions by day. Auto-detected ones are excluded. */
 function deviceDays(workouts: WorkoutRow[]): Map<string, DayFacts> {
   const out = new Map<string, DayFacts>();
   for (const w of workouts) {
+    if (w.auto_detected === true) continue;
     const day = out.get(w.workout_date) ?? { sessions: 0, minutes: 0, activities: [] };
     day.sessions += 1;
     day.minutes += durationMinutes(w.started_at, w.ended_at) ?? 0;
@@ -163,6 +191,19 @@ function deviceDays(workouts: WorkoutRow[]): Map<string, DayFacts> {
     out.set(w.workout_date, day);
   }
   return out;
+}
+
+/** Roll up the sessions the device noticed rather than the member starting. */
+function movementLoad(workouts: WorkoutRow[]): MovementLoad {
+  const auto = workouts.filter((w) => w.auto_detected === true);
+  return {
+    sessions: auto.length,
+    days: new Set(auto.map((w) => w.workout_date)).size,
+    minutes: auto.reduce(
+      (sum, w) => sum + (durationMinutes(w.started_at, w.ended_at) ?? 0),
+      0,
+    ),
+  };
 }
 
 /**
@@ -211,6 +252,11 @@ function checkinDays(checkins: CheckinTrainingRow[]): Map<string, DayFacts> {
  * device whenever it recorded any, because that is measured where the bucket is
  * estimated. It is the rule the biomarker merge already uses: prefer whatever
  * measured the quantity directly.
+ *
+ * WHAT THE DEVICE NOTICED IS NOT TRAINING and comes back under `movement`. A
+ * watch logging a walk to the station is real and worth showing; calling it a
+ * training day is how somebody ends up with seven out of seven for a week they
+ * trained none.
  */
 export function trainingLoad(
   input: { workouts?: WorkoutRow[]; checkins?: CheckinTrainingRow[] },
@@ -218,6 +264,7 @@ export function trainingLoad(
   windowDays = 7,
 ): TrainingLoad {
   const from = windowStart(endDate, windowDays);
+  const noMovement: MovementLoad = { sessions: 0, days: 0, minutes: 0 };
   const empty: TrainingLoad = {
     sessions: 0,
     days: 0,
@@ -226,17 +273,22 @@ export function trainingLoad(
     activities: [],
     restDays: from === null ? 0 : windowDays,
     sources: [],
+    movement: noMovement,
   };
   if (from === null) return empty;
 
   const inWindow = <T,>(rows: T[], date: (r: T) => string) =>
     rows.filter((r) => date(r) >= from && date(r) <= endDate);
 
-  const fromDevice = deviceDays(inWindow(input.workouts ?? [], (w) => w.workout_date));
+  const workoutsInWindow = inWindow(input.workouts ?? [], (w) => w.workout_date);
+  const fromDevice = deviceDays(workoutsInWindow);
   const fromCheckin = checkinDays(inWindow(input.checkins ?? [], (c) => c.checkin_date));
+  const movement = movementLoad(workoutsInWindow);
 
   const allDays = new Set([...fromDevice.keys(), ...fromCheckin.keys()]);
-  if (allDays.size === 0) return empty;
+  // A week of nothing but walks is still a week with something to say, so the
+  // movement roll-up survives the early return.
+  if (allDays.size === 0) return { ...empty, movement };
 
   let sessions = 0;
   let minutes = 0;
@@ -301,8 +353,12 @@ export function trainingLoad(
     minutes,
     minutesEstimated,
     activities,
+    // Rest is measured against training only. A day spent walking is not a
+    // training day, and calling it one would quietly undo the whole point of
+    // keeping the two apart.
     restDays: Math.max(0, windowDays - allDays.size),
     sources,
+    movement,
   };
 }
 

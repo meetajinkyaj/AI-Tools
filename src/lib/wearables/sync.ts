@@ -323,6 +323,9 @@ export async function storeWorkouts(
     avg_heart_rate: w.avgHeartRate ?? null,
     max_heart_rate: w.maxHeartRate ?? null,
     source: w.source ?? provider,
+    // Whether the member started it or their device noticed it. Only Fitbit
+    // reports this; false elsewhere means "they do not say", not "we know".
+    auto_detected: w.autoDetected === true,
     updated_at: new Date().toISOString(),
   }));
 

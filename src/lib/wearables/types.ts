@@ -77,6 +77,13 @@ export interface WorkoutSession {
   avgHeartRate?: number;
   maxHeartRate?: number;
   source?: string;
+  /**
+   * The vendor noticed this rather than the member starting it.
+   *
+   * Movement, not training. Only Fitbit tells us (`logType`), so everyone else
+   * stays false: that is "they do not say", not "we know they did not".
+   */
+  autoDetected?: boolean;
 }
 
 export interface WearableProvider {

@@ -478,10 +478,11 @@ describe("Fitbit workouts", () => {
     expect(out[0].date).toBe("2026-08-01");
   });
 
-  it("drops a short auto-detected walk, which is not training", async () => {
-    // SmartTrack logs a "Walk" after about fifteen minutes, unasked. Left
-    // alone, walking to the station twice a day reads as seven training days
-    // out of seven on the Training card.
+  it("keeps an auto-detected walk, and labels it as one", async () => {
+    // SmartTrack logs a "Walk" after about fifteen minutes, unasked. An
+    // earlier version threw these away so they could not inflate the training
+    // count; that protected the number by losing real data. A walk is
+    // movement, movement counts for health, so it is stored and marked.
     route({
       "/activities/list.json": {
         activities: [
@@ -489,29 +490,24 @@ describe("Fitbit workouts", () => {
         ],
       },
     });
-    expect(await fitbit.fetchWorkouts!(range)).toEqual([]);
+    const out = await fitbit.fetchWorkouts!(range);
+    expect(out).toHaveLength(1);
+    expect(out[0].autoDetected).toBe(true);
   });
 
-  it("keeps a long auto-detected session", async () => {
-    route({
-      "/activities/list.json": {
-        activities: [
-          activity({ logId: 2, logType: "auto_detected", duration: 2_700_000 }),
-        ],
-      },
-    });
-    expect(await fitbit.fetchWorkouts!(range)).toHaveLength(1);
-  });
-
-  it("keeps a short session the member started themselves", async () => {
-    // Starting one is a statement of intent, and a short deliberate session is
-    // still training. Only Fitbit's own guesses have to clear the bar.
-    route({
-      "/activities/list.json": {
-        activities: [activity({ logId: 3, logType: "tracker", duration: 600_000 })],
-      },
-    });
-    expect(await fitbit.fetchWorkouts!(range)).toHaveLength(1);
+  it("marks anything the member started as not auto-detected", async () => {
+    // Intent is the line, not duration: starting one says you meant it. Length
+    // never enters into it, so a ten minute deliberate session still counts.
+    for (const logType of ["tracker", "manual", "mobile_run", "fitstar"]) {
+      route({
+        "/activities/list.json": {
+          activities: [activity({ logId: 3, logType, duration: 600_000 })],
+        },
+      });
+      const out = await fitbit.fetchWorkouts!(range);
+      expect(out, logType).toHaveLength(1);
+      expect(out[0].autoDetected, logType).toBe(false);
+    }
   });
 
   it("trims the far edge of the window itself", async () => {
