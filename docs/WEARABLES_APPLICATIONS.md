@@ -187,27 +187,62 @@ own documentation contradicts itself, are in
 
 ## 2. The self-serve four, an afternoon each
 
-### ☐ Oura
+### ☑ Oura. REGISTERED 2026-08-04, on the NEW portal
 
-Audited 2026-08-04. **Blood oxygen was never arriving**, because the `spo2`
-scope was not requested and the field was read from the wrong collection.
+**The portal moved and this checklist used to send you to the wrong one.**
+As of 15 October 2025, new applications must be created at
+**`developer.ouraring.com`**. The legacy `cloud.ouraring.com/oauth/applications`
+page still exists and can still edit applications created there, but it will not
+create new ones. Ikigaro's application lives in the new portal, so **future
+edits happen there**.
 
-- **Where:** `cloud.ouraring.com` → your account → OAuth applications → New
-- **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/oura`
-- **Scopes to tick, exactly these three:** `daily`, `heartrate`, `spo2`
-- **Do NOT tick `personal`.** It returns gender, age, height and weight, and we
-  call no personal endpoint. It was previously requested and never read.
-- Gives you a client id and secret immediately.
+The new portal also requires a **Terms of Service** URL, which the old one did
+not: `https://app.ikigaro.com/terms`.
 
-The member can toggle individual scopes off at the consent screen, so anything
-listed that we do not use is both noise and a worse first impression.
+**Registered:**
 
-**Oura caps at ten users too**, exactly like Whoop, and it is their own
-documented default: *"By default, API Applications have a ten user limit. If you
-want to release your application to a wider audience, your application needs to
-be approved."* Unlike Whoop's form, Oura's review is submitted from the
-application's own page, so it is at least a button rather than a queue you
-cannot see into. Submit once the first real member has connected.
+| Field | Value |
+|---|---|
+| Display name | `Ikigaro` |
+| Website | `https://app.ikigaro.com` |
+| Redirect URI | `https://app.ikigaro.com/api/wearables/callback/oura` |
+| Privacy policy | `https://app.ikigaro.com/privacy` |
+| Terms of service | `https://app.ikigaro.com/terms` |
+
+**Scopes granted at the portal:** `Daily`, `Heartrate`, `SpO2`, `Workout`,
+`Stress`, `Heart Health`. Left off: `Email`, `Personal`, `Tag`, `Session`,
+`Ring Configuration`.
+
+> **The new portal ships every scope pre-ticked.** Untick deliberately rather
+> than accepting the default, or the consent screen asks for everything.
+
+#### Granted at the portal is not the same as requested by the code
+
+**The code requests three:** `daily`, `heartrate`, `spo2`. Those three are what
+the consent screen will show and what we can actually read.
+
+`Workout`, `Stress` and `Heart Health` are **granted but dormant**: permitted at
+the portal, never asked for at authorize time, so no member ever consents to
+them and no data arrives. That is harmless, and it is not a bug. Turning any of
+them on is a code change, and each has a real blocker:
+
+- **Workout does not fit our storage.** `wearable_daily_metrics` is one row per
+  day per metric; a workout is a session with a start, an end and an intensity,
+  and several can happen in a day. It needs its own table, a migration, and
+  first a decision about what a workout is *for* next to a blood panel. Same
+  applies to Whoop's `read:workout`.
+- **Stress and Heart Health scope strings are unverified.** Oura's published
+  scope list has eight entries and contains neither. The portal's display names
+  are not necessarily the OAuth strings, and **a wrong scope string breaks the
+  entire authorize request**, not just that scope. That would take the working
+  `daily`/`heartrate`/`spo2` baseline down with it.
+
+**Ten user limit**, their documented default: *"By default, API Applications
+have a ten user limit."* Review is submitted from the application's own page,
+once a real member has connected.
+
+**Remaining:** set `OURA_CLIENT_ID` and `OURA_CLIENT_SECRET` as Worker Secrets
+and redeploy. Oura then appears in Settings on its own.
 
 ### ☐ Fitbit
 

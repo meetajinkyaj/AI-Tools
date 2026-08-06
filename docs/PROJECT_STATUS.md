@@ -466,6 +466,29 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   threshold is the whole safety margin**: past it, losing the data ends the
   beta rather than inconveniencing it. Fix is $25/mo (Supabase Pro → daily
   backups, 7-day retention). See `RUNBOOK.md` §2b.
+- **Workout sync, wanted and not built.** `read:workout` is granted on the Whoop
+  app and `Workout` on the Oura one, both deliberately, and the founder wants
+  the data. Neither is requested in code, so both are dormant and harmless.
+  Blocked on a schema decision rather than on effort: `wearable_daily_metrics`
+  is one row per day per metric, and a workout is a session with a start, an
+  end and an intensity, several of which can happen in a day. It needs its own
+  table and a migration. Before that it needs an answer to what a workout is
+  *for* beside a blood panel, since "you trained four times this week" is a fact
+  without yet being an insight. Write the table after the use is known, not
+  before.
+- **Oura Stress and Heart Health: scope strings unverified.** Granted at the
+  portal, not requested in code. Oura's published scope list has eight entries
+  and contains neither, and portal display names are not necessarily OAuth
+  strings. A wrong scope string fails the **entire** authorize request, so
+  guessing would risk the working `daily`/`heartrate`/`spo2` baseline to add a
+  speculative one. The collections themselves are real (`daily_stress`,
+  `daily_cardiovascular_age`, `vO2_max`), so this is a lookup, not a rebuild.
+- **Oura's sandbox is unused and probably should not be.**
+  `/v2/sandbox/usercollection/<collection>` returns deterministic sample data
+  with no connected ring. Every adapter here was written from documentation and
+  four of four were wrong; this is the one vendor offering a way to check a
+  response shape without owning the hardware. Roughly an hour, and it would
+  settle the Oura mappings without waiting for a tester.
 - **Whoop AND Oura are both capped at 10 users until approved.** Two of the
   four self-serve providers, so this is the shape of the space rather than one
   vendor being awkward. Oura state it plainly: *"By default, API Applications
