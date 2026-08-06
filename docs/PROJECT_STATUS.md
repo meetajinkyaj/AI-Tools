@@ -115,7 +115,18 @@ operate it, and the known follow-ups. Update this as work lands.
     users only, deduped/day → powers retention) + client error capture
     (window.onerror/unhandledrejection, pre-auth included, capped). Server
     errors: Cloudflare Workers observability.
-15. **Age policy**, no minimum age (per legal review); under-18s use with
+15. **Vendor contract check** (`.github/workflows/oura-contract.yml`).
+    `scripts/verify-oura-sandbox.mjs` calls Oura's sandbox, which returns
+    deterministic sample data with no connected ring, and asserts that every
+    field path the adapter reads is actually present. Runs on changes to the
+    adapter and weekly on a schedule. **The only test here that talks to a third
+    party on purpose**, and the only defence against the failure that hit four
+    of four adapters: a field read from the wrong place, so the metric is
+    silently never emitted and nothing fails. Unit tests cannot catch it,
+    because their fixtures come from the same documentation that misled us. A
+    genuine mismatch fails the build; being unable to reach Oura only warns,
+    since learning nothing is not the same as learning something bad.
+16. **Age policy**, no minimum age (per legal review); under-18s use with
     parent/guardian consent (Terms §1); onboarding shows the consent note.
     Rewards/points terms live in Terms §14 (`/terms#rewards`, draft pending
     counsel's wording pass).
@@ -477,17 +488,11 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   and `wearable_daily_metrics` is one row per day per metric. Check-ins already
   carry `training_logged`, so the load and recovery signal can be built from
   data we hold today and gets sharper when device workouts arrive.
-- **Oura sandbox check is WRITTEN, and needs running somewhere with network
-  access.** `scripts/verify-oura-sandbox.mjs` calls
-  `/v2/sandbox/usercollection/<collection>`, which returns deterministic sample
-  data with no connected ring, and asserts that every field path the adapter
-  reads is actually present. Every adapter here was written from documentation
-  and four of four were wrong; this is the one vendor offering a way to catch
-  that without owning the hardware. **The dev container's network policy denies
-  `api.ouraring.com`**, so it exits 2 (inconclusive) there and has to run from a
-  machine that can reach it, or the host has to be allowlisted. Once it can run
-  in CI, an adapter that drifts from Oura's payload fails the build instead of
-  silently dropping a metric.
+- **Withings is the only adapter never audited.** The other four were, and all
+  four were wrong. It is a scale rather than a wearable, so it contributes
+  weight and body fat and nothing to the training or recovery picture, which is
+  why it keeps losing to more useful work. Do not register it before reading it
+  against their docs.
 - **Whoop AND Oura are both capped at 10 users until approved.** Two of the
   four self-serve providers, so this is the shape of the space rather than one
   vendor being awkward. Oura state it plainly: *"By default, API Applications

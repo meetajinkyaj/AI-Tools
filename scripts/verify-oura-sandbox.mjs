@@ -16,9 +16,14 @@
  * what we think, are still claims from their docs. A missing path is a
  * certainty; a present path is only encouraging.
  *
- * RUN IT FROM A MACHINE THAT CAN REACH ouraring.com. The usual dev container's
- * network policy denies that host outright, which is why this is a script and
- * not a test.
+ * WHERE IT RUNS. `.github/workflows/oura-contract.yml` runs it on every change
+ * to the adapter and weekly on a schedule, because most of what this guards
+ * against does not arrive as a pull request: a vendor can rename a field on a
+ * Tuesday and nothing in any diff explains why a metric stopped.
+ *
+ * It needs network access to `api.ouraring.com`. GitHub's runners have it; the
+ * dev container's network policy denies that host outright, so running it there
+ * reports INCONCLUSIVE rather than pretending to a result.
  *
  *     node scripts/verify-oura-sandbox.mjs
  *     node scripts/verify-oura-sandbox.mjs --token <an-oura-access-token>
