@@ -28,8 +28,15 @@
  *     node scripts/verify-oura-sandbox.mjs
  *     node scripts/verify-oura-sandbox.mjs --token <an-oura-access-token>
  *
- * The token is optional: the sandbox is documented as ignoring it. Pass one if
- * the sandbox starts refusing anonymous calls, and never commit it.
+ * NO TOKEN IS NEEDED, BUT THE HEADER IS. The sandbox ignores what the
+ * Authorization header contains and refuses the request when it is absent:
+ * `400 {"detail":"Missing auth token. Include any string in 'Authorization'
+ * header."}`. The first CI run said exactly that, nine times. "Ignored" and
+ * "optional" are not the same thing, and reading the docs as the second cost a
+ * round trip. A placeholder is sent when no token is given.
+ *
+ * Pass a real one only if the sandbox ever starts checking, and never commit
+ * it.
  *
  * Exit codes, kept distinct so a caller can tell a finding from a failure to
  * look: 0 every required path found, 1 a required path is genuinely missing,
@@ -78,7 +85,12 @@ function arg(name) {
   return i === -1 ? undefined : process.argv[i + 1];
 }
 
-const token = arg("--token") ?? process.env.OURA_SANDBOX_TOKEN;
+/**
+ * Any non-empty string satisfies the sandbox. A real token is accepted too and
+ * changes nothing, which is the point: this check must never need a credential
+ * to run, or it stops running.
+ */
+const token = arg("--token") ?? process.env.OURA_SANDBOX_TOKEN ?? "sandbox";
 
 // A week is enough: these are daily documents and the sandbox is synthetic.
 const end = new Date().toISOString().slice(0, 10);
@@ -96,6 +108,8 @@ const start = new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10);
 let missingCount = 0;
 let unreachable = 0;
 const lines = [];
+/** Distinct HTTP statuses seen, so the summary can report rather than guess. */
+const statuses = new Set();
 
 for (const { path, fields, optional } of CHECKS) {
   const url = `${BASE}/${path}?start_date=${start}&end_date=${end}`;
@@ -104,7 +118,8 @@ for (const { path, fields, optional } of CHECKS) {
     const res = await fetch(url, {
       headers: {
         Accept: "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        // Always sent. Absent, the sandbox 400s before it looks at anything.
+        Authorization: `Bearer ${token}`,
       },
     });
     if (!res.ok) {
@@ -112,6 +127,7 @@ for (const { path, fields, optional } of CHECKS) {
       // A 403 on an optional collection is a real answer: the scope was not
       // granted. A 403 on a required one, or anything else, means we could not
       // look, which is a different thing from looking and finding nothing.
+      statuses.add(res.status);
       lines.push(`${optional && res.status === 403 ? "?" : "-"} ${path.padEnd(26)} ${detail}`);
       if (!(optional && res.status === 403)) unreachable += 1;
       continue;
@@ -154,11 +170,16 @@ console.log(`Oura sandbox check, ${start} to ${end}\n`);
 console.log(lines.join("\n"));
 console.log("");
 if (unreachable > 0) {
+  // Report the status rather than assuming a cause. The first version of this
+  // message guessed "network allowlist", and the real answer that run was a
+  // missing header, so the guess actively pointed away from the fix.
+  const seen = [...statuses].sort().join(", ");
   console.log(
-    `INCONCLUSIVE. ${unreachable} collection(s) could not be reached, so nothing\n` +
-      "was checked for them. If that is a 'Host not in allowlist' 403, this is\n" +
-      "the environment's network policy rather than Oura: run it somewhere that\n" +
-      "can reach api.ouraring.com, or allowlist that host.",
+    `INCONCLUSIVE. ${unreachable} collection(s) could not be checked, so nothing\n` +
+      `was proven about them. HTTP status(es) seen: ${seen || "none, request failed"}.\n` +
+      "Read the detail on the lines above before assuming a cause: 403 with\n" +
+      "'Host not in allowlist' is this environment's network policy, while a 4xx\n" +
+      "from Oura itself is telling you what it wants.",
   );
 }
 if (missingCount > 0) {
