@@ -376,7 +376,71 @@ after the fact.
 > reconnect, or before anyone connects at all. Fitbit's expansion was timed for
 > exactly that reason.
 
+### Fitbit moved to the Google Health API, and the adapter has to be rewritten
+
+**Found 2026-08-06, verified against Google's own pages the same day.** This
+invalidates the plan in the section below, which is kept because its findings
+about Fitbit's DATA are still true and the rewrite needs them.
+
+`dev.fitbit.com`'s registration form now says registration of new applications
+there is discontinued, and that the legacy Fitbit Web API is **deprecated in
+September 2026**. Both halves matter and either alone would be fatal: we cannot
+get legacy credentials, and legacy has about a month left.
+
+Fitbit access now runs through the **Google Health API**, which is a different
+API rather than a renamed one:
+
+| | Legacy Fitbit Web API | Google Health API |
+|---|---|---|
+| Host | `api.fitbit.com` | `health.googleapis.com` |
+| Sign-in | Fitbit account | **Google account** |
+| Auth | Fitbit OAuth | Google OAuth 2.0 / Google Identity Services |
+| Reads | 100+ endpoints | `dailyRollup`, `rollUp`, `list`, `patch`, `batchDelete` |
+| Scopes | 7 short strings | 3 `googlehealth.*.readonly` URLs |
+| Tokens | ours today | **do not carry over**, per Google |
+
+Our seven scopes collapse into three: `activity` and `cardio_fitness` become
+`activity_and_fitness.readonly`; `heartrate`, `oxygen_saturation`,
+`respiratory_rate` and `temperature` all become
+`health_metrics_and_measurements.readonly`; `sleep` becomes `sleep.readonly`.
+
+**That last collapse is worth noticing.** Four metrics that were four separately
+declinable scopes are now one bundle, so under Google Health they arrive or
+refuse together. The defensive per-collection fetch stays useful, but the
+failure mode it guards against changes shape.
+
+**Two constraints to design around, not discover later.** An unverified Google
+OAuth client is capped at **100 test users** and needs a third-party security
+review to go past that, and while the client is unpublished **refresh tokens
+expire after 7 days**. A tester connected before the client is published drops
+after a week. Publish before anybody relies on it.
+
+**The adapter is marked `unavailable` rather than deleted.** An unconfigured
+provider is already hidden from the connect UI, so the risk was never that a
+member sees it; the risk is the next reader seeing a complete audited adapter
+and concluding Fitbit is one registration away. `providerConfigured()` now
+returns false for any provider carrying an `unavailable` reason, credentials or
+not, and a test pins that. What survives the rewrite is everything the adapter
+learned about Fitbit's data, which is most of the value in the section below.
+
+**Registration comes after the rewrite, not before.** The old order (register
+first, then code) was right when the scope list was the free variable. Here the
+Google Cloud client, its redirect URI and its three scopes all have to match
+code that does not exist yet, and 7-day test-mode tokens make a premature
+connection a moving target.
+
+Sources: Google's [migration guide](https://developers.google.com/health/migration),
+[API specifications](https://developers.google.com/health/migration/api-specifications),
+[scopes](https://developers.google.com/health/scopes) and
+[setup](https://developers.google.com/health/setup).
+
+---
+
 ### Fitbit extended 2026-08-06, before registration and on purpose
+
+> **Superseded in part.** Everything here about Fitbit's DATA still holds and
+> the Google Health rewrite needs it. Everything about the legacy API surface,
+> hosts, scope strings and registration, is dead. See the section above.
 
 Fitbit was the one provider still unregistered, which made it the one whose
 scope list was still free to change. So the endpoints were written first and the

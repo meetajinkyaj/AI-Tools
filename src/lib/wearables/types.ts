@@ -186,6 +186,23 @@ export interface WearableProvider {
 
   /** Access needs an application and approval, not just registration. */
   requiresApproval?: boolean;
+
+  /**
+   * This adapter targets an API that can no longer be reached, and setting its
+   * credentials must NOT switch it on.
+   *
+   * WHY A FLAG RATHER THAN DELETING THE ADAPTER. An unconfigured provider is
+   * already invisible, so the risk is not that users see it: it is that the
+   * next person to read this file sees a complete, audited adapter and
+   * concludes the integration is one registration away. When the vendor has
+   * closed registration, that conclusion costs an afternoon and produces
+   * credentials nothing in the stack can call.
+   *
+   * The value is the reason, in one line, shown wherever the provider is
+   * listed. Anything truthy hides it from the connect UI regardless of
+   * credentials.
+   */
+  unavailable?: string;
 }
 
 /** Thrown when a vendor says the grant is dead and the user must re-consent. */

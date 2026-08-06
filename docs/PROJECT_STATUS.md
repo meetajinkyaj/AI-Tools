@@ -504,7 +504,27 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   feature, and a test pins the exact provider list. Oura document a revoke
   endpoint whose literal URL every extractor we have strips out of the page;
   reading it is a Cowork task. Ultrahuman, Withings and Garmin document none.
-- **Fitbit workout sync: shipped, with a filter that is a judgment call.**
+- **🔴 Fitbit is blocked on a REWRITE, not a registration.** Found 2026-08-06
+  and verified against Google's own pages. `dev.fitbit.com` has closed
+  registration for new applications, and the legacy Fitbit Web API the adapter
+  targets is **deprecated in September 2026**. Fitbit access now runs through
+  the **Google Health API**: different host, Google account sign-in, Google
+  OAuth, `dailyRollup`/`list` in place of a hundred endpoints, new response
+  shapes, and three `googlehealth.*.readonly` scopes where we ask for seven
+  Fitbit short strings. Tokens do not carry over. The adapter is marked
+  `unavailable`, which `providerConfigured()` honours over credentials so
+  nobody can switch a dead API on with two env vars, and it is kept rather than
+  deleted because everything it learned about Fitbit's DATA survives the
+  rewrite. Registration must follow the rewrite, not precede it: the Google
+  Cloud client, redirect URI and scopes all have to match code that does not
+  exist yet, and 7-day test-mode refresh tokens make an early connection a
+  moving target. Also worth knowing before it surprises somebody: an unverified
+  Google client caps at **100 test users** and needs a third-party security
+  review to exceed it. Detail in [`WEARABLES.md`](./WEARABLES.md).
+- **Fitbit workout sync: written, and now legacy-only.** Shipped against the
+  API that is going away, so it is reference material for the rewrite rather
+  than a live integration. The findings hold either way, and the judgment call
+  below is the part to re-read when porting.**
   SmartTrack invents a "Walk" after about fifteen minutes of movement, unasked,
   so a member walking to the station twice a day would see seven training days
   out of seven having trained on none. Auto-detected sessions under twenty

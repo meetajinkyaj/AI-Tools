@@ -135,6 +135,30 @@ describe("the credential gate", () => {
 
     Object.assign(process.env, saved);
   });
+
+  it("keeps an unavailable provider off even with both credentials set", () => {
+    // Fitbit's adapter targets the legacy Fitbit Web API, which is closed to
+    // new applications and deprecated in September 2026. Setting two env vars
+    // must not switch it on: that would render a Connect button leading to a
+    // vendor screen that 400s, which a member reads as our bug.
+    const p = PROVIDERS.fitbit;
+    expect(p.unavailable, "fitbit should carry a reason it is off").toBeTruthy();
+
+    process.env[p.clientIdEnv] = "id";
+    process.env[p.clientSecretEnv] = "secret";
+    expect(providerConfigured(p)).toBe(false);
+
+    Object.assign(process.env, saved);
+  });
+
+  it("says why, rather than just hiding it", () => {
+    // A silent disappearance is indistinguishable from a bug. Every provider
+    // that is off on purpose has to explain itself in the code that hides it.
+    for (const id of PROVIDER_IDS) {
+      const reason = PROVIDERS[id].unavailable;
+      if (reason !== undefined) expect(reason.length, id).toBeGreaterThan(30);
+    }
+  });
 });
 
 describe("the Garmin push endpoint's shared secret", () => {

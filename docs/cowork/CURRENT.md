@@ -6,10 +6,18 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-06. **Four tasks are pending, and one of them blocks a
+Last updated: 2026-08-06. **Three tasks are pending, and one of them blocks a
 merge:** apply migration 0021, settle the duplicate-Ultrahuman question with
-one query, register Fitbit, and read one URL off Oura's own auth page. See
+one query, and read one URL off Oura's own auth page. See
 [PENDING TASK](#pending-task).
+
+**The Fitbit registration task is withdrawn**, and not because it was done.
+Cowork found that `dev.fitbit.com` has closed registration for new
+applications and that the legacy Fitbit Web API is deprecated in September
+2026: Fitbit now runs through the Google Health API. Nobody can complete that
+task as it was written. Registration has to follow a rewritten adapter, so it
+comes back as a task when there is code for it to match. Good catch, it would
+have cost an afternoon and produced credentials nothing could call.
 
 ---
 
@@ -126,64 +134,7 @@ Good catch either way: a duplicate would have been serious, because Ultrahuman
 rotates refresh tokens and two rows refreshing the same grant would each
 invalidate the other's token.
 
-## 2. Register the Fitbit developer application, and set its two secrets
-
-Self-serve, no review, credentials immediately. **Walk the founder through it
-screen by screen**, they are not technical.
-
-`dev.fitbit.com` → sign in → **Manage** → **Register an app**.
-
-| Field | What to put |
-|---|---|
-| Application name | `Ikigaro` |
-| Description | Longevity app. Users upload blood panels and check in daily; connecting a wearable shows sleep, recovery and activity alongside those lab results. |
-| Application website | `https://app.ikigaro.com` |
-| Organization | `Ikigaro` |
-| Terms of service | `https://app.ikigaro.com/terms` |
-| Privacy policy | `https://app.ikigaro.com/privacy` |
-| **OAuth 2.0 Application Type** | **`Server`** |
-| **Default Access Type** | **`Read Only`** |
-| Redirect URL | `https://app.ikigaro.com/api/wearables/callback/fitbit` |
-
-**`Server`, not Client and not Personal.** Personal only ever reads the
-developer's own account, which is not what we are building.
-
-**The redirect URL must match byte for byte.** Copy it, do not retype it.
-
-### The scopes, which is the step that matters
-
-**Tick exactly these seven:**
-
-☑ `activity` ☑ `heartrate` ☑ `sleep` ☑ `oxygen_saturation`
-☑ `cardio_fitness` ☑ `respiratory_rate` ☑ `temperature`
-
-**Leave everything else unticked**, in particular ☐ `weight` and ☐ `profile`.
-
-All seven are read by the adapter. Ticking more asks members for access we never
-use; ticking fewer just costs them those metrics, since each collection is
-fetched defensively and a refusal does not fail their sync.
-
-### The credentials
-
-**Do not paste either value into chat, a commit, or any file, and do not read
-the secret back to confirm it.** The founder copies them into Cloudflare and
-their password manager.
-
-Cloudflare → Workers & Pages → **`ai-tools`** → Settings → Variables and Secrets:
-`FITBIT_CLIENT_ID` and `FITBIT_CLIENT_SECRET`, both **type Secret**, not
-plaintext Variable. **Then redeploy.**
-
-### Verify, and stop
-
-1. Profile → Connected devices. **Fitbit should appear with a Connect button.**
-2. Press Connect. The consent screen should list **seven** permissions.
-3. **Stop there. Do not approve** unless the founder owns a Fitbit.
-
-Report whether Fitbit appeared, and exactly which permissions were listed. If
-`weight` or `profile` appear, the app was registered with the wrong scopes and
-it is a two-minute fix on its page.
-
-## 3. Read one URL off Oura's authentication page
+## 2. Read one URL off Oura's authentication page
 
 **Two minutes, no account changes, nothing to configure.** This is a
 copy-a-line-of-text job and it is here because every automated extractor we
@@ -230,13 +181,12 @@ the Ultrahuman connections.**
 
 Two things are waiting on the founder rather than on Cowork:
 
-- **The remaining wearable credentials.** Whoop is the pending task above.
-  Oura and Fitbit are self-serve and their adapters have now been audited, so
-  they are ready to register whenever there is an afternoon; the exact scopes
-  to tick are in [`../WEARABLES_APPLICATIONS.md`](../WEARABLES_APPLICATIONS.md)
-  and matter, since three of Fitbit's old six were dead. Withings is the one
-  adapter still unaudited: do not register it before it has been read against
-  their docs. Garmin is paused at their end indefinitely.
+- **The remaining wearable credentials.** Oura and Whoop are registered.
+  **Fitbit is blocked on a rewrite, not on a form**: its registration moved to
+  the Google Health API and the legacy one it was written against dies in
+  September 2026. Withings is the one adapter still unaudited: do not register
+  it before it has been read against their docs. Garmin is paused at their end
+  indefinitely.
 - **Supabase backups.** The production database is on the Free plan: no
   backups, no point-in-time recovery. Worst case is total loss. This is a
   spend decision (Pro, $25/mo), deliberately deferred until ~20 testers, not

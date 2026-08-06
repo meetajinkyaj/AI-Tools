@@ -401,10 +401,46 @@ export function fitbitDistanceMetres(
  */
 const FITBIT_AUTO_LOG_TYPES = new Set(["auto_detected"]);
 
+/**
+ * FITBIT, AND WHY THIS ENTIRE ADAPTER IS NOW UNREACHABLE.
+ *
+ * Everything below is written against the LEGACY Fitbit Web API, and that API
+ * is closed to us in both directions:
+ *
+ *   - New applications can no longer be registered. `dev.fitbit.com`'s
+ *     registration form now says so outright and points at Google.
+ *   - The legacy Web API is deprecated in September 2026.
+ *
+ * Fitbit access now runs through the GOOGLE HEALTH API, which is a different
+ * API rather than a renamed one: `health.googleapis.com`, Google OAuth against
+ * a Google account rather than a Fitbit login, `dailyRollup`/`list` methods in
+ * place of the hundred-odd legacy endpoints, new response shapes, and three
+ * Google scope URLs where this asks for seven Fitbit short strings. Google
+ * state plainly that existing tokens do not carry over.
+ *
+ * WHY IT IS KEPT RATHER THAN DELETED. The metric selection, the day
+ * attribution rules and the two traps found while writing it (VO2 max arriving
+ * as a range, distance arriving in whatever unit the account's locale implies)
+ * are all still true of Fitbit's data and all still needed by the rewrite.
+ * Deleting it would throw away the audit and keep only the mistakes.
+ *
+ * WHY IT IS MARKED `unavailable` RATHER THAN LEFT ALONE. An unconfigured
+ * provider is already hidden, so the danger was never that a member sees it.
+ * The danger is somebody reading a complete, audited adapter and concluding
+ * Fitbit is one registration away, then spending an afternoon producing
+ * credentials nothing here can call. The flag makes the file say what is true.
+ *
+ * Verified against Google's own migration, scopes and setup pages on
+ * 2026-08-06. Details and the rewrite plan are in `docs/WEARABLES.md`.
+ */
 const fitbit: WearableProvider = {
   id: "fitbit",
   name: PROVIDER_NAMES.fitbit,
   blurb: "Steps, sleep and resting heart rate from Fitbit.",
+  unavailable:
+    "Fitbit moved to the Google Health API. This adapter targets the legacy " +
+    "Fitbit Web API, which is closed to new applications and is deprecated in " +
+    "September 2026, so it must be rewritten before Fitbit can be connected.",
   clientIdEnv: "FITBIT_CLIENT_ID",
   clientSecretEnv: "FITBIT_CLIENT_SECRET",
   authorizeUrl: "https://www.fitbit.com/oauth2/authorize",
@@ -1172,6 +1208,11 @@ export function isProviderId(v: string): v is ProviderId {
  * surface, as a vendor error page with our name on it.
  */
 export function providerConfigured(p: WearableProvider): boolean {
+  // `unavailable` wins over credentials, deliberately. A provider whose API we
+  // can no longer reach must not be switchable on by setting two env vars,
+  // because the failure that produces is a Connect button leading to a vendor
+  // screen that 400s, which reads to a member as our bug.
+  if (p.unavailable) return false;
   return Boolean(process.env[p.clientIdEnv] && process.env[p.clientSecretEnv]);
 }
 
