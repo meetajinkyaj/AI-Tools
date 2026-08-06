@@ -150,6 +150,7 @@ or CLI. All are idempotent, safe to re-run.
 | `0017_access_granted_email` | `users.access_granted_email_at`, so the "you're in" email sends exactly once |
 | `0018_broadcasts` | Announcements: `broadcasts` + `broadcast_recipients`, plus `email_opt_out` and `unsubscribe_token` on `users` |
 | `0019_broadcast_app_button` | `broadcasts.include_app_button`, making the "Open Ikigaro" button opt-in |
+| `0020_wearable_workouts` | Workout **sessions** from wearables, a separate grain from the daily metrics table |
 
 > **Migration-first, always.** Run the migration on production *before* merging
 > code that depends on it. Code reading a column that doesn't exist yet takes the

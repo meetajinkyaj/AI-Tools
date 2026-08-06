@@ -51,6 +51,34 @@ export interface OAuthTokens {
   externalUserId?: string;
 }
 
+/**
+ * One workout session, as an adapter emits it.
+ *
+ * Sparse on purpose: no vendor fills every field. Oura reports calories and an
+ * intensity label but no strain; Whoop reports strain and kilojoules but no
+ * user label. Adapters fill what they have and leave the rest undefined.
+ */
+export interface WorkoutSession {
+  /** The vendor's own id. Half the idempotency key, so it must be stable. */
+  externalId: string;
+  startedAt: string;
+  endedAt: string;
+  /** The day it belongs to, YYYY-MM-DD, in the vendor's local terms. */
+  date: string;
+  /** Vendor's sport name, free text. Taxonomies differ and are not normalized. */
+  activity?: string;
+  /** Vendor's own intensity label. NOT comparable across vendors. */
+  intensity?: string;
+  /** Whoop's 0-21 exertion model. Null everywhere else, and not a percentage. */
+  strain?: number;
+  /** kcal. Whoop reports kilojoules; its adapter converts before emitting. */
+  calories?: number;
+  distanceM?: number;
+  avgHeartRate?: number;
+  maxHeartRate?: number;
+  source?: string;
+}
+
 export interface WearableProvider {
   id: ProviderId;
   /** Shown in the connect UI. */
@@ -107,6 +135,21 @@ export interface WearableProvider {
    * corrected night without ever needing a full re-pull.
    */
   syncWindowDays: number;
+
+  /**
+   * Pull workout SESSIONS for a date window.
+   *
+   * Separate from `fetchRange` because the two have different shapes and
+   * different storage: daily metrics upsert on (user, provider, date, metric),
+   * sessions on (user, provider, external id). Absent when a vendor reports no
+   * workouts, or when we do not request the scope for them.
+   */
+  fetchWorkouts?: (args: {
+    accessToken: string;
+    externalUserId: string | null;
+    start: string;
+    end: string;
+  }) => Promise<WorkoutSession[]>;
 
   /** Access needs an application and approval, not just registration. */
   requiresApproval?: boolean;

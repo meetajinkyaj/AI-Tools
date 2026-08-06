@@ -6,8 +6,9 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-04. **One task is pending:** set the two Oura secrets and
-confirm Oura appears. See [PENDING TASK](#pending-task).
+Last updated: 2026-08-06. **Two tasks are pending, in order:** apply migration
+`0020_wearable_workouts`, then set the two Oura secrets. See
+[PENDING TASK](#pending-task).
 
 ---
 
@@ -52,48 +53,78 @@ is outstanding.
 
 # PENDING TASK
 
-## Set the two Oura secrets, then check Oura appears
+## 1. Apply migration `0020_wearable_workouts` to production
 
-The application is registered on the new portal. This is the last step.
+**Migration first, before the code that needs it merges.** Code reading a table
+that does not exist takes the app down, which is why this ordering is a rule
+here rather than a preference.
 
-**Where:** Cloudflare → Workers & Pages → **`ai-tools`** → Settings → Variables
-and Secrets.
+Supabase → SQL Editor → paste
+[`supabase/migrations/0020_wearable_workouts.sql`](../../supabase/migrations/0020_wearable_workouts.sql)
+and run it. Idempotent, safe to re-run.
+
+### Then verify, and report each line
+
+```sql
+-- 1. The table exists with the columns we expect.
+select column_name, data_type, is_nullable
+from information_schema.columns
+where table_name = 'wearable_workouts'
+order by ordinal_position;
+
+-- 2. RLS is ON and there are NO policies. Both halves matter.
+select relrowsecurity from pg_class where relname = 'wearable_workouts';
+select count(*) from pg_policies where tablename = 'wearable_workouts';
+
+-- 3. The idempotency index is present, which is what makes a re-sync
+--    correct a session rather than duplicate it.
+select indexname from pg_indexes where tablename = 'wearable_workouts';
+
+-- 4. Nothing else was touched.
+select count(*) from wearable_connections;
+select count(*) from wearable_daily_metrics;
+```
+
+**Expected:** 17 columns, `relrowsecurity` **true**, **0** policies, indexes
+including `wearable_workouts_key` and `wearable_workouts_read_idx`, and the two
+existing tables unchanged.
+
+**If `relrowsecurity` is false or the policy count is anything but 0, stop and
+say so.** That combination is the only thing standing between the project's
+anon key and the table, and migration 0013 shipped two tables without it once
+already.
+
+> If the SQL Editor's "Running..." spinner freezes, **do not re-click Run**.
+> That happened on 0019. Check the real state from a second connection first: a
+> frozen spinner says nothing about whether the statement committed.
+
+## 2. Then set the two Oura secrets
+
+Cloudflare → Workers & Pages → **`ai-tools`** → Settings → Variables and Secrets.
 
 | Name | Type |
 |---|---|
 | `OURA_CLIENT_ID` | **Secret** |
 | `OURA_CLIENT_SECRET` | **Secret** |
 
-Values come from `developer.ouraring.com`, application `Ikigaro`. **Type Secret,
-not plaintext Variable**: `wrangler.jsonc` replaces plaintext vars on every
-deploy. **Never paste either value into chat, a commit, or any file.** If the
-step cannot be done without the secret passing through you, hand the founder the
-click path instead.
-
-**Then redeploy.** Secrets do not apply to an already-running version.
+From `developer.ouraring.com`, application `Ikigaro`. **Type Secret, not
+plaintext Variable**, and **never paste either value into chat, a commit or any
+file.** Then **redeploy**, since secrets do not apply to a running version.
 
 ### Verify, and stop
 
-1. `app.ikigaro.com` → Profile → Connected devices.
-2. **Oura should appear with a Connect button.** Ultrahuman keeps Disconnect,
-   Whoop keeps Connect, the rest stay button-less.
-3. Press **Connect**. The consent screen should list **exactly three**
-   permissions: daily, heart rate and SpO2.
-4. **Stop there. Do not approve**, there is no ring on the account.
+1. `app.ikigaro.com` → Profile → Connected devices. **Oura should appear with a
+   Connect button.**
+2. Press Connect. The consent screen should now list **four** permissions:
+   daily, heart rate, SpO2 and workout.
+3. **Stop there. Do not approve**, there is no ring on the account.
 
-### Expect three, not six, and that is correct
-
-The founder granted six scopes at the portal. **The code requests three**, and
-the consent screen shows what the code asks for, not what the portal permits.
-
-`Workout`, `Stress` and `Heart Health` are granted but dormant on purpose: two
-of them have no verified OAuth scope string in Oura's public documentation, and
-a wrong string fails the entire authorize request rather than just that scope,
-which would break the working baseline. Workouts also need their own table.
-This is written up in `../WEARABLES.md`.
-
-**So if the consent screen lists three, nothing is wrong.** Report the exact
-list either way.
+**Four, not six, is correct.** Workout was added to the code in this round.
+Stress and Heart Health are granted at the portal and still not requested,
+because their OAuth scope strings are in no public documentation and a wrong
+one fails the entire authorize request. The code fetches those collections
+anyway and tolerates a refusal, so if they happen to ride on `daily` they simply
+work. Written up in `../WEARABLES.md`.
 
 **Do not touch `WEARABLE_TOKEN_KEY`, the Whoop or Ultrahuman secrets, or the
 Ultrahuman connection**, which is healthy and syncing.

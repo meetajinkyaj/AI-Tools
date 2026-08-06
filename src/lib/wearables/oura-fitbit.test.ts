@@ -159,6 +159,77 @@ describe("Oura stress, cardiovascular age and VO2 max", () => {
   });
 });
 
+describe("Oura workouts", () => {
+  /** Shape from Oura's generated v2 workout schema. */
+  const workout = {
+    id: "8f9e1c2b-0000-4a11-9b33-abcdef123456",
+    activity: "cycling",
+    calories: 412,
+    day: "2026-08-01",
+    distance: 18_240.5,
+    end_datetime: "2026-08-01T18:12:00+05:30",
+    intensity: "moderate",
+    source: "manual",
+    start_datetime: "2026-08-01T17:05:00+05:30",
+  };
+
+  it("requests the workout scope, which is on Oura's published list", () => {
+    expect(oura.scopes).toContain("workout");
+  });
+
+  it("reads a session without converting calories, which are already kcal", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ data: [workout] }), { status: 200 })),
+    );
+    const out = await oura.fetchWorkouts!(range);
+    expect(out[0]).toMatchObject({
+      externalId: workout.id,
+      activity: "cycling",
+      intensity: "moderate",
+      calories: 412,
+      distanceM: 18_240.5,
+      date: "2026-08-01",
+    });
+  });
+
+  it("trusts Oura's own day rather than re-deriving it from the timestamp", async () => {
+    // A late-evening session in a positive offset is theirs to attribute. The
+    // timestamp is the 1st at 22:40 local, which is the 31st in UTC.
+    const late = {
+      ...workout,
+      day: "2026-08-01",
+      start_datetime: "2026-08-01T22:40:00+05:30",
+      end_datetime: "2026-08-01T23:30:00+05:30",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ data: [late] }), { status: 200 })),
+    );
+    const out = await oura.fetchWorkouts!(range);
+    expect(out[0].date).toBe("2026-08-01");
+  });
+
+  it("skips a record with no id, which could not be upserted anyway", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ data: [{ ...workout, id: undefined }] }), { status: 200 }),
+      ),
+    );
+    expect(await oura.fetchWorkouts!(range)).toEqual([]);
+  });
+
+  it("emits no strain, which is a Whoop concept", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ data: [workout] }), { status: 200 })),
+    );
+    const out = await oura.fetchWorkouts!(range);
+    expect(out[0].strain).toBeUndefined();
+  });
+});
+
 /* ---------------------------------------------------------------- Fitbit ---- */
 
 const fitbit = PROVIDERS.fitbit;

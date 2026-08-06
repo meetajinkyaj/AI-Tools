@@ -4,7 +4,13 @@ import { createSupabaseAdmin } from "../supabase-admin";
 import { decryptToken, encryptToken } from "./crypto";
 import { isMetricKey, type DailyMetric } from "./metrics";
 import { PROVIDERS } from "./providers";
-import { ReauthRequired, type OAuthTokens, type ProviderId, type WearableProvider } from "./types";
+import {
+  ReauthRequired,
+  type OAuthTokens,
+  type ProviderId,
+  type WearableProvider,
+  type WorkoutSession,
+} from "./types";
 
 /**
  * Refresh, fetch, normalize, store. The shared half of every integration.
@@ -236,6 +242,54 @@ export async function storeMetrics(
   return rows.length;
 }
 
+/**
+ * Upsert workout sessions.
+ *
+ * Conflict target is (user, provider, external id), NOT the day: several
+ * sessions happen in one day, which is the whole reason these do not live in
+ * `wearable_daily_metrics`. Re-syncing an overlapping window corrects a session
+ * whose score the vendor revised, rather than duplicating it.
+ */
+export async function storeWorkouts(
+  userId: string,
+  provider: ProviderId,
+  sessions: WorkoutSession[],
+): Promise<number> {
+  const clean = sessions.filter(
+    (w) =>
+      w.externalId &&
+      w.startedAt &&
+      w.endedAt &&
+      /^\d{4}-\d{2}-\d{2}$/.test(w.date),
+  );
+  if (clean.length === 0) return 0;
+
+  const supabase = createSupabaseAdmin();
+  const rows = clean.map((w) => ({
+    user_id: userId,
+    provider,
+    external_id: w.externalId,
+    started_at: w.startedAt,
+    ended_at: w.endedAt,
+    workout_date: w.date,
+    activity: w.activity ?? null,
+    intensity: w.intensity ?? null,
+    strain: w.strain ?? null,
+    calories: w.calories ?? null,
+    distance_m: w.distanceM ?? null,
+    avg_heart_rate: w.avgHeartRate ?? null,
+    max_heart_rate: w.maxHeartRate ?? null,
+    source: w.source ?? provider,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error } = await supabase
+    .from("wearable_workouts")
+    .upsert(rows, { onConflict: "user_id,provider,external_id" });
+  if (error) throw new Error(`storing ${provider} workouts failed: ${error.message}`);
+  return rows.length;
+}
+
 /* ---------------------------------- sync ---------------------------------- */
 
 function isoDay(d: Date): string {
@@ -277,6 +331,25 @@ export async function syncConnection(conn: ConnectionRow): Promise<SyncResult> {
       end: isoDay(end),
     });
     const stored = await storeMetrics(conn.user_id, conn.provider, metrics);
+
+    // WORKOUTS ARE BEST EFFORT, and deliberately so. They are a second endpoint
+    // behind a second scope, and a member who declined `workout` at the consent
+    // screen would otherwise have their whole sync marked failed over data they
+    // chose not to share. Sleep and recovery are the load-bearing half; a
+    // missing workout list must not cost them.
+    if (provider.fetchWorkouts) {
+      try {
+        const sessions = await provider.fetchWorkouts({
+          accessToken: token,
+          externalUserId: conn.external_user_id,
+          start: isoDay(start),
+          end: isoDay(end),
+        });
+        await storeWorkouts(conn.user_id, conn.provider, sessions);
+      } catch (err) {
+        console.warn(`${conn.provider} workout sync skipped:`, err);
+      }
+    }
 
     await supabase
       .from("wearable_connections")
