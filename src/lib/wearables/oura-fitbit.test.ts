@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
-import { PROVIDERS } from "./providers";
+import { fitbitVo2Max, PROVIDERS } from "./providers";
 
 /**
  * Oura and Fitbit, checked against their published documentation.
@@ -249,16 +249,14 @@ const nap = {
 };
 
 describe("Fitbit scopes", () => {
-  it("drops the three scopes nothing ever read", () => {
-    // profile, weight and oxygen_saturation each appeared on the consent
-    // screen asking for access we never exercised.
-    for (const dead of ["profile", "weight", "oxygen_saturation"]) {
+  it("still asks for nothing that goes unread", () => {
+    // `profile` and `weight` were dropped as dead and stay dropped.
+    // `oxygen_saturation` came back only when the adapter started calling the
+    // SpO2 collection, which is the right order: the scope list follows the
+    // code, never the other way round.
+    for (const dead of ["profile", "weight"]) {
       expect(fitbit.scopes, dead).not.toContain(dead);
     }
-  });
-
-  it("keeps the three it does use", () => {
-    expect(fitbit.scopes).toEqual(["activity", "heartrate", "sleep"]);
   });
 
   it("sends client credentials as Basic, which Fitbit requires", () => {
@@ -303,5 +301,115 @@ describe("Fitbit sleep", () => {
     route({ "/sleep/date/": { sleep: [null, night] } });
     const out = await fitbit.fetchRange!(range);
     expect(out.some((m) => m.metric === "sleep_minutes")).toBe(true);
+  });
+});
+
+describe("Fitbit VO2 max, which is a string and sometimes a range", () => {
+  /**
+   * Their documented example returns both forms. Fitbit gives a single number
+   * only when the user runs with GPS; otherwise it is a band. `Number("44-48")`
+   * is NaN, so the usual numeric helper would drop every ranged reading and the
+   * metric would look like it simply never arrives for anyone who does not run.
+   */
+  it("takes the midpoint of a band", () => {
+    expect(fitbitVo2Max("44-48")).toBe(46);
+  });
+
+  it("reads a plain value unchanged", () => {
+    expect(fitbitVo2Max("45")).toBe(45);
+  });
+
+  it("keeps the series continuous across both forms", () => {
+    // A user who starts running with GPS switches from bands to numbers. Both
+    // have to land on the same scale or the chart steps for no reason.
+    expect(fitbitVo2Max("44-48")).toBeGreaterThan(fitbitVo2Max("43")!);
+    expect(fitbitVo2Max("44-48")).toBeLessThan(fitbitVo2Max("49")!);
+  });
+
+  it("gives up rather than inventing a number", () => {
+    for (const junk of [undefined, "", "n/a", "-", "44-"]) {
+      expect(fitbitVo2Max(junk as string | undefined), String(junk)).toBeUndefined();
+    }
+  });
+});
+
+describe("Fitbit's overnight collections", () => {
+  it("reads HRV, SpO2, breathing rate and skin temperature", async () => {
+    route({
+      "/hrv/date/": { hrv: [{ dateTime: "2026-08-01", value: { dailyRmssd: 62.9, deepRmssd: 58.2 } }] },
+      "/spo2/date/": { spo2: [{ dateTime: "2026-08-01", value: { avg: 95.8 } }] },
+      "/br/date/": { br: [{ dateTime: "2026-08-01", value: { breathingRate: 15.4 } }] },
+      "/temp/skin/date/": { tempSkin: [{ dateTime: "2026-08-01", value: { nightlyRelative: -0.2 } }] },
+      "/cardioscore/date/": { cardioScore: [{ dateTime: "2026-08-01", value: { vo2Max: "44-48" } }] },
+    });
+    const out = await fitbit.fetchRange!(range);
+    const by = Object.fromEntries(out.map((m) => [m.metric, m.value]));
+    expect(by).toMatchObject({
+      hrv: 62.9,
+      spo2: 95.8,
+      respiratory_rate: 15.4,
+      temperature_deviation: -0.2,
+      vo2max: 46,
+    });
+  });
+
+  it("uses the whole-night HRV, not the deep-sleep one", async () => {
+    // `deepRmssd` covers deep sleep only and is not what other vendors report.
+    route({
+      "/hrv/date/": { hrv: [{ dateTime: "2026-08-01", value: { dailyRmssd: 62.9, deepRmssd: 58.2 } }] },
+    });
+    const out = await fitbit.fetchRange!(range);
+    expect(out.find((m) => m.metric === "hrv")?.value).toBe(62.9);
+  });
+
+  it("keeps a negative temperature deviation negative", async () => {
+    // nightlyRelative is already a deviation from baseline, unlike Whoop's
+    // absolute skin_temp_celsius. Clamping would erase the signal.
+    route({
+      "/temp/skin/date/": { tempSkin: [{ dateTime: "2026-08-01", value: { nightlyRelative: -0.4 } }] },
+    });
+    const out = await fitbit.fetchRange!(range);
+    expect(out.find((m) => m.metric === "temperature_deviation")?.value).toBe(-0.4);
+  });
+
+  it("survives a declined scope without failing the whole sync", async () => {
+    // A member can untick any of these at the consent screen. Losing steps and
+    // sleep over a metric they chose not to share would be the wrong trade, and
+    // a 403 reaches the sweep as ReauthRequired, which marks the connection
+    // dead outright.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const u = String(url);
+        if (u.includes("/hrv/") || u.includes("/temp/") || u.includes("/cardioscore/")) {
+          return new Response("", { status: 403 });
+        }
+        if (u.includes("/activities/steps/")) {
+          return new Response(
+            JSON.stringify({ "activities-steps": [{ dateTime: "2026-08-01", value: "9000" }] }),
+            { status: 200 },
+          );
+        }
+        return new Response(JSON.stringify({}), { status: 200 });
+      }),
+    );
+    const out = await fitbit.fetchRange!(range);
+    expect(out.find((m) => m.metric === "steps")?.value).toBe(9000);
+    expect(out.some((m) => m.metric === "hrv")).toBe(false);
+  });
+
+  it("asks for every scope it reads, and nothing more", () => {
+    expect(fitbit.scopes).toEqual([
+      "activity",
+      "heartrate",
+      "sleep",
+      "oxygen_saturation",
+      "cardio_fitness",
+      "respiratory_rate",
+      "temperature",
+    ]);
+    // Still dead, still absent.
+    expect(fitbit.scopes).not.toContain("weight");
+    expect(fitbit.scopes).not.toContain("profile");
   });
 });

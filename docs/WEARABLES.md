@@ -331,6 +331,53 @@ response shape without owning the hardware.
 Not wired up. Worth an hour, and it would let the remaining Oura collections be
 mapped against real payloads instead of prose.
 
+### Fitbit extended 2026-08-06, before registration and on purpose
+
+Fitbit was the one provider still unregistered, which made it the one whose
+scope list was still free to change. So the endpoints were written first and the
+application will be created against the finished list, rather than the usual
+order of registering and then discovering what is missing.
+
+**Three metrics became eight**: HRV, blood oxygen, breathing rate, skin
+temperature deviation and VO2 max joined steps, resting heart rate and sleep.
+
+**All four overnight collections describe the "main sleep"**, and Fitbit says
+plainly that a value dated the 22nd may come from a night that began on the
+21st. They have already decided which day it belongs to, so `dateTime` is used
+as given rather than shifted, which is the opposite of the rule for Oura's sleep
+document.
+
+**`temp/skin` maps directly** where Whoop's did not. `nightlyRelative` is
+already a deviation from the wearer's own baseline, signed and legitimately
+negative, which is exactly what `temperature_deviation` means. Whoop's
+`skin_temp_celsius` is an absolute reading near 33 and stays unmapped.
+
+**HRV uses `dailyRmssd`, not `deepRmssd`.** The second covers deep sleep only
+and is not what any other vendor reports.
+
+#### The trap: VO2 max is a string, and sometimes a range
+
+Their own documented example returns both forms:
+
+```json
+{"cardioScore":[{"value":{"vo2Max":"44-48"}},{"value":{"vo2Max":"45"}}]}
+```
+
+Fitbit gives a single number only when the user runs with GPS; otherwise it is a
+band. **`Number("44-48")` is NaN**, so passing this through the usual numeric
+helper drops every ranged reading silently, and the metric looks like it simply
+never arrives for anyone who does not run.
+
+`fitbitVo2Max()` takes the midpoint of a band, which is the honest reading and
+keeps the series continuous when a user moves between the two forms.
+
+#### Every collection is optional
+
+Each of the five sits behind its own scope, and a member can untick any of them
+at the consent screen. A refusal returns 403, which `providerFetch` turns into
+`ReauthRequired` and the sweep treats as a dead grant. So each is fetched
+defensively: declining blood oxygen costs blood oxygen, not the connection.
+
 ### Oura and Fitbit, audited 2026-08-04
 
 Same pass as Whoop, same result. **Four of four adapters audited so far were
