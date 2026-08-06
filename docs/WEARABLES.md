@@ -277,6 +277,60 @@ What follows from that:
 - Ultrahuman has no equivalent cap, which makes it the better bet for anything
   past the first ten Whoop users.
 
+### Extra Oura and Whoop scopes: granted, dormant, and why they stay that way
+
+Both portals now carry scopes we do not request: Whoop's `read:workout`, and
+Oura's `Workout`, `Stress` and `Heart Health`. They were ticked deliberately,
+and leaving them dormant is also deliberate.
+
+**Granting at the portal only permits a scope. The code decides what the consent
+screen asks for.** A scope we never put in the authorize URL is never consented
+to and never returns data, which is why this costs nothing and breaks nothing.
+
+Three things have to be true before any of them turns on.
+
+**1. Workouts do not fit `wearable_daily_metrics`.** That table is one row per
+day per metric. A workout is a session: a start, an end, an intensity, a sport,
+and several can happen in one day. Forcing it in would mean either inventing a
+daily aggregate nobody asked for, or hitting the same last-write-wins collision
+that naps caused. It needs its own table and a migration.
+
+Before that, it needs a decision that is not ours to make alone: **what is a
+workout for, here?** Ikigaro reads blood panels and shows trends. "You trained
+four times this week" is a fact; whether it belongs beside an ApoB reading, and
+what it would change, is a product question. The answer probably exists, but
+writing the table first and finding the use afterwards is how a schema acquires
+a column nobody reads.
+
+**2. Oura's Stress and Heart Health scope strings are unverified.** Oura's
+published scope list has eight entries: `email`, `personal`, `daily`,
+`heartrate`, `workout`, `tag`, `session`, `spo2`. Neither Stress nor Heart
+Health appears. The portal's display names are not necessarily the OAuth
+strings, and there is no public documentation mapping them.
+
+**A wrong scope string does not fail quietly for that one scope. It fails the
+whole authorize request**, which would take the working `daily`, `heartrate`
+and `spo2` baseline down with it and present exactly as Whoop's
+`request_unauthorized` does. Guessing here risks a working integration to add a
+speculative one.
+
+**3. The collections exist, which is the encouraging part.** Oura v2 does carry
+`daily_stress`, `daily_cardiovascular_age` and `vO2_max`, alongside `workout`.
+So the data is real and the mapping is tractable. Only the scope strings and
+response shapes are missing, and both become readable the moment a member with
+a ring connects, or via Oura's sandbox below.
+
+#### Oura has a sandbox, and it is the cheapest way to settle all of this
+
+`/v2/sandbox/usercollection/<collection>` mirrors the production endpoints and
+returns **deterministic sample data without a connected ring**. That is worth
+knowing: every adapter in this repo has been written against documentation and
+four of four were wrong, and this is the one vendor that offers a way to check a
+response shape without owning the hardware.
+
+Not wired up. Worth an hour, and it would let the remaining Oura collections be
+mapped against real payloads instead of prose.
+
 ### Oura and Fitbit, audited 2026-08-04
 
 Same pass as Whoop, same result. **Four of four adapters audited so far were
