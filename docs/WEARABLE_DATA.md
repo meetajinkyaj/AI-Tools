@@ -188,6 +188,59 @@ look wrong.
 
 ---
 
+## What a workout is for, next to a blood panel
+
+Written down because it was asked as an objection and answered properly, and
+because the answer decides the schema.
+
+**The naive expectation is a direct correlation, and there is not one.** A
+workout does not move ApoB this week. Anyone building toward "training drops
+your LDL by X" will be disappointed by the data and will build the wrong thing.
+
+**The real path is indirect and slow.** Someone who trains eats to recover:
+more protein, more fruit, more deliberate carbohydrate. They sleep differently.
+They hydrate. Those behaviours move markers, and they move them over a panel
+cycle, roughly six months. Training is upstream of the thing that is upstream of
+the marker.
+
+It is also not only about markers. Load-bearing exercise acts on bone density,
+muscle mass and gut function, none of which a standard panel measures at all.
+**The blood panel is one instrument in a wellness picture, not the definition of
+health**, and a feature that only earns its place by moving a marker would
+quietly encode the opposite.
+
+### What follows for the product
+
+**Near term, the job is training load and recovery, not correlation.** Those are
+demonstrable now: how hard the last week was, whether the body is absorbing it,
+how long recovery is taking. Sleep, HRV, resting heart rate and readiness are
+already stored and already say most of it.
+
+**Longer term, the correlation is a research question, not a feature.** It needs
+paired data: training history alongside two or more panels from the same person,
+six months apart. **Nobody has that yet**, including us. The way to have it in
+2027 is to start storing training properly in 2026, which is the argument for
+building this now rather than when the analysis is ready.
+
+**So: store the sessions, ship the load and recovery signal, and leave the
+biomarker claim unmade until the data supports it.** Saying "training improved
+your lipids" without the evidence is the kind of claim this app must not make,
+and the disclaimer exists for a reason.
+
+### What that means for storage
+
+A workout is a **session**: a start, an end, an intensity, a sport, several per
+day. `wearable_daily_metrics` is one row per day per metric, so forcing sessions
+into it means either inventing a daily aggregate or hitting the same
+last-write-wins collision that naps caused in two adapters. Workouts get their
+own table.
+
+Check-ins already carry `training_logged`, so the load and recovery signal can
+be built from data we hold today, and sharpens when device workouts arrive
+rather than depending on them.
+
+---
+
 ## If you are changing the ranking
 
 1. Change `SOURCE_RANK` in `merge.ts`, nothing else.

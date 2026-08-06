@@ -86,6 +86,13 @@ function push(
 interface OuraDoc {
   day?: string;
   score?: number;
+  /** daily_stress, seconds in the top and bottom quartile zones. */
+  stress_high?: number;
+  recovery_high?: number;
+  /** daily_cardiovascular_age, a prediction in years, range 18 to 100. */
+  vascular_age?: number;
+  /** vO2_max. */
+  vo2_max?: number;
   total_sleep_duration?: number;
   average_hrv?: number;
   average_heart_rate?: number;
@@ -129,14 +136,48 @@ const oura: WearableProvider = {
     const base = "https://api.ouraring.com/v2/usercollection";
     const qs = `start_date=${start}&end_date=${end}`;
 
+    /**
+     * A collection we can live without.
+     *
+     * WHY THIS EXISTS. Oura's newer portal offers `Stress` and `Heart Health`
+     * as separate grants, and their OAuth scope strings are not in any public
+     * documentation: the published list has eight entries and contains neither.
+     * The collections are real, so the likelihood is that they ride on `daily`,
+     * but likelihood is not knowledge, and this project has already paid twice
+     * for acting on a plausible first explanation.
+     *
+     * So they are requested and allowed to fail. Critically that includes 403,
+     * which `providerFetch` turns into `ReauthRequired`: without this catch a
+     * missing optional scope would mark the whole connection dead and ask the
+     * member to reconnect, which is a far worse outcome than one absent metric.
+     *
+     * The moment a real member connects, the logs settle whether these arrive,
+     * and the scope list can stop guessing.
+     */
+    const optional = async (path: string): Promise<OuraDoc[]> => {
+      try {
+        const res = await providerFetch<{ data?: OuraDoc[] }>(
+          "oura",
+          `${base}/${path}?${qs}`,
+          { accessToken },
+        );
+        return res.data ?? [];
+      } catch {
+        return [];
+      }
+    };
+
     // These collections return `next_token` when truncated. A 7-day window is
     // one document per day, so it is never reached; widen `syncWindowDays` and
     // pagination has to be handled first.
-    const [sleep, readiness, activity, spo2] = await Promise.all([
+    const [sleep, readiness, activity, spo2, stress, cardio, vo2] = await Promise.all([
       providerFetch<{ data?: OuraDoc[] }>("oura", `${base}/daily_sleep?${qs}`, { accessToken }),
       providerFetch<{ data?: OuraDoc[] }>("oura", `${base}/daily_readiness?${qs}`, { accessToken }),
       providerFetch<{ data?: OuraDoc[] }>("oura", `${base}/daily_activity?${qs}`, { accessToken }),
       providerFetch<{ data?: OuraDoc[] }>("oura", `${base}/daily_spo2?${qs}`, { accessToken }),
+      optional("daily_stress"),
+      optional("daily_cardiovascular_age"),
+      optional("vO2_max"),
     ]);
 
     for (const d of sleep.data ?? []) push(out, "sleep_score", d.day, num(d.score), "oura");
@@ -154,6 +195,26 @@ const oura: WearableProvider = {
     for (const d of spo2.data ?? []) {
       push(out, "spo2", d.day, num(d.spo2_percentage?.average), "oura");
     }
+
+    // Seconds in their payload, minutes in ours, like every other duration here.
+    for (const d of stress) {
+      const high = num(d.stress_high);
+      if (high !== undefined) {
+        push(out, "stress_high_minutes", d.day, secondsToMinutes(high), "oura");
+      }
+      const restored = num(d.recovery_high);
+      if (restored !== undefined) {
+        push(out, "recovery_high_minutes", d.day, secondsToMinutes(restored), "oura");
+      }
+    }
+
+    // A prediction in years, not a measurement. The metric's own comment says
+    // so, and any surface showing it has to as well.
+    for (const d of cardio) push(out, "vascular_age", d.day, num(d.vascular_age), "oura");
+
+    // `vO2_max`, capitalised exactly like that in their path. Our vocabulary
+    // already had the key and no adapter was filling it.
+    for (const d of vo2) push(out, "vo2max", d.day, num(d.vo2_max), "oura");
 
     // Detailed sleep carries the physiology; it is a separate collection.
     const detail = await providerFetch<{ data?: OuraDoc[] }>(

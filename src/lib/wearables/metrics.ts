@@ -73,6 +73,32 @@ export const METRICS = {
    * value: see `biomarker-overlap.ts`.
    */
   metabolic_score: { unit: "score", label: "Metabolic score", precision: 0 },
+
+  /* --------------------------- stress and recovery ------------------------ */
+  /*
+   * Oura's daily stress splits the day into time spent in a high-stress zone
+   * and time spent in a high-recovery zone, both in seconds. Stored as minutes,
+   * like sleep, so nothing in this vocabulary is in seconds.
+   *
+   * These are a PAIR and are worth reading together: eight stressed minutes on
+   * a day with four hundred restored ones is a different day from eight on a
+   * day with none.
+   */
+  stress_high_minutes: { unit: "min", label: "Stressed time", precision: 0 },
+  recovery_high_minutes: { unit: "min", label: "Restored time", precision: 0 },
+
+  /**
+   * Oura's predicted vascular age in years, range 18 to 100.
+   *
+   * THE ONE WEARABLE METRIC THAT SPEAKS THE SAME LANGUAGE AS A LIPID PANEL.
+   * Everything else here describes how a day went; this is a cardiovascular
+   * readout on the axis ApoB and blood pressure live on, which makes it the
+   * most interesting number a ring produces for this app.
+   *
+   * It is a MODEL OUTPUT, not a measurement, and must be labelled as a
+   * prediction wherever it appears. See `biomarker-overlap.ts`.
+   */
+  vascular_age: { unit: "years", label: "Cardiovascular age", precision: 0 },
 } as const;
 
 export type MetricKey = keyof typeof METRICS;
