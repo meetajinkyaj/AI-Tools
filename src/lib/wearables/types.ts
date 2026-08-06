@@ -151,6 +151,32 @@ export interface WearableProvider {
     end: string;
   }) => Promise<WorkoutSession[]>;
 
+  /**
+   * Tell the vendor the user has disconnected, so the grant dies at their end
+   * too and not only in our database.
+   *
+   * OPTIONAL, AND ITS ABSENCE IS A STATEMENT. Deleting our row destroys our
+   * copy of the credentials, so we can never call that vendor again either
+   * way; what survives without this is the authorisation sitting in the user's
+   * vendor account, which is why reconnecting goes straight to consent with no
+   * sign-in. Removing that is the vendor's to do and only some of them expose
+   * a way to ask.
+   *
+   * IMPLEMENTED ONLY WHERE THE ENDPOINT IS CONFIRMED FROM THE VENDOR'S OWN
+   * DOCUMENTATION. A guessed revoke URL 404s quietly and leaves us believing
+   * we revoked something we did not, which is worse than a documented gap: it
+   * is a privacy claim we cannot support. `docs/WEARABLES.md` lists who has
+   * one and who is still open.
+   *
+   * Best effort by contract. Throwing is fine; the caller disconnects anyway.
+   */
+  revoke?: (args: {
+    accessToken: string;
+    refreshToken: string | null;
+    clientId: string;
+    clientSecret: string;
+  }) => Promise<void>;
+
   /** Access needs an application and approval, not just registration. */
   requiresApproval?: boolean;
 }

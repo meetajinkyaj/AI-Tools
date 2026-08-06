@@ -400,6 +400,34 @@ negative, which is exactly what `temperature_deviation` means. Whoop's
 **HRV uses `dailyRmssd`, not `deepRmssd`.** The second covers deep sleep only
 and is not what any other vendor reports.
 
+#### Fitbit workouts, and the two traps in them
+
+`GET /1/user/-/activities/list.json?afterDate=&sort=asc&offset=0&limit=100`.
+The endpoint takes no end date, `offset` must be 0 and `limit` caps at 100, so
+the far edge of the window is trimmed in the adapter. It also gives a duration
+rather than an end time; `duration` (which includes pauses) is used rather than
+`activeDuration`, so our interval agrees with the clock the way Oura's and
+Whoop's spans do.
+
+**Trap one: distance is not reliably metric.** Fitbit's data dictionary says
+distance arrives in "units defined by the Accept-Language header", and their
+own published example shows `"distanceUnit": "Mile"`. Reading it as kilometres
+understates an American member's run by 38% and nothing fails. So the unit is
+read from the payload and an unrecognised one yields no distance at all. A
+blank field is a gap; a wrong one is a lie in a health record.
+
+**Trap two: Fitbit invents workouts.** SmartTrack logs a "Walk" after roughly
+fifteen minutes of sustained movement, unasked. Left alone, a member who walks
+to the station twice a day would open the Training card and see seven training
+days out of seven, having trained on none of them: the headline number,
+inflated by us. Auto-detected sessions under twenty minutes are dropped;
+anything the member started themselves is kept whatever its length, because
+starting one is a statement of intent. Twenty rather than fifteen because
+SmartTrack's own floor is fifteen, and matching it would keep every one.
+
+This filter is the only place an adapter discards a session the vendor sent.
+It is one constant, `FITBIT_AUTO_MIN_MINUTES`, if it ever needs reversing.
+
 #### The trap: VO2 max is a string, and sometimes a range
 
 Their own documented example returns both forms:
@@ -677,11 +705,49 @@ time a vendor has a bad minute.
 
 ---
 
+### Disconnect now tells the vendor, for the two who document how
+
+Pressing Disconnect always deletes our row, which destroys our copy of the
+credentials. What used to survive that was the authorisation sitting in the
+member's vendor account, which is why reconnecting goes straight to consent
+with no sign-in.
+
+`revokeAtVendor()` in `sync.ts` now asks the vendor to tear the grant down,
+BEFORE the row is deleted, since the credentials go with it.
+
+| Provider | Revoke | Endpoint |
+|---|---|---|
+| Fitbit | yes | `POST /oauth2/revoke`, Basic auth, `token=<refresh token>` |
+| Whoop | yes | `DELETE /developer/v2/user/access`, member's bearer token |
+| Oura | not yet | Their auth doc has a "Revoking The Access Token" section, and every extractor we have strips the code block holding the literal URL. Queued for Cowork to read off the page. |
+| Ultrahuman, Withings, Garmin | no | No revoke endpoint found in their documentation. |
+
+**Two rules, and both are the point of the feature.**
+
+**It never blocks the disconnect.** Somebody who pressed the button has to end
+up disconnected even when a vendor is down. A failed revoke that aborted the
+delete would leave them connected to an app they just left, with live tokens on
+our side, which is the worse of the two failures by a distance.
+
+**No endpoint is called unless it is confirmed from that vendor's own docs.**
+A guessed revoke URL 404s quietly and leaves us believing we revoked something
+we did not. That is not a missing feature, it is a privacy claim we cannot
+support, and `wearables.test.ts` asserts the exact list of providers that
+implement `revoke` so nobody adds a plausible-looking URL later.
+
+The stored access token is used as-is rather than refreshed first. Refreshing
+in order to revoke would mint a fresh credential at the vendor purely to
+destroy it, and would fail loudly on precisely the dead grants that need no
+revoking.
+
+---
+
 ## Deliberately not done yet
 
-- **Nothing is surfaced in Trends or Future You.** The data lands and stores;
-  what it should *say* is a product question worth answering with real data in
-  hand rather than guessing at now.
+- **Nothing is surfaced in Future You.** Trends now shows merged device series
+  and a Training and recovery card; the habit model still reads only check-ins.
+  What device data should *say* there is a product question worth answering
+  with real data in hand rather than guessing at now.
 - **Wearable data earns no points.** Steps are trivially spoofable and paying
   for them invites exactly that. If this changes, pay for *connecting* once, not
   for the numbers.

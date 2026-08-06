@@ -203,6 +203,49 @@ async function accessTokenFor(conn: ConnectionRow): Promise<string> {
   return tokens.accessToken;
 }
 
+/**
+ * Ask the vendor to tear down the grant, on the way out of a disconnect.
+ *
+ * BEST EFFORT, ALWAYS. Returns what happened instead of throwing, because the
+ * caller must delete our row whatever the answer: a user who pressed
+ * Disconnect has to end up disconnected even if the vendor is down, and a
+ * failed revoke that blocked the delete would leave them connected to an app
+ * they just left, holding live credentials. That is the worse of the two.
+ *
+ * NOT EVERY VENDOR CAN BE ASKED. `"unsupported"` means we have no revoke
+ * endpoint confirmed from that vendor's own documentation, and guessing a URL
+ * would leave us believing we revoked something we did not.
+ *
+ * Called BEFORE the row is deleted, since the credentials go with it.
+ */
+export type RevokeOutcome = "revoked" | "unsupported" | "failed";
+
+export async function revokeAtVendor(conn: ConnectionRow): Promise<RevokeOutcome> {
+  const p = PROVIDERS[conn.provider];
+  if (!p?.revoke) return "unsupported";
+  try {
+    const { id, secret } = clientCreds(p);
+    // The stored access token, NOT a refreshed one. Refreshing to revoke would
+    // mint a fresh credential at the vendor purely to destroy it, and would
+    // fail loudly on exactly the dead grants that need no revoking at all.
+    const accessToken = await decryptToken(conn.access_token_enc);
+    const refreshToken = await decryptToken(conn.refresh_token_enc);
+    if (!accessToken && !refreshToken) return "failed";
+    await p.revoke({
+      accessToken: accessToken ?? "",
+      refreshToken,
+      clientId: id,
+      clientSecret: secret,
+    });
+    return "revoked";
+  } catch (err) {
+    // Logged, never surfaced. The user asked to disconnect, not to hear about
+    // our conversation with a vendor.
+    console.warn(`vendor revoke failed for ${conn.provider}:`, err);
+    return "failed";
+  }
+}
+
 /* --------------------------------- store ---------------------------------- */
 
 /**

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clampScore, dayOf, isMetricKey, METRIC_KEYS, secondsToMinutes } from "./metrics";
 import { PROVIDERS, PROVIDER_IDS, isProviderId, providerConfigured } from "./providers";
@@ -158,5 +158,71 @@ describe("the Garmin push endpoint's shared secret", () => {
     expect(safeEqual("s3cr3t-push-keyy", secret)).toBe(false);
     expect(safeEqual("wrong", secret)).toBe(false);
     expect(safeEqual(secret, secret)).toBe(true);
+  });
+});
+
+describe("vendor-side revocation", () => {
+  /**
+   * The property that matters is honesty about coverage, not the HTTP call.
+   * Claiming a revoke we never performed is a privacy claim we cannot support,
+   * and the way that happens is somebody adding a plausible-looking URL for a
+   * vendor whose endpoint nobody confirmed.
+   */
+  it("is implemented only where the endpoint is confirmed from the vendor's docs", () => {
+    const withRevoke = PROVIDER_IDS.filter((id) => typeof PROVIDERS[id].revoke === "function");
+    expect(withRevoke.sort()).toEqual(["fitbit", "whoop"]);
+  });
+
+  it("sends Fitbit the refresh token, which kills the whole grant", async () => {
+    // Fitbit accept either token. Revoking the access token would end one hour
+    // of access and leave the grant alive.
+    const calls: { url: string; body: string; auth: string | null }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        calls.push({
+          url: String(url),
+          body: String(init.body),
+          auth: new Headers(init.headers).get("Authorization"),
+        });
+        return new Response("", { status: 200 });
+      }),
+    );
+    await PROVIDERS.fitbit.revoke!({
+      accessToken: "access",
+      refreshToken: "refresh",
+      clientId: "cid",
+      clientSecret: "secret",
+    });
+    expect(calls[0].url).toBe("https://api.fitbit.com/oauth2/revoke");
+    expect(calls[0].body).toBe("token=refresh");
+    expect(calls[0].auth).toBe(`Basic ${btoa("cid:secret")}`);
+    vi.unstubAllGlobals();
+  });
+
+  it("treats a Whoop 404 as success, because the grant is already gone", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));
+    await expect(
+      PROVIDERS.whoop.revoke!({
+        accessToken: "access",
+        refreshToken: null,
+        clientId: "cid",
+        clientSecret: "secret",
+      }),
+    ).resolves.toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+
+  it("throws on a real refusal, so the caller can log it and carry on", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
+    await expect(
+      PROVIDERS.whoop.revoke!({
+        accessToken: "access",
+        refreshToken: null,
+        clientId: "cid",
+        clientSecret: "secret",
+      }),
+    ).rejects.toThrow(/whoop revoke 500/);
+    vi.unstubAllGlobals();
   });
 });

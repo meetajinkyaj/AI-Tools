@@ -492,6 +492,26 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   reading over the duration bucket, and recovery is labelled "measured" or
   "reported" so a self-report never borrows a device's credibility. Fitbit
   workout sync is still outstanding.
+- **Disconnect now revokes at the vendor, for Fitbit and Whoop.** Deleting our
+  row always destroyed our copy of the credentials; what used to survive was
+  the authorisation sitting in the member's vendor account. `revokeAtVendor()`
+  now tears that down too, before the row is deleted, since the credentials go
+  with it. It is best effort and never blocks the disconnect: somebody who
+  pressed the button has to end up disconnected even when a vendor is down.
+  **Only endpoints confirmed from a vendor's own documentation are called.** A
+  guessed revoke URL 404s quietly and leaves us believing we revoked something
+  we did not, which is a privacy claim we cannot support rather than a missing
+  feature, and a test pins the exact provider list. Oura document a revoke
+  endpoint whose literal URL every extractor we have strips out of the page;
+  reading it is a Cowork task. Ultrahuman, Withings and Garmin document none.
+- **Fitbit workout sync: shipped, with a filter that is a judgment call.**
+  SmartTrack invents a "Walk" after about fifteen minutes of movement, unasked,
+  so a member walking to the station twice a day would see seven training days
+  out of seven having trained on none. Auto-detected sessions under twenty
+  minutes are dropped; anything the member started themselves is kept whatever
+  its length. It is one constant if it needs reversing. Their distance also
+  arrives in whatever unit the account's locale implies, so the unit is read
+  from the payload and an unknown one yields no distance rather than a guess.
 - **Withings is the only adapter never audited.** The other four were, and all
   four were wrong. It is a scale rather than a wearable, so it contributes
   weight and body fat and nothing to the training or recovery picture, which is

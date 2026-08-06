@@ -6,9 +6,9 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-06. **Two tasks are pending:** settle the
-duplicate-Ultrahuman question with one query, and register Fitbit. See
-[PENDING TASK](#pending-task).
+Last updated: 2026-08-06. **Three tasks are pending:** settle the
+duplicate-Ultrahuman question with one query, register Fitbit, and read one
+URL off Oura's own auth page. See [PENDING TASK](#pending-task).
 
 ---
 
@@ -137,6 +137,39 @@ plaintext Variable. **Then redeploy.**
 Report whether Fitbit appeared, and exactly which permissions were listed. If
 `weight` or `profile` appear, the app was registered with the wrong scopes and
 it is a two-minute fix on its page.
+
+## 3. Read one URL off Oura's authentication page
+
+**Two minutes, no account changes, nothing to configure.** This is a
+copy-a-line-of-text job and it is here because every automated extractor we
+have strips the exact line out of the page.
+
+Disconnect now tells the vendor to tear the grant down, so a member who
+disconnects is genuinely disconnected at both ends rather than only in our
+database. Fitbit and Whoop are done. Oura documents a revoke endpoint but we
+cannot read the URL: the page renders it inside a code block that our tooling
+drops.
+
+Go to **`https://api.ouraring.com/docs/authentication`** and scroll to the
+section headed **"Revoking The Access Token"**. Under it is a line that begins
+"When you need to revoke access for a specific token use the following API call
+format", followed by a URL in a code block.
+
+**Report back three things, exactly as written on the page:**
+
+1. The full URL, including the `https://` and every query parameter.
+2. The HTTP method, if the page states one (`GET` or `POST`).
+3. Whether the parameters are named `client_id` and `access_token`, or
+   something else.
+
+**Copy the characters as they appear. Do not tidy, complete or correct it.** If
+the page says something we do not expect, that is the finding, and a plausible
+guess is worse than nothing here: a wrong revoke URL returns a quiet 404 and
+leaves us believing we revoked a member's access when we did not. That is a
+privacy claim we would be making falsely, which is why the code refuses to call
+any revoke endpoint that has not been read off the vendor's own documentation.
+
+Nothing to change in Cloudflare, Supabase or the Oura dashboard. Just the text.
 
 ## Not a task, but worth knowing
 
