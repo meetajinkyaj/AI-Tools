@@ -239,6 +239,74 @@ Check-ins already carry `training_logged`, so the load and recovery signal can
 be built from data we hold today, and sharpens when device workouts arrive
 rather than depending on them.
 
+### What shipped: the Training and recovery card
+
+`src/lib/training.ts`, `/api/training`, `src/app/training-card.tsx`.
+
+**The check-in is the primary source, not the device.** The first version of
+`training.ts` read wearable sessions and nothing else, and it lived under
+`src/lib/wearables/`. In a beta where nobody had a ring connected, that is a
+card which renders for zero people. The check-in has carried activities with a
+duration bucket since migration 0003, from everybody, every day. A device
+upgrades the answer from reported to measured; it is not the entry ticket. The
+module moved up a directory to stop implying otherwise.
+
+**The two sources are reconciled per day, never added.** Somebody who logs
+"gym" and whose ring recorded the same hour trained once. Summing the sources
+would tell them they trained twice, which is the worst thing this code could
+get wrong: it would flatter the number in exactly the way a habit app must not,
+and it would only start being wrong for the people who engaged most.
+
+Per day:
+
+| Field | Rule |
+|---|---|
+| Days | Union of both sources. A day counts once. |
+| Sessions | The higher of the two counts, not the sum. |
+| Minutes | The device's measured total when it recorded any, otherwise the check-in's bucket estimate. |
+| Activities | Union of the names, deduped case-insensitively, ranked by how many days each appeared on. |
+
+The minutes rule is the biomarker precedence rule again: **prefer whatever
+measured the quantity directly.** A duration chip is a bucket we turned into a
+number on the user's behalf, so any total containing one is flagged
+`minutesEstimated` and the card labels it approximate. Presenting our own
+arithmetic as their data is the failure mode being avoided.
+
+**Recovery has two versions and they are labelled differently.**
+
+`recoverySignal()` is the measured one: HRV, resting heart rate and readiness,
+**two of which must agree** before it says anything, because each swings on its
+own with alcohol, illness and a late meal.
+
+`reportedRecovery()` is the check-in one: energy, corroborated or cancelled by
+self-reported sleep. **Energy can carry it alone**, and that is a deliberate
+departure from the two-marker rule. The device markers are proxies for a state,
+so each needs a second opinion. Energy is not a proxy: asked how recovered you
+feel, the answer *is* the reported measure, and demanding corroboration of the
+primary source would mean it almost never fires. The bar is raised elsewhere
+instead: four check-ins in each window, and half a point of movement on a five
+point scale.
+
+`recoveryView()` prefers the measured one and **falls back rather than
+blending**. Averaging a reading off the body with somebody's opinion of their
+morning produces a number that is neither, and there is no defensible weighting
+between them. The card prints which one it used, in words, every time.
+
+**Nothing here gives advice.** No "take a rest day", no "you are overtraining".
+A test asserts that no summary contains any of those phrasings, in every branch
+including the empty one. What to do about a hard week is between a person and
+their doctor.
+
+**The window ends today, not at the last check-in.** This is the opposite of
+`summarizeCheckins()`, on purpose. That function answers "what do your check-ins
+say", where a missed day is absence of evidence rather than a zero. This one
+answers "how much did you train this week", where a day with no session **is**
+the answer. Anchoring to the last workout would slide the window along and
+report a fortnight off as a full training week.
+
+**The card renders itself away** when the week held no training and recovery is
+unknown. A week off is not a failure to display back at somebody.
+
 ---
 
 ## If you are changing the ranking
