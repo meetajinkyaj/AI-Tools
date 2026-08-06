@@ -655,7 +655,7 @@ const fitbit: WearableProvider = {
    * THE REFRESH TOKEN IS SENT, NOT THE ACCESS TOKEN. Fitbit accept either, and
    * revoking the refresh token kills the whole grant rather than one hour of it.
    */
-  async revoke({ accessToken, refreshToken, clientId, clientSecret }) {
+  async revoke({ accessToken, refreshToken, clientId, clientSecret, signal }) {
     const res = await fetch("https://api.fitbit.com/oauth2/revoke", {
       method: "POST",
       headers: {
@@ -664,6 +664,7 @@ const fitbit: WearableProvider = {
         Accept: "application/json",
       },
       body: new URLSearchParams({ token: refreshToken ?? accessToken }),
+      signal,
     });
     if (!res.ok) {
       throw new Error(`fitbit revoke ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -906,10 +907,11 @@ const whoop: WearableProvider = {
    * respect their privacy." Doing it also stops any webhooks for that member,
    * which matters more here than for the others.
    */
-  async revoke({ accessToken }) {
+  async revoke({ accessToken, signal }) {
     const res = await fetch("https://api.prod.whoop.com/developer/v2/user/access", {
       method: "DELETE",
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      signal,
     });
     // 404 means the grant was already gone, which is the outcome we wanted.
     if (!res.ok && res.status !== 404) {

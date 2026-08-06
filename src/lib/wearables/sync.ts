@@ -218,7 +218,22 @@ async function accessTokenFor(conn: ConnectionRow): Promise<string> {
  *
  * Called BEFORE the row is deleted, since the credentials go with it.
  */
-export type RevokeOutcome = "revoked" | "unsupported" | "failed";
+export type RevokeOutcome = "revoked" | "unsupported" | "failed" | "timed-out";
+
+/**
+ * How long a vendor gets to answer before we give up and disconnect anyway.
+ *
+ * THIS IS WHAT MAKES "BEST EFFORT" TRUE. Without a bound, "best effort" is a
+ * comment rather than a behaviour: an unanswered socket would hold up a
+ * request the user is watching a spinner on, and if the Worker gave up first
+ * the delete would never run at all. The member would press Disconnect, see a
+ * failure, and still be connected, which is the exact outcome this whole path
+ * exists to prevent.
+ *
+ * Three seconds because nothing downstream depends on the answer. We are
+ * telling the vendor something, not asking.
+ */
+const REVOKE_TIMEOUT_MS = 3_000;
 
 export async function revokeAtVendor(conn: ConnectionRow): Promise<RevokeOutcome> {
   const p = PROVIDERS[conn.provider];
@@ -231,13 +246,29 @@ export async function revokeAtVendor(conn: ConnectionRow): Promise<RevokeOutcome
     const accessToken = await decryptToken(conn.access_token_enc);
     const refreshToken = await decryptToken(conn.refresh_token_enc);
     if (!accessToken && !refreshToken) return "failed";
-    await p.revoke({
-      accessToken: accessToken ?? "",
-      refreshToken,
-      clientId: id,
-      clientSecret: secret,
-    });
-    return "revoked";
+
+    // Belt and braces. The signal tears the request down, and the race caps
+    // the wait even if an implementation forgets to pass the signal on.
+    const signal = AbortSignal.timeout(REVOKE_TIMEOUT_MS);
+    const timedOut = new Promise<"timed-out">((resolve) =>
+      setTimeout(() => resolve("timed-out"), REVOKE_TIMEOUT_MS),
+    );
+    const outcome = await Promise.race([
+      p
+        .revoke({
+          accessToken: accessToken ?? "",
+          refreshToken,
+          clientId: id,
+          clientSecret: secret,
+          signal,
+        })
+        .then(() => "revoked" as const),
+      timedOut,
+    ]);
+    if (outcome === "timed-out") {
+      console.warn(`vendor revoke for ${conn.provider} timed out, disconnecting anyway`);
+    }
+    return outcome;
   } catch (err) {
     // Logged, never surfaced. The user asked to disconnect, not to hear about
     // our conversation with a vendor.

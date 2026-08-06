@@ -812,10 +812,24 @@ BEFORE the row is deleted, since the credentials go with it.
 
 **Two rules, and both are the point of the feature.**
 
-**It never blocks the disconnect.** Somebody who pressed the button has to end
-up disconnected even when a vendor is down. A failed revoke that aborted the
-delete would leave them connected to an app they just left, with live tokens on
-our side, which is the worse of the two failures by a distance.
+**It never blocks the disconnect, and that is enforced rather than intended.**
+Somebody who pressed the button has to end up disconnected even when a vendor
+is down. A failed revoke that aborted the delete would leave them connected to
+an app they just left, with live tokens on our side, which is the worse of the
+two failures by a distance.
+
+The first version of this said exactly that in a comment and did not do it:
+the revoke was awaited with no bound, so a vendor that accepted the connection
+and then went quiet would hold up a request the member is watching a spinner
+on, and a Worker timing out mid-revoke would never reach the delete at all.
+Press Disconnect, see a failure, stay connected: the precise outcome the
+feature exists to prevent. It is now capped at three seconds, by an
+`AbortSignal` every implementation must pass to its fetch AND a race around
+the call, so an implementation that forgets the signal still cannot hang the
+request. A test pins that the signal reaches `fetch`.
+
+Three seconds because nothing downstream depends on the answer. We are telling
+the vendor something, not asking.
 
 **No endpoint is called unless it is confirmed from that vendor's own docs.**
 A guessed revoke URL 404s quietly and leaves us believing we revoked something

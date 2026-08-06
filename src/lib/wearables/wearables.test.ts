@@ -200,7 +200,7 @@ describe("vendor-side revocation", () => {
   it("sends Fitbit the refresh token, which kills the whole grant", async () => {
     // Fitbit accept either token. Revoking the access token would end one hour
     // of access and leave the grant alive.
-    const calls: { url: string; body: string; auth: string | null }[] = [];
+    const calls: { url: string; body: string; auth: string | null; hasSignal: boolean }[] = [];
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string, init: RequestInit) => {
@@ -208,6 +208,7 @@ describe("vendor-side revocation", () => {
           url: String(url),
           body: String(init.body),
           auth: new Headers(init.headers).get("Authorization"),
+          hasSignal: init.signal instanceof AbortSignal,
         });
         return new Response("", { status: 200 });
       }),
@@ -217,10 +218,14 @@ describe("vendor-side revocation", () => {
       refreshToken: "refresh",
       clientId: "cid",
       clientSecret: "secret",
+      signal: AbortSignal.timeout(1000),
     });
     expect(calls[0].url).toBe("https://api.fitbit.com/oauth2/revoke");
     expect(calls[0].body).toBe("token=refresh");
     expect(calls[0].auth).toBe(`Basic ${btoa("cid:secret")}`);
+    // The signal has to reach fetch, or the caller's timeout is decorative and
+    // a silent vendor holds up a disconnect the user is waiting on.
+    expect(calls[0].hasSignal).toBe(true);
     vi.unstubAllGlobals();
   });
 
@@ -232,6 +237,7 @@ describe("vendor-side revocation", () => {
         refreshToken: null,
         clientId: "cid",
         clientSecret: "secret",
+        signal: AbortSignal.timeout(1000),
       }),
     ).resolves.toBeUndefined();
     vi.unstubAllGlobals();
@@ -245,6 +251,7 @@ describe("vendor-side revocation", () => {
         refreshToken: null,
         clientId: "cid",
         clientSecret: "secret",
+        signal: AbortSignal.timeout(1000),
       }),
     ).rejects.toThrow(/whoop revoke 500/);
     vi.unstubAllGlobals();

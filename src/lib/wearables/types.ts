@@ -182,6 +182,14 @@ export interface WearableProvider {
     refreshToken: string | null;
     clientId: string;
     clientSecret: string;
+    /**
+     * MUST be passed to every fetch this makes. The caller bounds it, because
+     * a vendor that accepts the connection and then says nothing would
+     * otherwise hold up a disconnect the user is waiting on, and a Worker that
+     * times out mid-revoke never reaches the delete: the member presses
+     * Disconnect, sees a failure, and stays connected.
+     */
+    signal: AbortSignal;
   }) => Promise<void>;
 
   /** Access needs an application and approval, not just registration. */
