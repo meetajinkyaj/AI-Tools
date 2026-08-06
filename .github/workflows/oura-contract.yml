@@ -1,0 +1,71 @@
+# Does the Oura adapter still match Oura's actual payload?
+#
+# WHY THIS IS ITS OWN WORKFLOW. Four of four wearable adapters written from
+# documentation were wrong, always the same way: a field read from the wrong
+# place, so the metric was silently never emitted and nothing failed. Unit tests
+# cannot catch that, because they assert against fixtures we wrote from the same
+# documentation that misled us.
+#
+# Oura's sandbox returns deterministic sample data with no connected ring, which
+# makes them the one vendor whose real response shape can be checked in CI. This
+# is the only test in the repo that talks to a third party on purpose.
+#
+# IT ALSO CATCHES DRIFT WITH NO COMMIT INVOLVED. A vendor can rename a field on
+# a Tuesday and our adapter quietly stops producing a metric with nothing in the
+# diff to explain it. Hence the weekly schedule: most of what this guards
+# against does not arrive as a pull request.
+name: Oura contract
+
+on:
+  pull_request:
+    # Only when something that could break the mapping changes. The scheduled
+    # run covers everything else.
+    paths:
+      - "src/lib/wearables/providers.ts"
+      - "scripts/verify-oura-sandbox.mjs"
+      - ".github/workflows/oura-contract.yml"
+  schedule:
+    # Mondays, 06:15 UTC. Off the hour because everything schedules on the hour
+    # and a queued runner is a slow runner.
+    - cron: "15 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # No `npm ci`: the script is dependency-free on purpose, so this job stays
+      # fast and cannot be broken by an unrelated install failure.
+      - name: Check field mappings against Oura's sandbox
+        run: |
+          set +e
+          node scripts/verify-oura-sandbox.mjs
+          code=$?
+          set -e
+          case $code in
+            0)
+              echo "::notice::Every Oura field path we read was present."
+              ;;
+            1)
+              # A real mismatch. The adapter reads something Oura does not send,
+              # which means a metric is silently missing in production.
+              echo "::error::The Oura adapter reads a field path that Oura's sandbox does not return. A metric is silently never emitted. Fix src/lib/wearables/providers.ts."
+              exit 1
+              ;;
+            2)
+              # Could not reach them. Oura being down, or a runner with no
+              # egress, must not block a deploy: we learned nothing, which is
+              # not the same as learning something bad.
+              echo "::warning::Could not reach Oura's sandbox, so nothing was checked. Not treated as a failure."
+              ;;
+            *)
+              echo "::error::verify-oura-sandbox.mjs exited $code, which it should never do."
+              exit 1
+              ;;
+          esac
