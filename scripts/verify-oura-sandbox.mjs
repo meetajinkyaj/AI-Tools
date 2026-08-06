@@ -11,10 +11,21 @@
  * and returns deterministic sample data with no connected ring.
  *
  * WHAT IT PROVES AND WHAT IT DOES NOT. It proves the field PATHS we read exist
- * and carry numbers of a plausible shape. It cannot prove the SEMANTICS: that
- * `stress_high` is seconds rather than minutes, or that `vascular_age` means
- * what we think, are still claims from their docs. A missing path is a
- * certainty; a present path is only encouraging.
+ * and carry numbers of a plausible shape. A missing path is a certainty; a
+ * present path is only encouraging.
+ *
+ * It cannot prove the SEMANTICS: that `stress_high` is seconds rather than
+ * minutes, or that `vascular_age` means what we think, are still claims from
+ * their docs.
+ *
+ * IT ALSO PROVES NOTHING ABOUT SCOPES, and that is the easy mistake to make
+ * with it. The sandbox accepts any string as a bearer token, so it enforces no
+ * scopes whatever. Every collection answering here says the collections exist
+ * and our field paths are right; it says nothing about which of them a real
+ * member's grant will actually admit. The first green run was read as proving
+ * that Stress and Heart Health ride on the `daily` scope. It does not: a
+ * sandbox with no scope enforcement cannot demonstrate scope enforcement, and
+ * that question is still open.
  *
  * WHERE IT RUNS. `.github/workflows/oura-contract.yml` runs it on every change
  * to the adapter and weekly on a schedule, because most of what this guards
@@ -54,8 +65,12 @@ const BASE = "https://api.ouraring.com/v2/sandbox/usercollection";
  * and this comment is the reminder.
  *
  * `optional` marks the collections whose OAuth scope strings are undocumented
- * (Oura's newer portal grants `Stress` and `Heart Health` separately). Their
- * absence is information, not failure.
+ * (Oura's newer portal grants `Stress` and `Heart Health` separately), so a
+ * refusal is not a failure.
+ *
+ * IN THE SANDBOX THEY WILL NEVER REFUSE, because it enforces no scopes. The
+ * flag exists for the shape of the answer in production, and so that this
+ * script can be pointed at the real API one day without rewriting it.
  */
 const CHECKS = [
   { path: "daily_sleep", fields: ["day", "score"] },
@@ -194,8 +209,13 @@ if (unreachable === 0 && missingCount === 0) {
 }
 console.log(
   "\nLegend: ok found  ·  x responded but a field is missing  ·  - could not\n" +
-    "check  ·  ? optional collection refused, which is expected while Oura's\n" +
-    "Stress and Heart Health scope strings remain undocumented.",
+    "check  ·  ? optional collection refused or returned nothing.",
+);
+console.log(
+  "The sandbox accepts any bearer string and so enforces NO scopes. Green here\n" +
+    "means the collections exist and our field paths are right. It does NOT mean\n" +
+    "a real member's grant will admit them: the Stress and Heart Health scope\n" +
+    "question is settled only by a live connection.",
 );
 // Only a genuine mismatch is a failure. Being unable to look is not a pass
 // either, so it exits 2 and a caller can tell the two apart.
