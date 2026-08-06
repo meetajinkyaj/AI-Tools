@@ -6,8 +6,8 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-06. **One task is pending:** register the Fitbit
-developer application and set its two secrets. See
+Last updated: 2026-08-06. **Two tasks are pending:** settle the
+duplicate-Ultrahuman question with one query, and register Fitbit. See
 [PENDING TASK](#pending-task).
 
 ---
@@ -53,28 +53,40 @@ is outstanding.
 
 # PENDING TASK
 
-## Register the Fitbit developer application, and set its two secrets
+## 1. Settle the duplicate-Ultrahuman question, which is probably not one
 
-Self-serve, no review, client id and secret immediately. **Walk the founder
-through it screen by screen**, they are not technical.
+You reported two active Ultrahuman rows and suspected a reconnect had added a
+row rather than replacing one. **The database makes that impossible.** Migration
+0015 created a unique index, `wearable_connections_user_provider_key on
+(user_id, provider)`, and the connect callback upserts on exactly that pair. Two
+rows for one user and one provider cannot exist.
 
-**Do this only after the current code is deployed.** The scope list below was
-extended on 2026-08-06 and must match what the code requests. Registering
-against the old list would ask members for the wrong permissions.
+So the near-certain explanation is **two different user accounts**, each with
+its own Ultrahuman connection. One query settles it:
 
-### What you can do, and what you cannot
+```sql
+select user_id, provider, status, connected_at, expires_at
+from wearable_connections
+where provider = 'ultrahuman'
+order by connected_at;
+```
 
-**You can:** navigate `dev.fitbit.com`, read the form out, say exactly what goes
-in each field, and confirm afterwards that Fitbit appears in the app.
+- **Two different `user_id` values:** nothing is wrong. Two accounts connected
+  the same Ultrahuman. Say so and move on.
+- **The same `user_id` twice:** stop and tell me immediately. That would mean
+  the unique index is missing from production despite the migration claiming
+  otherwise, which is a real problem and not one to fix from the dashboard.
 
-**You cannot:** create the Fitbit account, and you must never take the Client
-Secret. If a step needs it to pass through you, stop and hand the founder the
-click path instead.
+Good catch either way: a duplicate would have been serious, because Ultrahuman
+rotates refresh tokens and two rows refreshing the same grant would each
+invalidate the other's token.
 
-### 1. Register
+## 2. Register the Fitbit developer application, and set its two secrets
 
-`dev.fitbit.com` → sign in with the founder's Fitbit account → **Manage** →
-**Register an app**.
+Self-serve, no review, credentials immediately. **Walk the founder through it
+screen by screen**, they are not technical.
+
+`dev.fitbit.com` → sign in → **Manage** → **Register an app**.
 
 | Field | What to put |
 |---|---|
@@ -91,71 +103,50 @@ click path instead.
 **`Server`, not Client and not Personal.** Personal only ever reads the
 developer's own account, which is not what we are building.
 
-**The redirect URL must match byte for byte.** No trailing slash, no `www`, all
-lowercase. Copy it, do not retype it.
+**The redirect URL must match byte for byte.** Copy it, do not retype it.
 
-### 2. The scopes, which is the step that matters
+### The scopes, which is the step that matters
 
 **Tick exactly these seven:**
 
-- ☑ `activity`
-- ☑ `heartrate`
-- ☑ `sleep`
-- ☑ `oxygen_saturation`
-- ☑ `cardio_fitness`
-- ☑ `respiratory_rate`
-- ☑ `temperature`
+☑ `activity` ☑ `heartrate` ☑ `sleep` ☑ `oxygen_saturation`
+☑ `cardio_fitness` ☑ `respiratory_rate` ☑ `temperature`
 
-**Leave the rest unticked**, in particular:
+**Leave everything else unticked**, in particular ☐ `weight` and ☐ `profile`.
 
-- ☐ `weight`
-- ☐ `profile`
-- ☐ `location`, ☐ `nutrition`, ☐ `settings`, ☐ `social`, ☐ `electrocardiogram`,
-  ☐ `irregular_rhythm_notifications`
+All seven are read by the adapter. Ticking more asks members for access we never
+use; ticking fewer just costs them those metrics, since each collection is
+fetched defensively and a refusal does not fail their sync.
 
-Every one of the seven is read by the adapter. Ticking more puts access on the
-consent screen that we never use; ticking fewer just costs the member those
-metrics, since each collection is fetched defensively and a refusal does not
-fail their sync.
+### The credentials
 
-### 3. The two credentials
-
-Fitbit shows a **OAuth 2.0 Client ID** and a **Client Secret** after creation.
-
-**Do not paste either into chat, a commit, or any file. Do not read the secret
-back to confirm it.** The founder copies them straight into Cloudflare and their
-password manager.
+**Do not paste either value into chat, a commit, or any file, and do not read
+the secret back to confirm it.** The founder copies them into Cloudflare and
+their password manager.
 
 Cloudflare → Workers & Pages → **`ai-tools`** → Settings → Variables and Secrets:
+`FITBIT_CLIENT_ID` and `FITBIT_CLIENT_SECRET`, both **type Secret**, not
+plaintext Variable. **Then redeploy.**
 
-| Name | Type |
-|---|---|
-| `FITBIT_CLIENT_ID` | **Secret** |
-| `FITBIT_CLIENT_SECRET` | **Secret** |
+### Verify, and stop
 
-**Type Secret, not plaintext Variable.** `wrangler.jsonc` replaces plaintext
-vars on every deploy. **Then redeploy**, since secrets do not apply to a running
-version.
+1. Profile → Connected devices. **Fitbit should appear with a Connect button.**
+2. Press Connect. The consent screen should list **seven** permissions.
+3. **Stop there. Do not approve** unless the founder owns a Fitbit.
 
-### 4. Verify, and stop
+Report whether Fitbit appeared, and exactly which permissions were listed. If
+`weight` or `profile` appear, the app was registered with the wrong scopes and
+it is a two-minute fix on its page.
 
-1. `app.ikigaro.com` → Profile → Connected devices.
-2. **Fitbit should appear with a Connect button.** Ultrahuman keeps Disconnect,
-   Oura and Whoop keep Connect, Withings and Garmin stay absent.
-3. Press **Connect**. The consent screen should list **seven** permissions,
-   matching the seven ticked above.
-4. **Stop there. Do not approve** unless the founder owns a Fitbit: an empty
-   connection tells us nothing and costs a reconnect to clear.
+## Not a task, but worth knowing
 
-### What to report
+You were right that the live Oura connection holds only its three original
+scopes and will never return workouts. **Nothing to fix**: an OAuth grant cannot
+gain a permission after the fact, so it needs one disconnect and reconnect,
+which is only worth doing when there is a ring to produce workouts.
 
-- Did Fitbit appear, and only Fitbit?
-- Did the consent screen load, and exactly which permissions did it list?
-- If it lists `weight`, `profile` or anything beyond the seven, say so: the app
-  was registered with the wrong scopes and it is a two-minute fix on its page.
-
-**Do not touch `WEARABLE_TOKEN_KEY`, or the Oura, Whoop or Ultrahuman secrets,
-or the Ultrahuman connection**, which is healthy and syncing.
+**Do not touch `WEARABLE_TOKEN_KEY`, the Oura, Whoop or Ultrahuman secrets, or
+the Ultrahuman connections.**
 
 ---
 

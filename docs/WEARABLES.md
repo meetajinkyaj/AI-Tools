@@ -331,6 +331,27 @@ response shape without owning the hardware.
 Not wired up. Worth an hour, and it would let the remaining Oura collections be
 mapped against real payloads instead of prose.
 
+### Two things the first live Oura connection taught us
+
+**Oura namespaces its scopes internally.** We request `daily heartrate spo2`,
+and the token response comes back granting `extapi:daily extapi:heartrate
+extapi:spo2`. So the short names in the authorize URL are correct and Oura
+expands them. Worth recording as the only hard evidence we have about their
+scope vocabulary, and as a lead if the Stress and Heart Health strings ever
+need chasing: whatever they are, they are probably `extapi:` something.
+
+**A connection keeps the scopes it was granted, forever.** The live Oura
+connection was made before `workout` was added to the request, so its stored
+scopes are the older three, and it will never return workouts. That is not a
+bug and there is nothing to fix in code: an OAuth grant cannot gain a permission
+after the fact.
+
+> **Adding a scope means every existing connection needs one reconnect.** Not
+> urgent while nobody has a ring, but the rule to remember: change the scope
+> list only when the benefit is worth asking every connected member to
+> reconnect, or before anyone connects at all. Fitbit's expansion was timed for
+> exactly that reason.
+
 ### Fitbit extended 2026-08-06, before registration and on purpose
 
 Fitbit was the one provider still unregistered, which made it the one whose

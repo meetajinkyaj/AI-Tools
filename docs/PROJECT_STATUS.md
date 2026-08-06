@@ -477,14 +477,17 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   and `wearable_daily_metrics` is one row per day per metric. Check-ins already
   carry `training_logged`, so the load and recovery signal can be built from
   data we hold today and gets sharper when device workouts arrive.
-- **Oura's sandbox is unused and probably should not be.**
-  `/v2/sandbox/usercollection/<collection>` returns deterministic sample data
-  with no connected ring, and per the reference client the access token is
-  ignored there. Every adapter here was written from documentation and four of
-  four were wrong; this is the one vendor offering a way to check a response
-  shape without owning the hardware. **Blocked in this environment**, whose
-  network policy denies `ouraring.com` outright, so it needs running from a
-  machine that can reach it. Roughly an hour.
+- **Oura sandbox check is WRITTEN, and needs running somewhere with network
+  access.** `scripts/verify-oura-sandbox.mjs` calls
+  `/v2/sandbox/usercollection/<collection>`, which returns deterministic sample
+  data with no connected ring, and asserts that every field path the adapter
+  reads is actually present. Every adapter here was written from documentation
+  and four of four were wrong; this is the one vendor offering a way to catch
+  that without owning the hardware. **The dev container's network policy denies
+  `api.ouraring.com`**, so it exits 2 (inconclusive) there and has to run from a
+  machine that can reach it, or the host has to be allowlisted. Once it can run
+  in CI, an adapter that drifts from Oura's payload fails the build instead of
+  silently dropping a metric.
 - **Whoop AND Oura are both capped at 10 users until approved.** Two of the
   four self-serve providers, so this is the shape of the space rather than one
   vendor being awkward. Oura state it plainly: *"By default, API Applications
