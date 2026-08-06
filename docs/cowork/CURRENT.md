@@ -6,8 +6,8 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-06. **Two tasks are pending, in order:** apply migration
-`0020_wearable_workouts`, then set the two Oura secrets. See
+Last updated: 2026-08-06. **One task is pending:** register the Fitbit
+developer application and set its two secrets. See
 [PENDING TASK](#pending-task).
 
 ---
@@ -53,81 +53,109 @@ is outstanding.
 
 # PENDING TASK
 
-## 1. Apply migration `0020_wearable_workouts` to production
+## Register the Fitbit developer application, and set its two secrets
 
-**Migration first, before the code that needs it merges.** Code reading a table
-that does not exist takes the app down, which is why this ordering is a rule
-here rather than a preference.
+Self-serve, no review, client id and secret immediately. **Walk the founder
+through it screen by screen**, they are not technical.
 
-Supabase → SQL Editor → paste
-[`supabase/migrations/0020_wearable_workouts.sql`](../../supabase/migrations/0020_wearable_workouts.sql)
-and run it. Idempotent, safe to re-run.
+**Do this only after the current code is deployed.** The scope list below was
+extended on 2026-08-06 and must match what the code requests. Registering
+against the old list would ask members for the wrong permissions.
 
-### Then verify, and report each line
+### What you can do, and what you cannot
 
-```sql
--- 1. The table exists with the columns we expect.
-select column_name, data_type, is_nullable
-from information_schema.columns
-where table_name = 'wearable_workouts'
-order by ordinal_position;
+**You can:** navigate `dev.fitbit.com`, read the form out, say exactly what goes
+in each field, and confirm afterwards that Fitbit appears in the app.
 
--- 2. RLS is ON and there are NO policies. Both halves matter.
-select relrowsecurity from pg_class where relname = 'wearable_workouts';
-select count(*) from pg_policies where tablename = 'wearable_workouts';
+**You cannot:** create the Fitbit account, and you must never take the Client
+Secret. If a step needs it to pass through you, stop and hand the founder the
+click path instead.
 
--- 3. The idempotency index is present, which is what makes a re-sync
---    correct a session rather than duplicate it.
-select indexname from pg_indexes where tablename = 'wearable_workouts';
+### 1. Register
 
--- 4. Nothing else was touched.
-select count(*) from wearable_connections;
-select count(*) from wearable_daily_metrics;
-```
+`dev.fitbit.com` → sign in with the founder's Fitbit account → **Manage** →
+**Register an app**.
 
-**Expected:** 17 columns, `relrowsecurity` **true**, **0** policies, indexes
-including `wearable_workouts_key` and `wearable_workouts_read_idx`, and the two
-existing tables unchanged.
+| Field | What to put |
+|---|---|
+| Application name | `Ikigaro` |
+| Description | Longevity app. Users upload blood panels and check in daily; connecting a wearable shows sleep, recovery and activity alongside those lab results. |
+| Application website | `https://app.ikigaro.com` |
+| Organization | `Ikigaro` |
+| Terms of service | `https://app.ikigaro.com/terms` |
+| Privacy policy | `https://app.ikigaro.com/privacy` |
+| **OAuth 2.0 Application Type** | **`Server`** |
+| **Default Access Type** | **`Read Only`** |
+| Redirect URL | `https://app.ikigaro.com/api/wearables/callback/fitbit` |
 
-**If `relrowsecurity` is false or the policy count is anything but 0, stop and
-say so.** That combination is the only thing standing between the project's
-anon key and the table, and migration 0013 shipped two tables without it once
-already.
+**`Server`, not Client and not Personal.** Personal only ever reads the
+developer's own account, which is not what we are building.
 
-> If the SQL Editor's "Running..." spinner freezes, **do not re-click Run**.
-> That happened on 0019. Check the real state from a second connection first: a
-> frozen spinner says nothing about whether the statement committed.
+**The redirect URL must match byte for byte.** No trailing slash, no `www`, all
+lowercase. Copy it, do not retype it.
 
-## 2. Then set the two Oura secrets
+### 2. The scopes, which is the step that matters
 
-Cloudflare → Workers & Pages → **`ai-tools`** → Settings → Variables and Secrets.
+**Tick exactly these seven:**
+
+- ☑ `activity`
+- ☑ `heartrate`
+- ☑ `sleep`
+- ☑ `oxygen_saturation`
+- ☑ `cardio_fitness`
+- ☑ `respiratory_rate`
+- ☑ `temperature`
+
+**Leave the rest unticked**, in particular:
+
+- ☐ `weight`
+- ☐ `profile`
+- ☐ `location`, ☐ `nutrition`, ☐ `settings`, ☐ `social`, ☐ `electrocardiogram`,
+  ☐ `irregular_rhythm_notifications`
+
+Every one of the seven is read by the adapter. Ticking more puts access on the
+consent screen that we never use; ticking fewer just costs the member those
+metrics, since each collection is fetched defensively and a refusal does not
+fail their sync.
+
+### 3. The two credentials
+
+Fitbit shows a **OAuth 2.0 Client ID** and a **Client Secret** after creation.
+
+**Do not paste either into chat, a commit, or any file. Do not read the secret
+back to confirm it.** The founder copies them straight into Cloudflare and their
+password manager.
+
+Cloudflare → Workers & Pages → **`ai-tools`** → Settings → Variables and Secrets:
 
 | Name | Type |
 |---|---|
-| `OURA_CLIENT_ID` | **Secret** |
-| `OURA_CLIENT_SECRET` | **Secret** |
+| `FITBIT_CLIENT_ID` | **Secret** |
+| `FITBIT_CLIENT_SECRET` | **Secret** |
 
-From `developer.ouraring.com`, application `Ikigaro`. **Type Secret, not
-plaintext Variable**, and **never paste either value into chat, a commit or any
-file.** Then **redeploy**, since secrets do not apply to a running version.
+**Type Secret, not plaintext Variable.** `wrangler.jsonc` replaces plaintext
+vars on every deploy. **Then redeploy**, since secrets do not apply to a running
+version.
 
-### Verify, and stop
+### 4. Verify, and stop
 
-1. `app.ikigaro.com` → Profile → Connected devices. **Oura should appear with a
-   Connect button.**
-2. Press Connect. The consent screen should now list **four** permissions:
-   daily, heart rate, SpO2 and workout.
-3. **Stop there. Do not approve**, there is no ring on the account.
+1. `app.ikigaro.com` → Profile → Connected devices.
+2. **Fitbit should appear with a Connect button.** Ultrahuman keeps Disconnect,
+   Oura and Whoop keep Connect, Withings and Garmin stay absent.
+3. Press **Connect**. The consent screen should list **seven** permissions,
+   matching the seven ticked above.
+4. **Stop there. Do not approve** unless the founder owns a Fitbit: an empty
+   connection tells us nothing and costs a reconnect to clear.
 
-**Four, not six, is correct.** Workout was added to the code in this round.
-Stress and Heart Health are granted at the portal and still not requested,
-because their OAuth scope strings are in no public documentation and a wrong
-one fails the entire authorize request. The code fetches those collections
-anyway and tolerates a refusal, so if they happen to ride on `daily` they simply
-work. Written up in `../WEARABLES.md`.
+### What to report
 
-**Do not touch `WEARABLE_TOKEN_KEY`, the Whoop or Ultrahuman secrets, or the
-Ultrahuman connection**, which is healthy and syncing.
+- Did Fitbit appear, and only Fitbit?
+- Did the consent screen load, and exactly which permissions did it list?
+- If it lists `weight`, `profile` or anything beyond the seven, say so: the app
+  was registered with the wrong scopes and it is a two-minute fix on its page.
+
+**Do not touch `WEARABLE_TOKEN_KEY`, or the Oura, Whoop or Ultrahuman secrets,
+or the Ultrahuman connection**, which is healthy and syncing.
 
 ---
 

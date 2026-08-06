@@ -244,73 +244,52 @@ once a real member has connected.
 **Remaining:** set `OURA_CLIENT_ID` and `OURA_CLIENT_SECRET` as Worker Secrets
 and redeploy. Oura then appears in Settings on its own.
 
-### ☐ Fitbit
+### ☐ Fitbit. READY TO REGISTER, and the scope list changed
 
-Audited 2026-08-04. **Naps were overwriting whole nights**, and three of the six
-requested scopes were never read by anything.
+Audited 2026-08-04, then **extended 2026-08-06 before registration**, which was
+deliberate: Fitbit is the one provider not yet registered, so changing its scope
+list is free today and costs a re-consent from every connected member
+afterwards. The endpoints were written first so the boxes get ticked once.
+
+**It now contributes eight metrics rather than three:** steps, resting heart
+rate, sleep duration, **HRV, blood oxygen, breathing rate, skin temperature
+deviation and VO2 max**.
 
 - **Where:** `dev.fitbit.com` → Manage → Register an app
 - **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/fitbit`
 - **OAuth 2.0 Application Type:** `Server` (not Client or Personal. Personal
   only ever reads your own account, which is not what we are building)
-- **Scopes to tick, exactly these three:** `activity`, `heartrate`, `sleep`
-- **Do NOT tick `oxygen_saturation`, `weight` or `profile`.** None of them is
-  read. SpO2 in particular lives on its own Fitbit collection that we do not
-  call; adding it later means putting the scope back, which is free now and
-  costs a re-consent once anybody is connected.
 - **Default Access Type:** `Read Only`
 
-**Fitbit contributes three metrics:** steps, resting heart rate and sleep
-duration. Not a sleep score: Fitbit's real one is not on the public API, and
-the `efficiency` figure that was standing in for it is a different quantity.
-See [`WEARABLES.md`](./WEARABLES.md).
+**Scopes to tick, exactly these seven:**
 
-### ☑ Whoop. REGISTERED 2026-08-04, blocked on a member with a band
+| Scope | What it buys |
+|---|---|
+| `activity` | Steps |
+| `heartrate` | Resting heart rate **and HRV** |
+| `sleep` | Sleep duration |
+| `oxygen_saturation` | Blood oxygen |
+| `cardio_fitness` | VO2 max |
+| `respiratory_rate` | Breathing rate |
+| `temperature` | Skin temperature deviation |
 
-App `Ikigaro` created under team `Ikigaro` at `developer-dashboard.whoop.com`.
-Both secrets are set on the Worker and verified: Connect reaches Whoop's real
-sign-in with no error from our side. Nothing further to configure.
+**Do NOT tick `weight` or `profile`.** Nothing reads either, and `profile`
+returns personal details we never use.
 
-**It cannot be tested from an account without an active WHOOP membership.**
-Whoop gates development-mode authorisation on being a WHOOP member, so the
-founder's band-less account bounces with `request_unauthorized`. This needs a
-person who owns a working band, exactly as Ultrahuman needs someone with a ring.
+Every scope above is read by the adapter, and there is a test asserting the list
+matches. If you tick more, the consent screen asks for access we do not use; if
+you tick fewer, the member simply loses those metrics, since each collection is
+fetched defensively and a refusal does not fail the sync.
 
-**Two limits worth planning around**, both from Whoop's own approval page:
+**Fitbit contributes no sleep score**, deliberately: their real Sleep Score is
+not on the public API and the `efficiency` figure that was standing in for it is
+a different quantity. See [`WEARABLES.md`](./WEARABLES.md).
 
-- **Ten WHOOP members, total, until the app is approved.** Fine for closed beta,
-  a wall after it.
-- **Approval is a queue with no timeline.** Whoop's community forum carries
-  developers reporting submissions from March onward with no approval, no
-  rejection and no response. Treat it like Garmin: submit, then plan as though
-  it will not come.
-
-**Submit for approval as soon as the first real member connects**, since Whoop
-require having tested with at least one member before they will consider it, and
-the queue only gets longer.
-
-Original registration notes follow.
-
-**Do this one next.** The adapter was audited against Whoop's published v2
-documentation on 2026-08-04 and four real bugs were fixed before any account
-was connected, so this is the best-verified integration we have that has not
-yet been switched on. Details in [`WEARABLES.md`](./WEARABLES.md).
-
-- **Where:** `developer.whoop.com` → Developer Dashboard → create an App
-- **Redirect URI:** `https://app.ikigaro.com/api/wearables/callback/whoop`
-- **Scopes to tick, exactly these four:** `read:sleep`, `read:recovery`,
-  `read:cycles`, `offline`
-- **Do NOT tick `read:profile`.** It returns the member's name and email, we
-  call no profile endpoint, and Whoop's own guidance is to request only what
-  the app uses. The scope list must match the code
-  (`src/lib/wearables/providers.ts`) or the consent screen will ask for access
-  we never exercise.
-- `offline` is the one that matters: without it Whoop issues no refresh token
-  and every connection dies within the hour.
-- You can create up to 5 Apps on one account, so a separate staging App later
-  is free.
-
-Client id and secret appear immediately after creation. No review, no queue.
+**Workouts are not synced from Fitbit yet**, unlike Oura and Whoop. Their
+activity log is a different shape from both, its `offset` parameter accepts only
+`0`, and the session field names were not verifiable from their published
+reference the way the daily collections were. Deliberately left rather than
+guessed at.
 
 ### ☐ Withings
 

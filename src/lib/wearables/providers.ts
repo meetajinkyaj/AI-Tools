@@ -294,6 +294,30 @@ const oura: WearableProvider = {
 /* Fitbit                                                                      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Fitbit's VO2 max, which is a STRING and is sometimes a RANGE.
+ *
+ * Their documented example returns both forms: `"45"` and `"44-48"`. They only
+ * give a single number when the user runs with GPS; otherwise it is a band.
+ *
+ * `Number("44-48")` is NaN, so passing this through the usual numeric helper
+ * would drop every ranged reading silently, and the metric would look like it
+ * simply never arrives for anyone who does not run with GPS. The midpoint is
+ * the honest reading of a band, and it keeps the series continuous when a user
+ * moves between the two forms.
+ */
+export function fitbitVo2Max(raw: string | undefined): number | undefined {
+  if (!raw) return undefined;
+  const band = raw.match(/^\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*$/);
+  if (band) {
+    const lo = Number(band[1]);
+    const hi = Number(band[2]);
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return undefined;
+    return Math.round(((lo + hi) / 2) * 10) / 10;
+  }
+  return num(raw);
+}
+
 const fitbit: WearableProvider = {
   id: "fitbit",
   name: PROVIDER_NAMES.fitbit,
@@ -302,13 +326,26 @@ const fitbit: WearableProvider = {
   clientSecretEnv: "FITBIT_CLIENT_SECRET",
   authorizeUrl: "https://www.fitbit.com/oauth2/authorize",
   tokenUrl: "https://api.fitbit.com/oauth2/token",
-  // THREE SCOPES REMOVED, all of them dead: `profile` (we call no profile
-  // endpoint), `weight` (no body endpoint), and `oxygen_saturation` (Fitbit
-  // serves SpO2 from its own `/spo2/date/...` collection, which we do not
-  // call). Every one of them appeared on the consent screen asking for access
-  // we never exercised. Adding SpO2 later means putting the scope back, which
-  // is free now and costs a re-consent once anyone is connected.
-  scopes: ["activity", "heartrate", "sleep"],
+  // SEVEN SCOPES, EVERY ONE OF THEM READ. Fitbit was down to three because the
+  // other three it used to ask for were dead. It is back up to seven because
+  // the adapter now calls the collections that justify them, which is the right
+  // order to do it in: the scope list follows the code, never the other way.
+  //
+  // Deliberately still absent: `weight` and `profile`. Nothing reads either.
+  //
+  // Timing matters here. Fitbit is the one provider not yet registered, so
+  // changing this list is free today and costs a re-consent from every
+  // connected member afterwards. Getting it right once is why the endpoints
+  // below were written before the developer application was created.
+  scopes: [
+    "activity",
+    "heartrate",
+    "sleep",
+    "oxygen_saturation",
+    "cardio_fitness",
+    "respiratory_rate",
+    "temperature",
+  ],
   // Fitbit rejects credentials in the body and requires Basic.
   tokenAuth: "basic",
   refreshRotates: true,
@@ -361,6 +398,72 @@ const fitbit: WearableProvider = {
       // cannot reconcile against Fitbit's own app, and that is not even
       // labelled the same thing there. Better to contribute nothing.
     }
+
+    /*
+     * THE OVERNIGHT FOUR.
+     *
+     * HRV, SpO2, breathing rate and skin temperature all describe a user's
+     * "main sleep", and Fitbit says plainly that a value dated the 22nd may
+     * come from a night that began on the 21st. They have already decided which
+     * day it belongs to, so `dateTime` is used as given rather than shifted.
+     *
+     * Each is its own collection behind its own scope, which is why Fitbit
+     * contributed three metrics before this and eight after. All four cap at a
+     * 30 day range; our window is 7.
+     */
+    const optional = async <T>(path: string): Promise<T | null> => {
+      try {
+        return await providerFetch<T>("fitbit", `${api}/user/-/${path}`, { accessToken });
+      } catch {
+        // A member can decline any one of these scopes at the consent screen.
+        // Letting that fail the whole sync would cost them sleep and steps over
+        // a metric they chose not to share, and a 403 here reaches the sweep as
+        // ReauthRequired, which would mark the connection dead outright.
+        return null;
+      }
+    };
+
+    const [hrv, spo2, breathing, temp] = await Promise.all([
+      optional<{ hrv?: { dateTime?: string; value?: { dailyRmssd?: number } }[] }>(
+        `hrv/date/${start}/${end}.json`,
+      ),
+      optional<{ spo2?: { dateTime?: string; value?: { avg?: number } }[] }>(
+        `spo2/date/${start}/${end}.json`,
+      ),
+      optional<{ br?: { dateTime?: string; value?: { breathingRate?: number } }[] }>(
+        `br/date/${start}/${end}.json`,
+      ),
+      optional<{ tempSkin?: { dateTime?: string; value?: { nightlyRelative?: number } }[] }>(
+        `temp/skin/date/${start}/${end}.json`,
+      ),
+    ]);
+
+    for (const d of hrv?.hrv ?? []) {
+      // `dailyRmssd` is the whole-night figure. `deepRmssd` covers deep sleep
+      // only and is not what other vendors report, so it is not used.
+      push(out, "hrv", d.dateTime, num(d.value?.dailyRmssd), "fitbit");
+    }
+    for (const d of spo2?.spo2 ?? []) {
+      push(out, "spo2", d.dateTime, num(d.value?.avg), "fitbit");
+    }
+    for (const d of breathing?.br ?? []) {
+      push(out, "respiratory_rate", d.dateTime, num(d.value?.breathingRate), "fitbit");
+    }
+    for (const d of temp?.tempSkin ?? []) {
+      // `nightlyRelative` is already a deviation from the wearer's baseline,
+      // signed and legitimately negative, which is exactly what our
+      // `temperature_deviation` means. Unlike Whoop's skin_temp_celsius, this
+      // one maps directly.
+      push(out, "temperature_deviation", d.dateTime, num(d.value?.nightlyRelative), "fitbit");
+    }
+
+    const cardio = await optional<{
+      cardioScore?: { dateTime?: string; value?: { vo2Max?: string } }[];
+    }>(`cardioscore/date/${start}/${end}.json`);
+    for (const d of cardio?.cardioScore ?? []) {
+      push(out, "vo2max", d.dateTime, fitbitVo2Max(d.value?.vo2Max), "fitbit");
+    }
+
     return out;
   },
 };
