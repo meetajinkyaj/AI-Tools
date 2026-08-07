@@ -6,10 +6,13 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-06. **Three tasks are pending, and one of them blocks a
-merge:** apply migration 0021, settle the duplicate-Ultrahuman question with
-one query, and read one URL off Oura's own auth page. See
+Last updated: 2026-08-07. **Three tasks are pending:** settle the
+duplicate-Ultrahuman question with one query, read one URL off Oura's own auth
+page, and reconnect Oura so it can return workouts. See
 [PENDING TASK](#pending-task).
+
+Migration 0021 is applied and verified on production, and PR #104 is merged, so
+that task is gone from this list.
 
 **The Fitbit registration task is withdrawn**, and not because it was done.
 Cowork found that `dev.fitbit.com` has closed registration for new
@@ -31,6 +34,7 @@ have cost an afternoon and produced credentials nothing could call.
 | `0016_device_requests` | Applied 2026-07-30, verified. 8 columns, RLS on with 0 policies, unique `(user_id, device_key)` index present, table empty, `users`/`wearable_connections` counts unchanged. |
 | `0017_access_granted_email` | Applied 2026-07-30, verified. `users.access_granted_email_at` present and nullable, 0 of 4 users stamped, access breakdown unchanged. |
 | `0018_broadcasts` | Applied 2026-07-30, verified. Both tables live, RLS on with 0 policies, `broadcast_recipients_unique` present, 4/4/4 unique unsubscribe tokens, 0 opted out, access breakdown unchanged. |
+| `0021_workout_auto_detected` | Applied to production 2026-08-06 and verified twice. `wearable_workouts.auto_detected` present, `boolean`, not null, default `false`; 0 rows flagged. Records whether the member started a session or their device noticed it, which is what keeps an auto-logged walk out of the training-day count without discarding it. |
 | `0019_broadcast_app_button` | Applied 2026-07-30, verified. `broadcasts.include_app_button` boolean, not null, default false; 0 rows with it set; `users` and `broadcast_recipients` unchanged. The SQL Editor spinner hung during this run, so completion was confirmed from a second connection rather than from the UI. |
 
 | Configuration | Status |
@@ -61,50 +65,6 @@ is outstanding.
 ---
 
 # PENDING TASK
-
-## 0. Apply migration 0021, BEFORE PR #104 is merged
-
-**This one gates a merge, so it goes first.** The code in PR #104 writes a
-column that does not exist yet on production. Merge before applying and every
-Fitbit workout sync fails on the insert.
-
-`supabase/migrations/0021_workout_auto_detected.sql`. One statement, additive,
-idempotent, safe to re-run:
-
-```sql
-alter table wearable_workouts
-  add column if not exists auto_detected boolean not null default false;
-```
-
-(The file also sets a `comment on column`, which is documentation and cannot
-affect data. Run the whole file.)
-
-**What it is for.** Fitbit's watch logs a "Walk" by itself after about fifteen
-minutes of movement, without the member asking. That is real and worth keeping,
-walking is good for you, but it is not a workout, and counting it would show
-somebody seven training days in a week they trained on none. The column records
-which sessions the member started and which the watch noticed, so the Training
-card can show both without confusing them.
-
-**Verify after running:**
-
-```sql
-select column_name, data_type, is_nullable, column_default
-from information_schema.columns
-where table_name = 'wearable_workouts' and column_name = 'auto_detected';
-
-select count(*) as total, count(*) filter (where auto_detected) as auto
-from wearable_workouts;
-```
-
-Expect one row from the first (`boolean`, `NO`, `false`), and the second to
-show every existing row at `auto` = 0. **No existing row should change
-meaning**: nothing but Fitbit ever sets this, and Fitbit is not connected yet.
-
-Report both results. Then say the migration is applied so #104 can merge.
-
-A reminder from 0019: if the SQL Editor's "Running..." spinner freezes, **do
-not re-click Run.** Check the real state from a second connection first.
 
 ## 1. Settle the duplicate-Ultrahuman question, which is probably not one
 
@@ -167,12 +127,39 @@ any revoke endpoint that has not been read off the vendor's own documentation.
 
 Nothing to change in Cloudflare, Supabase or the Oura dashboard. Just the text.
 
-## Not a task, but worth knowing
+## 3. Reconnect Oura, so it can actually return workouts
 
-You were right that the live Oura connection holds only its three original
-scopes and will never return workouts. **Nothing to fix**: an OAuth grant cannot
-gain a permission after the fact, so it needs one disconnect and reconnect,
-which is only worth doing when there is a ring to produce workouts.
+**This is now the only way to get a single workout into the app**, so it has
+moved from "not worth doing yet" to a real task.
+
+You spotted that the live Oura connection holds only its three original scopes.
+An OAuth grant cannot gain a permission after the fact, so the fix is one
+disconnect and one reconnect by whoever owns that Oura account.
+
+The plan had been to add workouts to Ultrahuman instead, since it is the
+provider that actually works. **Ultrahuman's API does not expose workouts at
+all**: their own published data list has sleep, steps, heart rate, HRV,
+temperature, VO2 max and the recovery and metabolic scores, and no sessions.
+Checked before any code was written. So Oura it is.
+
+In the app: **Profile → Connected devices → Oura → Disconnect**, confirm, then
+**Connect** and approve.
+
+**What to check on the consent screen, and report back.** It should now ask for
+FOUR things rather than three, the extra one being workouts. If it still shows
+three, stop and say so: that would mean the deployed scope list is not the one
+in the code, which is worth knowing immediately.
+
+Two things worth knowing before you do it:
+
+- **Nothing is lost.** Metrics already synced stay in the database and in
+  Trends; disconnecting deletes the permission, not the data.
+- **Disconnect now tells Oura too, or will do once their revoke URL is known**
+  (task 2 above). Today it deletes our copy of the credentials, which is why
+  reconnecting goes straight to consent without a fresh sign-in.
+
+Workouts only appear for days when the ring actually recorded a session, so an
+empty result afterwards is not necessarily a fault.
 
 **Do not touch `WEARABLE_TOKEN_KEY`, the Oura, Whoop or Ultrahuman secrets, or
 the Ultrahuman connections.**
