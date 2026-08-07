@@ -504,7 +504,26 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   feature, and a test pins the exact provider list. Oura document a revoke
   endpoint whose literal URL every extractor we have strips out of the page;
   reading it is a Cowork task. Ultrahuman, Withings and Garmin document none.
-- **The workout pipeline has no live producer, and Ultrahuman cannot be one.**
+- **The workout pipeline has a producer: Oura, reconnected 2026-08-07.** The
+  old grant held three scopes and could never return a workout; the new one
+  carries `extapi:workout` alongside them, verified in the database, one row,
+  replaced cleanly by the upsert. The consent screen listed four permissions,
+  which was the deliberate tripwire: three would have meant production was
+  running older code than main. **Nothing has yet proven the path end to end**,
+  because a workout row only appears for a day the ring actually recorded a
+  session. `select * from wearable_workouts where provider = 'oura'` returning
+  anything is the first real proof, and it is worth checking after a week of
+  wear.
+- **Disconnect now revokes at Fitbit, Whoop and Oura.** Oura's URL had to be
+  read off their page by a human, because every extractor available here strips
+  the code block containing it. Their docs state no HTTP method and their prose
+  names a parameter their own example omits; both gaps are handled explicitly
+  rather than guessed. Ultrahuman, Withings and Garmin document no revoke
+  endpoint, so for those a disconnect still only destroys our copy of the
+  credentials.
+- **The duplicate Ultrahuman rows were two accounts, not a fault** (checked
+  2026-08-07). The unique index on `(user_id, provider)` is doing its job.
+- **Ultrahuman cannot be a workout producer, checked before writing code.**
   Checked 2026-08-07 before writing the adapter: Ultrahuman's Partnership API
   exposes no workouts, activities or sessions at all. Their own published data
   list is sleep, movement, steps, heart rate, HRV, temperature, VO2 max and the
@@ -517,7 +536,28 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   reconnect, now a Cowork task. Until then migrations 0020 and 0021, the device
   half of the Training card and the movement split are all built and idle, which
   is exactly why the card was built check-in-first.
-- **🔴 Fitbit is blocked on a REWRITE, not a registration.** Found 2026-08-06
+- **Fitbit runs on the Google Health API now, rewritten 2026-08-07.** Written
+  from Google's discovery document rather than their migration guide, which
+  disagrees with the spec in four places, each one a silently absent metric:
+  the method is `dailyRollUp` not `dailyRollup`, sleep and exercise are session
+  types not rollups, the path is kebab-case while the filter is snake-case for
+  the same type in the same request, and sleep is the one session type excluded
+  from the civil-time filter. Fetching that document takes one `curl`. Nine
+  metrics, six of them from `daily-*` collections the guide never mentions.
+  `recordingMethod` is a cleaner auto-detected signal than the legacy `logType`,
+  so migration 0021 keeps its producer. **`access_type=offline` and
+  `prompt=consent` are mandatory**: without them Google issues no refresh token
+  and a connection dies after an hour with nothing in the logs. Detail in
+  [`WEARABLES.md`](./WEARABLES.md).
+- **Fitbit needs a Google Cloud registration, and now the code exists to match
+  it.** OAuth Web Server client, redirect URI
+  `https://app.ikigaro.com/api/wearables/callback/fitbit`, the three
+  `googlehealth.*.readonly` scopes on the Data Access page, then the client id
+  and secret as Cloudflare Secrets. Two constraints to plan around: an
+  unverified client caps at **100 test users** and needs a third-party security
+  review beyond that, and while unpublished **refresh tokens expire after 7
+  days**, so a tester silently drops after a week.
+- **~~🔴 Fitbit is blocked on a REWRITE, not a registration.~~ Done.** Found 2026-08-06
   and verified against Google's own pages. `dev.fitbit.com` has closed
   registration for new applications, and the legacy Fitbit Web API the adapter
   targets is **deprecated in September 2026**. Fitbit access now runs through

@@ -192,6 +192,19 @@ export interface WearableProvider {
     signal: AbortSignal;
   }) => Promise<void>;
 
+  /**
+   * Extra query parameters for the authorize URL, beyond the five every OAuth
+   * provider needs.
+   *
+   * ADDED FOR GOOGLE, AND IT IS NOT OPTIONAL THERE. Google issues no refresh
+   * token at all unless `access_type=offline` is on the authorize URL, and
+   * sends one exactly once per grant unless `prompt=consent` forces a reissue.
+   * Miss either and the connection works for an hour and then dies, with
+   * nothing in the logs tying the failure to the cause. Whoop's `offline` scope
+   * is the same trap wearing different clothes, and it cost a day.
+   */
+  extraAuthParams?: Record<string, string>;
+
   /** Access needs an application and approval, not just registration. */
   requiresApproval?: boolean;
 

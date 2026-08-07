@@ -399,6 +399,25 @@ heart-rate-based session tracking that the API does not expose.
 `fetchWorkouts`.** A method that always returns `[]` looks like an integration
 that is failing rather than one that was never possible.
 
+#### The pipeline has a producer now: Oura, reconnected 2026-08-07
+
+The reconnect landed and was verified in the database. The new grant carries
+`extapi:daily extapi:heartrate extapi:spo2 extapi:workout`, where the old one
+had only the first three. One row, replaced cleanly by the upsert rather than
+duplicated.
+
+**Oura prefixes granted scopes with `extapi:`** where we request them bare.
+Worth knowing before somebody compares the two lists and concludes they
+disagree.
+
+The consent screen listed four permissions, which was the tripwire: three would
+have meant production was running older code than main. It showed four, so it
+is not.
+
+**This is the first time any provider has been able to return a workout.**
+Everything below described the state before that, and is kept because the
+reasoning still holds for the other five providers.
+
 #### What this means for the workout pipeline
 
 Everything built for workouts, migrations 0020 and 0021, the device half of the
@@ -423,6 +442,107 @@ This is also the second time the same shape of finding has changed a plan in
 two days: check what the vendor actually exposes before writing the adapter,
 not after. Four of four adapters written from assumption were wrong; two of two
 plans checked first were saved.
+
+---
+
+### The Google Health rewrite, done 2026-08-07 from the discovery document
+
+**Written from `health.googleapis.com/$discovery/rest?version=v4` (revision
+20260805), not from the migration guide.** That choice is the whole story of
+this rewrite. Google publish a machine-readable spec, and it disagrees with
+their own prose in four places, each of which would have produced a silently
+absent metric, which is the exact failure that caught four adapters here:
+
+| Google's prose | The spec | Cost of believing the prose |
+|---|---|---|
+| `dailyRollup` | **`dailyRollUp`**, capital U | 404 on every steps and calories call |
+| Sleep and exercise among the rollup types | Both are **session** types read via `list` | Two metrics that never arrive |
+| One name per data type | Path is **kebab-case**, filter field is **snake_case**, in the same request | Empty result, no error |
+| Sessions filter on civil start time | **Sleep is excluded** and wants `sleep.interval.end_time` in RFC-3339 | Sleep never returns |
+
+Fetching the discovery document takes one `curl`. Reading it took twenty
+minutes and it caught all four before a line was written.
+
+#### What the adapter now reads
+
+Six `daily-*` collections through `list`, which the migration guide never
+mentions and which are better than what the legacy API offered: one value per
+day, already computed, instead of rolling up intraday samples.
+
+| Metric | Data type | Field |
+|---|---|---|
+| `resting_heart_rate` | `daily-resting-heart-rate` | `beatsPerMinute` (int64, arrives as a STRING) |
+| `hrv` | `daily-heart-rate-variability` | `averageHeartRateVariabilityMilliseconds` (RMSSD) |
+| `spo2` | `daily-oxygen-saturation` | `averagePercentage` |
+| `respiratory_rate` | `daily-respiratory-rate` | `breathsPerMinute` |
+| `vo2max` | `daily-vo2-max` | `vo2Max` |
+| `temperature_deviation` | `daily-sleep-temperature-derivations` | `nightly - baseline` |
+| `sleep_minutes` | `sleep` (session) | `summary.minutesAsleep` |
+| `steps` | `steps` | `dailyRollUp` → `steps.countSum` |
+| `active_calories` | `active-energy-burned` | `dailyRollUp` → `activeEnergyBurned.kcalSum` |
+
+**Skin temperature is the Whoop trap in a new coat.** Legacy Fitbit sent
+`nightlyRelative`, already a deviation, so it mapped straight across. Google
+sends an absolute nightly reading near 33 degrees plus a baseline, and
+publishing the first as a deviation would put a body temperature on a chart
+whose other points are fractions of a degree. The adapter subtracts, and
+reports nothing at all when there is no baseline: a gap beats an invented
+number. `googleTemperatureDeviation()` is tested for exactly this.
+
+**Two traps that went away.** VO2 max is a plain number now, so the legacy
+band-parsing (`"44-48"` → 46) is gone. Distance is unambiguous rather than
+locale-dependent, though it is in **millimetres**: reading it as metres turns a
+5km run into 5,000km.
+
+**Still no sleep score**, for the same reason as before. Google Health exposes
+none, and publishing sleep efficiency under `sleep_score` would put a number
+beside Oura's that means something different.
+
+#### The OAuth details that would have killed it silently
+
+**`access_type=offline` and `prompt=consent` are mandatory.** Google issues no
+refresh token at all without the first, and sends one exactly once per grant
+without the second. Miss either and a connection works for an hour and then
+dies, with nothing in the logs tying the failure to the cause. This is Whoop's
+`offline` scope wearing different clothes, and that one cost a day. Providers
+gained `extraAuthParams` for it, applied last in the connect route so a vendor
+cannot override `state` or `redirect_uri`.
+
+**Google does not rotate refresh tokens.** The refresh response omits the field
+entirely. `tokenColumns` already refuses to blank a token a vendor did not
+send, so this is safe, but `refreshRotates: false` records what is true rather
+than what is convenient. It is the only provider with that flag, and a test
+pins the exception so a future one gets reviewed.
+
+**Three scopes, and the collapse matters.** `heartrate`, `oxygen_saturation`,
+`respiratory_rate` and `temperature` were four separately declinable Fitbit
+scopes and are now one Google bundle. A member used to be able to decline SpO2
+and keep HRV; now those four arrive or refuse together. Each collection is
+still fetched defensively, but what that protects against has changed shape.
+
+**`recordingMethod` is a better auto-detected signal than the legacy API had.**
+Fitbit's `logType` needed matching against a list of strings; Google state it
+as an enum, so `PASSIVELY_MEASURED` means the device noticed the session and
+anything else means a person was involved. That maps straight onto migration
+0021's `auto_detected`. `UNSPECIFIED` and `UNKNOWN` are not treated as
+auto-detected, keeping the rule that false means "they do not say".
+
+**The provider id stays `fitbit`.** Members think Fitbit, the redirect URI is
+registered against `/api/wearables/callback/fitbit`, and
+`wearable_connections.provider` already uses it. Google Health is the pipe, not
+the brand.
+
+#### What is still needed before it can be connected
+
+A Google Cloud project with the Health API enabled, an OAuth Web Server client
+whose redirect URI is `https://app.ikigaro.com/api/wearables/callback/fitbit`,
+the three scopes on the Data Access page, and the client id and secret set as
+Cloudflare Secrets. **Registration follows the code, which is now written.**
+
+Two constraints to plan around rather than discover: an unverified client caps
+at **100 test users** and needs a third-party security review beyond that, and
+while the client is unpublished **refresh tokens expire after 7 days**, so a
+tester silently drops after a week. Publish before anyone relies on it.
 
 ---
 
@@ -863,8 +983,22 @@ BEFORE the row is deleted, since the credentials go with it.
 |---|---|---|
 | Fitbit | yes | `POST /oauth2/revoke`, Basic auth, `token=<refresh token>` |
 | Whoop | yes | `DELETE /developer/v2/user/access`, member's bearer token |
-| Oura | not yet | Their auth doc has a "Revoking The Access Token" section, and every extractor we have strips the code block holding the literal URL. Queued for Cowork to read off the page. |
+| Oura | yes | `POST /oauth/revoke?access_token=`, falling back to GET |
 | Ultrahuman, Withings, Garmin | no | No revoke endpoint found in their documentation. |
+
+**Oura's URL took a human to obtain**, which is worth remembering next time. It
+lives in a code block that every extractor available here strips out of the
+page, so the endpoint sat unimplemented for a day rather than being guessed at.
+Read off `api.ouraring.com/docs/authentication` on 2026-08-07.
+
+Two things their docs do not say, both handled rather than assumed. The
+**method** is not stated: RFC 7009 says revocation is a POST and a
+state-changing call should not be a GET, so POST goes first, and a 404 or 405
+retries once as GET, because their example is a bare URL with a query string
+and no body, which is equally consistent with either. The **prose mentions
+`client_id`** while the URL they print carries only `access_token`; we send
+what the example shows, since adding an undocumented parameter is the same
+guess in a smaller costume.
 
 **Two rules, and both are the point of the feature.**
 

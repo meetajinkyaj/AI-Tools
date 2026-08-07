@@ -288,392 +288,471 @@ const oura: WearableProvider = {
     }
     return out;
   },
+
+  /**
+   * Oura's revoke, read off their authentication page on 2026-08-07.
+   *
+   * WHY IT TOOK A HUMAN TO GET THIS. The URL lives in a code block that every
+   * extractor available here strips out of the page, so the endpoint sat
+   * unimplemented for a day rather than being guessed at. A guessed revoke URL
+   * returns a quiet 404 and leaves us believing we destroyed a member's grant
+   * when we did not, which is a privacy claim we cannot support.
+   *
+   * TWO THINGS THEIR DOCS DO NOT SAY, both handled rather than assumed.
+   *
+   * The METHOD is not stated. RFC 7009 says revocation is a POST, and a
+   * state-changing call should not be a GET, so POST is tried first. Their
+   * example is a bare URL with a query string and no body, which is equally
+   * consistent with a GET, so a 404/405 retries once as GET rather than
+   * reporting a failure that is really a disagreement about verbs.
+   *
+   * The PROSE mentions `client_id` while the URL they print carries only
+   * `access_token`. We send what the example shows. Adding an undocumented
+   * parameter is the same guess in a smaller costume, and if Oura needed it
+   * they would have put it in their own example.
+   */
+  async revoke({ accessToken, signal }) {
+    const url =
+      "https://api.ouraring.com/oauth/revoke" +
+      `?access_token=${encodeURIComponent(accessToken)}`;
+    const call = (method: "POST" | "GET") =>
+      fetch(url, { method, headers: { Accept: "application/json" }, signal });
+
+    let res = await call("POST");
+    if (res.status === 404 || res.status === 405) res = await call("GET");
+
+    // 401 means the token is already dead, which is the outcome we wanted.
+    if (!res.ok && res.status !== 401) {
+      throw new Error(`oura revoke ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    }
+  },
 };
 
 /* -------------------------------------------------------------------------- */
-/* Fitbit                                                                      */
+/* Fitbit, via the Google Health API                                           */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Fitbit's VO2 max, which is a STRING and is sometimes a RANGE.
+ * FITBIT NOW SPEAKS GOOGLE HEALTH, and this is a rewrite rather than an edit.
  *
- * Their documented example returns both forms: `"45"` and `"44-48"`. They only
- * give a single number when the user runs with GPS; otherwise it is a band.
+ * The legacy Fitbit Web API is closed to new applications and is deprecated in
+ * September 2026. Fitbit data now comes from `health.googleapis.com`, behind a
+ * Google account and Google OAuth, with different endpoints, different scopes
+ * and a different response format. Nothing of the old HTTP layer survived.
  *
- * `Number("44-48")` is NaN, so passing this through the usual numeric helper
- * would drop every ranged reading silently, and the metric would look like it
- * simply never arrives for anyone who does not run with GPS. The midpoint is
- * the honest reading of a band, and it keeps the series continuous when a user
- * moves between the two forms.
+ * WRITTEN FROM THE DISCOVERY DOCUMENT, NOT THE MIGRATION GUIDE. Google publish
+ * a machine-readable spec at `health.googleapis.com/$discovery/rest?version=v4`
+ * (revision 20260805), and it disagrees with their own prose in ways that would
+ * each have cost a debugging session:
+ *
+ *   - The method is `dailyRollUp`, with a capital U. The migration guide writes
+ *     it `dailyRollup`. One of those 404s.
+ *   - Sleep and exercise are NOT in the rollup response at all. They are
+ *     session types read through `list`.
+ *   - The path uses kebab-case (`daily-heart-rate-variability`) while the
+ *     filter expression for the same type uses snake_case
+ *     (`daily_heart_rate_variability.date`). Both, in one request.
+ *   - Sleep is explicitly excluded from the session civil-time filter and must
+ *     be filtered on `sleep.interval.end_time` as RFC-3339 instead.
+ *
+ * THE ID STAYS `fitbit`. Members think Fitbit, the redirect URI is registered
+ * against `/api/wearables/callback/fitbit`, and `wearable_connections.provider`
+ * already uses it. Google Health is the pipe, not the brand.
  */
-export function fitbitVo2Max(raw: string | undefined): number | undefined {
-  if (!raw) return undefined;
-  const band = raw.match(/^\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*$/);
-  if (band) {
-    const lo = Number(band[1]);
-    const hi = Number(band[2]);
-    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return undefined;
-    return Math.round(((lo + hi) / 2) * 10) / 10;
-  }
-  return num(raw);
+
+/** Google's `Date` message: a plain calendar date with no timezone. */
+interface GDate {
+  year?: number;
+  month?: number;
+  day?: number;
 }
 
-/** One entry from Fitbit's activity log list. */
-interface FitbitActivity {
-  logId?: number | string;
-  activityName?: string;
-  /** Local time with an offset, e.g. "2026-08-03T12:08:29.000-08:00". */
-  startTime?: string;
-  /** Milliseconds, INCLUDING pauses. `activeDuration` excludes them. */
-  duration?: number;
-  activeDuration?: number;
-  calories?: number;
-  /** In whatever `distanceUnit` says, which is not always metric. */
-  distance?: number;
-  distanceUnit?: string;
-  averageHeartRate?: number;
-  /** manual | mobile_run | tracker | auto_detected | fitstar | an app name. */
-  logType?: string;
-  /** An OBJECT here, unlike Oura's plain string. */
-  source?: { name?: string } | null;
+/** "2026-08-07" as Google's Date message. */
+function gDate(iso: string): GDate {
+  const [year, month, day] = iso.split("-").map(Number);
+  return { year, month, day };
 }
 
-/**
- * Fitbit's distance, in metres, or undefined when we cannot tell the unit.
- *
- * THIS IS THE UNIT TRAP THIS REPO KEEPS FALLING INTO. Fitbit's data dictionary
- * says distance comes back in "units defined by the Accept-Language header",
- * and their own published examples show `"distanceUnit": "Mile"` alongside a
- * bare number. Reading `distance` as kilometres would understate an American
- * member's run by 38% and nothing would fail.
- *
- * So the unit is read from the payload, and an unrecognised one yields nothing
- * rather than a guess. A missing distance is a blank field; a wrong one is a
- * lie in a health record.
- */
-export function fitbitDistanceMetres(
-  distance: number | undefined,
-  unit: string | undefined,
-): number | undefined {
-  const d = num(distance);
-  if (d === undefined || !unit) return undefined;
-  const factor: Record<string, number> = {
-    kilometer: 1000,
-    kilometre: 1000,
-    km: 1000,
-    meter: 1,
-    metre: 1,
-    m: 1,
-    mile: 1609.344,
-    mi: 1609.344,
-    yard: 0.9144,
-    foot: 0.3048,
-    feet: 0.3048,
+/** Google's Date message back to "YYYY-MM-DD", or undefined if unusable. */
+function isoFromGDate(d: GDate | undefined): string | undefined {
+  if (!d?.year || !d.month || !d.day) return undefined;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.year}-${pad(d.month)}-${pad(d.day)}`;
+}
+
+/** The day after `iso`, since every Google range is closed-open. */
+function nextDay(iso: string): string {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+}
+
+/** A `list` response, narrowed to the one data field each call cares about. */
+interface GDataPoint {
+  name?: string;
+  dataSource?: { recordingMethod?: string; platform?: string };
+  dailyRestingHeartRate?: { beatsPerMinute?: string | number; date?: GDate };
+  dailyHeartRateVariability?: {
+    averageHeartRateVariabilityMilliseconds?: number;
+    date?: GDate;
   };
-  // Singular is what Fitbit's examples show, and a plural would otherwise fall
-  // through to "unknown unit" and silently drop the distance. The first version
-  // listed "feet" but not "yards" or "miles", which is the kind of asymmetry
-  // that produces a bug nobody can see. Normalising here beats guessing which
-  // forms a vendor uses.
-  const cleaned = unit.trim().toLowerCase().replace(/s$/, "");
-  const f = factor[cleaned] ?? factor[unit.trim().toLowerCase()];
-  return f === undefined ? undefined : Math.round(d * f);
+  dailyOxygenSaturation?: { averagePercentage?: number; date?: GDate };
+  dailyRespiratoryRate?: { breathsPerMinute?: number; date?: GDate };
+  dailyVo2Max?: { vo2Max?: number; date?: GDate };
+  dailySleepTemperatureDerivations?: {
+    nightlyTemperatureCelsius?: number;
+    baselineTemperatureCelsius?: number;
+    date?: GDate;
+  };
+  sleep?: {
+    summary?: { minutesAsleep?: string | number };
+    metadata?: { nap?: boolean; mainSleep?: boolean; processed?: boolean };
+    interval?: {
+      startTime?: string;
+      endTime?: string;
+      civilStartTime?: { date?: GDate };
+      civilEndTime?: { date?: GDate };
+    };
+  };
+  exercise?: {
+    displayName?: string;
+    exerciseType?: string;
+    interval?: {
+      startTime?: string;
+      endTime?: string;
+      civilStartTime?: { date?: GDate };
+    };
+    metricsSummary?: {
+      caloriesKcal?: number;
+      distanceMillimeters?: number;
+      averageHeartRateBeatsPerMinute?: string | number;
+    };
+  };
 }
 
 /**
- * Fitbit's `logType` values that mean the watch noticed it rather than the
- * member starting it.
+ * Google reports skin temperature as an absolute nightly reading plus a
+ * baseline. Our `temperature_deviation` is the difference, signed.
  *
- * WHY THIS IS LABELLED AND NOT DISCARDED. Fitbit's SmartTrack logs a "Walk"
- * after roughly fifteen minutes of sustained movement, unasked. The first cut
- * of this adapter dropped short auto-detected sessions outright, so that a
- * member who walks to the station twice a day would not open the Training card
- * to seven training days out of seven, having trained on none.
+ * THIS IS THE WHOOP TRAP IN A NEW COAT. Legacy Fitbit sent `nightlyRelative`,
+ * already a deviation, so it mapped straight across. Google sends roughly 33
+ * degrees and a baseline near it; publishing the first as a deviation would put
+ * a body temperature on a chart whose other points are fractions of a degree,
+ * which is exactly why Whoop's `skin_temp_celsius` stayed unmapped.
  *
- * That protected the training number by throwing away real data. A walk is
- * movement, and movement is most of what this app is about; everyday activity
- * acts on bone, muscle, gut and metabolic health whether or not anybody would
- * call it a workout. So every session is stored, and the distinction travels
- * with it.
- *
- * INTENT IS THE LINE, NOT DURATION. Started by the member means training. Noticed
- * by the device means movement. No per-sport thresholds to argue about, one
- * sentence to explain, and somebody who considers their auto-detected hour a
- * real session can log it at check-in, which the training view already
- * reconciles per day.
- *
- * `fitstar` is Fitbit's own guided-workout app, which the member does start,
- * so it is deliberately NOT here.
+ * Without a baseline there is no deviation to report, and inventing one from a
+ * population figure would be worse than a gap.
  */
-const FITBIT_AUTO_LOG_TYPES = new Set(["auto_detected"]);
+export function googleTemperatureDeviation(
+  nightly: number | undefined,
+  baseline: number | undefined,
+): number | undefined {
+  const n = num(nightly);
+  const b = num(baseline);
+  if (n === undefined || b === undefined) return undefined;
+  return Math.round((n - b) * 100) / 100;
+}
 
-/**
- * FITBIT, AND WHY THIS ENTIRE ADAPTER IS NOW UNREACHABLE.
- *
- * Everything below is written against the LEGACY Fitbit Web API, and that API
- * is closed to us in both directions:
- *
- *   - New applications can no longer be registered. `dev.fitbit.com`'s
- *     registration form now says so outright and points at Google.
- *   - The legacy Web API is deprecated in September 2026.
- *
- * Fitbit access now runs through the GOOGLE HEALTH API, which is a different
- * API rather than a renamed one: `health.googleapis.com`, Google OAuth against
- * a Google account rather than a Fitbit login, `dailyRollup`/`list` methods in
- * place of the hundred-odd legacy endpoints, new response shapes, and three
- * Google scope URLs where this asks for seven Fitbit short strings. Google
- * state plainly that existing tokens do not carry over.
- *
- * WHY IT IS KEPT RATHER THAN DELETED. The metric selection, the day
- * attribution rules and the two traps found while writing it (VO2 max arriving
- * as a range, distance arriving in whatever unit the account's locale implies)
- * are all still true of Fitbit's data and all still needed by the rewrite.
- * Deleting it would throw away the audit and keep only the mistakes.
- *
- * WHY IT IS MARKED `unavailable` RATHER THAN LEFT ALONE. An unconfigured
- * provider is already hidden, so the danger was never that a member sees it.
- * The danger is somebody reading a complete, audited adapter and concluding
- * Fitbit is one registration away, then spending an afternoon producing
- * credentials nothing here can call. The flag makes the file say what is true.
- *
- * Verified against Google's own migration, scopes and setup pages on
- * 2026-08-06. Details and the rewrite plan are in `docs/WEARABLES.md`.
- */
+/** Google Health's OAuth scopes. Four metrics now share one of them. */
+const GOOGLE_HEALTH_SCOPES = [
+  "https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly",
+  "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly",
+  "https://www.googleapis.com/auth/googlehealth.sleep.readonly",
+];
+
+const GH_BASE = "https://health.googleapis.com/v4/users/me/dataTypes";
+
 const fitbit: WearableProvider = {
   id: "fitbit",
   name: PROVIDER_NAMES.fitbit,
   blurb: "Steps, sleep and resting heart rate from Fitbit.",
-  unavailable:
-    "Fitbit moved to the Google Health API. This adapter targets the legacy " +
-    "Fitbit Web API, which is closed to new applications and is deprecated in " +
-    "September 2026, so it must be rewritten before Fitbit can be connected.",
   clientIdEnv: "FITBIT_CLIENT_ID",
   clientSecretEnv: "FITBIT_CLIENT_SECRET",
-  authorizeUrl: "https://www.fitbit.com/oauth2/authorize",
-  tokenUrl: "https://api.fitbit.com/oauth2/token",
-  // SEVEN SCOPES, EVERY ONE OF THEM READ. Fitbit was down to three because the
-  // other three it used to ask for were dead. It is back up to seven because
-  // the adapter now calls the collections that justify them, which is the right
-  // order to do it in: the scope list follows the code, never the other way.
-  //
-  // Deliberately still absent: `weight` and `profile`. Nothing reads either.
-  //
-  // Timing matters here. Fitbit is the one provider not yet registered, so
-  // changing this list is free today and costs a re-consent from every
-  // connected member afterwards. Getting it right once is why the endpoints
-  // below were written before the developer application was created.
-  scopes: [
-    "activity",
-    "heartrate",
-    "sleep",
-    "oxygen_saturation",
-    "cardio_fitness",
-    "respiratory_rate",
-    "temperature",
-  ],
-  // Fitbit rejects credentials in the body and requires Basic.
-  tokenAuth: "basic",
-  refreshRotates: true,
+
+  // Google's own OAuth, not Fitbit's. The member signs in with a Google
+  // account; a Fitbit login will not appear anywhere in this flow.
+  authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+  tokenUrl: "https://oauth2.googleapis.com/token",
+
+  /**
+   * THREE SCOPES WHERE THERE WERE SEVEN, and the collapse matters.
+   *
+   * `heartrate`, `oxygen_saturation`, `respiratory_rate` and `temperature`
+   * were four separately declinable Fitbit scopes and are now one Google
+   * bundle. Under the old API a member could decline SpO2 and keep HRV; here
+   * those four arrive or refuse together. The defensive per-collection fetch
+   * below still earns its place, but what it protects against has changed
+   * shape: a partial refusal is now all-or-nothing across that bundle.
+   */
+  scopes: GOOGLE_HEALTH_SCOPES,
+
+  /**
+   * WITHOUT THESE TWO, GOOGLE ISSUES NO REFRESH TOKEN and every connection
+   * dies within the hour with nothing in the logs to explain it. `access_type`
+   * is what asks for one at all; `prompt` is what makes Google reissue it when
+   * a member who has consented before reconnects, since it is sent exactly
+   * once per grant otherwise. This is Whoop's `offline` scope in Google form,
+   * and it cost that integration a day.
+   */
+  extraAuthParams: { access_type: "offline", prompt: "consent" },
+
+  tokenAuth: "body",
+
+  /**
+   * Google does NOT rotate refresh tokens: the same one is reused, and the
+   * refresh response omits the field entirely. `tokenColumns` only overwrites
+   * when a vendor actually sends one, so the stored token survives.
+   */
+  refreshRotates: false,
   syncWindowDays: 7,
+
   async fetchRange({ accessToken, start, end }) {
     const out: DailyMetric[] = [];
-    const api = "https://api.fitbit.com/1";
+    // Every Google range is closed-open, so the last day needs the day after.
+    const endExclusive = nextDay(end);
 
-    const steps = await providerFetch<{ "activities-steps"?: { dateTime: string; value: string }[] }>(
-      "fitbit",
-      `${api}/user/-/activities/steps/date/${start}/${end}.json`,
-      { accessToken },
-    );
-    for (const d of steps["activities-steps"] ?? []) {
-      push(out, "steps", d.dateTime, num(d.value), "fitbit");
-    }
-
-    const rhr = await providerFetch<{
-      "activities-heart"?: { dateTime: string; value?: { restingHeartRate?: number } }[];
-    }>("fitbit", `${api}/user/-/activities/heart/date/${start}/${end}.json`, { accessToken });
-    for (const d of rhr["activities-heart"] ?? []) {
-      push(out, "resting_heart_rate", d.dateTime, num(d.value?.restingHeartRate), "fitbit");
-    }
-
-    // `${api}.2` is api.fitbit.com/1.2: sleep is the one collection still on
-    // 1.2 while everything else here is on 1.
-    const sleep = await providerFetch<{
-      sleep?: {
-        dateOfSleep?: string;
-        minutesAsleep?: number;
-        efficiency?: number;
-        /** False for naps. Fitbit logs those as separate records. */
-        isMainSleep?: boolean;
-      }[];
-    }>("fitbit", `${api}.2/user/-/sleep/date/${start}/${end}.json`, { accessToken });
-    for (const s of sleep.sleep ?? []) {
-      if (!s || typeof s !== "object") continue;
-      // NAPS SHARE A DATE WITH THE NIGHT. The metrics upsert is keyed on
-      // (user, provider, date, metric), so an afternoon nap arriving after the
-      // night would replace it outright and the day would read as 40 minutes
-      // of sleep. Same trap as Whoop's `nap` flag.
-      if (s.isMainSleep === false) continue;
-      push(out, "sleep_minutes", s.dateOfSleep, num(s.minutesAsleep), "fitbit");
-
-      // NO SLEEP SCORE FROM FITBIT, deliberately. `efficiency` is time asleep
-      // over time in bed, which is a different quantity from a sleep score:
-      // Fitbit's own Sleep Score is a composite and is not exposed on the
-      // public API at all. Publishing efficiency under `sleep_score` would put
-      // a number next to Oura's that means something else, that the member
-      // cannot reconcile against Fitbit's own app, and that is not even
-      // labelled the same thing there. Better to contribute nothing.
-    }
-
-    /*
-     * THE OVERNIGHT FOUR.
+    /**
+     * A `list` call, tolerant of refusal.
      *
-     * HRV, SpO2, breathing rate and skin temperature all describe a user's
-     * "main sleep", and Fitbit says plainly that a value dated the 22nd may
-     * come from a night that began on the 21st. They have already decided which
-     * day it belongs to, so `dateTime` is used as given rather than shifted.
-     *
-     * Each is its own collection behind its own scope, which is why Fitbit
-     * contributed three metrics before this and eight after. All four cap at a
-     * 30 day range; our window is 7.
+     * Each collection is wrapped because a member can decline a scope at the
+     * consent screen, and letting that fail the whole sync would cost them
+     * sleep and steps over a metric they chose not to share. A 403 here would
+     * otherwise reach the sweep as `ReauthRequired` and mark the connection
+     * dead outright.
      */
-    const optional = async <T>(path: string): Promise<T | null> => {
+    const list = async (dataType: string, filter: string): Promise<GDataPoint[]> => {
       try {
-        return await providerFetch<T>("fitbit", `${api}/user/-/${path}`, { accessToken });
+        const res = await providerFetch<{ dataPoints?: GDataPoint[] }>(
+          "fitbit",
+          `${GH_BASE}/${dataType}/dataPoints?filter=${encodeURIComponent(filter)}&pageSize=200`,
+          { accessToken },
+        );
+        return res.dataPoints ?? [];
       } catch {
-        // A member can decline any one of these scopes at the consent screen.
-        // Letting that fail the whole sync would cost them sleep and steps over
-        // a metric they chose not to share, and a 403 here reaches the sweep as
-        // ReauthRequired, which would mark the connection dead outright.
-        return null;
+        return [];
       }
     };
 
-    const [hrv, spo2, breathing, temp] = await Promise.all([
-      optional<{ hrv?: { dateTime?: string; value?: { dailyRmssd?: number } }[] }>(
-        `hrv/date/${start}/${end}.json`,
-      ),
-      optional<{ spo2?: { dateTime?: string; value?: { avg?: number } }[] }>(
-        `spo2/date/${start}/${end}.json`,
-      ),
-      optional<{ br?: { dateTime?: string; value?: { breathingRate?: number } }[] }>(
-        `br/date/${start}/${end}.json`,
-      ),
-      optional<{ tempSkin?: { dateTime?: string; value?: { nightlyRelative?: number } }[] }>(
-        `temp/skin/date/${start}/${end}.json`,
-      ),
+    /**
+     * A daily summary collection.
+     *
+     * The path is kebab-case and the filter field is snake_case, for the same
+     * data type, in the same request. That is Google's spec, not a typo here.
+     */
+    const daily = (dataType: string) =>
+      list(
+        dataType,
+        `${dataType.replace(/-/g, "_")}.date >= "${start}" AND ` +
+          `${dataType.replace(/-/g, "_")}.date < "${endExclusive}"`,
+      );
+
+    const [rhr, hrv, spo2, breathing, vo2, temp] = await Promise.all([
+      daily("daily-resting-heart-rate"),
+      daily("daily-heart-rate-variability"),
+      daily("daily-oxygen-saturation"),
+      daily("daily-respiratory-rate"),
+      daily("daily-vo2-max"),
+      daily("daily-sleep-temperature-derivations"),
     ]);
 
-    for (const d of hrv?.hrv ?? []) {
-      // `dailyRmssd` is the whole-night figure. `deepRmssd` covers deep sleep
-      // only and is not what other vendors report, so it is not used.
-      push(out, "hrv", d.dateTime, num(d.value?.dailyRmssd), "fitbit");
+    for (const p of rhr) {
+      const d = p.dailyRestingHeartRate;
+      push(out, "resting_heart_rate", isoFromGDate(d?.date), num(d?.beatsPerMinute), "fitbit");
     }
-    for (const d of spo2?.spo2 ?? []) {
-      push(out, "spo2", d.dateTime, num(d.value?.avg), "fitbit");
+    for (const p of hrv) {
+      const d = p.dailyHeartRateVariability;
+      // RMSSD, which is what every other vendor here reports. The deep-sleep
+      // variant sits alongside it and is not comparable.
+      push(
+        out,
+        "hrv",
+        isoFromGDate(d?.date),
+        num(d?.averageHeartRateVariabilityMilliseconds),
+        "fitbit",
+      );
     }
-    for (const d of breathing?.br ?? []) {
-      push(out, "respiratory_rate", d.dateTime, num(d.value?.breathingRate), "fitbit");
+    for (const p of spo2) {
+      const d = p.dailyOxygenSaturation;
+      push(out, "spo2", isoFromGDate(d?.date), num(d?.averagePercentage), "fitbit");
     }
-    for (const d of temp?.tempSkin ?? []) {
-      // `nightlyRelative` is already a deviation from the wearer's baseline,
-      // signed and legitimately negative, which is exactly what our
-      // `temperature_deviation` means. Unlike Whoop's skin_temp_celsius, this
-      // one maps directly.
-      push(out, "temperature_deviation", d.dateTime, num(d.value?.nightlyRelative), "fitbit");
+    for (const p of breathing) {
+      const d = p.dailyRespiratoryRate;
+      push(out, "respiratory_rate", isoFromGDate(d?.date), num(d?.breathsPerMinute), "fitbit");
+    }
+    for (const p of vo2) {
+      // A plain number now. The legacy API sent a string that was sometimes a
+      // range like "44-48", which needed parsing; that trap is gone.
+      push(out, "vo2max", isoFromGDate(p.dailyVo2Max?.date), num(p.dailyVo2Max?.vo2Max), "fitbit");
+    }
+    for (const p of temp) {
+      const d = p.dailySleepTemperatureDerivations;
+      push(
+        out,
+        "temperature_deviation",
+        isoFromGDate(d?.date),
+        googleTemperatureDeviation(d?.nightlyTemperatureCelsius, d?.baselineTemperatureCelsius),
+        "fitbit",
+      );
     }
 
-    const cardio = await optional<{
-      cardioScore?: { dateTime?: string; value?: { vo2Max?: string } }[];
-    }>(`cardioscore/date/${start}/${end}.json`);
-    for (const d of cardio?.cardioScore ?? []) {
-      push(out, "vo2max", d.dateTime, fitbitVo2Max(d.value?.vo2Max), "fitbit");
+    /*
+     * SLEEP, which filters differently from every other session type.
+     *
+     * Google exclude sleep from the civil-start-time filter and want
+     * `sleep.interval.end_time` in RFC-3339 instead. Filtering on the END is
+     * also the right question: a night belongs to the morning you wake, which
+     * is the rule Oura's adapter follows for the same reason.
+     */
+    const sleeps = await list(
+      "sleep",
+      `sleep.interval.end_time >= "${start}T00:00:00Z" AND ` +
+        `sleep.interval.end_time < "${endExclusive}T00:00:00Z"`,
+    );
+    for (const p of sleeps) {
+      const s = p.sleep;
+      if (!s) continue;
+      // Naps share a day with the night they adjoin, and the upsert is keyed
+      // on (user, provider, date, metric), so keeping them would let a 20
+      // minute nap silently replace a full night. Both adapters that missed
+      // this shipped the bug.
+      if (s.metadata?.nap === true) continue;
+      if (s.metadata?.mainSleep === false) continue;
+      const day =
+        isoFromGDate(s.interval?.civilEndTime?.date) ??
+        (s.interval?.endTime ? dayOf(s.interval.endTime) : undefined);
+      push(out, "sleep_minutes", day, num(s.summary?.minutesAsleep), "fitbit");
+      // NO sleep score. Google Health exposes none, exactly as the legacy API
+      // did not, and publishing sleep efficiency under `sleep_score` would put
+      // a number beside Oura's that means something else.
+    }
+
+    /*
+     * STEPS AND ACTIVE CALORIES, which are interval types and roll up.
+     *
+     * `dailyRollUp` is a POST with a closed-open civil range and a window size
+     * in days. Note the capital U: Google's own migration guide writes
+     * `dailyRollup`, and that spelling 404s.
+     */
+    const rollUp = async (dataType: string) => {
+      try {
+        return await providerFetch<{
+          rollupDataPoints?: {
+            civilStartTime?: { date?: GDate };
+            steps?: { countSum?: string | number };
+            activeEnergyBurned?: { kcalSum?: number };
+          }[];
+        }>("fitbit", `${GH_BASE}/${dataType}/dataPoints:dailyRollUp`, {
+          accessToken,
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            range: { start: { date: gDate(start) }, end: { date: gDate(endExclusive) } },
+            windowSizeDays: 1,
+          }),
+        });
+      } catch {
+        return { rollupDataPoints: [] };
+      }
+    };
+
+    const [stepRoll, energyRoll] = await Promise.all([
+      rollUp("steps"),
+      rollUp("active-energy-burned"),
+    ]);
+    for (const r of stepRoll.rollupDataPoints ?? []) {
+      push(out, "steps", isoFromGDate(r.civilStartTime?.date), num(r.steps?.countSum), "fitbit");
+    }
+    for (const r of energyRoll.rollupDataPoints ?? []) {
+      push(
+        out,
+        "active_calories",
+        isoFromGDate(r.civilStartTime?.date),
+        num(r.activeEnergyBurned?.kcalSum),
+        "fitbit",
+      );
     }
 
     return out;
   },
 
   /**
-   * Fitbit workouts, from the activity log list.
+   * Exercise sessions.
    *
-   * THREE THINGS ABOUT THIS ENDPOINT ARE NOT LIKE THE OTHERS.
+   * `recordingMethod` IS THE AUTO-DETECTED SIGNAL, and it is better than what
+   * the legacy API gave us. Fitbit's `logType` had to be pattern-matched
+   * against a list of strings; Google state the recording method as an enum, so
+   * `PASSIVELY_MEASURED` means the device noticed the session and anything else
+   * means a person was involved. That maps straight onto migration 0021's
+   * `auto_detected`, which keeps an auto-logged walk out of the training-day
+   * count without discarding it.
    *
-   * It has no end date. `afterDate` must be paired with `sort=asc`, `offset`
-   * must be 0 and `limit` caps at 100, so the window's far edge is trimmed here
-   * rather than asked for. With a 7 day sync window and a 100 row page, a
-   * member would have to log fourteen sessions a day to overflow it.
-   *
-   * It gives a duration, not an end time. `duration` is elapsed milliseconds
-   * INCLUDING pauses, which is the right one for a start-to-end pair: the row
-   * says when the session happened, and Oura's and Whoop's spans include their
-   * pauses too. `activeDuration` would make our interval disagree with the
-   * clock.
-   *
-   * `source` is an object, where Oura sends a plain string.
+   * `UNSPECIFIED` and `UNKNOWN` are NOT treated as auto-detected. False there
+   * means "they do not say", not "we know it was deliberate", which is the same
+   * rule every other provider follows.
    */
   async fetchWorkouts({ accessToken, start, end }) {
-    const res = await providerFetch<{ activities?: FitbitActivity[] }>(
+    const endExclusive = nextDay(end);
+    const res = await providerFetch<{ dataPoints?: GDataPoint[] }>(
       "fitbit",
-      "https://api.fitbit.com/1/user/-/activities/list.json" +
-        `?afterDate=${start}&sort=asc&offset=0&limit=100`,
+      `${GH_BASE}/exercise/dataPoints?pageSize=200&filter=` +
+        encodeURIComponent(
+          `exercise.interval.civil_start_time >= "${start}" AND ` +
+            `exercise.interval.civil_start_time < "${endExclusive}"`,
+        ),
       { accessToken },
     );
 
     const out: WorkoutSession[] = [];
-    for (const a of res.activities ?? []) {
-      if (!a || typeof a !== "object") continue;
-      const id = a.logId;
-      if (id === undefined || id === null || !a.startTime) continue;
+    for (const p of res.dataPoints ?? []) {
+      if (!p || typeof p !== "object") continue;
+      const e = p.exercise;
+      const startedAt = e?.interval?.startTime;
+      const endedAt = e?.interval?.endTime;
+      if (!e || !startedAt || !endedAt) continue;
 
-      const ms = num(a.duration);
-      const startMs = Date.parse(a.startTime);
-      if (ms === undefined || ms <= 0 || !Number.isFinite(startMs)) continue;
+      const date =
+        isoFromGDate(e.interval?.civilStartTime?.date) ?? dayOf(startedAt);
+      if (!date || date < start || date > end) continue;
 
-      // The local date, taken from the offset Fitbit already applied. Their
-      // timestamp says which day the member thinks it was; converting to UTC
-      // first would move an evening session in Asia onto the following day.
-      const date = a.startTime.slice(0, 10);
-      if (date < start || date > end) continue;
+      const metrics = e.metricsSummary;
+      const distanceMm = num(metrics?.distanceMillimeters);
 
       out.push({
-        autoDetected: FITBIT_AUTO_LOG_TYPES.has(a.logType ?? ""),
-        externalId: String(id),
-        startedAt: a.startTime,
-        endedAt: new Date(startMs + ms).toISOString(),
+        // `name` is Google's own identifier and is the stable half of the
+        // idempotency key. Sessions without one fall back to their start and
+        // type, which is unique enough: a member cannot begin two exercises of
+        // the same kind at the same instant.
+        externalId: p.name ?? `${startedAt}:${e.exerciseType ?? "exercise"}`,
+        startedAt,
+        endedAt,
         date,
-        activity: a.activityName ?? undefined,
-        calories: num(a.calories),
-        distanceM: fitbitDistanceMetres(a.distance, a.distanceUnit),
-        avgHeartRate: num(a.averageHeartRate),
-        // How Fitbit came by the session, which is the closest thing they give
-        // to Oura's intensity label and worth keeping: a member reading their
-        // own history should be able to tell what the watch guessed from what
-        // they started.
-        source: a.source?.name ?? a.logType ?? undefined,
+        activity: e.displayName ?? undefined,
+        calories: num(metrics?.caloriesKcal),
+        // MILLIMETRES. Not metres, and not the locale-dependent unit the
+        // legacy API used, which had to be read from a `distanceUnit` field.
+        distanceM: distanceMm === undefined ? undefined : Math.round(distanceMm / 1000),
+        avgHeartRate: num(metrics?.averageHeartRateBeatsPerMinute),
+        autoDetected: p.dataSource?.recordingMethod === "PASSIVELY_MEASURED",
+        source: p.dataSource?.platform ?? undefined,
       });
     }
     return out;
   },
 
   /**
-   * Fitbit's documented revoke: POST /oauth2/revoke, Basic auth with the app's
-   * own credentials, and the token in a form body.
-   *
-   * THE REFRESH TOKEN IS SENT, NOT THE ACCESS TOKEN. Fitbit accept either, and
-   * revoking the refresh token kills the whole grant rather than one hour of it.
+   * Google's standard OAuth revocation, which takes either token and kills the
+   * whole grant. Documented at `oauth2.googleapis.com/revoke`, unlike Oura's,
+   * which had to be read off a page by hand.
    */
-  async revoke({ accessToken, refreshToken, clientId, clientSecret, signal }) {
-    const res = await fetch("https://api.fitbit.com/oauth2/revoke", {
+  async revoke({ accessToken, refreshToken, signal }) {
+    const res = await fetch("https://oauth2.googleapis.com/revoke", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-        Accept: "application/json",
-      },
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ token: refreshToken ?? accessToken }),
       signal,
     });
-    if (!res.ok) {
-      throw new Error(`fitbit revoke ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    // 400 is what Google answer for a token that is already invalid, which is
+    // the outcome we wanted.
+    if (!res.ok && res.status !== 400) {
+      throw new Error(`google health revoke ${res.status}: ${(await res.text()).slice(0, 200)}`);
     }
   },
 };

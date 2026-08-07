@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
-import { fitbitDistanceMetres, fitbitVo2Max, PROVIDERS } from "./providers";
+import { googleTemperatureDeviation, PROVIDERS } from "./providers";
 
 /**
  * Oura and Fitbit, checked against their published documentation.
@@ -230,163 +230,154 @@ describe("Oura workouts", () => {
   });
 });
 
-/* ---------------------------------------------------------------- Fitbit ---- */
+/* ========================================================================== */
+/* Fitbit, via the Google Health API                                          */
+/* ========================================================================== */
+
+/**
+ * Written against Google's discovery document
+ * (`health.googleapis.com/$discovery/rest?version=v4`, revision 20260805),
+ * which disagrees with their own migration prose in several places. These
+ * tests pin the disagreements, because each one is a silent-empty-metric bug
+ * of the kind that has caught four adapters in this repo.
+ */
 
 const fitbit = PROVIDERS.fitbit;
 
-/** From Fitbit's documented sleep log shape. */
-const night = {
-  dateOfSleep: "2026-08-01",
-  minutesAsleep: 397,
-  efficiency: 68,
-  isMainSleep: true,
-};
-const nap = {
-  dateOfSleep: "2026-08-01",
-  minutesAsleep: 40,
-  efficiency: 96,
-  isMainSleep: false,
+/** Records every request so a test can assert on paths, filters and bodies. */
+function captureFetch(byFragment: Record<string, unknown> = {}) {
+  const calls: { url: string; method: string; body: string | null }[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init: RequestInit = {}) => {
+      const u = String(url);
+      calls.push({
+        url: u,
+        method: String(init.method ?? "GET"),
+        body: init.body ? String(init.body) : null,
+      });
+      const hit = Object.entries(byFragment).find(([frag]) => u.includes(frag));
+      return new Response(JSON.stringify(hit ? hit[1] : {}), { status: 200 });
+    }),
+  );
+  return calls;
+}
+
+const gd = (iso: string) => {
+  const [year, month, day] = iso.split("-").map(Number);
+  return { year, month, day };
 };
 
-describe("Fitbit scopes", () => {
-  it("still asks for nothing that goes unread", () => {
-    // `profile` and `weight` were dropped as dead and stay dropped.
-    // `oxygen_saturation` came back only when the adapter started calling the
-    // SpO2 collection, which is the right order: the scope list follows the
-    // code, never the other way round.
-    for (const dead of ["profile", "weight"]) {
-      expect(fitbit.scopes, dead).not.toContain(dead);
-    }
+describe("Google Health OAuth", () => {
+  it("points at Google, not Fitbit", () => {
+    // The member signs in with a Google account. A Fitbit login appears
+    // nowhere in this flow.
+    expect(fitbit.authorizeUrl).toContain("accounts.google.com");
+    expect(fitbit.tokenUrl).toBe("https://oauth2.googleapis.com/token");
   });
 
-  it("sends client credentials as Basic, which Fitbit requires", () => {
-    expect(fitbit.tokenAuth).toBe("basic");
+  it("asks for offline access, without which there is no refresh token at all", () => {
+    // Google issues no refresh token unless access_type=offline, and sends one
+    // exactly once per grant unless prompt=consent forces a reissue. Miss
+    // either and the connection works for an hour and then dies silently.
+    expect(fitbit.extraAuthParams).toMatchObject({
+      access_type: "offline",
+      prompt: "consent",
+    });
+  });
+
+  it("requests three scopes, all read-only", () => {
+    expect(fitbit.scopes).toHaveLength(3);
+    for (const s of fitbit.scopes) {
+      expect(s).toMatch(/^https:\/\/www\.googleapis\.com\/auth\/googlehealth\./);
+      expect(s).toMatch(/\.readonly$/);
+    }
+    // Four legacy scopes collapsed into this one bundle, so heart rate, SpO2,
+    // respiratory rate and temperature now arrive or refuse together.
+    expect(fitbit.scopes).toContain(
+      "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly",
+    );
+  });
+
+  it("does not claim Google rotates refresh tokens, because it does not", () => {
+    // Google reuses the same refresh token and omits the field on refresh.
+    // Claiming rotation would be harmless here only because tokenColumns
+    // refuses to blank a token the vendor did not send.
+    expect(fitbit.refreshRotates).toBe(false);
   });
 });
 
-describe("Fitbit sleep", () => {
-  it("ignores naps, which would otherwise replace the night", async () => {
-    // Both records carry the same `dateOfSleep`, and the upsert is keyed on
-    // (user, provider, date, metric), so the nap would win on arrival order.
-    route({ "/sleep/date/": { sleep: [night, nap] } });
-    const out = await fitbit.fetchRange!(range);
-    const sleeps = out.filter((m) => m.metric === "sleep_minutes");
-    expect(sleeps).toHaveLength(1);
-    expect(sleeps[0].value).toBe(397);
+describe("Google Health daily collections", () => {
+  it("uses kebab-case in the path and snake_case in the filter", () => {
+    // Google's spec really does want both spellings of one data type in a
+    // single request. Getting it uniform either way returns nothing.
+    const calls = captureFetch();
+    return fitbit.fetchRange!(range).then(() => {
+      const hrv = calls.find((c) => c.url.includes("daily-heart-rate-variability"));
+      expect(hrv, "path should be kebab-case").toBeTruthy();
+      expect(decodeURIComponent(hrv!.url)).toContain("daily_heart_rate_variability.date");
+    });
   });
 
-  it("publishes no sleep score, because efficiency is not one", async () => {
-    // Fitbit's real Sleep Score is not on the public API. `efficiency` is time
-    // asleep over time in bed: a different quantity, not reconcilable against
-    // Fitbit's own app, and misleading beside Oura's score in one series.
-    route({ "/sleep/date/": { sleep: [night] } });
-    const out = await fitbit.fetchRange!(range);
-    expect(out.some((m) => m.metric === "sleep_score")).toBe(false);
+  it("asks for a closed-open range, so the last day is not dropped", async () => {
+    const calls = captureFetch();
+    await fitbit.fetchRange!(range);
+    const hrv = calls.find((c) => c.url.includes("daily-heart-rate-variability"))!;
+    const filter = decodeURIComponent(hrv.url);
+    expect(filter).toContain('>= "2026-08-01"');
+    // end is 2026-08-01, so the exclusive bound is the next day.
+    expect(filter).toContain('< "2026-08-02"');
   });
 
-  it("still reads steps and resting heart rate", async () => {
-    route({
-      "/activities/steps/": { "activities-steps": [{ dateTime: "2026-08-01", value: "9432" }] },
-      "/activities/heart/": {
-        "activities-heart": [{ dateTime: "2026-08-01", value: { restingHeartRate: 58 } }],
+  it("reads the daily metrics off their own shapes", async () => {
+    captureFetch({
+      "daily-resting-heart-rate": {
+        dataPoints: [{ dailyRestingHeartRate: { beatsPerMinute: "54", date: gd("2026-08-01") } }],
+      },
+      "daily-heart-rate-variability": {
+        dataPoints: [
+          {
+            dailyHeartRateVariability: {
+              averageHeartRateVariabilityMilliseconds: 61.5,
+              date: gd("2026-08-01"),
+            },
+          },
+        ],
+      },
+      "daily-oxygen-saturation": {
+        dataPoints: [{ dailyOxygenSaturation: { averagePercentage: 96.4, date: gd("2026-08-01") } }],
+      },
+      "daily-respiratory-rate": {
+        dataPoints: [{ dailyRespiratoryRate: { breathsPerMinute: 14.2, date: gd("2026-08-01") } }],
+      },
+      "daily-vo2-max": {
+        dataPoints: [{ dailyVo2Max: { vo2Max: 46.1, date: gd("2026-08-01") } }],
       },
     });
     const out = await fitbit.fetchRange!(range);
-    const by = Object.fromEntries(out.map((m) => [m.metric, m.value]));
-    // Fitbit sends step counts as STRINGS. `num` parses them.
-    expect(by).toMatchObject({ steps: 9432, resting_heart_rate: 58 });
+    const at = (m: string) => out.find((x) => x.metric === m)?.value;
+    // beatsPerMinute is an int64, which JSON carries as a STRING.
+    expect(at("resting_heart_rate")).toBe(54);
+    expect(at("hrv")).toBe(61.5);
+    expect(at("spo2")).toBe(96.4);
+    expect(at("respiratory_rate")).toBe(14.2);
+    expect(at("vo2max")).toBe(46.1);
   });
 
-  it("survives a null record instead of throwing", async () => {
-    route({ "/sleep/date/": { sleep: [null, night] } });
-    const out = await fitbit.fetchRange!(range);
-    expect(out.some((m) => m.metric === "sleep_minutes")).toBe(true);
-  });
-});
-
-describe("Fitbit VO2 max, which is a string and sometimes a range", () => {
-  /**
-   * Their documented example returns both forms. Fitbit gives a single number
-   * only when the user runs with GPS; otherwise it is a band. `Number("44-48")`
-   * is NaN, so the usual numeric helper would drop every ranged reading and the
-   * metric would look like it simply never arrives for anyone who does not run.
-   */
-  it("takes the midpoint of a band", () => {
-    expect(fitbitVo2Max("44-48")).toBe(46);
-  });
-
-  it("reads a plain value unchanged", () => {
-    expect(fitbitVo2Max("45")).toBe(45);
-  });
-
-  it("keeps the series continuous across both forms", () => {
-    // A user who starts running with GPS switches from bands to numbers. Both
-    // have to land on the same scale or the chart steps for no reason.
-    expect(fitbitVo2Max("44-48")).toBeGreaterThan(fitbitVo2Max("43")!);
-    expect(fitbitVo2Max("44-48")).toBeLessThan(fitbitVo2Max("49")!);
-  });
-
-  it("gives up rather than inventing a number", () => {
-    for (const junk of [undefined, "", "n/a", "-", "44-"]) {
-      expect(fitbitVo2Max(junk as string | undefined), String(junk)).toBeUndefined();
-    }
-  });
-});
-
-describe("Fitbit's overnight collections", () => {
-  it("reads HRV, SpO2, breathing rate and skin temperature", async () => {
-    route({
-      "/hrv/date/": { hrv: [{ dateTime: "2026-08-01", value: { dailyRmssd: 62.9, deepRmssd: 58.2 } }] },
-      "/spo2/date/": { spo2: [{ dateTime: "2026-08-01", value: { avg: 95.8 } }] },
-      "/br/date/": { br: [{ dateTime: "2026-08-01", value: { breathingRate: 15.4 } }] },
-      "/temp/skin/date/": { tempSkin: [{ dateTime: "2026-08-01", value: { nightlyRelative: -0.2 } }] },
-      "/cardioscore/date/": { cardioScore: [{ dateTime: "2026-08-01", value: { vo2Max: "44-48" } }] },
-    });
-    const out = await fitbit.fetchRange!(range);
-    const by = Object.fromEntries(out.map((m) => [m.metric, m.value]));
-    expect(by).toMatchObject({
-      hrv: 62.9,
-      spo2: 95.8,
-      respiratory_rate: 15.4,
-      temperature_deviation: -0.2,
-      vo2max: 46,
-    });
-  });
-
-  it("uses the whole-night HRV, not the deep-sleep one", async () => {
-    // `deepRmssd` covers deep sleep only and is not what other vendors report.
-    route({
-      "/hrv/date/": { hrv: [{ dateTime: "2026-08-01", value: { dailyRmssd: 62.9, deepRmssd: 58.2 } }] },
-    });
-    const out = await fitbit.fetchRange!(range);
-    expect(out.find((m) => m.metric === "hrv")?.value).toBe(62.9);
-  });
-
-  it("keeps a negative temperature deviation negative", async () => {
-    // nightlyRelative is already a deviation from baseline, unlike Whoop's
-    // absolute skin_temp_celsius. Clamping would erase the signal.
-    route({
-      "/temp/skin/date/": { tempSkin: [{ dateTime: "2026-08-01", value: { nightlyRelative: -0.4 } }] },
-    });
-    const out = await fitbit.fetchRange!(range);
-    expect(out.find((m) => m.metric === "temperature_deviation")?.value).toBe(-0.4);
-  });
-
-  it("survives a declined scope without failing the whole sync", async () => {
-    // A member can untick any of these at the consent screen. Losing steps and
-    // sleep over a metric they chose not to share would be the wrong trade, and
-    // a 403 reaches the sweep as ReauthRequired, which marks the connection
-    // dead outright.
+  it("survives one collection being refused without losing the others", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) => {
-        const u = String(url);
-        if (u.includes("/hrv/") || u.includes("/temp/") || u.includes("/cardioscore/")) {
-          return new Response("", { status: 403 });
+        if (String(url).includes("daily-oxygen-saturation")) {
+          return new Response("nope", { status: 403 });
         }
-        if (u.includes("/activities/steps/")) {
+        if (String(url).includes("daily-resting-heart-rate")) {
           return new Response(
-            JSON.stringify({ "activities-steps": [{ dateTime: "2026-08-01", value: "9000" }] }),
+            JSON.stringify({
+              dataPoints: [
+                { dailyRestingHeartRate: { beatsPerMinute: "51", date: gd("2026-08-01") } },
+              ],
+            }),
             { status: 200 },
           );
         }
@@ -394,163 +385,233 @@ describe("Fitbit's overnight collections", () => {
       }),
     );
     const out = await fitbit.fetchRange!(range);
-    expect(out.find((m) => m.metric === "steps")?.value).toBe(9000);
-    expect(out.some((m) => m.metric === "hrv")).toBe(false);
-  });
-
-  it("asks for every scope it reads, and nothing more", () => {
-    expect(fitbit.scopes).toEqual([
-      "activity",
-      "heartrate",
-      "sleep",
-      "oxygen_saturation",
-      "cardio_fitness",
-      "respiratory_rate",
-      "temperature",
-    ]);
-    // Still dead, still absent.
-    expect(fitbit.scopes).not.toContain("weight");
-    expect(fitbit.scopes).not.toContain("profile");
+    expect(out.find((m) => m.metric === "resting_heart_rate")?.value).toBe(51);
+    expect(out.some((m) => m.metric === "spo2")).toBe(false);
   });
 });
 
-describe("Fitbit distance, which is not reliably metric", () => {
-  it("converts using the unit Fitbit sent, not an assumption", () => {
-    // Their data dictionary: distance comes back in "units defined by the
-    // Accept-Language header", and their own examples show Mile. Reading it as
-    // kilometres understates an American member's run by 38%, silently.
-    expect(fitbitDistanceMetres(1.872894, "Mile")).toBe(3014);
-    expect(fitbitDistanceMetres(5, "Kilometer")).toBe(5000);
-    expect(fitbitDistanceMetres(400, "Meter")).toBe(400);
+describe("Google Health skin temperature, the Whoop trap in a new coat", () => {
+  it("subtracts the baseline rather than publishing an absolute reading", () => {
+    // Legacy Fitbit sent a value that was already a deviation. Google sends
+    // roughly 33 degrees plus a baseline, and publishing the first as a
+    // deviation would put a body temperature on a chart of fractions.
+    expect(googleTemperatureDeviation(33.4, 33.1)).toBe(0.3);
+    expect(googleTemperatureDeviation(32.8, 33.1)).toBe(-0.3);
   });
 
-  it("accepts a plural unit, which an asymmetric table silently dropped", () => {
-    // The first table listed "feet" but neither "yards" nor "miles", so a
-    // plural fell through to "unknown unit" and the distance vanished. That
-    // asymmetry is invisible until somebody's run has no distance on it.
-    expect(fitbitDistanceMetres(2, "Miles")).toBe(3219);
-    expect(fitbitDistanceMetres(5, "Kilometers")).toBe(5000);
-    expect(fitbitDistanceMetres(100, "Yards")).toBe(91);
+  it("reports nothing when there is no baseline to subtract", () => {
+    expect(googleTemperatureDeviation(33.4, undefined)).toBeUndefined();
+    expect(googleTemperatureDeviation(undefined, 33.1)).toBeUndefined();
   });
 
-  it("returns nothing rather than guessing at an unknown unit", () => {
-    // A missing distance is a blank field. A wrong one is a lie in a health
-    // record, and nothing downstream could tell the difference.
-    expect(fitbitDistanceMetres(5, undefined)).toBeUndefined();
-    expect(fitbitDistanceMetres(5, "furlong")).toBeUndefined();
-    expect(fitbitDistanceMetres(undefined, "Mile")).toBeUndefined();
+  it("emits the difference, not the raw nightly value", async () => {
+    captureFetch({
+      "daily-sleep-temperature-derivations": {
+        dataPoints: [
+          {
+            dailySleepTemperatureDerivations: {
+              nightlyTemperatureCelsius: 33.6,
+              baselineTemperatureCelsius: 33.2,
+              date: gd("2026-08-01"),
+            },
+          },
+        ],
+      },
+    });
+    const out = await fitbit.fetchRange!(range);
+    expect(out.find((m) => m.metric === "temperature_deviation")?.value).toBe(0.4);
   });
 });
 
-describe("Fitbit workouts", () => {
-  const fitbit = PROVIDERS.fitbit;
-
-  const activity = (over: Record<string, unknown> = {}) => ({
-    logId: 19018673358,
-    activityName: "Run",
-    startTime: "2026-08-01T07:08:29.000-08:00",
-    duration: 1_800_000, // 30 minutes, including pauses
-    activeDuration: 1_700_000,
-    calories: 340,
-    distance: 5,
-    distanceUnit: "Kilometer",
-    averageHeartRate: 148,
-    logType: "tracker",
-    source: { name: "Fitbit for Android" },
-    ...over,
+describe("Google Health sleep", () => {
+  it("filters on end time, which is the one session type Google excludes", async () => {
+    // Sleep is explicitly excluded from the civil-start-time filter every
+    // other session type uses, and wants RFC-3339 on interval.end_time.
+    const calls = captureFetch();
+    await fitbit.fetchRange!(range);
+    const sleep = calls.find((c) => c.url.includes("/sleep/dataPoints"))!;
+    const filter = decodeURIComponent(sleep.url);
+    expect(filter).toContain("sleep.interval.end_time");
+    expect(filter).toContain('>= "2026-08-01T00:00:00Z"');
   });
 
-  it("reads a session, deriving the end from the duration", () => {
-    // Fitbit gives no end time. `duration` includes pauses, which is the right
-    // one for a start-to-end pair: Oura's and Whoop's spans include theirs too.
-    route({ "/activities/list.json": { activities: [activity()] } });
-    return fitbit.fetchWorkouts!(range).then((out) => {
-      expect(out).toHaveLength(1);
-      expect(out[0].externalId).toBe("19018673358");
-      expect(out[0].activity).toBe("Run");
-      expect(out[0].distanceM).toBe(5000);
-      expect(out[0].avgHeartRate).toBe(148);
-      expect(out[0].source).toBe("Fitbit for Android");
-      expect(Date.parse(out[0].endedAt) - Date.parse(out[0].startedAt)).toBe(1_800_000);
+  it("dates a night by the morning it ended", async () => {
+    captureFetch({
+      "/sleep/dataPoints": {
+        dataPoints: [
+          {
+            sleep: {
+              summary: { minutesAsleep: "431" },
+              metadata: { mainSleep: true, nap: false },
+              interval: {
+                startTime: "2026-07-31T22:40:00Z",
+                endTime: "2026-08-01T06:15:00Z",
+                civilEndTime: { date: gd("2026-08-01") },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const out = await fitbit.fetchRange!(range);
+    const sleep = out.find((m) => m.metric === "sleep_minutes");
+    expect(sleep?.value).toBe(431);
+    expect(sleep?.date).toBe("2026-08-01");
+  });
+
+  it("skips naps, which would otherwise overwrite a whole night", async () => {
+    // The upsert is keyed on (user, provider, date, metric), so a 20 minute
+    // nap sharing a day with the night would silently replace it. Two adapters
+    // in this repo shipped exactly that bug.
+    captureFetch({
+      "/sleep/dataPoints": {
+        dataPoints: [
+          {
+            sleep: {
+              summary: { minutesAsleep: "22" },
+              metadata: { nap: true },
+              interval: {
+                startTime: "2026-08-01T14:00:00Z",
+                endTime: "2026-08-01T14:22:00Z",
+                civilEndTime: { date: gd("2026-08-01") },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const out = await fitbit.fetchRange!(range);
+    expect(out.some((m) => m.metric === "sleep_minutes")).toBe(false);
+  });
+
+  it("publishes no sleep score, because Google Health exposes none", async () => {
+    captureFetch({
+      "/sleep/dataPoints": {
+        dataPoints: [
+          {
+            sleep: {
+              summary: { minutesAsleep: "400", minutesInSleepPeriod: "440" },
+              metadata: { mainSleep: true },
+              interval: {
+                startTime: "2026-07-31T23:00:00Z",
+                endTime: "2026-08-01T06:20:00Z",
+                civilEndTime: { date: gd("2026-08-01") },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const out = await fitbit.fetchRange!(range);
+    // Efficiency is derivable and means something different from Oura's score.
+    expect(out.some((m) => m.metric === "sleep_score")).toBe(false);
+  });
+});
+
+describe("Google Health rollups", () => {
+  it("POSTs dailyRollUp with a capital U, which their own guide gets wrong", async () => {
+    const calls = captureFetch();
+    await fitbit.fetchRange!(range);
+    const steps = calls.find((c) => c.url.includes("/steps/dataPoints"))!;
+    expect(steps.url).toContain(":dailyRollUp");
+    expect(steps.url).not.toContain(":dailyRollup");
+    expect(steps.method).toBe("POST");
+    expect(JSON.parse(steps.body!)).toMatchObject({
+      range: { start: { date: gd("2026-08-01") }, end: { date: gd("2026-08-02") } },
+      windowSizeDays: 1,
     });
   });
 
-  it("keeps the member's own local day, not a UTC one", async () => {
-    // 07:08 at -08:00 is 15:08 UTC on the same day, but an evening session
-    // would cross midnight and land on the wrong date if converted first.
-    route({
-      "/activities/list.json": {
-        activities: [activity({ startTime: "2026-08-01T22:40:00.000+05:30" })],
+  it("reads steps and active calories off their rollup values", async () => {
+    captureFetch({
+      "/steps/dataPoints": {
+        rollupDataPoints: [{ civilStartTime: { date: gd("2026-08-01") }, steps: { countSum: "9412" } }],
+      },
+      "/active-energy-burned/dataPoints": {
+        rollupDataPoints: [
+          { civilStartTime: { date: gd("2026-08-01") }, activeEnergyBurned: { kcalSum: 612.5 } },
+        ],
+      },
+    });
+    const out = await fitbit.fetchRange!(range);
+    expect(out.find((m) => m.metric === "steps")?.value).toBe(9412);
+    expect(out.find((m) => m.metric === "active_calories")?.value).toBe(612.5);
+  });
+});
+
+describe("Google Health exercise", () => {
+  const exercise = (over: Record<string, unknown> = {}, source?: Record<string, unknown>) => ({
+    name: "users/me/dataTypes/exercise/dataPoints/abc123",
+    dataSource: { recordingMethod: "ACTIVELY_MEASURED", platform: "FITBIT", ...source },
+    exercise: {
+      displayName: "Run",
+      exerciseType: "RUNNING",
+      interval: {
+        startTime: "2026-08-01T07:00:00Z",
+        endTime: "2026-08-01T07:35:00Z",
+        civilStartTime: { date: gd("2026-08-01") },
+      },
+      metricsSummary: {
+        caloriesKcal: 340,
+        distanceMillimeters: 5_000_000,
+        averageHeartRateBeatsPerMinute: "148",
+      },
+      ...over,
+    },
+  });
+
+  it("converts distance from MILLIMETRES", async () => {
+    // Google report millimetres. Reading them as metres would turn a 5km run
+    // into 5,000km and nothing would fail.
+    captureFetch({ "/exercise/dataPoints": { dataPoints: [exercise()] } });
+    const out = await fitbit.fetchWorkouts!(range);
+    expect(out[0].distanceM).toBe(5000);
+    expect(out[0].calories).toBe(340);
+    expect(out[0].avgHeartRate).toBe(148);
+    expect(out[0].externalId).toBe("users/me/dataTypes/exercise/dataPoints/abc123");
+  });
+
+  it("reads recordingMethod as the auto-detected signal", async () => {
+    // Better than the legacy API, which needed a string match on logType.
+    captureFetch({
+      "/exercise/dataPoints": {
+        dataPoints: [
+          exercise({ displayName: "Walk" }, { recordingMethod: "PASSIVELY_MEASURED" }),
+        ],
       },
     });
     const out = await fitbit.fetchWorkouts!(range);
-    expect(out[0].date).toBe("2026-08-01");
+    expect(out[0].autoDetected).toBe(true);
   });
 
-  it("keeps an auto-detected walk, and labels it as one", async () => {
-    // SmartTrack logs a "Walk" after about fifteen minutes, unasked. An
-    // earlier version threw these away so they could not inflate the training
-    // count; that protected the number by losing real data. A walk is
-    // movement, movement counts for health, so it is stored and marked.
-    route({
-      "/activities/list.json": {
-        activities: [
-          activity({ logId: 1, activityName: "Walk", logType: "auto_detected", duration: 900_000 }),
-        ],
+  it("does not treat an unstated recording method as auto-detected", async () => {
+    // False means "they do not say", never "we know it was deliberate", which
+    // is the rule every other provider follows.
+    for (const method of ["ACTIVELY_MEASURED", "MANUAL", "UNKNOWN", "RECORDING_METHOD_UNSPECIFIED"]) {
+      captureFetch({
+        "/exercise/dataPoints": { dataPoints: [exercise({}, { recordingMethod: method })] },
+      });
+      const out = await fitbit.fetchWorkouts!(range);
+      expect(out[0].autoDetected, method).toBe(false);
+    }
+  });
+
+  it("falls back to a stable id when Google names no data point", async () => {
+    const e = exercise();
+    delete (e as Record<string, unknown>).name;
+    captureFetch({ "/exercise/dataPoints": { dataPoints: [e] } });
+    const out = await fitbit.fetchWorkouts!(range);
+    // Start plus type: a member cannot begin two runs at the same instant.
+    expect(out[0].externalId).toBe("2026-08-01T07:00:00Z:RUNNING");
+  });
+
+  it("survives a null entry and one with no interval", async () => {
+    captureFetch({
+      "/exercise/dataPoints": {
+        dataPoints: [null, { exercise: { displayName: "Broken" } }, exercise()],
       },
     });
     const out = await fitbit.fetchWorkouts!(range);
     expect(out).toHaveLength(1);
-    expect(out[0].autoDetected).toBe(true);
-  });
-
-  it("marks anything the member started as not auto-detected", async () => {
-    // Intent is the line, not duration: starting one says you meant it. Length
-    // never enters into it, so a ten minute deliberate session still counts.
-    for (const logType of ["tracker", "manual", "mobile_run", "fitstar"]) {
-      route({
-        "/activities/list.json": {
-          activities: [activity({ logId: 3, logType, duration: 600_000 })],
-        },
-      });
-      const out = await fitbit.fetchWorkouts!(range);
-      expect(out, logType).toHaveLength(1);
-      expect(out[0].autoDetected, logType).toBe(false);
-    }
-  });
-
-  it("trims the far edge of the window itself", async () => {
-    // The endpoint takes afterDate and no end date, so anything past `end`
-    // comes back and has to be dropped here.
-    route({
-      "/activities/list.json": {
-        activities: [
-          activity({ logId: 4, startTime: "2026-08-09T07:00:00.000-08:00" }),
-          activity({ logId: 5 }),
-        ],
-      },
-    });
-    const out = await fitbit.fetchWorkouts!(range);
-    expect(out.map((w) => w.externalId)).toEqual(["5"]);
-  });
-
-  it("survives a null entry and a missing id instead of throwing", async () => {
-    route({
-      "/activities/list.json": {
-        activities: [null, { activityName: "Run" }, activity({ duration: 0 }), activity({ logId: 9 })],
-      },
-    });
-    const out = await fitbit.fetchWorkouts!(range);
-    expect(out.map((w) => w.externalId)).toEqual(["9"]);
-  });
-
-  it("leaves distance out when Fitbit did not say the unit", async () => {
-    route({
-      "/activities/list.json": {
-        activities: [activity({ distanceUnit: undefined })],
-      },
-    });
-    const out = await fitbit.fetchWorkouts!(range);
-    expect(out[0].distanceM).toBeUndefined();
   });
 });
