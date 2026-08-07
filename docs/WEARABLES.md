@@ -1063,6 +1063,72 @@ regardless.
 
 ---
 
+## Pending integrations: Withings, Polar, Coros
+
+Three named on the roadmap, in the order they are worth doing. Access model
+first, because it decides the sequence far more than engineering effort does.
+
+| Vendor | Access | State | What it adds |
+|---|---|---|---|
+| **Withings** | Registered, credentials in hand | **Adapter written, NEVER AUDITED** | Weight and body composition, plus sleep |
+| **Polar** | **Self-serve, no approval period** | No adapter | Sleep with stages and a sleep score, HRV and breathing rate (Nightly Recharge), training load, VO2 max, steps |
+| **Coros** | **Partner application, their approval** | No adapter | Endurance training data, HR, VO2 max, SpO2, sleep |
+
+### Withings first, because it is the only one already paid for
+
+The adapter exists and the credentials exist. It is also **the one adapter
+never checked against its vendor's documentation**, and four of four that were
+checked turned out wrong in the same way. So the work is an audit, not an
+integration, and it is short.
+
+It is a scale rather than a wearable, which is why it keeps losing to more
+useful work: it contributes weight and body fat and nothing to training or
+recovery. **Do not register anything further for it before reading the adapter
+against Withings' docs.**
+
+### Polar is the least gated integration left
+
+Their **AccessLink** API is OAuth 2.0 authorization code, and registration at
+their developer portal is **self-serve with no approval period**. That makes it
+the only remaining vendor where the whole thing is inside our control: no
+ten-user cap, no queue, no partner review. Compare Whoop, where developers
+report months of silence.
+
+The data is a good fit rather than an adjacent one. Sleep with stages and a
+score, Nightly Recharge (autonomic state, HRV, breathing rate), daily activity,
+training load, and VO2 max all land on keys the vocabulary already has.
+
+**One trap to know before writing a line.** After the OAuth exchange, Polar
+require an explicit `POST` to their users endpoint to register the member with
+the application. **Skip it and every subsequent data request fails, with a
+perfectly valid access token.** That is precisely the shape of failure this
+codebase keeps meeting, an authorised connection returning nothing, and it is
+documented rather than discoverable. Verify it against Polar's own docs before
+building; this note comes from a third-party write-up.
+
+### Coros is gated, like Garmin and Ultrahuman
+
+Their own support page says developers wishing to partner submit an API
+application. So it is an application and a wait, not a form and a client id.
+Worth submitting early for the same reason as Whoop, since the queue only
+lengthens, but **no plan should depend on it.**
+
+There is a widely-shared Node project that drives Coros' Training Hub through a
+non-public endpoint, and its own README warns it "could break anytime".
+**That is not an option here.** An undocumented endpoint underneath a health
+record is a data-integrity risk and an unstated dependency on a vendor's
+goodwill.
+
+### What "pending" means in the device request list
+
+`src/lib/device-requests.ts` recognises both names already, and both now sit
+under "Public API, no adapter yet" with a reason, rather than under "No public
+API today" where they wrongly sat for weeks. The distinction is visible in the
+admin console: a request for a queued device is a roadmap item, while a request
+for a blocked one is an answer we can give the member today.
+
+---
+
 ## Deliberately not done yet
 
 - **Nothing is surfaced in Future You.** Trends now shows merged device series

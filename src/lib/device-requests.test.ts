@@ -181,3 +181,34 @@ describe("the autocomplete hints", () => {
     }
   });
 });
+
+describe("Polar and Coros are queued, not blocked", () => {
+  /**
+   * Both sat under "No public API today" for weeks and both were wrong: Polar's
+   * AccessLink is self-serve with no approval period, and Coros publish an
+   * application form. A member asking for either should not be told we cannot,
+   * and the admin list should show why they are waiting.
+   */
+  it("neither is marked blocked", () => {
+    for (const name of ["polar", "coros"]) {
+      const d = matchDevice(name);
+      expect(d?.key, name).toBe(name);
+      expect(d?.blocked, name).not.toBe(true);
+    }
+  });
+
+  it("both explain what they are waiting on", () => {
+    // A queued device with no reason is indistinguishable from one nobody has
+    // looked at, which is the state this replaced.
+    for (const name of ["polar", "coros"]) {
+      expect(matchDevice(name)?.reason, name).toBeTruthy();
+    }
+  });
+
+  it("neither claims to be supported, because no adapter exists", () => {
+    for (const name of ["polar", "coros"]) {
+      expect(matchDevice(name)?.supported, name).toBe(false);
+    }
+  });
+});
+
