@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     { data: panels },
     { data: checkins },
     { data: profiles },
+    { data: devices },
   ] = await Promise.all([
       supabase
         .from("users")
@@ -37,6 +38,11 @@ export async function GET(request: Request) {
       // it from anything else here would let the admin view disagree with what
       // the user is actually looking at.
       supabase.from("profiles").select("user_id").eq("relationship", "self"),
+      // Provider, state and freshness only. NO token column is selected, and
+      // none should be added: this response goes to a browser.
+      supabase
+        .from("wearable_connections")
+        .select("user_id, provider, status, last_sync_at"),
     ]);
 
   const pointsByUser = new Map<string, number>();
@@ -61,6 +67,39 @@ export async function GET(request: Request) {
 
   const onboardedIds = new Set((profiles ?? []).map((p) => (p as { user_id: string }).user_id));
 
+  /**
+   * Connections per user, sorted by provider so the roster does not reshuffle
+   * between loads.
+   *
+   * `synced` is carried separately from `status` because the two disagree in
+   * the case that matters: a connection can read `active` and have returned
+   * nothing at all, which is what every wearable incident here has looked
+   * like. A single "connected" tag would hide exactly the state worth seeing.
+   */
+  const devicesByUser = new Map<
+    string,
+    { provider: string; status: string; synced: boolean; last_sync_at: string | null }[]
+  >();
+  for (const d of devices ?? []) {
+    const r = d as {
+      user_id: string;
+      provider: string;
+      status: string;
+      last_sync_at: string | null;
+    };
+    const list = devicesByUser.get(r.user_id) ?? [];
+    list.push({
+      provider: r.provider,
+      status: r.status,
+      synced: r.last_sync_at != null,
+      last_sync_at: r.last_sync_at,
+    });
+    devicesByUser.set(r.user_id, list);
+  }
+  for (const list of devicesByUser.values()) {
+    list.sort((a, b) => a.provider.localeCompare(b.provider));
+  }
+
   const roster = (users ?? []).map((u) => {
     const last = lastCheckin.get(u.id);
     return {
@@ -75,6 +114,7 @@ export async function GET(request: Request) {
       panels: panelsByUser.get(u.id) ?? 0,
       last_checkin: last?.date ?? null,
       streak: last?.streak ?? 0,
+      devices: devicesByUser.get(u.id) ?? [],
     };
   });
 

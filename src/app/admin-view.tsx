@@ -150,6 +150,30 @@ interface AnalyticsData {
   checkinSeries: { date: string; count: number }[];
   pushOptIns: number;
   redemptions: number;
+  devices: {
+    adoption: {
+      usersWithAnyDevice: number;
+      usersSyncing: number;
+      byProvider: {
+        provider: string;
+        connected: number;
+        syncing: number;
+        needsReauth: number;
+      }[];
+    };
+    retention: {
+      segment: "device" | "no_device";
+      users: number;
+      points: { day: number; eligible: number; retained: number; rate: number | null }[];
+    }[];
+    activity: {
+      segment: "device" | "no_device";
+      users: number;
+      active: number;
+      meanActiveDays: number | null;
+    }[];
+    minCohort: number;
+  };
   errors: {
     recent: {
       id: string;
@@ -362,11 +386,142 @@ function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }
         )}
       </section>
 
+      <DeviceReport devices={data.devices} />
+
       <p className="font-body text-xs text-muted">
         Retention counts activity as a check-in or an app open; app-open data
         accrues from the day this instrumentation deployed.
       </p>
     </div>
+  );
+}
+
+/**
+ * Devices, and whether owning one changes how people behave.
+ *
+ * THE HONESTY PROBLEM THIS SOLVES. Splitting retention by a segment makes small
+ * cohorts smaller, and a percentage off two people is not a weak signal, it is
+ * a wrong answer with a decimal point next to a bar chart. So the rate is
+ * withheld below `minCohort` and the raw counts are shown instead, and the
+ * panel says why rather than rendering a dash and letting somebody assume a
+ * bug.
+ *
+ * Mean active days leads, because at this scale it is the more truthful of the
+ * two: day-N retention asks whether somebody returned on one specific day,
+ * where a member who used the app on days 6 and 8 counts as lost at D7.
+ */
+function DeviceReport({ devices }: { devices: AnalyticsData["devices"] }) {
+  const { adoption, retention, activity, minCohort } = devices;
+  const label = (s: "device" | "no_device") => (s === "device" ? "With a device" : "No device");
+
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="font-label text-[0.6rem] uppercase tracking-[0.24em] text-muted">
+        Devices &amp; retention
+      </h2>
+
+      <div className="grid grid-cols-2 gap-3">
+        <StatTile
+          label="Connected"
+          value={String(adoption.usersWithAnyDevice)}
+          sub="users with any device"
+        />
+        {/* The gap between these two tiles is the number to watch: connecting
+            is one tap, syncing means the grant, scopes, encryption and the
+            vendor's API all held. */}
+        <StatTile
+          label="Actually syncing"
+          value={String(adoption.usersSyncing)}
+          sub="have returned data at least once"
+        />
+      </div>
+
+      {adoption.byProvider.length > 0 && (
+        <Card className="flex flex-col gap-2 p-5">
+          <span className="font-body text-[10px] uppercase tracking-wide text-muted">
+            By provider
+          </span>
+          <table className="w-full text-left font-body text-sm">
+            <thead className="text-muted">
+              <tr>
+                <th className="py-1 font-medium">Provider</th>
+                <th className="py-1 font-medium">Connected</th>
+                <th className="py-1 font-medium">Syncing</th>
+                <th className="py-1 font-medium">Needs reconnect</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {adoption.byProvider.map((p) => (
+                <tr key={p.provider}>
+                  <td className="py-1.5 text-foreground">{p.provider}</td>
+                  <td className="py-1.5">{p.connected}</td>
+                  <td className={`py-1.5 ${p.syncing < p.connected ? "text-accent" : ""}`}>
+                    {p.syncing}
+                  </td>
+                  <td className={`py-1.5 ${p.needsReauth > 0 ? "text-accent" : "text-muted"}`}>
+                    {p.needsReauth}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+
+      <Card className="flex flex-col gap-3 p-5">
+        <span className="font-body text-[10px] uppercase tracking-wide text-muted">
+          Engagement by segment, last 30 days
+        </span>
+        <div className="grid grid-cols-2 gap-3">
+          {activity.map((a) => (
+            <div key={a.segment} className="flex flex-col gap-0.5">
+              <span className="font-body text-xs text-muted">{label(a.segment)}</span>
+              <span className="font-display text-2xl font-medium text-foreground">
+                {a.meanActiveDays != null ? a.meanActiveDays : "-"}
+                <span className="ml-1 font-body text-xs text-muted">days each</span>
+              </span>
+              <span className="font-body text-[11px] text-muted">
+                {a.active} of {a.users} active
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-border pt-3">
+          <span className="font-body text-[10px] uppercase tracking-wide text-muted">
+            Day-N retention by segment
+          </span>
+          {retention.map((r) => (
+            <div key={r.segment} className="flex items-center justify-between gap-3">
+              <span className="font-body text-sm text-foreground">
+                {label(r.segment)}
+                <span className="ml-1 text-muted">({r.users})</span>
+              </span>
+              <span className="flex gap-3 font-body text-sm">
+                {r.points.map((p) => (
+                  <span key={p.day} className="text-muted">
+                    D{p.day}{" "}
+                    <span className="text-foreground">
+                      {p.rate != null
+                        ? `${Math.round(p.rate * 100)}%`
+                        : `${p.retained}/${p.eligible}`}
+                    </span>
+                  </span>
+                ))}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <p className="font-body text-xs text-muted">
+          Percentages appear once a segment has {minCohort} eligible users; below
+          that only the raw counts are shown, because a rate off two people
+          reads as evidence and is not. Members who connect a device are already
+          the more engaged ones, so a gap here is correlation and largely
+          self-selection: a reason to ask a question, not an answer to one.
+        </p>
+      </Card>
+    </section>
   );
 }
 
@@ -874,6 +1029,46 @@ interface RosterUser {
   panels: number;
   last_checkin: string | null;
   streak: number;
+  devices: { provider: string; status: string; synced: boolean; last_sync_at: string | null }[];
+}
+
+/**
+ * A member's connected devices, as small tags.
+ *
+ * CONNECTED AND SYNCING ARE SHOWN DIFFERENTLY on purpose. A connection can read
+ * `active` and have returned nothing at all, and that gap is where every
+ * wearable incident in this project has lived. A tag that said only
+ * "connected" would hide the one state worth looking at.
+ */
+function DeviceTags({ devices }: { devices: RosterUser["devices"] }) {
+  if (devices.length === 0) return <span className="text-muted">-</span>;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {devices.map((d) => {
+        const dead = d.status === "expired";
+        const tone = dead
+          ? "border-accent/40 text-accent"
+          : d.synced
+            ? "border-clay/40 text-clay"
+            : "border-border text-muted";
+        const why = dead
+          ? "needs reconnecting"
+          : d.synced
+            ? `last synced ${d.last_sync_at?.slice(0, 10)}`
+            : "connected, never synced";
+        return (
+          <span
+            key={d.provider}
+            title={why}
+            className={`rounded-pill border px-2 py-0.5 font-body text-[0.65rem] ${tone}`}
+          >
+            {d.provider}
+            {dead ? " !" : d.synced ? "" : " ?"}
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
@@ -1048,6 +1243,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
               <th className="px-4 py-2 font-medium">Joined</th>
               <th className="px-4 py-2 font-medium">Points</th>
               <th className="px-4 py-2 font-medium">Panels</th>
+              <th className="px-4 py-2 font-medium">Devices</th>
               <th className="px-4 py-2 font-medium">Last check-in</th>
               <th className="px-4 py-2 font-medium">Streak</th>
             </tr>
@@ -1181,6 +1377,9 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                 </td>
                 <td className="px-4 py-2">{u.points}</td>
                 <td className="px-4 py-2">{u.panels}</td>
+                <td className="px-4 py-2">
+                  <DeviceTags devices={u.devices} />
+                </td>
                 <td className="px-4 py-2 text-muted">{u.last_checkin ?? "-"}</td>
                 <td className="px-4 py-2">{u.streak}</td>
               </tr>

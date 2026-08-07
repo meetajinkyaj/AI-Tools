@@ -6,7 +6,12 @@ import {
   computeFunnel,
   computeRetention,
   computeStreakBuckets,
+  computeDeviceAdoption,
   dailySeries,
+  type DeviceRow,
+  MIN_SEGMENT_COHORT,
+  retentionBySegment,
+  activityBySegment,
   type UserRow,
 } from "./analytics";
 
@@ -94,5 +99,136 @@ describe("addDays", () => {
   it("crosses month boundaries in UTC", () => {
     expect(addDays("2026-01-31", 1)).toBe("2026-02-01");
     expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Devices                                                                    */
+/* -------------------------------------------------------------------------- */
+
+const dev = (
+  user_id: string,
+  provider: string,
+  over: Partial<DeviceRow> = {},
+): DeviceRow => ({ user_id, provider, status: "active", last_sync_at: "2026-08-07T00:00:00Z", ...over });
+
+describe("computeDeviceAdoption", () => {
+  it("separates connected from actually syncing", () => {
+    // The gap between these two is where every wearable incident in this
+    // project has lived: a row saying active with nothing behind it.
+    const out = computeDeviceAdoption([
+      dev("u1", "oura"),
+      dev("u2", "oura", { last_sync_at: null }),
+    ]);
+    expect(out.usersWithAnyDevice).toBe(2);
+    expect(out.usersSyncing).toBe(1);
+    expect(out.byProvider[0]).toMatchObject({ provider: "oura", connected: 2, syncing: 1 });
+  });
+
+  it("counts a user once per provider however many rows exist", () => {
+    const out = computeDeviceAdoption([dev("u1", "oura"), dev("u1", "oura")]);
+    expect(out.byProvider[0].connected).toBe(1);
+  });
+
+  it("counts a user with two providers once overall", () => {
+    const out = computeDeviceAdoption([dev("u1", "oura"), dev("u1", "whoop")]);
+    expect(out.usersWithAnyDevice).toBe(1);
+    expect(out.byProvider).toHaveLength(2);
+  });
+
+  it("surfaces connections that need reconnecting", () => {
+    const out = computeDeviceAdoption([dev("u1", "oura", { status: "expired" })]);
+    expect(out.byProvider[0].needsReauth).toBe(1);
+  });
+
+  it("survives a malformed row rather than throwing", () => {
+    const out = computeDeviceAdoption([
+      null as unknown as DeviceRow,
+      { user_id: "", provider: "", status: "active", last_sync_at: null },
+      dev("u1", "oura"),
+    ]);
+    expect(out.usersWithAnyDevice).toBe(1);
+  });
+});
+
+describe("segmented reporting refuses to invent a retention story", () => {
+  const today = "2026-08-31";
+  /** `n` users who all signed up on the same day, ids prefixed. */
+  const cohort = (prefix: string, n: number): UserRow[] =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `${prefix}${i}`,
+      created_at: "2026-08-01T00:00:00Z",
+    }));
+
+  it("withholds the rate below the minimum cohort, but still shows counts", () => {
+    // A percentage off two people is not a weak signal, it is a wrong answer
+    // with a decimal point, and it sits next to a bar chart looking like data.
+    const users = cohort("d", 2);
+    const active = new Map(users.map((u) => [u.id, new Set(["2026-08-02"])]));
+    const out = retentionBySegment(users, active, new Set(users.map((u) => u.id)), today);
+    const device = out.find((s) => s.segment === "device")!;
+    const d1 = device.points.find((p) => p.day === 1)!;
+    expect(d1.rate).toBeNull();
+    expect(d1.retained).toBe(2);
+    expect(d1.eligible).toBe(2);
+  });
+
+  it("reports a rate once the cohort is large enough", () => {
+    const users = cohort("d", MIN_SEGMENT_COHORT);
+    const active = new Map(users.map((u) => [u.id, new Set(["2026-08-02"])]));
+    const out = retentionBySegment(users, active, new Set(users.map((u) => u.id)), today);
+    expect(out.find((s) => s.segment === "device")!.points[0].rate).toBe(1);
+  });
+
+  it("leaves the whole-population figure untouched", () => {
+    // The default minCohort is 1, so the existing panel keeps showing "2 of 3"
+    // exactly as it did. This change must not move that number.
+    const users = cohort("u", 2);
+    const active = new Map([[users[0].id, new Set(["2026-08-02"])]]);
+    expect(computeRetention(users, active, today)[0].rate).toBe(0.5);
+  });
+
+  it("segments on ever-connected, so a disconnect does not move somebody", () => {
+    // Dropping them would select for the happy path: the people most likely to
+    // leave are exactly the ones who would fall out of the segment.
+    const users = cohort("u", 4);
+    const active = new Map<string, Set<string>>();
+    const out = retentionBySegment(users, active, new Set(["u0", "u1"]), today);
+    expect(out.find((s) => s.segment === "device")!.users).toBe(2);
+    expect(out.find((s) => s.segment === "no_device")!.users).toBe(2);
+  });
+});
+
+describe("activityBySegment", () => {
+  const today = "2026-08-31";
+  const users: UserRow[] = [
+    { id: "a", created_at: "2026-08-01T00:00:00Z" },
+    { id: "b", created_at: "2026-08-01T00:00:00Z" },
+  ];
+
+  it("counts every day in the window, not one specific day", () => {
+    // The reason this sits beside day-N retention: somebody who used the app on
+    // days 6 and 8 counts as lost at D7 and is plainly not lost.
+    const active = new Map([["a", new Set(["2026-08-20", "2026-08-25", "2026-08-30"])]]);
+    const out = activityBySegment(users, active, new Set(["a"]), today);
+    expect(out.find((s) => s.segment === "device")).toMatchObject({
+      users: 1,
+      active: 1,
+      meanActiveDays: 3,
+    });
+  });
+
+  it("ignores days outside the window and in the future", () => {
+    const active = new Map([["a", new Set(["2026-01-01", "2027-01-01", "2026-08-30"])]]);
+    const out = activityBySegment(users, active, new Set(["a"]), today);
+    expect(out.find((s) => s.segment === "device")!.meanActiveDays).toBe(1);
+  });
+
+  it("returns null rather than zero for an empty segment", () => {
+    // Zero would read as "these people never open the app". Nobody is in the
+    // segment, which is a different statement.
+    const out = activityBySegment(users, new Map(), new Set(), today);
+    expect(out.find((s) => s.segment === "device")!.meanActiveDays).toBeNull();
+    expect(out.find((s) => s.segment === "no_device")!.meanActiveDays).toBe(0);
   });
 });
