@@ -6,9 +6,18 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-06. **Two tasks are pending:** settle the
-duplicate-Ultrahuman question with one query, and register Fitbit. See
+Last updated: 2026-08-06. **Three tasks are pending, and one of them blocks a
+merge:** apply migration 0021, settle the duplicate-Ultrahuman question with
+one query, and read one URL off Oura's own auth page. See
 [PENDING TASK](#pending-task).
+
+**The Fitbit registration task is withdrawn**, and not because it was done.
+Cowork found that `dev.fitbit.com` has closed registration for new
+applications and that the legacy Fitbit Web API is deprecated in September
+2026: Fitbit now runs through the Google Health API. Nobody can complete that
+task as it was written. Registration has to follow a rewritten adapter, so it
+comes back as a task when there is code for it to match. Good catch, it would
+have cost an afternoon and produced credentials nothing could call.
 
 ---
 
@@ -53,6 +62,50 @@ is outstanding.
 
 # PENDING TASK
 
+## 0. Apply migration 0021, BEFORE PR #104 is merged
+
+**This one gates a merge, so it goes first.** The code in PR #104 writes a
+column that does not exist yet on production. Merge before applying and every
+Fitbit workout sync fails on the insert.
+
+`supabase/migrations/0021_workout_auto_detected.sql`. One statement, additive,
+idempotent, safe to re-run:
+
+```sql
+alter table wearable_workouts
+  add column if not exists auto_detected boolean not null default false;
+```
+
+(The file also sets a `comment on column`, which is documentation and cannot
+affect data. Run the whole file.)
+
+**What it is for.** Fitbit's watch logs a "Walk" by itself after about fifteen
+minutes of movement, without the member asking. That is real and worth keeping,
+walking is good for you, but it is not a workout, and counting it would show
+somebody seven training days in a week they trained on none. The column records
+which sessions the member started and which the watch noticed, so the Training
+card can show both without confusing them.
+
+**Verify after running:**
+
+```sql
+select column_name, data_type, is_nullable, column_default
+from information_schema.columns
+where table_name = 'wearable_workouts' and column_name = 'auto_detected';
+
+select count(*) as total, count(*) filter (where auto_detected) as auto
+from wearable_workouts;
+```
+
+Expect one row from the first (`boolean`, `NO`, `false`), and the second to
+show every existing row at `auto` = 0. **No existing row should change
+meaning**: nothing but Fitbit ever sets this, and Fitbit is not connected yet.
+
+Report both results. Then say the migration is applied so #104 can merge.
+
+A reminder from 0019: if the SQL Editor's "Running..." spinner freezes, **do
+not re-click Run.** Check the real state from a second connection first.
+
 ## 1. Settle the duplicate-Ultrahuman question, which is probably not one
 
 You reported two active Ultrahuman rows and suspected a reconnect had added a
@@ -81,62 +134,38 @@ Good catch either way: a duplicate would have been serious, because Ultrahuman
 rotates refresh tokens and two rows refreshing the same grant would each
 invalidate the other's token.
 
-## 2. Register the Fitbit developer application, and set its two secrets
+## 2. Read one URL off Oura's authentication page
 
-Self-serve, no review, credentials immediately. **Walk the founder through it
-screen by screen**, they are not technical.
+**Two minutes, no account changes, nothing to configure.** This is a
+copy-a-line-of-text job and it is here because every automated extractor we
+have strips the exact line out of the page.
 
-`dev.fitbit.com` → sign in → **Manage** → **Register an app**.
+Disconnect now tells the vendor to tear the grant down, so a member who
+disconnects is genuinely disconnected at both ends rather than only in our
+database. Fitbit and Whoop are done. Oura documents a revoke endpoint but we
+cannot read the URL: the page renders it inside a code block that our tooling
+drops.
 
-| Field | What to put |
-|---|---|
-| Application name | `Ikigaro` |
-| Description | Longevity app. Users upload blood panels and check in daily; connecting a wearable shows sleep, recovery and activity alongside those lab results. |
-| Application website | `https://app.ikigaro.com` |
-| Organization | `Ikigaro` |
-| Terms of service | `https://app.ikigaro.com/terms` |
-| Privacy policy | `https://app.ikigaro.com/privacy` |
-| **OAuth 2.0 Application Type** | **`Server`** |
-| **Default Access Type** | **`Read Only`** |
-| Redirect URL | `https://app.ikigaro.com/api/wearables/callback/fitbit` |
+Go to **`https://api.ouraring.com/docs/authentication`** and scroll to the
+section headed **"Revoking The Access Token"**. Under it is a line that begins
+"When you need to revoke access for a specific token use the following API call
+format", followed by a URL in a code block.
 
-**`Server`, not Client and not Personal.** Personal only ever reads the
-developer's own account, which is not what we are building.
+**Report back three things, exactly as written on the page:**
 
-**The redirect URL must match byte for byte.** Copy it, do not retype it.
+1. The full URL, including the `https://` and every query parameter.
+2. The HTTP method, if the page states one (`GET` or `POST`).
+3. Whether the parameters are named `client_id` and `access_token`, or
+   something else.
 
-### The scopes, which is the step that matters
+**Copy the characters as they appear. Do not tidy, complete or correct it.** If
+the page says something we do not expect, that is the finding, and a plausible
+guess is worse than nothing here: a wrong revoke URL returns a quiet 404 and
+leaves us believing we revoked a member's access when we did not. That is a
+privacy claim we would be making falsely, which is why the code refuses to call
+any revoke endpoint that has not been read off the vendor's own documentation.
 
-**Tick exactly these seven:**
-
-☑ `activity` ☑ `heartrate` ☑ `sleep` ☑ `oxygen_saturation`
-☑ `cardio_fitness` ☑ `respiratory_rate` ☑ `temperature`
-
-**Leave everything else unticked**, in particular ☐ `weight` and ☐ `profile`.
-
-All seven are read by the adapter. Ticking more asks members for access we never
-use; ticking fewer just costs them those metrics, since each collection is
-fetched defensively and a refusal does not fail their sync.
-
-### The credentials
-
-**Do not paste either value into chat, a commit, or any file, and do not read
-the secret back to confirm it.** The founder copies them into Cloudflare and
-their password manager.
-
-Cloudflare → Workers & Pages → **`ai-tools`** → Settings → Variables and Secrets:
-`FITBIT_CLIENT_ID` and `FITBIT_CLIENT_SECRET`, both **type Secret**, not
-plaintext Variable. **Then redeploy.**
-
-### Verify, and stop
-
-1. Profile → Connected devices. **Fitbit should appear with a Connect button.**
-2. Press Connect. The consent screen should list **seven** permissions.
-3. **Stop there. Do not approve** unless the founder owns a Fitbit.
-
-Report whether Fitbit appeared, and exactly which permissions were listed. If
-`weight` or `profile` appear, the app was registered with the wrong scopes and
-it is a two-minute fix on its page.
+Nothing to change in Cloudflare, Supabase or the Oura dashboard. Just the text.
 
 ## Not a task, but worth knowing
 
@@ -152,13 +181,12 @@ the Ultrahuman connections.**
 
 Two things are waiting on the founder rather than on Cowork:
 
-- **The remaining wearable credentials.** Whoop is the pending task above.
-  Oura and Fitbit are self-serve and their adapters have now been audited, so
-  they are ready to register whenever there is an afternoon; the exact scopes
-  to tick are in [`../WEARABLES_APPLICATIONS.md`](../WEARABLES_APPLICATIONS.md)
-  and matter, since three of Fitbit's old six were dead. Withings is the one
-  adapter still unaudited: do not register it before it has been read against
-  their docs. Garmin is paused at their end indefinitely.
+- **The remaining wearable credentials.** Oura and Whoop are registered.
+  **Fitbit is blocked on a rewrite, not on a form**: its registration moved to
+  the Google Health API and the legacy one it was written against dies in
+  September 2026. Withings is the one adapter still unaudited: do not register
+  it before it has been read against their docs. Garmin is paused at their end
+  indefinitely.
 - **Supabase backups.** The production database is on the Free plan: no
   backups, no point-in-time recovery. Worst case is total loss. This is a
   spend decision (Pro, $25/mo), deliberately deferred until ~20 testers, not

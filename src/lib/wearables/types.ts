@@ -77,6 +77,13 @@ export interface WorkoutSession {
   avgHeartRate?: number;
   maxHeartRate?: number;
   source?: string;
+  /**
+   * The vendor noticed this rather than the member starting it.
+   *
+   * Movement, not training. Only Fitbit tells us (`logType`), so everyone else
+   * stays false: that is "they do not say", not "we know they did not".
+   */
+  autoDetected?: boolean;
 }
 
 export interface WearableProvider {
@@ -151,8 +158,59 @@ export interface WearableProvider {
     end: string;
   }) => Promise<WorkoutSession[]>;
 
+  /**
+   * Tell the vendor the user has disconnected, so the grant dies at their end
+   * too and not only in our database.
+   *
+   * OPTIONAL, AND ITS ABSENCE IS A STATEMENT. Deleting our row destroys our
+   * copy of the credentials, so we can never call that vendor again either
+   * way; what survives without this is the authorisation sitting in the user's
+   * vendor account, which is why reconnecting goes straight to consent with no
+   * sign-in. Removing that is the vendor's to do and only some of them expose
+   * a way to ask.
+   *
+   * IMPLEMENTED ONLY WHERE THE ENDPOINT IS CONFIRMED FROM THE VENDOR'S OWN
+   * DOCUMENTATION. A guessed revoke URL 404s quietly and leaves us believing
+   * we revoked something we did not, which is worse than a documented gap: it
+   * is a privacy claim we cannot support. `docs/WEARABLES.md` lists who has
+   * one and who is still open.
+   *
+   * Best effort by contract. Throwing is fine; the caller disconnects anyway.
+   */
+  revoke?: (args: {
+    accessToken: string;
+    refreshToken: string | null;
+    clientId: string;
+    clientSecret: string;
+    /**
+     * MUST be passed to every fetch this makes. The caller bounds it, because
+     * a vendor that accepts the connection and then says nothing would
+     * otherwise hold up a disconnect the user is waiting on, and a Worker that
+     * times out mid-revoke never reaches the delete: the member presses
+     * Disconnect, sees a failure, and stays connected.
+     */
+    signal: AbortSignal;
+  }) => Promise<void>;
+
   /** Access needs an application and approval, not just registration. */
   requiresApproval?: boolean;
+
+  /**
+   * This adapter targets an API that can no longer be reached, and setting its
+   * credentials must NOT switch it on.
+   *
+   * WHY A FLAG RATHER THAN DELETING THE ADAPTER. An unconfigured provider is
+   * already invisible, so the risk is not that users see it: it is that the
+   * next person to read this file sees a complete, audited adapter and
+   * concludes the integration is one registration away. When the vendor has
+   * closed registration, that conclusion costs an afternoon and produces
+   * credentials nothing in the stack can call.
+   *
+   * The value is the reason, in one line, shown wherever the provider is
+   * listed. Anything truthy hides it from the connect UI regardless of
+   * credentials.
+   */
+  unavailable?: string;
 }
 
 /** Thrown when a vendor says the grant is dead and the user must re-consent. */

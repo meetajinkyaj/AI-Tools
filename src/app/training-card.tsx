@@ -63,12 +63,21 @@ const DIRECTION_LABEL: Record<RecoverySignal["direction"], string> = {
   unknown: "Not enough data",
 };
 
-/** Where the week's numbers came from, said plainly. */
-function sourceNote(load: TrainingLoad): string {
-  const both = load.sources.length === 2;
-  if (both) return "From your check-ins and your connected device";
-  if (load.sources[0] === "device") return "From your connected device";
-  return "From what you logged at check-in";
+/**
+ * Where the week's numbers came from, said plainly.
+ *
+ * Reads the list rather than assuming a default. The first version fell
+ * through to the check-in wording whenever `sources` was not exactly
+ * `["device"]`, which told somebody whose week was entirely device-recorded
+ * walks that they had typed it in themselves.
+ */
+function sourceNote(load: TrainingLoad): string | null {
+  const checkin = load.sources.includes("checkin");
+  const device = load.sources.includes("device");
+  if (checkin && device) return "From your check-ins and your connected device";
+  if (device) return "From your connected device";
+  if (checkin) return "From what you logged at check-in";
+  return null;
 }
 
 export function TrainingCard({ getToken }: { getToken: () => Promise<string | null> }) {
@@ -98,10 +107,13 @@ export function TrainingCard({ getToken }: { getToken: () => Promise<string | nu
 
   const { load: week, recovery, window } = data;
 
-  // Nothing trained and nothing to say about recovery: show nothing at all
-  // rather than a card of zeroes. A week off is not a failure to display back
-  // at somebody, and an empty card on the page you check daily is just noise.
-  if (week.days === 0 && recovery.direction === "unknown") return null;
+  // Nothing trained, nothing walked and nothing to say about recovery: show
+  // nothing at all rather than a card of zeroes. A week off is not a failure to
+  // display back at somebody, and an empty card on the page you check daily is
+  // just noise.
+  if (week.days === 0 && week.movement.sessions === 0 && recovery.direction === "unknown") {
+    return null;
+  }
 
   return (
     <Card className="flex flex-col gap-4 p-6">
@@ -151,6 +163,27 @@ export function TrainingCard({ getToken }: { getToken: () => Promise<string | nu
         </div>
       )}
 
+      {/* MOVEMENT, KEPT VISIBLY APART FROM TRAINING. A watch logging a walk to
+          the station is real and worth showing: everyday movement acts on
+          bone, muscle, gut and metabolic health, and this app is a wellness
+          picture rather than a gym log. It is also not a workout, and adding
+          it to the training count would hand somebody seven training days for
+          a week they trained none. So: its own line, its own words, never
+          summed into the numbers above. */}
+      {week.movement.sessions > 0 && (
+        <p className="font-body text-xs text-muted">
+          Your device also picked up{" "}
+          <span className="text-foreground">
+            {week.movement.sessions} movement session
+            {week.movement.sessions === 1 ? "" : "s"}
+          </span>
+          {week.movement.minutes > 0 && `, ${readableMinutes(week.movement.minutes)}`}, on{" "}
+          {week.movement.days} day{week.movement.days === 1 ? "" : "s"}. Walking and
+          everyday movement count for your health; they are kept separate here
+          because they are not training.
+        </p>
+      )}
+
       {recovery.direction !== "unknown" && (
         <div className="flex flex-col gap-1 border-t border-border pt-3">
           <div className="flex items-baseline justify-between gap-3">
@@ -173,9 +206,9 @@ export function TrainingCard({ getToken }: { getToken: () => Promise<string | nu
       )}
 
       <p className="font-body text-[0.7rem] text-muted">
-        {sourceNote(week)}. Training supports bone, muscle and metabolic health over
-        months, so this is a record of the work, not a prediction about your next
-        panel.
+        {sourceNote(week) ? `${sourceNote(week)}. ` : ""}
+        Training supports bone, muscle and metabolic health over months, so this is
+        a record of the work, not a prediction about your next panel.
       </p>
     </Card>
   );

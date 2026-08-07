@@ -376,7 +376,71 @@ after the fact.
 > reconnect, or before anyone connects at all. Fitbit's expansion was timed for
 > exactly that reason.
 
+### Fitbit moved to the Google Health API, and the adapter has to be rewritten
+
+**Found 2026-08-06, verified against Google's own pages the same day.** This
+invalidates the plan in the section below, which is kept because its findings
+about Fitbit's DATA are still true and the rewrite needs them.
+
+`dev.fitbit.com`'s registration form now says registration of new applications
+there is discontinued, and that the legacy Fitbit Web API is **deprecated in
+September 2026**. Both halves matter and either alone would be fatal: we cannot
+get legacy credentials, and legacy has about a month left.
+
+Fitbit access now runs through the **Google Health API**, which is a different
+API rather than a renamed one:
+
+| | Legacy Fitbit Web API | Google Health API |
+|---|---|---|
+| Host | `api.fitbit.com` | `health.googleapis.com` |
+| Sign-in | Fitbit account | **Google account** |
+| Auth | Fitbit OAuth | Google OAuth 2.0 / Google Identity Services |
+| Reads | 100+ endpoints | `dailyRollup`, `rollUp`, `list`, `patch`, `batchDelete` |
+| Scopes | 7 short strings | 3 `googlehealth.*.readonly` URLs |
+| Tokens | ours today | **do not carry over**, per Google |
+
+Our seven scopes collapse into three: `activity` and `cardio_fitness` become
+`activity_and_fitness.readonly`; `heartrate`, `oxygen_saturation`,
+`respiratory_rate` and `temperature` all become
+`health_metrics_and_measurements.readonly`; `sleep` becomes `sleep.readonly`.
+
+**That last collapse is worth noticing.** Four metrics that were four separately
+declinable scopes are now one bundle, so under Google Health they arrive or
+refuse together. The defensive per-collection fetch stays useful, but the
+failure mode it guards against changes shape.
+
+**Two constraints to design around, not discover later.** An unverified Google
+OAuth client is capped at **100 test users** and needs a third-party security
+review to go past that, and while the client is unpublished **refresh tokens
+expire after 7 days**. A tester connected before the client is published drops
+after a week. Publish before anybody relies on it.
+
+**The adapter is marked `unavailable` rather than deleted.** An unconfigured
+provider is already hidden from the connect UI, so the risk was never that a
+member sees it; the risk is the next reader seeing a complete audited adapter
+and concluding Fitbit is one registration away. `providerConfigured()` now
+returns false for any provider carrying an `unavailable` reason, credentials or
+not, and a test pins that. What survives the rewrite is everything the adapter
+learned about Fitbit's data, which is most of the value in the section below.
+
+**Registration comes after the rewrite, not before.** The old order (register
+first, then code) was right when the scope list was the free variable. Here the
+Google Cloud client, its redirect URI and its three scopes all have to match
+code that does not exist yet, and 7-day test-mode tokens make a premature
+connection a moving target.
+
+Sources: Google's [migration guide](https://developers.google.com/health/migration),
+[API specifications](https://developers.google.com/health/migration/api-specifications),
+[scopes](https://developers.google.com/health/scopes) and
+[setup](https://developers.google.com/health/setup).
+
+---
+
 ### Fitbit extended 2026-08-06, before registration and on purpose
+
+> **Superseded in part.** Everything here about Fitbit's DATA still holds and
+> the Google Health rewrite needs it. Everything about the legacy API surface,
+> hosts, scope strings and registration, is dead. See the section above.
 
 Fitbit was the one provider still unregistered, which made it the one whose
 scope list was still free to change. So the endpoints were written first and the
@@ -399,6 +463,64 @@ negative, which is exactly what `temperature_deviation` means. Whoop's
 
 **HRV uses `dailyRmssd`, not `deepRmssd`.** The second covers deep sleep only
 and is not what any other vendor reports.
+
+#### Fitbit workouts, and the two traps in them
+
+`GET /1/user/-/activities/list.json?afterDate=&sort=asc&offset=0&limit=100`.
+The endpoint takes no end date, `offset` must be 0 and `limit` caps at 100, so
+the far edge of the window is trimmed in the adapter. It also gives a duration
+rather than an end time; `duration` (which includes pauses) is used rather than
+`activeDuration`, so our interval agrees with the clock the way Oura's and
+Whoop's spans do.
+
+**Trap one: distance is not reliably metric.** Fitbit's data dictionary says
+distance arrives in "units defined by the Accept-Language header", and their
+own published example shows `"distanceUnit": "Mile"`. Reading it as kilometres
+understates an American member's run by 38% and nothing fails. So the unit is
+read from the payload and an unrecognised one yields no distance at all. A
+blank field is a gap; a wrong one is a lie in a health record.
+
+**Trap two: Fitbit invents workouts.** SmartTrack logs a "Walk" after roughly
+fifteen minutes of sustained movement, unasked. Left alone, a member who walks
+to the station twice a day would open the Training card and see seven training
+days out of seven, having trained on none of them: the headline number,
+inflated by us.
+
+The first fix dropped short auto-detected sessions at the adapter. **That was
+half right and it threw away real data.** A walk is movement, and movement is
+most of what this app is about: everyday and load-bearing activity acts on
+bone, muscle, gut and metabolic health whether or not anybody would call it a
+workout. Deleting it meant the only signal we had for it never reached the
+database.
+
+So every session is stored and the distinction travels with it, in
+`wearable_workouts.auto_detected` (migration 0021).
+
+**Intent is the line, not duration.** Started by the member is training,
+because they meant it to be. Noticed by the device is movement. No per-sport
+thresholds to argue about, one sentence to explain to a user, and the judgment
+call sits where it belongs: somebody who considers their auto-detected hour a
+real session can log it at check-in, and `trainingLoad()` already reconciles
+the two sources per day, so their own view wins.
+
+`fitstar`, Fitbit's guided-workout app, counts as member-started. Only
+`auto_detected` does not.
+
+**False is right for every other provider.** Oura, Whoop and Ultrahuman never
+say how a session came to exist, so the column stays false for them: that is
+"they do not say", not "we know they did not", and it preserves exactly the
+behaviour those rows already had.
+
+A retired provider still gets a row in Settings when somebody is connected to
+it, with Disconnect and no Connect. `unavailable` removes a provider from the
+connect list, and on its own that would strand anyone already connected: no
+row, no Disconnect, no way to revoke a grant we can no longer sync. **Retiring
+an integration must never take away the exit.**
+
+The Training card shows movement on its own line, in its own words, never
+summed into the training numbers. Rest days are still counted against training
+only: a day spent walking is not a training day, and calling it one would undo
+the whole point of keeping them apart.
 
 #### The trap: VO2 max is a string, and sometimes a range
 
@@ -677,11 +799,75 @@ time a vendor has a bad minute.
 
 ---
 
+### Disconnect now tells the vendor, for the two who document how
+
+Pressing Disconnect always deletes our row, which destroys our copy of the
+credentials. What used to survive that was the authorisation sitting in the
+member's vendor account, which is why reconnecting goes straight to consent
+with no sign-in.
+
+`revokeAtVendor()` in `sync.ts` now asks the vendor to tear the grant down,
+BEFORE the row is deleted, since the credentials go with it.
+
+| Provider | Revoke | Endpoint |
+|---|---|---|
+| Fitbit | yes | `POST /oauth2/revoke`, Basic auth, `token=<refresh token>` |
+| Whoop | yes | `DELETE /developer/v2/user/access`, member's bearer token |
+| Oura | not yet | Their auth doc has a "Revoking The Access Token" section, and every extractor we have strips the code block holding the literal URL. Queued for Cowork to read off the page. |
+| Ultrahuman, Withings, Garmin | no | No revoke endpoint found in their documentation. |
+
+**Two rules, and both are the point of the feature.**
+
+**It never blocks the disconnect, and that is enforced rather than intended.**
+Somebody who pressed the button has to end up disconnected even when a vendor
+is down. A failed revoke that aborted the delete would leave them connected to
+an app they just left, with live tokens on our side, which is the worse of the
+two failures by a distance.
+
+The first version of this said exactly that in a comment and did not do it:
+the revoke was awaited with no bound, so a vendor that accepted the connection
+and then went quiet would hold up a request the member is watching a spinner
+on, and a Worker timing out mid-revoke would never reach the delete at all.
+Press Disconnect, see a failure, stay connected: the precise outcome the
+feature exists to prevent. It is now capped at three seconds, by an
+`AbortSignal` every implementation must pass to its fetch AND a race around
+the call, so an implementation that forgets the signal still cannot hang the
+request. A test pins that the signal reaches `fetch`.
+
+Three seconds because nothing downstream depends on the answer. We are telling
+the vendor something, not asking.
+
+**No endpoint is called unless it is confirmed from that vendor's own docs.**
+A guessed revoke URL 404s quietly and leaves us believing we revoked something
+we did not. That is not a missing feature, it is a privacy claim we cannot
+support, and `wearables.test.ts` asserts the exact list of providers that
+implement `revoke` so nobody adds a plausible-looking URL later.
+
+**The access token IS refreshed first when it has expired, and the reasoning
+that said otherwise was wrong.** The first version used the stored token as-is,
+on the grounds that refreshing in order to revoke mints a credential purely to
+destroy it. That reads well and it broke Whoop: their revoke authenticates with
+the member's access token, and those last about an hour. Disconnect any time
+after the nightly sync and the stored token is already dead, so Whoop answers
+401, the outcome is logged as "failed", and the grant survives at their end.
+The feature would have worked for one of the two providers that support it, and
+only during the hour after a sync. Fitbit was unaffected either way, because its
+revoke takes the refresh token.
+
+The rotated token is deliberately NOT persisted: the row is about to be
+deleted, and writing it back would only widen the window in which a
+half-finished disconnect leaves live credentials behind. On a genuinely dead
+grant the refresh throws, which lands as "failed", and the row is deleted
+regardless.
+
+---
+
 ## Deliberately not done yet
 
-- **Nothing is surfaced in Trends or Future You.** The data lands and stores;
-  what it should *say* is a product question worth answering with real data in
-  hand rather than guessing at now.
+- **Nothing is surfaced in Future You.** Trends now shows merged device series
+  and a Training and recovery card; the habit model still reads only check-ins.
+  What device data should *say* there is a product question worth answering
+  with real data in hand rather than guessing at now.
 - **Wearable data earns no points.** Steps are trivially spoofable and paying
   for them invites exactly that. If this changes, pay for *connecting* once, not
   for the numbers.

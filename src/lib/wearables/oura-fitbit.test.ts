@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
-import { fitbitVo2Max, PROVIDERS } from "./providers";
+import { fitbitDistanceMetres, fitbitVo2Max, PROVIDERS } from "./providers";
 
 /**
  * Oura and Fitbit, checked against their published documentation.
@@ -411,5 +411,146 @@ describe("Fitbit's overnight collections", () => {
     // Still dead, still absent.
     expect(fitbit.scopes).not.toContain("weight");
     expect(fitbit.scopes).not.toContain("profile");
+  });
+});
+
+describe("Fitbit distance, which is not reliably metric", () => {
+  it("converts using the unit Fitbit sent, not an assumption", () => {
+    // Their data dictionary: distance comes back in "units defined by the
+    // Accept-Language header", and their own examples show Mile. Reading it as
+    // kilometres understates an American member's run by 38%, silently.
+    expect(fitbitDistanceMetres(1.872894, "Mile")).toBe(3014);
+    expect(fitbitDistanceMetres(5, "Kilometer")).toBe(5000);
+    expect(fitbitDistanceMetres(400, "Meter")).toBe(400);
+  });
+
+  it("accepts a plural unit, which an asymmetric table silently dropped", () => {
+    // The first table listed "feet" but neither "yards" nor "miles", so a
+    // plural fell through to "unknown unit" and the distance vanished. That
+    // asymmetry is invisible until somebody's run has no distance on it.
+    expect(fitbitDistanceMetres(2, "Miles")).toBe(3219);
+    expect(fitbitDistanceMetres(5, "Kilometers")).toBe(5000);
+    expect(fitbitDistanceMetres(100, "Yards")).toBe(91);
+  });
+
+  it("returns nothing rather than guessing at an unknown unit", () => {
+    // A missing distance is a blank field. A wrong one is a lie in a health
+    // record, and nothing downstream could tell the difference.
+    expect(fitbitDistanceMetres(5, undefined)).toBeUndefined();
+    expect(fitbitDistanceMetres(5, "furlong")).toBeUndefined();
+    expect(fitbitDistanceMetres(undefined, "Mile")).toBeUndefined();
+  });
+});
+
+describe("Fitbit workouts", () => {
+  const fitbit = PROVIDERS.fitbit;
+
+  const activity = (over: Record<string, unknown> = {}) => ({
+    logId: 19018673358,
+    activityName: "Run",
+    startTime: "2026-08-01T07:08:29.000-08:00",
+    duration: 1_800_000, // 30 minutes, including pauses
+    activeDuration: 1_700_000,
+    calories: 340,
+    distance: 5,
+    distanceUnit: "Kilometer",
+    averageHeartRate: 148,
+    logType: "tracker",
+    source: { name: "Fitbit for Android" },
+    ...over,
+  });
+
+  it("reads a session, deriving the end from the duration", () => {
+    // Fitbit gives no end time. `duration` includes pauses, which is the right
+    // one for a start-to-end pair: Oura's and Whoop's spans include theirs too.
+    route({ "/activities/list.json": { activities: [activity()] } });
+    return fitbit.fetchWorkouts!(range).then((out) => {
+      expect(out).toHaveLength(1);
+      expect(out[0].externalId).toBe("19018673358");
+      expect(out[0].activity).toBe("Run");
+      expect(out[0].distanceM).toBe(5000);
+      expect(out[0].avgHeartRate).toBe(148);
+      expect(out[0].source).toBe("Fitbit for Android");
+      expect(Date.parse(out[0].endedAt) - Date.parse(out[0].startedAt)).toBe(1_800_000);
+    });
+  });
+
+  it("keeps the member's own local day, not a UTC one", async () => {
+    // 07:08 at -08:00 is 15:08 UTC on the same day, but an evening session
+    // would cross midnight and land on the wrong date if converted first.
+    route({
+      "/activities/list.json": {
+        activities: [activity({ startTime: "2026-08-01T22:40:00.000+05:30" })],
+      },
+    });
+    const out = await fitbit.fetchWorkouts!(range);
+    expect(out[0].date).toBe("2026-08-01");
+  });
+
+  it("keeps an auto-detected walk, and labels it as one", async () => {
+    // SmartTrack logs a "Walk" after about fifteen minutes, unasked. An
+    // earlier version threw these away so they could not inflate the training
+    // count; that protected the number by losing real data. A walk is
+    // movement, movement counts for health, so it is stored and marked.
+    route({
+      "/activities/list.json": {
+        activities: [
+          activity({ logId: 1, activityName: "Walk", logType: "auto_detected", duration: 900_000 }),
+        ],
+      },
+    });
+    const out = await fitbit.fetchWorkouts!(range);
+    expect(out).toHaveLength(1);
+    expect(out[0].autoDetected).toBe(true);
+  });
+
+  it("marks anything the member started as not auto-detected", async () => {
+    // Intent is the line, not duration: starting one says you meant it. Length
+    // never enters into it, so a ten minute deliberate session still counts.
+    for (const logType of ["tracker", "manual", "mobile_run", "fitstar"]) {
+      route({
+        "/activities/list.json": {
+          activities: [activity({ logId: 3, logType, duration: 600_000 })],
+        },
+      });
+      const out = await fitbit.fetchWorkouts!(range);
+      expect(out, logType).toHaveLength(1);
+      expect(out[0].autoDetected, logType).toBe(false);
+    }
+  });
+
+  it("trims the far edge of the window itself", async () => {
+    // The endpoint takes afterDate and no end date, so anything past `end`
+    // comes back and has to be dropped here.
+    route({
+      "/activities/list.json": {
+        activities: [
+          activity({ logId: 4, startTime: "2026-08-09T07:00:00.000-08:00" }),
+          activity({ logId: 5 }),
+        ],
+      },
+    });
+    const out = await fitbit.fetchWorkouts!(range);
+    expect(out.map((w) => w.externalId)).toEqual(["5"]);
+  });
+
+  it("survives a null entry and a missing id instead of throwing", async () => {
+    route({
+      "/activities/list.json": {
+        activities: [null, { activityName: "Run" }, activity({ duration: 0 }), activity({ logId: 9 })],
+      },
+    });
+    const out = await fitbit.fetchWorkouts!(range);
+    expect(out.map((w) => w.externalId)).toEqual(["9"]);
+  });
+
+  it("leaves distance out when Fitbit did not say the unit", async () => {
+    route({
+      "/activities/list.json": {
+        activities: [activity({ distanceUnit: undefined })],
+      },
+    });
+    const out = await fitbit.fetchWorkouts!(range);
+    expect(out[0].distanceM).toBeUndefined();
   });
 });

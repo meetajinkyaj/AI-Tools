@@ -4,6 +4,7 @@ import {
   type ExerciseEntry,
   isDurationBucket,
   isExerciseType,
+  matchExerciseType,
 } from "./exercises";
 import type { MergedSeries } from "./wearables/merge";
 
@@ -44,6 +45,28 @@ export interface WorkoutRow {
   /** Whoop only, 0-21. Never comparable to another vendor's number. */
   strain?: number | string | null;
   provider: string;
+  /**
+   * The device noticed this rather than the member starting it. Movement, not
+   * training. See `MOVEMENT` below for why the two are never added together.
+   */
+  auto_detected?: boolean | null;
+}
+
+/**
+ * What a device picked up without being asked.
+ *
+ * KEPT APART FROM TRAINING ON PURPOSE, and shown rather than hidden. A walk to
+ * the station is not a workout, and pretending it is would hand somebody seven
+ * training days for a week they trained none. It is also not nothing:
+ * everyday movement acts on bone, muscle, gut and metabolic health, and this
+ * app is a wellness picture rather than a gym log.
+ *
+ * So both numbers exist and neither borrows the other's meaning.
+ */
+export interface MovementLoad {
+  sessions: number;
+  days: number;
+  minutes: number;
 }
 
 /** One daily check-in, as the training view needs it. */
@@ -78,13 +101,49 @@ export interface TrainingLoad {
   restDays: number;
   /** Which sources contributed a day, in a stable order. */
   sources: TrainingSource[];
+  /**
+   * Sessions the device noticed rather than the member starting. Counted
+   * separately and never folded into the numbers above.
+   */
+  movement: MovementLoad;
+}
+
+/**
+ * One activity, as both a thing to count and a thing to print.
+ *
+ * THE TWO ARE NOT THE SAME STRING, and that is the point. `key` is what decides
+ * whether a ring's "Weight Training" and a check-in's "Gym / Weights" are the
+ * same activity; `label` is what the user reads. Keying on the display text
+ * showed one gym hour as two chips.
+ */
+interface ActivityRef {
+  /** Identity WITHIN a source. Two device sports are two things. */
+  key: string;
+  /**
+   * Identity ACROSS sources, when we can place the name in our taxonomy.
+   *
+   * Kept apart from `key` because the two questions have different answers.
+   * Football and Tennis both bucket to `sports`, and they are not the same
+   * activity: keying on the bucket collapsed a week of Football and Tennis
+   * into one chip reading "Football". But a ring's "Weight Training" and a
+   * check-in's "Gym / Weights" ARE one activity, and only the bucket can see
+   * that. So the bucket merges across sources and never within one.
+   */
+  bucket: string | null;
+  label: string;
+  fromCheckin: boolean;
 }
 
 /** What one day looked like from one source. */
 interface DayFacts {
   sessions: number;
   minutes: number;
-  activities: string[];
+  activities: ActivityRef[];
+}
+
+/** The key for an activity we could not place in our own taxonomy. */
+function rawKey(name: string): string {
+  return `raw:${name.toLowerCase()}`;
 }
 
 function toNumber(v: number | string | null | undefined): number | null {
@@ -108,25 +167,62 @@ function windowStart(endDate: string, windowDays: number): string | null {
   return new Date(endMs - (windowDays - 1) * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** A human label for one logged check-in activity. */
-function exerciseLabel(e: ExerciseEntry): string {
-  if (isExerciseType(e.type)) return EXERCISE_TYPE_LABELS[e.type];
+/** One logged check-in activity, as something to count and to print. */
+function checkinActivity(e: ExerciseEntry): ActivityRef | null {
+  if (isExerciseType(e.type)) {
+    return {
+      key: e.type,
+      bucket: e.type,
+      label: EXERCISE_TYPE_LABELS[e.type],
+      fromCheckin: true,
+    };
+  }
   // "other" carries its own free text; without one there is nothing to show.
-  return (e.label ?? "").trim();
+  const label = (e.label ?? "").trim();
+  if (!label) return null;
+  // The free text goes through the same matcher the device names do. Somebody
+  // typing "Padel" under "other" and a ring reporting "Padel" is one activity,
+  // and without this they were two chips reading the same word.
+  return { key: rawKey(label), bucket: matchExerciseType(label), label, fromCheckin: true };
 }
 
-/** Group device sessions by day. */
+/**
+ * One device session's activity.
+ *
+ * The vendor's own word is kept for display AND for identity, so two different
+ * sports never collapse into each other. The bucket is carried alongside so a
+ * check-in describing the same session can still be recognised as a duplicate.
+ */
+function deviceActivity(raw: string): ActivityRef {
+  return { key: rawKey(raw), bucket: matchExerciseType(raw), label: raw, fromCheckin: false };
+}
+
+/** Group device sessions by day. Auto-detected ones are excluded. */
 function deviceDays(workouts: WorkoutRow[]): Map<string, DayFacts> {
   const out = new Map<string, DayFacts>();
   for (const w of workouts) {
+    if (w.auto_detected === true) continue;
     const day = out.get(w.workout_date) ?? { sessions: 0, minutes: 0, activities: [] };
     day.sessions += 1;
     day.minutes += durationMinutes(w.started_at, w.ended_at) ?? 0;
     const a = (w.activity ?? "").trim();
-    if (a) day.activities.push(a);
+    if (a) day.activities.push(deviceActivity(a));
     out.set(w.workout_date, day);
   }
   return out;
+}
+
+/** Roll up the sessions the device noticed rather than the member starting. */
+function movementLoad(workouts: WorkoutRow[]): MovementLoad {
+  const auto = workouts.filter((w) => w.auto_detected === true);
+  return {
+    sessions: auto.length,
+    days: new Set(auto.map((w) => w.workout_date)).size,
+    minutes: auto.reduce(
+      (sum, w) => sum + (durationMinutes(w.started_at, w.ended_at) ?? 0),
+      0,
+    ),
+  };
 }
 
 /**
@@ -152,8 +248,8 @@ function checkinDays(checkins: CheckinTrainingRow[]): Map<string, DayFacts> {
       // volume. Counting it as zero minutes is honest; inventing a median
       // would put a number on the screen the user never gave us.
       if (isDurationBucket(e.duration)) day.minutes += DURATION_MINUTES[e.duration];
-      const label = exerciseLabel(e);
-      if (label) day.activities.push(label);
+      const activity = checkinActivity(e);
+      if (activity) day.activities.push(activity);
     }
     out.set(c.checkin_date, day);
   }
@@ -175,6 +271,11 @@ function checkinDays(checkins: CheckinTrainingRow[]): Map<string, DayFacts> {
  * device whenever it recorded any, because that is measured where the bucket is
  * estimated. It is the rule the biomarker merge already uses: prefer whatever
  * measured the quantity directly.
+ *
+ * WHAT THE DEVICE NOTICED IS NOT TRAINING and comes back under `movement`. A
+ * watch logging a walk to the station is real and worth showing; calling it a
+ * training day is how somebody ends up with seven out of seven for a week they
+ * trained none.
  */
 export function trainingLoad(
   input: { workouts?: WorkoutRow[]; checkins?: CheckinTrainingRow[] },
@@ -182,6 +283,7 @@ export function trainingLoad(
   windowDays = 7,
 ): TrainingLoad {
   const from = windowStart(endDate, windowDays);
+  const noMovement: MovementLoad = { sessions: 0, days: 0, minutes: 0 };
   const empty: TrainingLoad = {
     sessions: 0,
     days: 0,
@@ -190,23 +292,44 @@ export function trainingLoad(
     activities: [],
     restDays: from === null ? 0 : windowDays,
     sources: [],
+    movement: noMovement,
   };
   if (from === null) return empty;
 
   const inWindow = <T,>(rows: T[], date: (r: T) => string) =>
     rows.filter((r) => date(r) >= from && date(r) <= endDate);
 
-  const fromDevice = deviceDays(inWindow(input.workouts ?? [], (w) => w.workout_date));
+  const workoutsInWindow = inWindow(input.workouts ?? [], (w) => w.workout_date);
+  const fromDevice = deviceDays(workoutsInWindow);
   const fromCheckin = checkinDays(inWindow(input.checkins ?? [], (c) => c.checkin_date));
+  const movement = movementLoad(workoutsInWindow);
 
   const allDays = new Set([...fromDevice.keys(), ...fromCheckin.keys()]);
-  if (allDays.size === 0) return empty;
+  // A week of nothing but walks is still a week with something to say, so the
+  // movement roll-up survives the early return, and so does the fact that a
+  // device is what reported it.
+  if (allDays.size === 0) {
+    return {
+      ...empty,
+      movement,
+      sources: movement.sessions > 0 ? ["device"] : [],
+    };
+  }
 
   let sessions = 0;
   let minutes = 0;
   let minutesEstimated = false;
-  /** Days on which each activity name appeared, so a name counts once a day. */
-  const activityDays = new Map<string, { label: string; days: number }>();
+  /**
+   * Days on which each activity appeared, so one activity counts once a day.
+   *
+   * Days are a SET rather than a counter because the same activity can be
+   * reported twice on one day, by both sources or by two device sessions, and
+   * a counter would make one Tuesday look like two.
+   */
+  const activityDays = new Map<
+    string,
+    { label: string; days: Set<string>; bucket: string | null; fromCheckin: boolean }
+  >();
 
   for (const day of allDays) {
     const d = fromDevice.get(day);
@@ -222,25 +345,73 @@ export function trainingLoad(
       minutesEstimated = true;
     }
 
-    // Union the names: a ring recording a run and a check-in logging weights on
-    // the same day are two real activities, not a contradiction to resolve.
-    const seen = new Set<string>();
-    for (const name of [...(d?.activities ?? []), ...(c?.activities ?? [])]) {
-      const key = name.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const prev = activityDays.get(key);
-      activityDays.set(key, { label: prev?.label ?? name, days: (prev?.days ?? 0) + 1 });
+    // Union the activities: a ring recording a run and a check-in logging
+    // weights on the same day are two real activities, not a contradiction to
+    // resolve.
+    //
+    // DEVICE ACTIVITIES ARE NEVER MERGED WITH EACH OTHER. Football on Monday
+    // and Tennis on Wednesday both bucket to "sports", and they are two
+    // things; an earlier version keyed on the bucket and collapsed that week
+    // into a single chip reading "Football".
+    //
+    // A CHECK-IN ENTRY IS DROPPED when a device activity that day shares its
+    // bucket, because that is the one case where two names describe one
+    // session. The device's word survives: it observed the session where the
+    // check-in recalled it, which is the same reason its minutes win, and its
+    // word is usually the more specific one. A ring reporting "Padel" against
+    // a check-in bucketed "Racquet & team sports" is the case that decided it.
+    for (const ref of [...(d?.activities ?? []), ...(c?.activities ?? [])]) {
+      const prev = activityDays.get(ref.key);
+      if (prev) {
+        prev.days.add(day);
+      } else {
+        activityDays.set(ref.key, {
+          label: ref.label,
+          days: new Set([day]),
+          bucket: ref.bucket,
+          fromCheckin: ref.fromCheckin,
+        });
+      }
     }
   }
 
+  /*
+   * COLLAPSE A CHECK-IN INTO THE DEVICE THAT DESCRIBES THE SAME ACTIVITY, and
+   * do it over the whole window rather than day by day.
+   *
+   * Per-day was the first attempt and it leaked across days: somebody who logs
+   * "gym" on Monday, then logs it again on Wednesday when their ring also
+   * records "Weight Training", ended up with both chips, because Monday's
+   * check-in had no device entry beside it to be absorbed by.
+   *
+   * The days are unioned rather than dropped, so the frequency ordering still
+   * reflects every day the activity happened, whichever source saw it.
+   */
+  const bucketOwner = new Map<string, string>();
+  for (const [key, a] of activityDays) {
+    if (!a.fromCheckin && a.bucket !== null && !bucketOwner.has(a.bucket)) {
+      bucketOwner.set(a.bucket, key);
+    }
+  }
+  for (const [key, a] of activityDays) {
+    if (!a.fromCheckin || a.bucket === null) continue;
+    const owner = bucketOwner.get(a.bucket);
+    if (owner === undefined || owner === key) continue;
+    for (const day of a.days) activityDays.get(owner)?.days.add(day);
+    activityDays.delete(key);
+  }
+
   const activities = [...activityDays.values()]
-    .sort((x, y) => y.days - x.days || x.label.localeCompare(y.label))
+    .sort((x, y) => y.days.size - x.days.size || x.label.localeCompare(y.label))
     .map((a) => a.label);
 
   const sources: TrainingSource[] = [];
   if (fromCheckin.size > 0) sources.push("checkin");
-  if (fromDevice.size > 0) sources.push("device");
+  // Movement counts as the device having contributed, even when it produced no
+  // training day. Without this a week of nothing but walks reported its source
+  // as the check-in, which is a plain falsehood about data the member never
+  // typed.
+  if (fromDevice.size > 0 || movement.sessions > 0) sources.push("device");
 
   return {
     sessions,
@@ -248,8 +419,12 @@ export function trainingLoad(
     minutes,
     minutesEstimated,
     activities,
+    // Rest is measured against training only. A day spent walking is not a
+    // training day, and calling it one would quietly undo the whole point of
+    // keeping the two apart.
     restDays: Math.max(0, windowDays - allDays.size),
     sources,
+    movement,
   };
 }
 
@@ -472,12 +647,15 @@ export function reportedRecovery(
   // question is how recovered the person feels, and sleep is an input to that
   // rather than a second opinion on it.
   const score = energy + (sleep ?? 0);
+  // "energy and sleep are", "energy is". Getting this wrong is small and it is
+  // the kind of small that makes a health app read like a form letter.
+  const verb = basis.length > 1 ? "are" : "is";
   if (energy > 0 && score > 0) {
     return {
       direction: "recovering",
       source: "reported",
       basis,
-      summary: `Your reported ${basis.join(" and ")} is up on the previous ${recentDays} days.`,
+      summary: `Your reported ${basis.join(" and ")} ${verb} up on the previous ${recentDays} days.`,
     };
   }
   if (energy < 0 && score < 0) {
@@ -485,7 +663,7 @@ export function reportedRecovery(
       direction: "straining",
       source: "reported",
       basis,
-      summary: `Your reported ${basis.join(" and ")} is down on the previous ${recentDays} days.`,
+      summary: `Your reported ${basis.join(" and ")} ${verb} down on the previous ${recentDays} days.`,
     };
   }
   return {

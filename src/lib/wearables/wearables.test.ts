@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clampScore, dayOf, isMetricKey, METRIC_KEYS, secondsToMinutes } from "./metrics";
 import { PROVIDERS, PROVIDER_IDS, isProviderId, providerConfigured } from "./providers";
@@ -135,6 +135,30 @@ describe("the credential gate", () => {
 
     Object.assign(process.env, saved);
   });
+
+  it("keeps an unavailable provider off even with both credentials set", () => {
+    // Fitbit's adapter targets the legacy Fitbit Web API, which is closed to
+    // new applications and deprecated in September 2026. Setting two env vars
+    // must not switch it on: that would render a Connect button leading to a
+    // vendor screen that 400s, which a member reads as our bug.
+    const p = PROVIDERS.fitbit;
+    expect(p.unavailable, "fitbit should carry a reason it is off").toBeTruthy();
+
+    process.env[p.clientIdEnv] = "id";
+    process.env[p.clientSecretEnv] = "secret";
+    expect(providerConfigured(p)).toBe(false);
+
+    Object.assign(process.env, saved);
+  });
+
+  it("says why, rather than just hiding it", () => {
+    // A silent disappearance is indistinguishable from a bug. Every provider
+    // that is off on purpose has to explain itself in the code that hides it.
+    for (const id of PROVIDER_IDS) {
+      const reason = PROVIDERS[id].unavailable;
+      if (reason !== undefined) expect(reason.length, id).toBeGreaterThan(30);
+    }
+  });
 });
 
 describe("the Garmin push endpoint's shared secret", () => {
@@ -158,5 +182,78 @@ describe("the Garmin push endpoint's shared secret", () => {
     expect(safeEqual("s3cr3t-push-keyy", secret)).toBe(false);
     expect(safeEqual("wrong", secret)).toBe(false);
     expect(safeEqual(secret, secret)).toBe(true);
+  });
+});
+
+describe("vendor-side revocation", () => {
+  /**
+   * The property that matters is honesty about coverage, not the HTTP call.
+   * Claiming a revoke we never performed is a privacy claim we cannot support,
+   * and the way that happens is somebody adding a plausible-looking URL for a
+   * vendor whose endpoint nobody confirmed.
+   */
+  it("is implemented only where the endpoint is confirmed from the vendor's docs", () => {
+    const withRevoke = PROVIDER_IDS.filter((id) => typeof PROVIDERS[id].revoke === "function");
+    expect(withRevoke.sort()).toEqual(["fitbit", "whoop"]);
+  });
+
+  it("sends Fitbit the refresh token, which kills the whole grant", async () => {
+    // Fitbit accept either token. Revoking the access token would end one hour
+    // of access and leave the grant alive.
+    const calls: { url: string; body: string; auth: string | null; hasSignal: boolean }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        calls.push({
+          url: String(url),
+          body: String(init.body),
+          auth: new Headers(init.headers).get("Authorization"),
+          hasSignal: init.signal instanceof AbortSignal,
+        });
+        return new Response("", { status: 200 });
+      }),
+    );
+    await PROVIDERS.fitbit.revoke!({
+      accessToken: "access",
+      refreshToken: "refresh",
+      clientId: "cid",
+      clientSecret: "secret",
+      signal: AbortSignal.timeout(1000),
+    });
+    expect(calls[0].url).toBe("https://api.fitbit.com/oauth2/revoke");
+    expect(calls[0].body).toBe("token=refresh");
+    expect(calls[0].auth).toBe(`Basic ${btoa("cid:secret")}`);
+    // The signal has to reach fetch, or the caller's timeout is decorative and
+    // a silent vendor holds up a disconnect the user is waiting on.
+    expect(calls[0].hasSignal).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("treats a Whoop 404 as success, because the grant is already gone", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));
+    await expect(
+      PROVIDERS.whoop.revoke!({
+        accessToken: "access",
+        refreshToken: null,
+        clientId: "cid",
+        clientSecret: "secret",
+        signal: AbortSignal.timeout(1000),
+      }),
+    ).resolves.toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+
+  it("throws on a real refusal, so the caller can log it and carry on", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
+    await expect(
+      PROVIDERS.whoop.revoke!({
+        accessToken: "access",
+        refreshToken: null,
+        clientId: "cid",
+        clientSecret: "secret",
+        signal: AbortSignal.timeout(1000),
+      }),
+    ).rejects.toThrow(/whoop revoke 500/);
+    vi.unstubAllGlobals();
   });
 });

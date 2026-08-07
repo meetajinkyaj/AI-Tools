@@ -4,6 +4,7 @@ import {
   categoryForType,
   EXERCISE_TYPES,
   EXERCISE_TYPE_LABELS,
+  matchExerciseType,
   normalizeActivities,
   validateExercises,
 } from "./exercises";
@@ -67,5 +68,54 @@ describe("validateExercises", () => {
     expect(
       validateExercises([{ type: "other", label: "x".repeat(61) }]).ok,
     ).toBe(false);
+  });
+});
+
+describe("matchExerciseType", () => {
+  it("maps what the four vendors actually call weight training", () => {
+    // Oura, Whoop, Fitbit and Ultrahuman each have their own word for it, and
+    // the check-in has a fifth. They are one activity.
+    for (const raw of [
+      "weight_training",
+      "Weightlifting",
+      "Weights",
+      "Strength Training",
+      "strength-training",
+      "resistance training",
+    ]) {
+      expect(matchExerciseType(raw), raw).toBe("gym");
+    }
+  });
+
+  it("does not let 'gymnastics' fall into 'gym'", () => {
+    // The ordering trap: "gym" is a substring of "gymnastics", so anything
+    // matching on substrings has to test the longer word first.
+    expect(matchExerciseType("Gymnastics")).toBe("gymnastics");
+    expect(matchExerciseType("calisthenics")).toBe("gymnastics");
+  });
+
+  it("flattens the separators vendors disagree about", () => {
+    for (const raw of ["yoga", "Hot Yoga", "yoga_flow", "yoga-nidra"]) {
+      expect(matchExerciseType(raw), raw).toBe("yoga_mobility");
+    }
+  });
+
+  it("places the common cardio and sport names", () => {
+    expect(matchExerciseType("Treadmill Running")).toBe("running");
+    expect(matchExerciseType("Indoor Cycling")).toBe("cycling");
+    expect(matchExerciseType("Open Water Swim")).toBe("swimming");
+    expect(matchExerciseType("Hiking/Rucking")).toBe("hiking");
+    expect(matchExerciseType("Padel")).toBe("sports");
+    expect(matchExerciseType("Kickboxing")).toBe("boxing");
+    expect(matchExerciseType("Functional Fitness")).toBe("functional");
+    expect(matchExerciseType("HIIT")).toBe("functional");
+  });
+
+  it("returns null rather than guessing at something it does not know", () => {
+    // A wrong category prints a word that misdescribes what the person did,
+    // which is worse than printing the vendor's own.
+    for (const raw of ["Rowing", "Elliptical", "Kabaddi", "", "   ", null, undefined]) {
+      expect(matchExerciseType(raw), String(raw)).toBeNull();
+    }
   });
 });

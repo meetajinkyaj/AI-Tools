@@ -203,6 +203,112 @@ async function accessTokenFor(conn: ConnectionRow): Promise<string> {
   return tokens.accessToken;
 }
 
+/**
+ * Ask the vendor to tear down the grant, on the way out of a disconnect.
+ *
+ * BEST EFFORT, ALWAYS. Returns what happened instead of throwing, because the
+ * caller must delete our row whatever the answer: a user who pressed
+ * Disconnect has to end up disconnected even if the vendor is down, and a
+ * failed revoke that blocked the delete would leave them connected to an app
+ * they just left, holding live credentials. That is the worse of the two.
+ *
+ * NOT EVERY VENDOR CAN BE ASKED. `"unsupported"` means we have no revoke
+ * endpoint confirmed from that vendor's own documentation, and guessing a URL
+ * would leave us believing we revoked something we did not.
+ *
+ * Called BEFORE the row is deleted, since the credentials go with it.
+ */
+export type RevokeOutcome = "revoked" | "unsupported" | "failed" | "timed-out";
+
+/**
+ * How long a vendor gets to answer before we give up and disconnect anyway.
+ *
+ * THIS IS WHAT MAKES "BEST EFFORT" TRUE. Without a bound, "best effort" is a
+ * comment rather than a behaviour: an unanswered socket would hold up a
+ * request the user is watching a spinner on, and if the Worker gave up first
+ * the delete would never run at all. The member would press Disconnect, see a
+ * failure, and still be connected, which is the exact outcome this whole path
+ * exists to prevent.
+ *
+ * Three seconds because nothing downstream depends on the answer. We are
+ * telling the vendor something, not asking.
+ */
+const REVOKE_TIMEOUT_MS = 3_000;
+
+export async function revokeAtVendor(conn: ConnectionRow): Promise<RevokeOutcome> {
+  const p = PROVIDERS[conn.provider];
+  if (!p?.revoke) return "unsupported";
+  try {
+    const { id, secret } = clientCreds(p);
+    const refreshToken = await decryptToken(conn.refresh_token_enc);
+
+    /*
+     * A LIVE ACCESS TOKEN, REFRESHING IF THE STORED ONE HAS EXPIRED.
+     *
+     * The first version used the stored token as-is, reasoning that refreshing
+     * in order to revoke mints a credential purely to destroy it. That reads
+     * well and it broke Whoop, whose revoke authenticates with the member's
+     * access token and whose access tokens last about an hour. Disconnect any
+     * time after the nightly sync and the stored token is already dead: Whoop
+     * answers 401, we log "failed", and the grant survives at their end. The
+     * feature would have worked for one of the two providers that support it,
+     * and only for the hour after a sync.
+     *
+     * Fitbit is unaffected either way, because its revoke takes the refresh
+     * token.
+     *
+     * Refreshing is cheap and the objection was misplaced: a token minted here
+     * is destroyed seconds later by the very call it enables. On a grant that
+     * is genuinely dead the refresh throws, which lands in the catch below as
+     * "failed", and the row is deleted regardless. Nothing is worse off.
+     */
+    let accessToken = await decryptToken(conn.access_token_enc);
+    const expiresAt = conn.expires_at ? Date.parse(conn.expires_at) : null;
+    const expired =
+      expiresAt !== null && expiresAt - EXPIRY_SKEW_SECONDS * 1000 <= Date.now();
+    if ((expired || !accessToken) && refreshToken) {
+      const tokens = await requestTokens(conn.provider, {
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      });
+      accessToken = tokens.accessToken;
+      // NOT persisted, deliberately. The row is about to be deleted, so
+      // writing the rotated token back is work whose only effect would be to
+      // widen the window in which a half-finished disconnect leaves live
+      // credentials behind.
+    }
+    if (!accessToken && !refreshToken) return "failed";
+
+    // Belt and braces. The signal tears the request down, and the race caps
+    // the wait even if an implementation forgets to pass the signal on.
+    const signal = AbortSignal.timeout(REVOKE_TIMEOUT_MS);
+    const timedOut = new Promise<"timed-out">((resolve) =>
+      setTimeout(() => resolve("timed-out"), REVOKE_TIMEOUT_MS),
+    );
+    const outcome = await Promise.race([
+      p
+        .revoke({
+          accessToken: accessToken ?? "",
+          refreshToken,
+          clientId: id,
+          clientSecret: secret,
+          signal,
+        })
+        .then(() => "revoked" as const),
+      timedOut,
+    ]);
+    if (outcome === "timed-out") {
+      console.warn(`vendor revoke for ${conn.provider} timed out, disconnecting anyway`);
+    }
+    return outcome;
+  } catch (err) {
+    // Logged, never surfaced. The user asked to disconnect, not to hear about
+    // our conversation with a vendor.
+    console.warn(`vendor revoke failed for ${conn.provider}:`, err);
+    return "failed";
+  }
+}
+
 /* --------------------------------- store ---------------------------------- */
 
 /**
@@ -280,6 +386,9 @@ export async function storeWorkouts(
     avg_heart_rate: w.avgHeartRate ?? null,
     max_heart_rate: w.maxHeartRate ?? null,
     source: w.source ?? provider,
+    // Whether the member started it or their device noticed it. Only Fitbit
+    // reports this; false elsewhere means "they do not say", not "we know".
+    auto_detected: w.autoDetected === true,
     updated_at: new Date().toISOString(),
   }));
 

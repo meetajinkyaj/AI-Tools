@@ -23,12 +23,14 @@ const w = (
   startHour: number,
   minutes: number,
   activity?: string,
+  autoDetected = false,
 ): WorkoutRow => ({
   workout_date: date,
   started_at: `${date}T${String(startHour).padStart(2, "0")}:00:00Z`,
   ended_at: `${date}T${String(startHour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00Z`,
   activity,
   provider: "whoop",
+  auto_detected: autoDetected,
 });
 
 /** A check-in that logged activities. */
@@ -186,6 +188,94 @@ describe("trainingLoad, from check-ins", () => {
   });
 });
 
+describe("trainingLoad, movement versus training", () => {
+  it("does not let a walk the watch noticed become a training day", () => {
+    // Fitbit's SmartTrack logs a Walk after about fifteen minutes, unasked.
+    // Counting those would hand somebody seven training days out of seven for
+    // a week they trained on none, and that is the headline number.
+    const load = trainingLoad(
+      {
+        workouts: [
+          w("2026-08-03", 8, 18, "Walk", true),
+          w("2026-08-04", 8, 22, "Walk", true),
+          w("2026-08-05", 8, 16, "Walk", true),
+        ],
+      },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(0);
+    expect(load.restDays).toBe(7);
+    expect(load.minutes).toBe(0);
+    expect(load.activities).toEqual([]);
+  });
+
+  it("keeps the walk rather than discarding it", () => {
+    // A walk is movement and movement counts for health. Throwing it away to
+    // protect the training number loses real data, which is what the first cut
+    // of the Fitbit adapter did.
+    const load = trainingLoad(
+      {
+        workouts: [
+          w("2026-08-03", 8, 18, "Walk", true),
+          w("2026-08-03", 18, 20, "Walk", true),
+          w("2026-08-05", 8, 16, "Walk", true),
+        ],
+      },
+      "2026-08-07",
+    );
+    expect(load.movement).toEqual({ sessions: 3, days: 2, minutes: 54 });
+  });
+
+  it("reports movement even on a week with no training at all", () => {
+    // A week of nothing but walks still has something to say, so the roll-up
+    // has to survive the empty-training early return.
+    const load = trainingLoad(
+      { workouts: [w("2026-08-07", 8, 25, "Walk", true)] },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(0);
+    expect(load.movement.sessions).toBe(1);
+  });
+
+  it("counts a session the member started, however short", () => {
+    // Intent is the line, not duration. Starting one says you meant it.
+    const load = trainingLoad(
+      { workouts: [w("2026-08-07", 7, 12, "Run", false)] },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(1);
+    expect(load.movement.sessions).toBe(0);
+  });
+
+  it("still counts the day when the member logged it themselves", () => {
+    // Somebody who considers their auto-detected hour a real session can say
+    // so at check-in, and their own judgment wins.
+    const load = trainingLoad(
+      {
+        workouts: [w("2026-08-07", 8, 55, "Walk", true)],
+        checkins: [c("2026-08-07", [{ type: "walking", duration: "long" }])],
+      },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(1);
+    expect(load.activities).toEqual(["Walking / Zone 2"]);
+    // The walk is still reported as movement; the two views do not erase
+    // each other, they answer different questions.
+    expect(load.movement.sessions).toBe(1);
+  });
+
+  it("treats a provider that does not say as member-started", () => {
+    // Oura, Whoop and Ultrahuman never set the flag. Absent means "they do not
+    // say", and the safe reading is the behaviour those rows already had.
+    const load = trainingLoad(
+      { workouts: [{ ...w("2026-08-07", 7, 45, "Run"), auto_detected: undefined }] },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(1);
+    expect(load.movement.sessions).toBe(0);
+  });
+});
+
 describe("trainingLoad, reconciling the two sources", () => {
   it("does not count one day twice when both sources saw it", () => {
     // Somebody who logs "gym" and whose ring records the same hour trained
@@ -252,6 +342,150 @@ describe("trainingLoad, reconciling the two sources", () => {
       "2026-08-07",
     );
     expect(load.activities).toContain("Running");
+    expect(load.activities).toContain("Gym / Weights");
+  });
+
+  it("shows one chip when both sources named the same activity differently", () => {
+    // The bug this was written for: the ring says "Weight Training", the user
+    // tapped "Gym / Weights", and the card listed one gym hour twice under two
+    // names. The load arithmetic had it right and the chip row gave it away.
+    const load = trainingLoad(
+      {
+        workouts: [w("2026-08-07", 7, 50, "Weight Training")],
+        checkins: [c("2026-08-07", [{ type: "gym", duration: "long" }])],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities).toEqual(["Weight Training"]);
+  });
+
+  it("prints the device's word, which is the more specific one", () => {
+    // A ring reporting "Padel" against a check-in bucketed as "Racquet & team
+    // sports" is the case that decided this: our taxonomy is a set of buckets,
+    // and the vendor watched the actual session.
+    const both = trainingLoad(
+      {
+        workouts: [w("2026-08-07", 7, 60, "Padel")],
+        checkins: [c("2026-08-07", [{ type: "sports", duration: "long" }])],
+      },
+      "2026-08-07",
+    );
+    expect(both.activities).toEqual(["Padel"]);
+  });
+
+  it("keeps the check-in's word when no device saw that activity", () => {
+    const load = trainingLoad(
+      { checkins: [c("2026-08-07", [{ type: "sports", duration: "long" }])] },
+      "2026-08-07",
+    );
+    expect(load.activities).toEqual(["Racquet & team sports"]);
+  });
+
+  it("upgrades the wording once a device names an activity seen earlier", () => {
+    // Monday was logged by hand, Wednesday the ring caught it too. One chip,
+    // and the device's word for it.
+    const load = trainingLoad(
+      {
+        checkins: [
+          c("2026-08-03", [{ type: "gym", duration: "long" }]),
+          c("2026-08-05", [{ type: "gym", duration: "long" }]),
+        ],
+        workouts: [w("2026-08-05", 7, 50, "Weight Training")],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities).toEqual(["Weight Training"]);
+    expect(load.days).toBe(2);
+  });
+
+  it("does not merge two different sports that share one of our buckets", () => {
+    // Football and Tennis both bucket to "sports" and they are two things. An
+    // earlier version keyed activities on the bucket and collapsed a week of
+    // both into a single chip reading "Football".
+    const load = trainingLoad(
+      {
+        workouts: [
+          w("2026-08-03", 18, 60, "Football"),
+          w("2026-08-05", 18, 45, "Tennis"),
+        ],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities.sort()).toEqual(["Football", "Tennis"]);
+    expect(load.days).toBe(2);
+  });
+
+  it("merges a check-in and a device across DIFFERENT days, not just shared ones", () => {
+    // Logged by hand on Monday, and again on Wednesday when the ring also saw
+    // it. Collapsing only within a day left Monday's check-in with nothing
+    // beside it to be absorbed by, so both chips survived.
+    const load = trainingLoad(
+      {
+        checkins: [
+          c("2026-08-03", [{ type: "gym", duration: "long" }]),
+          c("2026-08-05", [{ type: "gym", duration: "long" }]),
+        ],
+        workouts: [w("2026-08-05", 7, 50, "Weight Training")],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities).toEqual(["Weight Training"]);
+    expect(load.days).toBe(2);
+  });
+
+  it("matches a free-text 'other' check-in against the device's word", () => {
+    // Somebody typing "Padel" under "other" and a ring reporting "Padel" is
+    // one activity. Without running the free text through the same matcher the
+    // device names use, this rendered the same word twice.
+    const load = trainingLoad(
+      {
+        checkins: [c("2026-08-07", [{ type: "other", label: "Padel", duration: "long" }])],
+        workouts: [w("2026-08-07", 18, 60, "Padel")],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities).toEqual(["Padel"]);
+  });
+
+  it("counts one day once when both sources report the activity", () => {
+    // Days are a set, not a counter: the same Tuesday seen twice is one
+    // Tuesday, and a counter would order the chip row by double-sightings.
+    const load = trainingLoad(
+      {
+        checkins: [c("2026-08-07", [{ type: "gym", duration: "long" }])],
+        workouts: [
+          w("2026-08-07", 7, 50, "Weight Training"),
+          w("2026-08-07", 18, 30, "Weight Training"),
+        ],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities).toEqual(["Weight Training"]);
+    expect(load.days).toBe(1);
+  });
+
+  it("reports the device as the source on a week of nothing but walks", () => {
+    // The card prints this. Saying "from what you logged at check-in" about
+    // data the member never typed is a plain falsehood.
+    const load = trainingLoad(
+      { workouts: [w("2026-08-07", 8, 25, "Walk", true)] },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(0);
+    expect(load.sources).toEqual(["device"]);
+  });
+
+  it("keeps an activity it cannot place under the vendor's own name", () => {
+    // Rowing is not in our taxonomy and is not close to anything in it.
+    // Forcing it into a category would print a word that misdescribes it.
+    const load = trainingLoad(
+      {
+        workouts: [w("2026-08-07", 7, 30, "Rowing")],
+        checkins: [c("2026-08-07", [{ type: "gym", duration: "short" }])],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities).toContain("Rowing");
     expect(load.activities).toContain("Gym / Weights");
   });
 });

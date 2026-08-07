@@ -318,10 +318,135 @@ export function fitbitVo2Max(raw: string | undefined): number | undefined {
   return num(raw);
 }
 
+/** One entry from Fitbit's activity log list. */
+interface FitbitActivity {
+  logId?: number | string;
+  activityName?: string;
+  /** Local time with an offset, e.g. "2026-08-03T12:08:29.000-08:00". */
+  startTime?: string;
+  /** Milliseconds, INCLUDING pauses. `activeDuration` excludes them. */
+  duration?: number;
+  activeDuration?: number;
+  calories?: number;
+  /** In whatever `distanceUnit` says, which is not always metric. */
+  distance?: number;
+  distanceUnit?: string;
+  averageHeartRate?: number;
+  /** manual | mobile_run | tracker | auto_detected | fitstar | an app name. */
+  logType?: string;
+  /** An OBJECT here, unlike Oura's plain string. */
+  source?: { name?: string } | null;
+}
+
+/**
+ * Fitbit's distance, in metres, or undefined when we cannot tell the unit.
+ *
+ * THIS IS THE UNIT TRAP THIS REPO KEEPS FALLING INTO. Fitbit's data dictionary
+ * says distance comes back in "units defined by the Accept-Language header",
+ * and their own published examples show `"distanceUnit": "Mile"` alongside a
+ * bare number. Reading `distance` as kilometres would understate an American
+ * member's run by 38% and nothing would fail.
+ *
+ * So the unit is read from the payload, and an unrecognised one yields nothing
+ * rather than a guess. A missing distance is a blank field; a wrong one is a
+ * lie in a health record.
+ */
+export function fitbitDistanceMetres(
+  distance: number | undefined,
+  unit: string | undefined,
+): number | undefined {
+  const d = num(distance);
+  if (d === undefined || !unit) return undefined;
+  const factor: Record<string, number> = {
+    kilometer: 1000,
+    kilometre: 1000,
+    km: 1000,
+    meter: 1,
+    metre: 1,
+    m: 1,
+    mile: 1609.344,
+    mi: 1609.344,
+    yard: 0.9144,
+    foot: 0.3048,
+    feet: 0.3048,
+  };
+  // Singular is what Fitbit's examples show, and a plural would otherwise fall
+  // through to "unknown unit" and silently drop the distance. The first version
+  // listed "feet" but not "yards" or "miles", which is the kind of asymmetry
+  // that produces a bug nobody can see. Normalising here beats guessing which
+  // forms a vendor uses.
+  const cleaned = unit.trim().toLowerCase().replace(/s$/, "");
+  const f = factor[cleaned] ?? factor[unit.trim().toLowerCase()];
+  return f === undefined ? undefined : Math.round(d * f);
+}
+
+/**
+ * Fitbit's `logType` values that mean the watch noticed it rather than the
+ * member starting it.
+ *
+ * WHY THIS IS LABELLED AND NOT DISCARDED. Fitbit's SmartTrack logs a "Walk"
+ * after roughly fifteen minutes of sustained movement, unasked. The first cut
+ * of this adapter dropped short auto-detected sessions outright, so that a
+ * member who walks to the station twice a day would not open the Training card
+ * to seven training days out of seven, having trained on none.
+ *
+ * That protected the training number by throwing away real data. A walk is
+ * movement, and movement is most of what this app is about; everyday activity
+ * acts on bone, muscle, gut and metabolic health whether or not anybody would
+ * call it a workout. So every session is stored, and the distinction travels
+ * with it.
+ *
+ * INTENT IS THE LINE, NOT DURATION. Started by the member means training. Noticed
+ * by the device means movement. No per-sport thresholds to argue about, one
+ * sentence to explain, and somebody who considers their auto-detected hour a
+ * real session can log it at check-in, which the training view already
+ * reconciles per day.
+ *
+ * `fitstar` is Fitbit's own guided-workout app, which the member does start,
+ * so it is deliberately NOT here.
+ */
+const FITBIT_AUTO_LOG_TYPES = new Set(["auto_detected"]);
+
+/**
+ * FITBIT, AND WHY THIS ENTIRE ADAPTER IS NOW UNREACHABLE.
+ *
+ * Everything below is written against the LEGACY Fitbit Web API, and that API
+ * is closed to us in both directions:
+ *
+ *   - New applications can no longer be registered. `dev.fitbit.com`'s
+ *     registration form now says so outright and points at Google.
+ *   - The legacy Web API is deprecated in September 2026.
+ *
+ * Fitbit access now runs through the GOOGLE HEALTH API, which is a different
+ * API rather than a renamed one: `health.googleapis.com`, Google OAuth against
+ * a Google account rather than a Fitbit login, `dailyRollup`/`list` methods in
+ * place of the hundred-odd legacy endpoints, new response shapes, and three
+ * Google scope URLs where this asks for seven Fitbit short strings. Google
+ * state plainly that existing tokens do not carry over.
+ *
+ * WHY IT IS KEPT RATHER THAN DELETED. The metric selection, the day
+ * attribution rules and the two traps found while writing it (VO2 max arriving
+ * as a range, distance arriving in whatever unit the account's locale implies)
+ * are all still true of Fitbit's data and all still needed by the rewrite.
+ * Deleting it would throw away the audit and keep only the mistakes.
+ *
+ * WHY IT IS MARKED `unavailable` RATHER THAN LEFT ALONE. An unconfigured
+ * provider is already hidden, so the danger was never that a member sees it.
+ * The danger is somebody reading a complete, audited adapter and concluding
+ * Fitbit is one registration away, then spending an afternoon producing
+ * credentials nothing here can call. The flag makes the file say what is true.
+ *
+ * Verified against Google's own migration, scopes and setup pages on
+ * 2026-08-06. Details and the rewrite plan are in `docs/WEARABLES.md`.
+ */
 const fitbit: WearableProvider = {
   id: "fitbit",
   name: PROVIDER_NAMES.fitbit,
   blurb: "Steps, sleep and resting heart rate from Fitbit.",
+  unavailable:
+    "Fitbit moved to the Google Health API. This adapter targets the legacy " +
+    "Fitbit Web API, which is closed to new applications and is deprecated in " +
+    "September 2026, so it must be rewritten before Fitbit can be connected.",
   clientIdEnv: "FITBIT_CLIENT_ID",
   clientSecretEnv: "FITBIT_CLIENT_SECRET",
   authorizeUrl: "https://www.fitbit.com/oauth2/authorize",
@@ -465,6 +590,91 @@ const fitbit: WearableProvider = {
     }
 
     return out;
+  },
+
+  /**
+   * Fitbit workouts, from the activity log list.
+   *
+   * THREE THINGS ABOUT THIS ENDPOINT ARE NOT LIKE THE OTHERS.
+   *
+   * It has no end date. `afterDate` must be paired with `sort=asc`, `offset`
+   * must be 0 and `limit` caps at 100, so the window's far edge is trimmed here
+   * rather than asked for. With a 7 day sync window and a 100 row page, a
+   * member would have to log fourteen sessions a day to overflow it.
+   *
+   * It gives a duration, not an end time. `duration` is elapsed milliseconds
+   * INCLUDING pauses, which is the right one for a start-to-end pair: the row
+   * says when the session happened, and Oura's and Whoop's spans include their
+   * pauses too. `activeDuration` would make our interval disagree with the
+   * clock.
+   *
+   * `source` is an object, where Oura sends a plain string.
+   */
+  async fetchWorkouts({ accessToken, start, end }) {
+    const res = await providerFetch<{ activities?: FitbitActivity[] }>(
+      "fitbit",
+      "https://api.fitbit.com/1/user/-/activities/list.json" +
+        `?afterDate=${start}&sort=asc&offset=0&limit=100`,
+      { accessToken },
+    );
+
+    const out: WorkoutSession[] = [];
+    for (const a of res.activities ?? []) {
+      if (!a || typeof a !== "object") continue;
+      const id = a.logId;
+      if (id === undefined || id === null || !a.startTime) continue;
+
+      const ms = num(a.duration);
+      const startMs = Date.parse(a.startTime);
+      if (ms === undefined || ms <= 0 || !Number.isFinite(startMs)) continue;
+
+      // The local date, taken from the offset Fitbit already applied. Their
+      // timestamp says which day the member thinks it was; converting to UTC
+      // first would move an evening session in Asia onto the following day.
+      const date = a.startTime.slice(0, 10);
+      if (date < start || date > end) continue;
+
+      out.push({
+        autoDetected: FITBIT_AUTO_LOG_TYPES.has(a.logType ?? ""),
+        externalId: String(id),
+        startedAt: a.startTime,
+        endedAt: new Date(startMs + ms).toISOString(),
+        date,
+        activity: a.activityName ?? undefined,
+        calories: num(a.calories),
+        distanceM: fitbitDistanceMetres(a.distance, a.distanceUnit),
+        avgHeartRate: num(a.averageHeartRate),
+        // How Fitbit came by the session, which is the closest thing they give
+        // to Oura's intensity label and worth keeping: a member reading their
+        // own history should be able to tell what the watch guessed from what
+        // they started.
+        source: a.source?.name ?? a.logType ?? undefined,
+      });
+    }
+    return out;
+  },
+
+  /**
+   * Fitbit's documented revoke: POST /oauth2/revoke, Basic auth with the app's
+   * own credentials, and the token in a form body.
+   *
+   * THE REFRESH TOKEN IS SENT, NOT THE ACCESS TOKEN. Fitbit accept either, and
+   * revoking the refresh token kills the whole grant rather than one hour of it.
+   */
+  async revoke({ accessToken, refreshToken, clientId, clientSecret, signal }) {
+    const res = await fetch("https://api.fitbit.com/oauth2/revoke", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+        Accept: "application/json",
+      },
+      body: new URLSearchParams({ token: refreshToken ?? accessToken }),
+      signal,
+    });
+    if (!res.ok) {
+      throw new Error(`fitbit revoke ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    }
   },
 };
 
@@ -692,6 +902,27 @@ const whoop: WearableProvider = {
       });
     }
     return out;
+  },
+
+  /**
+   * Whoop's `revokeUserOAuthAccess`: DELETE /developer/v2/user/access, carrying
+   * the member's own access token, answering 204.
+   *
+   * Their documentation asks for this directly: "When a user disables your
+   * integration, you should revoke their access token from your application to
+   * respect their privacy." Doing it also stops any webhooks for that member,
+   * which matters more here than for the others.
+   */
+  async revoke({ accessToken, signal }) {
+    const res = await fetch("https://api.prod.whoop.com/developer/v2/user/access", {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      signal,
+    });
+    // 404 means the grant was already gone, which is the outcome we wanted.
+    if (!res.ok && res.status !== 404) {
+      throw new Error(`whoop revoke ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    }
   },
 };
 
@@ -985,6 +1216,11 @@ export function isProviderId(v: string): v is ProviderId {
  * surface, as a vendor error page with our name on it.
  */
 export function providerConfigured(p: WearableProvider): boolean {
+  // `unavailable` wins over credentials, deliberately. A provider whose API we
+  // can no longer reach must not be switchable on by setting two env vars,
+  // because the failure that produces is a Connect button leading to a vendor
+  // screen that 400s, which reads to a member as our bug.
+  if (p.unavailable) return false;
   return Boolean(process.env[p.clientIdEnv] && process.env[p.clientSecretEnv]);
 }
 

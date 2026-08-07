@@ -492,6 +492,46 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   reading over the duration bucket, and recovery is labelled "measured" or
   "reported" so a self-report never borrows a device's credibility. Fitbit
   workout sync is still outstanding.
+- **Disconnect now revokes at the vendor, for Fitbit and Whoop.** Deleting our
+  row always destroyed our copy of the credentials; what used to survive was
+  the authorisation sitting in the member's vendor account. `revokeAtVendor()`
+  now tears that down too, before the row is deleted, since the credentials go
+  with it. It is best effort and never blocks the disconnect: somebody who
+  pressed the button has to end up disconnected even when a vendor is down.
+  **Only endpoints confirmed from a vendor's own documentation are called.** A
+  guessed revoke URL 404s quietly and leaves us believing we revoked something
+  we did not, which is a privacy claim we cannot support rather than a missing
+  feature, and a test pins the exact provider list. Oura document a revoke
+  endpoint whose literal URL every extractor we have strips out of the page;
+  reading it is a Cowork task. Ultrahuman, Withings and Garmin document none.
+- **🔴 Fitbit is blocked on a REWRITE, not a registration.** Found 2026-08-06
+  and verified against Google's own pages. `dev.fitbit.com` has closed
+  registration for new applications, and the legacy Fitbit Web API the adapter
+  targets is **deprecated in September 2026**. Fitbit access now runs through
+  the **Google Health API**: different host, Google account sign-in, Google
+  OAuth, `dailyRollup`/`list` in place of a hundred endpoints, new response
+  shapes, and three `googlehealth.*.readonly` scopes where we ask for seven
+  Fitbit short strings. Tokens do not carry over. The adapter is marked
+  `unavailable`, which `providerConfigured()` honours over credentials so
+  nobody can switch a dead API on with two env vars, and it is kept rather than
+  deleted because everything it learned about Fitbit's DATA survives the
+  rewrite. Registration must follow the rewrite, not precede it: the Google
+  Cloud client, redirect URI and scopes all have to match code that does not
+  exist yet, and 7-day test-mode refresh tokens make an early connection a
+  moving target. Also worth knowing before it surprises somebody: an unverified
+  Google client caps at **100 test users** and needs a third-party security
+  review to exceed it. Detail in [`WEARABLES.md`](./WEARABLES.md).
+- **Fitbit workout sync: written, and now legacy-only.** Shipped against the
+  API that is going away, so it is reference material for the rewrite rather
+  than a live integration. The findings hold either way, and the judgment call
+  below is the part to re-read when porting.**
+  SmartTrack invents a "Walk" after about fifteen minutes of movement, unasked,
+  so a member walking to the station twice a day would see seven training days
+  out of seven having trained on none. Auto-detected sessions under twenty
+  minutes are dropped; anything the member started themselves is kept whatever
+  its length. It is one constant if it needs reversing. Their distance also
+  arrives in whatever unit the account's locale implies, so the unit is read
+  from the payload and an unknown one yields no distance rather than a guess.
 - **Withings is the only adapter never audited.** The other four were, and all
   four were wrong. It is a scale rather than a wearable, so it contributes
   weight and body fat and nothing to the training or recovery picture, which is

@@ -261,10 +261,19 @@ Per day:
 
 | Field | Rule |
 |---|---|
-| Days | Union of both sources. A day counts once. |
+| Days | Union of both sources. A day counts once. Auto-detected sessions are excluded. |
 | Sessions | The higher of the two counts, not the sum. |
 | Minutes | The device's measured total when it recorded any, otherwise the check-in's bucket estimate. |
-| Activities | Union of the names, deduped case-insensitively, ranked by how many days each appeared on. |
+| Activities | Union. A check-in collapses into a device activity sharing its bucket, across the whole window; two device activities never merge with each other. Ranked by distinct days. |
+
+**Identity and display are two different questions.** An activity carries a
+`key` (identity within a source, the vendor's own word) and a `bucket`
+(identity across sources, our taxonomy). Keying on the bucket alone collapsed
+Football and Tennis into one chip, because both bucket to `sports`; keying on
+the word alone showed one gym hour twice, as "Weight Training" and "Gym /
+Weights". So the bucket merges across sources and never within one, and the
+collapse runs over the whole window rather than day by day, or a Monday
+check-in with no device beside it survives as a second chip.
 
 The minutes rule is the biomarker precedence rule again: **prefer whatever
 measured the quantity directly.** A duration chip is a bucket we turned into a
@@ -291,6 +300,17 @@ point scale.
 blending**. Averaging a reading off the body with somebody's opinion of their
 morning produces a number that is neither, and there is no defensible weighting
 between them. The card prints which one it used, in words, every time.
+
+**Movement is counted, and counted separately.** Fitbit is the one vendor that
+tells us whether the member started a session or the watch noticed it
+(`wearable_workouts.auto_detected`, migration 0021). What the watch noticed
+does not become a training day, a training minute or an activity chip; it comes
+back under `movement` and gets its own line on the card. Both halves matter: a
+walk to the station is not a workout, and it is also not nothing, since
+everyday movement acts on bone, muscle, gut and metabolic health. Adding the
+two together would hand somebody seven training days for a week they trained
+none; dropping the walk, which is what the first version did, throws away the
+only signal we have for it.
 
 **Nothing here gives advice.** No "take a rest day", no "you are overtraining".
 A test asserts that no summary contains any of those phrasings, in every branch
