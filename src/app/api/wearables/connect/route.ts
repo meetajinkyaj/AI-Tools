@@ -59,6 +59,12 @@ export async function GET(request: Request) {
   url.searchParams.set("redirect_uri", callbackUrl(providerId));
   url.searchParams.set("scope", provider.scopes.join(" "));
   url.searchParams.set("state", state);
+  // Vendor-specific extras, set last so a provider cannot quietly override
+  // `state` or `redirect_uri` and weaken the flow.
+  for (const [k, v] of Object.entries(provider.extraAuthParams ?? {})) {
+    if (["state", "redirect_uri", "client_id", "response_type"].includes(k)) continue;
+    url.searchParams.set(k, v);
+  }
 
   return NextResponse.json({ url: url.toString() });
 }

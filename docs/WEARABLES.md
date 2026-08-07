@@ -445,6 +445,107 @@ plans checked first were saved.
 
 ---
 
+### The Google Health rewrite, done 2026-08-07 from the discovery document
+
+**Written from `health.googleapis.com/$discovery/rest?version=v4` (revision
+20260805), not from the migration guide.** That choice is the whole story of
+this rewrite. Google publish a machine-readable spec, and it disagrees with
+their own prose in four places, each of which would have produced a silently
+absent metric, which is the exact failure that caught four adapters here:
+
+| Google's prose | The spec | Cost of believing the prose |
+|---|---|---|
+| `dailyRollup` | **`dailyRollUp`**, capital U | 404 on every steps and calories call |
+| Sleep and exercise among the rollup types | Both are **session** types read via `list` | Two metrics that never arrive |
+| One name per data type | Path is **kebab-case**, filter field is **snake_case**, in the same request | Empty result, no error |
+| Sessions filter on civil start time | **Sleep is excluded** and wants `sleep.interval.end_time` in RFC-3339 | Sleep never returns |
+
+Fetching the discovery document takes one `curl`. Reading it took twenty
+minutes and it caught all four before a line was written.
+
+#### What the adapter now reads
+
+Six `daily-*` collections through `list`, which the migration guide never
+mentions and which are better than what the legacy API offered: one value per
+day, already computed, instead of rolling up intraday samples.
+
+| Metric | Data type | Field |
+|---|---|---|
+| `resting_heart_rate` | `daily-resting-heart-rate` | `beatsPerMinute` (int64, arrives as a STRING) |
+| `hrv` | `daily-heart-rate-variability` | `averageHeartRateVariabilityMilliseconds` (RMSSD) |
+| `spo2` | `daily-oxygen-saturation` | `averagePercentage` |
+| `respiratory_rate` | `daily-respiratory-rate` | `breathsPerMinute` |
+| `vo2max` | `daily-vo2-max` | `vo2Max` |
+| `temperature_deviation` | `daily-sleep-temperature-derivations` | `nightly - baseline` |
+| `sleep_minutes` | `sleep` (session) | `summary.minutesAsleep` |
+| `steps` | `steps` | `dailyRollUp` → `steps.countSum` |
+| `active_calories` | `active-energy-burned` | `dailyRollUp` → `activeEnergyBurned.kcalSum` |
+
+**Skin temperature is the Whoop trap in a new coat.** Legacy Fitbit sent
+`nightlyRelative`, already a deviation, so it mapped straight across. Google
+sends an absolute nightly reading near 33 degrees plus a baseline, and
+publishing the first as a deviation would put a body temperature on a chart
+whose other points are fractions of a degree. The adapter subtracts, and
+reports nothing at all when there is no baseline: a gap beats an invented
+number. `googleTemperatureDeviation()` is tested for exactly this.
+
+**Two traps that went away.** VO2 max is a plain number now, so the legacy
+band-parsing (`"44-48"` → 46) is gone. Distance is unambiguous rather than
+locale-dependent, though it is in **millimetres**: reading it as metres turns a
+5km run into 5,000km.
+
+**Still no sleep score**, for the same reason as before. Google Health exposes
+none, and publishing sleep efficiency under `sleep_score` would put a number
+beside Oura's that means something different.
+
+#### The OAuth details that would have killed it silently
+
+**`access_type=offline` and `prompt=consent` are mandatory.** Google issues no
+refresh token at all without the first, and sends one exactly once per grant
+without the second. Miss either and a connection works for an hour and then
+dies, with nothing in the logs tying the failure to the cause. This is Whoop's
+`offline` scope wearing different clothes, and that one cost a day. Providers
+gained `extraAuthParams` for it, applied last in the connect route so a vendor
+cannot override `state` or `redirect_uri`.
+
+**Google does not rotate refresh tokens.** The refresh response omits the field
+entirely. `tokenColumns` already refuses to blank a token a vendor did not
+send, so this is safe, but `refreshRotates: false` records what is true rather
+than what is convenient. It is the only provider with that flag, and a test
+pins the exception so a future one gets reviewed.
+
+**Three scopes, and the collapse matters.** `heartrate`, `oxygen_saturation`,
+`respiratory_rate` and `temperature` were four separately declinable Fitbit
+scopes and are now one Google bundle. A member used to be able to decline SpO2
+and keep HRV; now those four arrive or refuse together. Each collection is
+still fetched defensively, but what that protects against has changed shape.
+
+**`recordingMethod` is a better auto-detected signal than the legacy API had.**
+Fitbit's `logType` needed matching against a list of strings; Google state it
+as an enum, so `PASSIVELY_MEASURED` means the device noticed the session and
+anything else means a person was involved. That maps straight onto migration
+0021's `auto_detected`. `UNSPECIFIED` and `UNKNOWN` are not treated as
+auto-detected, keeping the rule that false means "they do not say".
+
+**The provider id stays `fitbit`.** Members think Fitbit, the redirect URI is
+registered against `/api/wearables/callback/fitbit`, and
+`wearable_connections.provider` already uses it. Google Health is the pipe, not
+the brand.
+
+#### What is still needed before it can be connected
+
+A Google Cloud project with the Health API enabled, an OAuth Web Server client
+whose redirect URI is `https://app.ikigaro.com/api/wearables/callback/fitbit`,
+the three scopes on the Data Access page, and the client id and secret set as
+Cloudflare Secrets. **Registration follows the code, which is now written.**
+
+Two constraints to plan around rather than discover: an unverified client caps
+at **100 test users** and needs a third-party security review beyond that, and
+while the client is unpublished **refresh tokens expire after 7 days**, so a
+tester silently drops after a week. Publish before anyone relies on it.
+
+---
+
 ### Fitbit moved to the Google Health API, and the adapter has to be rewritten
 
 **Found 2026-08-06, verified against Google's own pages the same day.** This

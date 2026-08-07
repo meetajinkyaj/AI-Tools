@@ -75,14 +75,17 @@ describe("the provider registry", () => {
     expect(isProviderId("constructor")).toBe(false);
   });
 
-  it("treats every refresh token as rotating", () => {
+  it("treats every refresh token as rotating, except where a vendor says otherwise", () => {
     // Most of these vendors retire the old refresh token on use. The sync path
-    // writes back unconditionally, so this is documentation with teeth: if a
-    // future provider is added claiming otherwise, that claim gets reviewed
-    // rather than assumed.
-    for (const id of PROVIDER_IDS) {
-      expect(PROVIDERS[id].refreshRotates, id).toBe(true);
-    }
+    // writes back unconditionally, so this is documentation with teeth: a
+    // provider claiming otherwise gets reviewed rather than assumed.
+    //
+    // Google is the one exception and it is safe: they reuse the same refresh
+    // token and omit the field on refresh, and `tokenColumns` only overwrites
+    // when a vendor actually sends one, so the stored token survives either
+    // way. The flag records what is true, not what is convenient.
+    const nonRotating = PROVIDER_IDS.filter((id) => !PROVIDERS[id].refreshRotates);
+    expect(nonRotating).toEqual(["fitbit"]);
   });
 
   it("marks Garmin push-only and everyone else pollable", () => {
@@ -137,16 +140,16 @@ describe("the credential gate", () => {
   });
 
   it("keeps an unavailable provider off even with both credentials set", () => {
-    // Fitbit's adapter targets the legacy Fitbit Web API, which is closed to
-    // new applications and deprecated in September 2026. Setting two env vars
-    // must not switch it on: that would render a Connect button leading to a
-    // vendor screen that 400s, which a member reads as our bug.
-    const p = PROVIDERS.fitbit;
-    expect(p.unavailable, "fitbit should carry a reason it is off").toBeTruthy();
-
-    process.env[p.clientIdEnv] = "id";
-    process.env[p.clientSecretEnv] = "secret";
-    expect(providerConfigured(p)).toBe(false);
+    // No provider is retired today: Fitbit's was, and the Google Health rewrite
+    // cleared it. The gate is still the thing being tested, so it is exercised
+    // against a stand-in rather than deleted along with its only user, because
+    // the next retirement should find this already working.
+    const stub = { ...PROVIDERS.oura, unavailable: "retired for the purposes of this test" };
+    process.env[stub.clientIdEnv] = "id";
+    process.env[stub.clientSecretEnv] = "secret";
+    expect(providerConfigured(stub)).toBe(false);
+    // Same provider without the flag is configured, so the flag is what did it.
+    expect(providerConfigured(PROVIDERS.oura)).toBe(true);
 
     Object.assign(process.env, saved);
   });
@@ -197,8 +200,8 @@ describe("vendor-side revocation", () => {
     expect(withRevoke.sort()).toEqual(["fitbit", "oura", "whoop"]);
   });
 
-  it("sends Fitbit the refresh token, which kills the whole grant", async () => {
-    // Fitbit accept either token. Revoking the access token would end one hour
+  it("sends Google the refresh token, which kills the whole grant", async () => {
+    // Google accept either token. Revoking the access token would end one hour
     // of access and leave the grant alive.
     const calls: { url: string; body: string; auth: string | null; hasSignal: boolean }[] = [];
     vi.stubGlobal(
@@ -220,9 +223,8 @@ describe("vendor-side revocation", () => {
       clientSecret: "secret",
       signal: AbortSignal.timeout(1000),
     });
-    expect(calls[0].url).toBe("https://api.fitbit.com/oauth2/revoke");
+    expect(calls[0].url).toBe("https://oauth2.googleapis.com/revoke");
     expect(calls[0].body).toBe("token=refresh");
-    expect(calls[0].auth).toBe(`Basic ${btoa("cid:secret")}`);
     // The signal has to reach fetch, or the caller's timeout is decorative and
     // a silent vendor holds up a disconnect the user is waiting on.
     expect(calls[0].hasSignal).toBe(true);
