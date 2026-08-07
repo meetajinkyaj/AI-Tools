@@ -1,6 +1,6 @@
 # Ikigaro. Project & Session Reference
 
-_Last updated: 2026-07-30_
+_Last updated: 2026-08-07_
 
 A living reference for the Ikigaro app: architecture, what's built, how to
 operate it, and the known follow-ups. Update this as work lands.

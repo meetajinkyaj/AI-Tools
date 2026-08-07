@@ -1,6 +1,6 @@
 # CTO Handover. Ikigaro
 
-_Last updated: 2026-07-27_
+_Last updated: 2026-08-07_
 
 **If you are the incoming CTO, start here.** This document is the entry point to
 everything: what the product is, what exists, what you own on day one, what will
@@ -32,6 +32,16 @@ In this order:
 | 10 | [`WEARABLES.md`](./WEARABLES.md) | How device sync runs, why tokens are encrypted, adding a provider | skim |
 | 11 | [`WEARABLE_DATA.md`](./WEARABLE_DATA.md) | How several devices become one series, and why we never average | skim |
 | 12 | [`EMAIL.md`](./EMAIL.md) | Resend, the two message types, and how "send exactly once" is enforced | skim |
+| 13 | [`POINTS_ECONOMY.md`](./POINTS_ECONOMY.md) | Every earn, its rationale, and the emission budget | skim |
+| 14 | [`WEARABLES_APPLICATIONS.md`](./WEARABLES_APPLICATIONS.md) | What each vendor asked for on their developer form, and what we answered | reference |
+| 15 | [`GARMIN_AUDIT.md`](./GARMIN_AUDIT.md) | The one compliance gap that is open, and why Garmin is paused | reference |
+
+Also: [`cowork/CURRENT.md`](./cowork/CURRENT.md) is the live queue of work that
+needs a human in a browser (vendor dashboards, Supabase migrations, Cloudflare
+secrets). It carries a ledger of everything already applied, so it doubles as
+the record of what was done outside the repo. **One file, always**: finished
+tasks are deleted rather than archived, because a folder of stale prompts is a
+trap for whoever re-runs one.
 
 Then do the day-one checklist in §5.
 
@@ -100,7 +110,35 @@ Playwright (E2E against staging, plus a production smoke monitor).
   Playwright suite that exercises the deployed staging app on every PR.
   `npm test` for the current count, see `docs/TESTING.md`.
 
+- **Wearable sync is the largest subsystem and the most carefully documented.**
+  Six adapters behind one canonical metric vocabulary, OAuth with encrypted
+  tokens, a nightly sweep, workout sessions, and a merge that resolves several
+  devices into one series per day without ever averaging them. The reasoning is
+  in [`WEARABLES.md`](./WEARABLES.md) and [`WEARABLE_DATA.md`](./WEARABLE_DATA.md),
+  and both are worth reading before touching any of it. **Four of four adapters
+  audited against vendor docs were wrong** in the same way (a field read from
+  the wrong place, so a metric was silently never emitted), which is why there
+  is now a CI job that checks our field paths against Oura's sandbox on every
+  adapter change.
+
 **Real debt, sized:**
+- **🔴 No database backups.** Supabase Free: no backups, no point-in-time
+  recovery. Total loss ends the beta rather than inconveniencing it. The
+  founder's threshold for fixing it is ~20 testers, and it is $25/mo. **This is
+  the largest single risk in the stack** and it is a spend decision, not an
+  engineering one.
+- **Wearables depend on vendor goodwill, and two vendors cap you at ten users.**
+  Oura and Whoop both limit an unapproved app to 10 members; Whoop's approval
+  queue has developers reporting months of silence, so no plan should assume it
+  lifts. Fitbit runs through Google Health, where an unverified client caps at
+  100 test users and needs a third-party security review beyond that, and
+  refresh tokens expire after 7 days until the client is published. Ultrahuman
+  is the only uncapped provider. Garmin is paused at Garmin's end.
+- **A vendor can end an integration with a blog post.** Fitbit's legacy API was
+  closed to new applications and deprecated inside a month, which forced a full
+  adapter rewrite in August 2026. Budget for this happening again to somebody
+  else; the mitigation that worked was writing the replacement from the
+  vendor's machine-readable spec rather than their prose.
 - **E2E covers the signed-out surface only.** Playwright runs against staging on
   every PR (landing renders, every API route rejects anonymous callers, admin
   gate, legal pages, PWA). Everything *behind login*, onboarding, upload,

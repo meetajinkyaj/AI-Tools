@@ -706,21 +706,24 @@ summed into the training numbers. Rest days are still counted against training
 only: a day spent walking is not a training day, and calling it one would undo
 the whole point of keeping them apart.
 
-#### The trap: VO2 max is a string, and sometimes a range
+#### The trap that WAS: VO2 max as a string, sometimes a range
 
-Their own documented example returns both forms:
+> **Historical.** This described the legacy Fitbit Web API and the
+> `fitbitVo2Max()` helper, both of which the Google Health rewrite deleted on
+> 2026-08-07. Google send `vo2Max` as a plain number. Kept because it is the
+> clearest example in this repo of a vendor field whose TYPE is the trap.
 
-```json
-{"cardioScore":[{"value":{"vo2Max":"44-48"}},{"value":{"vo2Max":"45"}}]}
-```
+Fitbit's legacy VO2 max was a string and was sometimes a range: their own
+examples returned both `"45"` and `"44-48"`, the single number only when the
+member ran with GPS. `Number("44-48")` is `NaN`, so passing it through the
+ordinary numeric helper dropped every ranged reading silently, and the metric
+looked like it simply never arrived for anyone who did not run with GPS. The
+fix took the midpoint, which is the honest reading of a band and keeps the
+series continuous when a member moves between the two forms.
 
-Fitbit gives a single number only when the user runs with GPS; otherwise it is a
-band. **`Number("44-48")` is NaN**, so passing this through the usual numeric
-helper drops every ranged reading silently, and the metric looks like it simply
-never arrives for anyone who does not run.
-
-`fitbitVo2Max()` takes the midpoint of a band, which is the honest reading and
-keeps the series continuous when a user moves between the two forms.
+**The lesson outlived the code.** A vendor field can be the wrong TYPE rather
+than the wrong path, and a numeric helper that returns undefined on a malformed
+string will hide that forever.
 
 #### Every collection is optional
 

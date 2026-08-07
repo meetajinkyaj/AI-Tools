@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
-import { googleTemperatureDeviation, PROVIDERS } from "./providers";
+import { googleLocalDay, googleTemperatureDeviation, PROVIDERS } from "./providers";
 
 /**
  * Oura and Fitbit, checked against their published documentation.
@@ -613,5 +613,67 @@ describe("Google Health exercise", () => {
     });
     const out = await fitbit.fetchWorkouts!(range);
     expect(out).toHaveLength(1);
+  });
+});
+
+describe("Google Health failure handling", () => {
+  it("FAILS LOUDLY when every collection is refused", async () => {
+    // The worst state this codebase can produce is a connection that says
+    // active with zero failures and no data, because nothing ever explains it.
+    // A member who declines the health scopes gets 403 on everything, and that
+    // has to reach the sweep rather than presenting as a healthy empty week.
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("denied", { status: 403 })));
+    await expect(fitbit.fetchRange!(range)).rejects.toThrow();
+  });
+
+  it("tolerates a partial refusal, which is a member declining one scope", async () => {
+    // Google bundle four old scopes into one, but sleep and activity are still
+    // separate grants, so a partial refusal is a real and legitimate state.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (String(url).includes("/sleep/")) return new Response("denied", { status: 403 });
+        return new Response(
+          JSON.stringify({
+            dataPoints: [
+              { dailyRestingHeartRate: { beatsPerMinute: "52", date: gd("2026-08-01") } },
+            ],
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+    const out = await fitbit.fetchRange!(range);
+    expect(out.find((m) => m.metric === "resting_heart_rate")?.value).toBe(52);
+  });
+
+  it("does not treat an empty but successful week as a failure", async () => {
+    // Nothing wrong, nothing recorded. This must not throw, or a member who
+    // simply did not wear the device would see their connection degrade.
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })));
+    await expect(fitbit.fetchRange!(range)).resolves.toEqual([]);
+  });
+});
+
+describe("googleLocalDay", () => {
+  it("prefers the civil date Google already computed", () => {
+    expect(googleLocalDay(gd("2026-08-01"), "2026-08-02T01:00:00Z", "-25200s")).toBe("2026-08-01");
+  });
+
+  it("reconstructs the local day from the offset when the civil date is absent", () => {
+    // An 18:00 session in Los Angeles arrives as 01:00 the NEXT day in UTC.
+    // Taking the date off that string files it on the wrong day, and at the
+    // edge of a sync window drops it entirely.
+    expect(googleLocalDay(undefined, "2026-08-02T01:00:00Z", "-25200s")).toBe("2026-08-01");
+    // And the other direction: 05:30 in India is the previous day in UTC.
+    expect(googleLocalDay(undefined, "2026-08-01T00:10:00Z", "19800s")).toBe("2026-08-01");
+  });
+
+  it("reads the timestamp as written when there is no offset either", () => {
+    expect(googleLocalDay(undefined, "2026-08-01T18:00:00-07:00", undefined)).toBe("2026-08-01");
+  });
+
+  it("gives up rather than inventing a day", () => {
+    expect(googleLocalDay(undefined, undefined, "-25200s")).toBeUndefined();
   });
 });

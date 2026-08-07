@@ -385,6 +385,37 @@ function nextDay(iso: string): string {
   return new Date(Date.parse(`${iso}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 }
 
+/**
+ * The member's LOCAL calendar day for a session, from whatever Google gave us.
+ *
+ * `civilStartTime` is the right answer and is normally present. When it is not,
+ * the fallback matters more than it looks: Google send `startTime` as
+ * RFC-3339, and their `google-datetime` format is normally UTC-normalised, so
+ * an 18:00 session in Los Angeles arrives as 01:00 the NEXT day. Taking the
+ * date off that string would file the session on the wrong day and, at the
+ * edge of a sync window, drop it entirely.
+ *
+ * `startUtcOffset` is supplied for exactly this, as a duration like "-25200s",
+ * so the local day can be reconstructed rather than guessed. With neither, the
+ * timestamp is read as written, which is the best available answer.
+ */
+export function googleLocalDay(
+  civil: GDate | undefined,
+  startTime: string | undefined,
+  utcOffset: string | undefined,
+): string | undefined {
+  const fromCivil = isoFromGDate(civil);
+  if (fromCivil) return fromCivil;
+  if (!startTime) return undefined;
+
+  const ms = Date.parse(startTime);
+  const seconds = utcOffset ? Number(String(utcOffset).replace(/s$/, "")) : NaN;
+  if (Number.isFinite(ms) && Number.isFinite(seconds)) {
+    return new Date(ms + seconds * 1000).toISOString().slice(0, 10);
+  }
+  return dayOf(startTime);
+}
+
 /** A `list` response, narrowed to the one data field each call cares about. */
 interface GDataPoint {
   name?: string;
@@ -408,6 +439,8 @@ interface GDataPoint {
     interval?: {
       startTime?: string;
       endTime?: string;
+      startUtcOffset?: string;
+      endUtcOffset?: string;
       civilStartTime?: { date?: GDate };
       civilEndTime?: { date?: GDate };
     };
@@ -418,6 +451,7 @@ interface GDataPoint {
     interval?: {
       startTime?: string;
       endTime?: string;
+      startUtcOffset?: string;
       civilStartTime?: { date?: GDate };
     };
     metricsSummary?: {
@@ -518,6 +552,24 @@ const fitbit: WearableProvider = {
      * otherwise reach the sweep as `ReauthRequired` and mark the connection
      * dead outright.
      */
+    /*
+     * TALLIED, NOT SWALLOWED. The first version of this caught every failure
+     * and returned an empty list, which quietly created the worst connection
+     * state this codebase has: a member who declines the health scopes gets
+     * 403 on every call, and would have seen `status: active`,
+     * `failure_count: 0`, `last_error: null` and a Fitbit that is permanently
+     * connected and permanently empty. Nothing would ever have said why. That
+     * is the same shape as the August 3rd incident, where a row said connected
+     * and had no credentials.
+     *
+     * So a partial refusal is still tolerated, and a TOTAL one is not: if
+     * nothing at all succeeded, the first error is rethrown and the sync
+     * records a real failure. That also restores 429 and 5xx to the failure
+     * counter, which the blanket catch had hidden.
+     */
+    let succeeded = 0;
+    let firstError: unknown = null;
+
     const list = async (dataType: string, filter: string): Promise<GDataPoint[]> => {
       try {
         const res = await providerFetch<{ dataPoints?: GDataPoint[] }>(
@@ -525,8 +577,10 @@ const fitbit: WearableProvider = {
           `${GH_BASE}/${dataType}/dataPoints?filter=${encodeURIComponent(filter)}&pageSize=200`,
           { accessToken },
         );
+        succeeded += 1;
         return res.dataPoints ?? [];
-      } catch {
+      } catch (err) {
+        firstError ??= err;
         return [];
       }
     };
@@ -615,9 +669,11 @@ const fitbit: WearableProvider = {
       // this shipped the bug.
       if (s.metadata?.nap === true) continue;
       if (s.metadata?.mainSleep === false) continue;
-      const day =
-        isoFromGDate(s.interval?.civilEndTime?.date) ??
-        (s.interval?.endTime ? dayOf(s.interval.endTime) : undefined);
+      const day = googleLocalDay(
+        s.interval?.civilEndTime?.date,
+        s.interval?.endTime,
+        s.interval?.endUtcOffset,
+      );
       push(out, "sleep_minutes", day, num(s.summary?.minutesAsleep), "fitbit");
       // NO sleep score. Google Health exposes none, exactly as the legacy API
       // did not, and publishing sleep efficiency under `sleep_score` would put
@@ -633,7 +689,7 @@ const fitbit: WearableProvider = {
      */
     const rollUp = async (dataType: string) => {
       try {
-        return await providerFetch<{
+        const res = await providerFetch<{
           rollupDataPoints?: {
             civilStartTime?: { date?: GDate };
             steps?: { countSum?: string | number };
@@ -648,7 +704,10 @@ const fitbit: WearableProvider = {
             windowSizeDays: 1,
           }),
         });
-      } catch {
+        succeeded += 1;
+        return res;
+      } catch (err) {
+        firstError ??= err;
         return { rollupDataPoints: [] };
       }
     };
@@ -669,6 +728,13 @@ const fitbit: WearableProvider = {
         "fitbit",
       );
     }
+
+    // NOTHING WORKED AT ALL is a failure, not an empty week. Declining every
+    // scope, a dead grant and Google having a bad afternoon all land here, and
+    // all three deserve to reach the sweep rather than presenting as a healthy
+    // connection with no data. A ReauthRequired rethrown here still means
+    // reauth; anything else counts against the failure budget.
+    if (succeeded === 0 && firstError !== null) throw firstError;
 
     return out;
   },
@@ -708,8 +774,11 @@ const fitbit: WearableProvider = {
       const endedAt = e?.interval?.endTime;
       if (!e || !startedAt || !endedAt) continue;
 
-      const date =
-        isoFromGDate(e.interval?.civilStartTime?.date) ?? dayOf(startedAt);
+      const date = googleLocalDay(
+        e.interval?.civilStartTime?.date,
+        startedAt,
+        e.interval?.startUtcOffset,
+      );
       if (!date || date < start || date > end) continue;
 
       const metrics = e.metricsSummary;

@@ -329,8 +329,31 @@ export async function storeMetrics(
   );
   if (clean.length === 0) return 0;
 
+  /*
+   * ONE ROW PER CONFLICT KEY, OR POSTGRES REJECTS THE WHOLE BATCH.
+   *
+   * `ON CONFLICT DO UPDATE` cannot touch the same row twice in one statement:
+   * two entries sharing (user, provider, date, metric) raise SQLSTATE 21000 and
+   * the ENTIRE upsert is lost, not just the duplicate. A sync that produced one
+   * accidental pair would store nothing at all, count as a failure, and after
+   * five of those mark a perfectly good connection expired.
+   *
+   * The pair is easy to produce and nobody would notice writing it. Google
+   * Health aggregates several sources under one account, so a member with a
+   * Fitbit and a Pixel Watch can legitimately have two data points for one
+   * calendar day; the same is true of any vendor that reports a value twice
+   * because a session was revised.
+   *
+   * Deduped here rather than in each adapter, because it is a property of the
+   * TABLE and six adapters would each have to remember it. Last wins, matching
+   * what the upsert itself would have done had the rows arrived separately.
+   */
+  const byKey = new Map<string, DailyMetric>();
+  for (const m of clean) byKey.set(`${m.date} ${m.metric}`, m);
+  const deduped = [...byKey.values()];
+
   const supabase = createSupabaseAdmin();
-  const rows = clean.map((m) => ({
+  const rows = deduped.map((m) => ({
     user_id: userId,
     provider,
     metric_date: m.date,

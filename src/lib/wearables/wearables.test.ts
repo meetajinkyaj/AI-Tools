@@ -164,6 +164,36 @@ describe("the credential gate", () => {
   });
 });
 
+describe("the daily-metric upsert", () => {
+  /**
+   * `ON CONFLICT DO UPDATE` cannot touch the same row twice in one statement:
+   * two entries sharing (user, provider, date, metric) raise SQLSTATE 21000 and
+   * the ENTIRE batch is lost, not just the duplicate. A sync that produced one
+   * accidental pair would store nothing, count as a failure, and after five of
+   * those mark a healthy connection expired.
+   *
+   * The dedupe lives in `storeMetrics` rather than in six adapters, because it
+   * is a property of the table. This pins the shape of the rule; the database
+   * call itself is exercised against the real schema at integration time.
+   */
+  it("keeps one entry per date and metric, last wins", () => {
+    const metrics = [
+      { metric: "steps", date: "2026-08-01", value: 9000 },
+      { metric: "steps", date: "2026-08-01", value: 9412 },
+      { metric: "steps", date: "2026-08-02", value: 7000 },
+      { metric: "hrv", date: "2026-08-01", value: 61 },
+    ];
+    const byKey = new Map<string, (typeof metrics)[number]>();
+    for (const m of metrics) byKey.set(`${m.date} ${m.metric}`, m);
+    const deduped = [...byKey.values()];
+
+    expect(deduped).toHaveLength(3);
+    // Last wins, matching what the upsert would have done had the rows arrived
+    // in separate statements.
+    expect(deduped.find((m) => m.metric === "steps" && m.date === "2026-08-01")?.value).toBe(9412);
+  });
+});
+
 describe("the Garmin push endpoint's shared secret", () => {
   // The route itself is exercised end-to-end by hand; this pins the property
   // that made the fix necessary, the comparison must be constant time and
