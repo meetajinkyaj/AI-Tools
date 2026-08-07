@@ -194,7 +194,7 @@ describe("vendor-side revocation", () => {
    */
   it("is implemented only where the endpoint is confirmed from the vendor's docs", () => {
     const withRevoke = PROVIDER_IDS.filter((id) => typeof PROVIDERS[id].revoke === "function");
-    expect(withRevoke.sort()).toEqual(["fitbit", "whoop"]);
+    expect(withRevoke.sort()).toEqual(["fitbit", "oura", "whoop"]);
   });
 
   it("sends Fitbit the refresh token, which kills the whole grant", async () => {
@@ -233,6 +233,72 @@ describe("vendor-side revocation", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));
     await expect(
       PROVIDERS.whoop.revoke!({
+        accessToken: "access",
+        refreshToken: null,
+        clientId: "cid",
+        clientSecret: "secret",
+        signal: AbortSignal.timeout(1000),
+      }),
+    ).resolves.toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+
+  it("sends Oura the URL its own docs print, and nothing extra", async () => {
+    // Their prose mentions client_id; the URL they actually show carries only
+    // access_token. Sending what the example shows, because adding an
+    // undocumented parameter is a guess in a smaller costume.
+    const calls: { url: string; method: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        calls.push({ url: String(url), method: String(init.method) });
+        return new Response("", { status: 200 });
+      }),
+    );
+    await PROVIDERS.oura.revoke!({
+      accessToken: "tok en/+",
+      refreshToken: "r",
+      clientId: "cid",
+      clientSecret: "secret",
+      signal: AbortSignal.timeout(1000),
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe("POST");
+    // Encoded, so a token containing / or + cannot break out of the query.
+    expect(calls[0].url).toBe(
+      "https://api.ouraring.com/oauth/revoke?access_token=tok%20en%2F%2B",
+    );
+    expect(calls[0].url).not.toContain("client_id");
+    vi.unstubAllGlobals();
+  });
+
+  it("retries Oura as GET when POST is refused, since they document no method", async () => {
+    // Their example is a bare URL with a query string and no body, which is as
+    // consistent with GET as with POST. A 405 is a disagreement about verbs,
+    // not a failure to revoke.
+    const methods: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        methods.push(String(init.method));
+        return new Response("", { status: init.method === "POST" ? 405 : 200 });
+      }),
+    );
+    await PROVIDERS.oura.revoke!({
+      accessToken: "access",
+      refreshToken: null,
+      clientId: "cid",
+      clientSecret: "secret",
+      signal: AbortSignal.timeout(1000),
+    });
+    expect(methods).toEqual(["POST", "GET"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("treats an Oura 401 as success, because the token is already dead", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 401 })));
+    await expect(
+      PROVIDERS.oura.revoke!({
         accessToken: "access",
         refreshToken: null,
         clientId: "cid",

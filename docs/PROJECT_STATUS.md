@@ -504,7 +504,26 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   feature, and a test pins the exact provider list. Oura document a revoke
   endpoint whose literal URL every extractor we have strips out of the page;
   reading it is a Cowork task. Ultrahuman, Withings and Garmin document none.
-- **The workout pipeline has no live producer, and Ultrahuman cannot be one.**
+- **The workout pipeline has a producer: Oura, reconnected 2026-08-07.** The
+  old grant held three scopes and could never return a workout; the new one
+  carries `extapi:workout` alongside them, verified in the database, one row,
+  replaced cleanly by the upsert. The consent screen listed four permissions,
+  which was the deliberate tripwire: three would have meant production was
+  running older code than main. **Nothing has yet proven the path end to end**,
+  because a workout row only appears for a day the ring actually recorded a
+  session. `select * from wearable_workouts where provider = 'oura'` returning
+  anything is the first real proof, and it is worth checking after a week of
+  wear.
+- **Disconnect now revokes at Fitbit, Whoop and Oura.** Oura's URL had to be
+  read off their page by a human, because every extractor available here strips
+  the code block containing it. Their docs state no HTTP method and their prose
+  names a parameter their own example omits; both gaps are handled explicitly
+  rather than guessed. Ultrahuman, Withings and Garmin document no revoke
+  endpoint, so for those a disconnect still only destroys our copy of the
+  credentials.
+- **The duplicate Ultrahuman rows were two accounts, not a fault** (checked
+  2026-08-07). The unique index on `(user_id, provider)` is doing its job.
+- **Ultrahuman cannot be a workout producer, checked before writing code.**
   Checked 2026-08-07 before writing the adapter: Ultrahuman's Partnership API
   exposes no workouts, activities or sessions at all. Their own published data
   list is sleep, movement, steps, heart rate, HRV, temperature, VO2 max and the

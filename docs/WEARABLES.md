@@ -399,6 +399,25 @@ heart-rate-based session tracking that the API does not expose.
 `fetchWorkouts`.** A method that always returns `[]` looks like an integration
 that is failing rather than one that was never possible.
 
+#### The pipeline has a producer now: Oura, reconnected 2026-08-07
+
+The reconnect landed and was verified in the database. The new grant carries
+`extapi:daily extapi:heartrate extapi:spo2 extapi:workout`, where the old one
+had only the first three. One row, replaced cleanly by the upsert rather than
+duplicated.
+
+**Oura prefixes granted scopes with `extapi:`** where we request them bare.
+Worth knowing before somebody compares the two lists and concludes they
+disagree.
+
+The consent screen listed four permissions, which was the tripwire: three would
+have meant production was running older code than main. It showed four, so it
+is not.
+
+**This is the first time any provider has been able to return a workout.**
+Everything below described the state before that, and is kept because the
+reasoning still holds for the other five providers.
+
 #### What this means for the workout pipeline
 
 Everything built for workouts, migrations 0020 and 0021, the device half of the
@@ -863,8 +882,22 @@ BEFORE the row is deleted, since the credentials go with it.
 |---|---|---|
 | Fitbit | yes | `POST /oauth2/revoke`, Basic auth, `token=<refresh token>` |
 | Whoop | yes | `DELETE /developer/v2/user/access`, member's bearer token |
-| Oura | not yet | Their auth doc has a "Revoking The Access Token" section, and every extractor we have strips the code block holding the literal URL. Queued for Cowork to read off the page. |
+| Oura | yes | `POST /oauth/revoke?access_token=`, falling back to GET |
 | Ultrahuman, Withings, Garmin | no | No revoke endpoint found in their documentation. |
+
+**Oura's URL took a human to obtain**, which is worth remembering next time. It
+lives in a code block that every extractor available here strips out of the
+page, so the endpoint sat unimplemented for a day rather than being guessed at.
+Read off `api.ouraring.com/docs/authentication` on 2026-08-07.
+
+Two things their docs do not say, both handled rather than assumed. The
+**method** is not stated: RFC 7009 says revocation is a POST and a
+state-changing call should not be a GET, so POST goes first, and a 404 or 405
+retries once as GET, because their example is a bare URL with a query string
+and no body, which is equally consistent with either. The **prose mentions
+`client_id`** while the URL they print carries only `access_token`; we send
+what the example shows, since adding an undocumented parameter is the same
+guess in a smaller costume.
 
 **Two rules, and both are the point of the feature.**
 

@@ -6,13 +6,10 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-07. **Three tasks are pending:** settle the
-duplicate-Ultrahuman question with one query, read one URL off Oura's own auth
-page, and reconnect Oura so it can return workouts. See
-[PENDING TASK](#pending-task).
-
-Migration 0021 is applied and verified on production, and PR #104 is merged, so
-that task is gone from this list.
+Last updated: 2026-08-07. **Nothing is pending.** The last three tasks came
+back the same day: Oura is reconnected with the workout scope, the duplicate
+Ultrahuman rows were two different accounts and not a fault, and Oura's revoke
+URL has been read off their page and implemented.
 
 **The Fitbit registration task is withdrawn**, and not because it was done.
 Cowork found that `dev.fitbit.com` has closed registration for new
@@ -49,6 +46,9 @@ have cost an afternoon and produced credentials nothing could call.
 
 | Verification | Status |
 |---|---|
+| Oura reconnected with the workout scope | **2026-08-07.** The old grant held three scopes and could never return a workout, and an OAuth grant cannot gain a permission after the fact. Disconnected and reconnected; the consent screen listed **four** permissions (Sleep/Readiness/Activity, Heart Rate, SpO2, Workout Data), which was the tripwire, three would have meant production was behind main. The new row carries `extapi:daily extapi:heartrate extapi:spo2 extapi:workout`, status active, both tokens stored, expiring 2026-09-06. One row: the upsert replaced the old grant rather than duplicating it. Note Oura returns granted scopes prefixed `extapi:` where we request them bare. **This is the first provider ever able to return a workout.** |
+| Duplicate Ultrahuman rows | **2026-08-07, not a fault.** Two different `user_id` values, so two accounts each connected their own Ultrahuman. The unique index `wearable_connections_user_provider_key on (user_id, provider)` makes a genuine duplicate impossible, and the query confirmed the index is doing its job rather than missing. Worth having asked: a real duplicate would have been serious, since Ultrahuman rotates refresh tokens and two rows refreshing one grant would each invalidate the other's token. |
+| Oura revoke URL | **2026-08-07, read off `api.ouraring.com/docs/authentication` by hand** because every automated extractor strips the code block containing it. `https://api.ouraring.com/oauth/revoke?access_token={access_token}`, no HTTP method stated, and only `access_token` in the URL despite the prose mentioning `client_id`. Both gaps are handled in the adapter rather than guessed: POST first with a GET retry, and only the parameter their example shows. Disconnect now revokes at Fitbit, Whoop and Oura. |
 | Ultrahuman reconnected | 2026-08-04, after the row was lost to a Disconnect. Connect and Approve went straight through, and the card shows Disconnect with "synced just now". Healthy. |
 | Whoop, connect blocked | 2026-08-04. Secrets are set and valid, and Connect reaches Whoop's real sign-in. Whoop then returns `request_unauthorized` with no code. **Confirmed not a credential, scope or config fault**, and not a whitelist: Whoop allow any WHOOP member to authorise a development-mode app up to a limit of ten, so there is nothing to add anybody to. It is blocked on the signing-in account having an active WHOOP membership, which the founder's band-less account does not. Needs a tester with a band. |
 | First real wearable connection | **Achieved 2026-08-04**, after the key was regenerated. `?wearable=connected` for the first time; row has `status active`, `failure_count 0`, both tokens stored, `expires_at` 24h out, `last_error` null, and `last_sync_at` stamped by the app's own post-connect sync. This proves the token host, the metrics host, the `/authorise` spelling, the scope strings and the redirect URI. `external_user_id` is null and expected to be: `/user_info` is not called. Earlier note, kept because it explains the trail: **Not yet achieved.** The `atob` fix deployed clean, but the row on production turned out to be the pre-fix failed attempt: a shell with `status = 'active'` and no credentials, which the card rendered as Disconnect. Found by reading `connected_at`, which the upsert refreshes and which had not moved. The token host, `/authorise` spelling, scope strings and redirect URI are still proven by the successful code exchange that preceded the encryption failure. The metrics endpoint remains unproven. |
@@ -66,125 +66,12 @@ is outstanding.
 
 # PENDING TASK
 
-## 1. Settle the duplicate-Ultrahuman question, which is probably not one
-
-You reported two active Ultrahuman rows and suspected a reconnect had added a
-row rather than replacing one. **The database makes that impossible.** Migration
-0015 created a unique index, `wearable_connections_user_provider_key on
-(user_id, provider)`, and the connect callback upserts on exactly that pair. Two
-rows for one user and one provider cannot exist.
-
-So the near-certain explanation is **two different user accounts**, each with
-its own Ultrahuman connection. One query settles it:
-
-```sql
-select user_id, provider, status, connected_at, expires_at
-from wearable_connections
-where provider = 'ultrahuman'
-order by connected_at;
-```
-
-- **Two different `user_id` values:** nothing is wrong. Two accounts connected
-  the same Ultrahuman. Say so and move on.
-- **The same `user_id` twice:** stop and tell me immediately. That would mean
-  the unique index is missing from production despite the migration claiming
-  otherwise, which is a real problem and not one to fix from the dashboard.
-
-Good catch either way: a duplicate would have been serious, because Ultrahuman
-rotates refresh tokens and two rows refreshing the same grant would each
-invalidate the other's token.
-
-## 2. Read one URL off Oura's authentication page
-
-**Two minutes, no account changes, nothing to configure.** This is a
-copy-a-line-of-text job and it is here because every automated extractor we
-have strips the exact line out of the page.
-
-Disconnect now tells the vendor to tear the grant down, so a member who
-disconnects is genuinely disconnected at both ends rather than only in our
-database. Fitbit and Whoop are done. Oura documents a revoke endpoint but we
-cannot read the URL: the page renders it inside a code block that our tooling
-drops.
-
-Go to **`https://api.ouraring.com/docs/authentication`** and scroll to the
-section headed **"Revoking The Access Token"**. Under it is a line that begins
-"When you need to revoke access for a specific token use the following API call
-format", followed by a URL in a code block.
-
-**Report back three things, exactly as written on the page:**
-
-1. The full URL, including the `https://` and every query parameter.
-2. The HTTP method, if the page states one (`GET` or `POST`).
-3. Whether the parameters are named `client_id` and `access_token`, or
-   something else.
-
-**Copy the characters as they appear. Do not tidy, complete or correct it.** If
-the page says something we do not expect, that is the finding, and a plausible
-guess is worse than nothing here: a wrong revoke URL returns a quiet 404 and
-leaves us believing we revoked a member's access when we did not. That is a
-privacy claim we would be making falsely, which is why the code refuses to call
-any revoke endpoint that has not been read off the vendor's own documentation.
-
-Nothing to change in Cloudflare, Supabase or the Oura dashboard. Just the text.
-
-## 3. Reconnect Oura, so it can actually return workouts
-
-**This is now the only way to get a single workout into the app**, so it has
-moved from "not worth doing yet" to a real task.
-
-You spotted that the live Oura connection holds only its three original scopes.
-An OAuth grant cannot gain a permission after the fact, so the fix is one
-disconnect and one reconnect by whoever owns that Oura account.
-
-The plan had been to add workouts to Ultrahuman instead, since it is the
-provider that actually works. **Ultrahuman's API does not expose workouts at
-all**: their own published data list has sleep, steps, heart rate, HRV,
-temperature, VO2 max and the recovery and metabolic scores, and no sessions.
-Checked before any code was written. So Oura it is.
-
-In the app: **Profile → Connected devices → Oura → Disconnect**, confirm, then
-**Connect** and approve.
-
-**What to check on the consent screen, and report back.** It should now ask for
-FOUR things rather than three, the extra one being workouts. If it still shows
-three, stop and say so: that would mean the deployed scope list is not the one
-in the code, which is worth knowing immediately.
-
-Two things worth knowing before you do it:
-
-- **Nothing is lost.** Metrics already synced stay in the database and in
-  Trends; disconnecting deletes the permission, not the data.
-- **Disconnect now tells Oura too, or will do once their revoke URL is known**
-  (task 2 above). Today it deletes our copy of the credentials, which is why
-  reconnecting goes straight to consent without a fresh sign-in.
-
-Workouts only appear for days when the ring actually recorded a session, so an
-empty result afterwards is not necessarily a fault.
-
-**Do not touch `WEARABLE_TOKEN_KEY`, the Oura, Whoop or Ultrahuman secrets, or
-the Ultrahuman connections.**
+**Nothing is pending.** All three queued tasks came back on 2026-08-07 and
+their answers are in the ledger above. The next one will appear here when there
+is one; do not go looking for work in the older sections, they are a record of
+what was already done.
 
 ---
-
-Two things are waiting on the founder rather than on Cowork:
-
-- **The remaining wearable credentials.** Oura and Whoop are registered.
-  **Fitbit is blocked on a rewrite, not on a form**: its registration moved to
-  the Google Health API and the legacy one it was written against dies in
-  September 2026. Withings is the one adapter still unaudited: do not register
-  it before it has been read against their docs. Garmin is paused at their end
-  indefinitely.
-- **Supabase backups.** The production database is on the Free plan: no
-  backups, no point-in-time recovery. Worst case is total loss. This is a
-  spend decision (Pro, $25/mo), deliberately deferred until ~20 testers, not
-  an oversight. It is the largest standing risk in the stack.
-
-A note for whoever applies the next migration: on 0019 the SQL Editor's
-"Running..." spinner froze and never cleared. Do not re-click Run. Check the
-real database state from a second connection first, both that the change
-landed and that nothing is still in flight or blocked. A frozen spinner says
-nothing about whether the statement committed. Replacing this step with a CI
-runner is on the deferred list in `../PROJECT_STATUS.md` §8.
 
 ## Later, as each provider's credentials arrive
 

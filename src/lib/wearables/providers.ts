@@ -288,6 +288,44 @@ const oura: WearableProvider = {
     }
     return out;
   },
+
+  /**
+   * Oura's revoke, read off their authentication page on 2026-08-07.
+   *
+   * WHY IT TOOK A HUMAN TO GET THIS. The URL lives in a code block that every
+   * extractor available here strips out of the page, so the endpoint sat
+   * unimplemented for a day rather than being guessed at. A guessed revoke URL
+   * returns a quiet 404 and leaves us believing we destroyed a member's grant
+   * when we did not, which is a privacy claim we cannot support.
+   *
+   * TWO THINGS THEIR DOCS DO NOT SAY, both handled rather than assumed.
+   *
+   * The METHOD is not stated. RFC 7009 says revocation is a POST, and a
+   * state-changing call should not be a GET, so POST is tried first. Their
+   * example is a bare URL with a query string and no body, which is equally
+   * consistent with a GET, so a 404/405 retries once as GET rather than
+   * reporting a failure that is really a disagreement about verbs.
+   *
+   * The PROSE mentions `client_id` while the URL they print carries only
+   * `access_token`. We send what the example shows. Adding an undocumented
+   * parameter is the same guess in a smaller costume, and if Oura needed it
+   * they would have put it in their own example.
+   */
+  async revoke({ accessToken, signal }) {
+    const url =
+      "https://api.ouraring.com/oauth/revoke" +
+      `?access_token=${encodeURIComponent(accessToken)}`;
+    const call = (method: "POST" | "GET") =>
+      fetch(url, { method, headers: { Accept: "application/json" }, signal });
+
+    let res = await call("POST");
+    if (res.status === 404 || res.status === 405) res = await call("GET");
+
+    // 401 means the token is already dead, which is the outcome we wanted.
+    if (!res.ok && res.status !== 401) {
+      throw new Error(`oura revoke ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    }
+  },
 };
 
 /* -------------------------------------------------------------------------- */
