@@ -6,10 +6,8 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-07. **One task is pending:** register the Google Cloud
-client for Fitbit and set its two secrets. Note this is a GOOGLE registration,
-not a Fitbit one: `dev.fitbit.com` has closed new applications and the adapter
-was rewritten against the Google Health API on 2026-08-07.
+Last updated: 2026-08-07. **Nothing is pending.** The Google Cloud
+registration for Fitbit is done and the connect flow is proven end to end.
 
 **The Fitbit registration task is withdrawn**, and not because it was done.
 Cowork found that `dev.fitbit.com` has closed registration for new
@@ -46,6 +44,7 @@ have cost an afternoon and produced credentials nothing could call.
 
 | Verification | Status |
 |---|---|
+| Fitbit via Google Health, registered and proven | **2026-08-07.** Google Cloud project, Health API enabled, OAuth Web Server client, redirect URI matched, the three `googlehealth.*.readonly` scopes granted, both secrets set as Cloudflare Secrets and deployed. The stored grant carries exactly those three scopes, status active, failure_count 0, no last_error, both tokens encrypted and stored, `last_sync_at` stamped by the post-connect sync. **This proved the whole Google path end to end for the first time**: authorize, token exchange at Google's endpoint, encryption under `WEARABLE_TOKEN_KEY`, storage and sync, with no error at any step. The only thing absent is data, because no Fitbit device feeds the account. Two expected behaviours, neither a fault: `expires_at` about an hour out, which is Google's access-token lifetime and is renewed from the refresh token; and the refresh token itself expiring after ~7 days while the client is unpublished, so this test connection will drop and show Connect again. Publishing needs the third-party security review, worth doing nearer real testers. |
 | Oura reconnected with the workout scope | **2026-08-07.** The old grant held three scopes and could never return a workout, and an OAuth grant cannot gain a permission after the fact. Disconnected and reconnected; the consent screen listed **four** permissions (Sleep/Readiness/Activity, Heart Rate, SpO2, Workout Data), which was the tripwire, three would have meant production was behind main. The new row carries `extapi:daily extapi:heartrate extapi:spo2 extapi:workout`, status active, both tokens stored, expiring 2026-09-06. One row: the upsert replaced the old grant rather than duplicating it. Note Oura returns granted scopes prefixed `extapi:` where we request them bare. **This is the first provider ever able to return a workout.** |
 | Duplicate Ultrahuman rows | **2026-08-07, not a fault.** Two different `user_id` values, so two accounts each connected their own Ultrahuman. The unique index `wearable_connections_user_provider_key on (user_id, provider)` makes a genuine duplicate impossible, and the query confirmed the index is doing its job rather than missing. Worth having asked: a real duplicate would have been serious, since Ultrahuman rotates refresh tokens and two rows refreshing one grant would each invalidate the other's token. |
 | Oura revoke URL | **2026-08-07, read off `api.ouraring.com/docs/authentication` by hand** because every automated extractor strips the code block containing it. `https://api.ouraring.com/oauth/revoke?access_token={access_token}`, no HTTP method stated, and only `access_token` in the URL despite the prose mentioning `client_id`. Both gaps are handled in the adapter rather than guessed: POST first with a GET retry, and only the parameter their example shows. Disconnect now revokes at Fitbit, Whoop and Oura. |
@@ -66,129 +65,8 @@ is outstanding.
 
 # PENDING TASK
 
-## 1. Register the Google Cloud client for Fitbit, and set its two secrets
-
-**Read this first: Fitbit no longer registers at `dev.fitbit.com`.** That form
-is closed to new applications and the API behind it dies in September 2026.
-Fitbit data now comes through Google's **Health API**, so this is a Google
-Cloud registration and the member will sign in with a **Google account**, not a
-Fitbit one. The adapter was rewritten for it on 2026-08-07, so the code exists
-and this registration has to match it exactly.
-
-**Walk the founder through it screen by screen. They are not technical.**
-
-### Step 1: project and API
-
-1. `console.cloud.google.com`, signed in as the account that should own this.
-2. Create a project (or reuse one) named **`Ikigaro`**.
-3. **APIs & Services → Library**, search for **Google Health API**, open it,
-   press **Enable**. Nothing works until this is on.
-
-### Step 2: the consent screen
-
-**APIs & Services → OAuth consent screen** (newer consoles split this into
-Branding, Audience and Data Access).
-
-| Field | What to put |
-|---|---|
-| App name | `Ikigaro` |
-| User support email | the founder's |
-| App logo | optional, skip for now |
-| Application home page | `https://app.ikigaro.com` |
-| Privacy policy | `https://app.ikigaro.com/privacy` |
-| Terms of service | `https://app.ikigaro.com/terms` |
-| Audience / User type | **External** |
-| Developer contact | the founder's email |
-
-### Step 3: the three scopes, which is the step that matters
-
-On the **Data Access** page, press **Add or remove scopes**, then use **manually
-add scopes** and paste these three, one per line:
-
-```
-https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly
-https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly
-https://www.googleapis.com/auth/googlehealth.sleep.readonly
-```
-
-**Exactly these three. All end in `.readonly`.** Do not add any `.writeonly`
-scope: the app only ever reads, and asking to write to somebody's health record
-is not something we want on a consent screen.
-
-If a scope will not paste, check the Health API is actually enabled from step 1.
-Google hides its scopes until then.
-
-### Step 4: the OAuth client
-
-**APIs & Services → Credentials → Create credentials → OAuth client ID.**
-
-| Field | What to put |
-|---|---|
-| Application type | **Web application** |
-| Name | `Ikigaro app` |
-| Authorized redirect URI | `https://app.ikigaro.com/api/wearables/callback/fitbit` |
-
-**The redirect URI must match byte for byte. Copy it, do not retype it.** A
-trailing slash or `http` instead of `https` produces a `redirect_uri_mismatch`
-at the consent screen and nowhere else.
-
-Leave **Authorized JavaScript origins** empty. The exchange happens server side.
-
-### Step 5: test users
-
-On the **Audience** page, add the founder's Google account under **Test users**,
-plus any tester who will connect a Fitbit.
-
-**Nobody can connect unless their email is on this list** while the app is
-unpublished, and the list caps at **100**. Past that Google require a
-third-party security review, which is a real project and not a form.
-
-### Step 6: the credentials
-
-**Do not paste either value into chat, into a commit, or into any file, and do
-not read the secret back to confirm it.** The founder copies them straight from
-Google into Cloudflare and their password manager.
-
-Cloudflare → Workers & Pages → **`ai-tools`** → Settings → Variables and
-Secrets. Add both as **type Secret**, not plaintext Variable:
-
-- `FITBIT_CLIENT_ID`
-- `FITBIT_CLIENT_SECRET`
-
-(The names still say Fitbit on purpose. Members think Fitbit, the redirect URI
-is registered against that word, and the database column already uses it.
-Google Health is the pipe, not the brand.)
-
-**Then redeploy.**
-
-### Step 7: verify, and report these four things
-
-1. **Profile → Connected devices.** Fitbit should now appear with a **Connect**
-   button.
-2. Press **Connect**. **You should land on a GOOGLE sign-in screen.** If you see
-   a Fitbit login, stop and tell me: that means the deployed code is older than
-   the rewrite.
-3. Approve, and **count the permissions Google lists. It should be three.**
-   Write down their exact wording, because Google's labels do not match the
-   scope names and knowing the real wording is useful.
-4. Say whether the callback returned to the app with `?wearable=connected`.
-
-**Stop before approving if the founder does not own a Fitbit.** Reaching the
-Google consent screen with three permissions listed is proof enough that
-registration is right; approving without a device just creates a connection
-with nothing to sync.
-
-### One thing that will look like a bug in a week, and is not
-
-While the client is unpublished, **Google expires refresh tokens after 7 days.**
-Any tester who connects will silently drop about a week later and need to
-reconnect. That is Google's testing-mode behaviour, not our fault, and it goes
-away when the app is published. Do not spend an afternoon debugging it.
-
-### Do not touch
-
-`WEARABLE_TOKEN_KEY`, the Oura, Whoop or Ultrahuman secrets, or any existing
-connection. This task adds two new secrets and changes nothing else.
+**Nothing is pending.** The Google Cloud registration came back done on
+2026-08-07; the result is in the ledger above.
 
 ---
 
