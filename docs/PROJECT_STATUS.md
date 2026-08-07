@@ -504,6 +504,19 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   feature, and a test pins the exact provider list. Oura document a revoke
   endpoint whose literal URL every extractor we have strips out of the page;
   reading it is a Cowork task. Ultrahuman, Withings and Garmin document none.
+- **The workout pipeline has no live producer, and Ultrahuman cannot be one.**
+  Checked 2026-08-07 before writing the adapter: Ultrahuman's Partnership API
+  exposes no workouts, activities or sessions at all. Their own published data
+  list is sleep, movement, steps, heart rate, HRV, temperature, VO2 max and the
+  recovery and metabolic scores; a platform that ships this connector states
+  "Workouts / Activities: No (not available via Partnership API)"; and the Ring
+  AIR has no GPS. **Oura is now the cheapest live producer and it needs no
+  code**: its adapter requests `workout` and every field path it reads is
+  confirmed against Oura's sandbox, but the live grant predates the scope and an
+  OAuth grant cannot gain a permission after the fact. One disconnect and
+  reconnect, now a Cowork task. Until then migrations 0020 and 0021, the device
+  half of the Training card and the movement split are all built and idle, which
+  is exactly why the card was built check-in-first.
 - **🔴 Fitbit is blocked on a REWRITE, not a registration.** Found 2026-08-06
   and verified against Google's own pages. `dev.fitbit.com` has closed
   registration for new applications, and the legacy Fitbit Web API the adapter

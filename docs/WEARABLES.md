@@ -376,6 +376,56 @@ after the fact.
 > reconnect, or before anyone connects at all. Fitbit's expansion was timed for
 > exactly that reason.
 
+### Ultrahuman has no workouts, checked 2026-08-07 before writing the adapter
+
+**The plan was to add `fetchWorkouts` to Ultrahuman**, on the reasoning that it
+is the only connected, working, uncapped provider and therefore the cheapest
+way to give the workout pipeline a live producer. Checked first. It does not
+exist.
+
+**Ultrahuman's own list of Partnership API data** is: sleep, movement data,
+steps, heart rate, HRV, temperature, VO2 max, Recovery Index, Movement Index,
+Metabolic Score, plus the CGM set and profile. No sessions, no activities, no
+exercise. Their Partner API is one date-based `/metrics` document per day, and
+a session has nowhere to live in it.
+
+An integration platform that has shipped this connector states it flatly in
+their support matrix: *"Workouts / Activities: No (not available via
+Partnership API)."* Their write-up adds the reason: the Ring AIR has no GPS and
+is not primarily a workout tracker, so what the Ultrahuman app shows is
+heart-rate-based session tracking that the API does not expose.
+
+**So: no adapter work, and the entry stays absent rather than becoming an empty
+`fetchWorkouts`.** A method that always returns `[]` looks like an integration
+that is failing rather than one that was never possible.
+
+#### What this means for the workout pipeline
+
+Everything built for workouts, migrations 0020 and 0021, the device half of the
+Training card, and the movement split, currently has **no live producer at
+all**:
+
+| Provider | Connected | Has `fetchWorkouts` | Can produce a workout today |
+|---|---|---|---|
+| Ultrahuman | yes | **no, and cannot** | no |
+| Oura | yes | yes, sandbox-verified | **no, the grant predates the scope** |
+| Whoop | no | yes | no |
+| Fitbit | no | yes | no, adapter retired |
+| Withings, Garmin | no | no | no |
+
+**The cheapest live producer is now Oura, and it needs no code.** The adapter
+requests `workout` and the contract check has confirmed every field path it
+reads against Oura's sandbox. The only blocker is that the live connection was
+granted before the scope was added, and an OAuth grant cannot gain a permission
+after the fact. One disconnect and reconnect fixes it.
+
+This is also the second time the same shape of finding has changed a plan in
+two days: check what the vendor actually exposes before writing the adapter,
+not after. Four of four adapters written from assumption were wrong; two of two
+plans checked first were saved.
+
+---
+
 ### Fitbit moved to the Google Health API, and the adapter has to be rewritten
 
 **Found 2026-08-06, verified against Google's own pages the same day.** This
