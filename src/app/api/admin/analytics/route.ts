@@ -6,8 +6,13 @@ import {
   computeActive,
   computeFunnel,
   computeRetention,
+  computeDeviceAdoption,
   computeStreakBuckets,
   dailySeries,
+  type DeviceRow,
+  MIN_SEGMENT_COHORT,
+  retentionBySegment,
+  activityBySegment,
   type UserRow,
 } from "@/lib/analytics";
 import { assessBackupRisk, declaredBackupPosture } from "@/lib/backup-risk";
@@ -40,6 +45,7 @@ export async function GET(request: Request) {
       { count: redemptionCount },
       { data: recentErrors },
       { count: errorCount7d },
+      { data: devices },
     ] = await Promise.all([
       supabase.from("users").select("id, created_at").is("deleted_at", null),
       supabase
@@ -67,6 +73,12 @@ export async function GET(request: Request) {
         .from("client_errors")
         .select("id", { count: "exact", head: true })
         .gte("created_at", weekAgo),
+      // Deliberately narrow. No token column is selected here, and none should
+      // be added: this route serves a browser, and the connection list in the
+      // member-facing API is assembled field by field for the same reason.
+      supabase
+        .from("wearable_connections")
+        .select("user_id, provider, status, last_sync_at"),
     ]);
 
     const userRows = (users ?? []) as UserRow[];
@@ -106,6 +118,12 @@ export async function GET(request: Request) {
 
     const funnel = computeFunnel(userRows, onboarded, panelDatesByUser);
 
+    const deviceRows = (devices ?? []) as DeviceRow[];
+    // "Ever connected", not "connected now". Somebody who connected and later
+    // disconnected still had the experience being measured, and dropping them
+    // would select for the happy path.
+    const deviceUserIds = new Set(deviceRows.map((d) => d.user_id));
+
     return NextResponse.json({
       funnel,
       // The tripwire on the "no backups until ~20 testers" decision. Computed
@@ -121,6 +139,12 @@ export async function GET(request: Request) {
       pushOptIns: pushCount ?? 0,
       redemptions: redemptionCount ?? 0,
       errors: { recent: recentErrors ?? [], count7d: errorCount7d ?? 0 },
+      devices: {
+        adoption: computeDeviceAdoption(deviceRows),
+        retention: retentionBySegment(userRows, activeDatesByUser, deviceUserIds, today),
+        activity: activityBySegment(userRows, activeDatesByUser, deviceUserIds, today),
+        minCohort: MIN_SEGMENT_COHORT,
+      },
       generatedAt: new Date().toISOString(),
     });
   } catch (err) {
