@@ -262,9 +262,23 @@ someone with a ring.
 
 **Ten members, total, until Whoop approves the app**, and approval is not a
 formality. Whoop's public community forum carries multiple developers reporting
-submissions from March onward with *"no approval, no rejection, no timeline"*,
-including at least one platform describing almost exactly our use case, wearable
-data alongside quarterly lab work.
+submissions with *"no approval, no rejection, no timeline"*, several of them
+tagging Whoop staff directly to ask for escalation. Threads seen on
+`community.whoop.com` include *"Whoop Developer API, App Approval"* and *"API
+Approval No Response for Over a Month"*; in the second, a developer names their
+service as **YoLongevity.com** and says more than 100 of their users are waiting
+on the integration. One developer has abandoned the official route entirely and
+now has each user create their own Whoop developer app and connect with personal
+API keys, which needs no approval at all.
+
+**A note on this paragraph.** An earlier version said "at least one platform
+describing almost exactly our use case, wearable data alongside quarterly lab
+work" and named nobody, which made the claim impossible to check later and
+impossible to answer when somebody asked which platform. The names above are
+what the forum actually shows. Whether any of them pairs wearables with lab
+panels the way we do is NOT established, so that comparison has been dropped
+rather than left standing unsourced. **Record the name when the finding is
+made**: a fact without its source becomes folklore in about a week.
 
 What follows from that:
 

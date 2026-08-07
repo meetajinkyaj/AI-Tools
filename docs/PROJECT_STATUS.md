@@ -607,17 +607,21 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   equivalent limit. Submit for approval as soon as the first real member
   connects, since Whoop require a completed test with one member before they
   will look at it and the queue only lengthens.
-- **Disconnect does not revoke at the vendor.** It deletes our copy of the
-  credentials, so we can never call the vendor again, but the authorisation the
-  user granted still stands in their vendor account. Confirmed on production
-  2026-08-04: a disconnect and reconnect went straight to the consent screen
-  with no sign-in. That is correct OAuth and not a bug, and the dialog copy was
-  fixed to stop promising a sign-in. Several vendors (Oura, Fitbit, Whoop)
-  document a revoke endpoint and calling it on disconnect would be strictly
-  better, both for the user's expectation of "disconnected" and for the data-use
-  promise made on their application forms. Deferred rather than guessed at,
-  because it is a different endpoint and payload per vendor and none of them is
-  verified. Worth doing when there is a second provider live.
+- **Disconnect revokes at Fitbit, Whoop and Oura; three vendors still cannot
+  be told.** Fixed 2026-08-07, and this bullet used to say the opposite.
+  Deleting the row always destroyed our copy of the credentials, so we could
+  never call a vendor again either way; what survived was the authorisation
+  sitting in the member's own vendor account, which is why a disconnect and
+  reconnect went straight to consent with no sign-in (confirmed on production
+  2026-08-04, correct OAuth rather than a bug, and the dialog copy was fixed
+  then to stop promising a sign-in). `revokeAtVendor()` now tears that down
+  too, before the row is deleted, bounded at three seconds so a silent vendor
+  cannot hold up a disconnect the member is watching. **Ultrahuman, Withings
+  and Garmin document no revoke endpoint**, so for those the old paragraph
+  still describes what happens. Only endpoints confirmed from a vendor's own
+  documentation are ever called: a guessed URL 404s quietly and leaves us
+  believing we destroyed a grant we did not, which is a privacy claim rather
+  than a missing feature.
 - **Garmin: deregistration and permission-change pushes are silently dropped.**
   A compliance gap, not a nicety: our handler reads only `dailies`, `sleeps`
   and `hrv`, so a user revoking consent at Garmin's end is acknowledged and
