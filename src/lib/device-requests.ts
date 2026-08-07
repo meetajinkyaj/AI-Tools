@@ -120,7 +120,38 @@ const DEVICES: DeviceEntry[] = [
     aliases: ["apple watch", "applewatch", "iwatch", "apple watch ultra", "apple watch series", "watch os", "watchos"],
   },
 
+  // ---- Public API, no adapter yet -----------------------------------------
+  //
+  // These have a real, documented API and are queued rather than blocked. The
+  // distinction matters in the admin list: a request for one of these is a
+  // roadmap item, while a request for something below is an answer we can give
+  // the member today.
+  {
+    key: "polar",
+    label: "Polar",
+    supported: false,
+    reason:
+      "Queued. Polar's AccessLink API is self-serve with no approval period, " +
+      "which makes it the least gated integration left.",
+    aliases: ["polar", "polar flow", "polar vantage", "polar h10", "polar ignite"],
+  },
+  {
+    key: "coros",
+    label: "Coros",
+    supported: false,
+    reason:
+      "Queued. Coros have an API but it is partner-only: access needs an " +
+      "application and their approval, like Garmin and Ultrahuman.",
+    aliases: ["coros", "coros pace", "coros apex", "coros vertix"],
+  },
+
   // ---- No public API today ------------------------------------------------
+  //
+  // CHECK BEFORE ADDING TO THIS LIST. Polar and Coros sat here for weeks and
+  // both were wrong: Polar's API is self-serve and Coros publish an
+  // application form. "No public API" is a claim about a vendor, and vendors
+  // change; it is worth ten minutes on their developer site before asserting
+  // it, because nobody re-checks a line like this once it is written.
   {
     key: "fittr_hart",
     label: "Fittr HART",
@@ -152,18 +183,6 @@ const DEVICES: DeviceEntry[] = [
     label: "Amazfit / Zepp",
     supported: false,
     aliases: ["amazfit", "zepp", "zepp health", "amazfit helio", "helio ring", "amazfit gtr", "amazfit t rex"],
-  },
-  {
-    key: "polar",
-    label: "Polar",
-    supported: false,
-    aliases: ["polar", "polar flow", "polar vantage", "polar h10", "polar ignite"],
-  },
-  {
-    key: "coros",
-    label: "Coros",
-    supported: false,
-    aliases: ["coros", "coros pace", "coros apex", "coros vertix"],
   },
   {
     key: "suunto",

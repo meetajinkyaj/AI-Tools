@@ -585,6 +585,20 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   its length. It is one constant if it needs reversing. Their distance also
   arrives in whatever unit the account's locale implies, so the unit is read
   from the payload and an unknown one yields no distance rather than a guess.
+- **Three integrations are pending, in this order: Withings, Polar, Coros.**
+  Ordered by access model rather than effort. Withings is already registered
+  with credentials in hand, so its cost is an audit rather than an integration.
+  **Polar is the least gated vendor left**: their AccessLink API is OAuth 2.0
+  and registration is self-serve with no approval period, no user cap and no
+  queue, which is true of nothing else remaining. Its data also fits the
+  vocabulary well (sleep with stages and a score, HRV and breathing rate via
+  Nightly Recharge, training load, VO2 max). One documented trap: after the
+  OAuth exchange Polar require an explicit POST registering the member with the
+  application, and skipping it makes every data request fail on a valid token.
+  **Coros is partner-only**, an application and a wait like Garmin and
+  Ultrahuman; the only public code around it drives an undocumented endpoint
+  and is not an option under a health record. Detail in
+  [`WEARABLES.md`](./WEARABLES.md).
 - **Withings is the only adapter never audited.** The other four were, and all
   four were wrong. It is a scale rather than a wearable, so it contributes
   weight and body fat and nothing to the training or recovery picture, which is
