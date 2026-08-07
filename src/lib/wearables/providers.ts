@@ -370,7 +370,13 @@ export function fitbitDistanceMetres(
     foot: 0.3048,
     feet: 0.3048,
   };
-  const f = factor[unit.trim().toLowerCase()];
+  // Singular is what Fitbit's examples show, and a plural would otherwise fall
+  // through to "unknown unit" and silently drop the distance. The first version
+  // listed "feet" but not "yards" or "miles", which is the kind of asymmetry
+  // that produces a bug nobody can see. Normalising here beats guessing which
+  // forms a vendor uses.
+  const cleaned = unit.trim().toLowerCase().replace(/s$/, "");
+  const f = factor[cleaned] ?? factor[unit.trim().toLowerCase()];
   return f === undefined ? undefined : Math.round(d * f);
 }
 

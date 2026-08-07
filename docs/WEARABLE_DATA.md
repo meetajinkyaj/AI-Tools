@@ -264,7 +264,16 @@ Per day:
 | Days | Union of both sources. A day counts once. Auto-detected sessions are excluded. |
 | Sessions | The higher of the two counts, not the sum. |
 | Minutes | The device's measured total when it recorded any, otherwise the check-in's bucket estimate. |
-| Activities | Union of the names, deduped case-insensitively, ranked by how many days each appeared on. |
+| Activities | Union. A check-in collapses into a device activity sharing its bucket, across the whole window; two device activities never merge with each other. Ranked by distinct days. |
+
+**Identity and display are two different questions.** An activity carries a
+`key` (identity within a source, the vendor's own word) and a `bucket`
+(identity across sources, our taxonomy). Keying on the bucket alone collapsed
+Football and Tennis into one chip, because both bucket to `sports`; keying on
+the word alone showed one gym hour twice, as "Weight Training" and "Gym /
+Weights". So the bucket merges across sources and never within one, and the
+collapse runs over the whole window rather than day by day, or a Monday
+check-in with no device beside it survives as a second chip.
 
 The minutes rule is the biomarker precedence rule again: **prefer whatever
 measured the quantity directly.** A duration chip is a bucket we turned into a

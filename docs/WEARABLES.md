@@ -511,6 +511,12 @@ say how a session came to exist, so the column stays false for them: that is
 "they do not say", not "we know they did not", and it preserves exactly the
 behaviour those rows already had.
 
+A retired provider still gets a row in Settings when somebody is connected to
+it, with Disconnect and no Connect. `unavailable` removes a provider from the
+connect list, and on its own that would strand anyone already connected: no
+row, no Disconnect, no way to revoke a grant we can no longer sync. **Retiring
+an integration must never take away the exit.**
+
 The Training card shows movement on its own line, in its own words, never
 summed into the training numbers. Rest days are still counted against training
 only: a day spent walking is not a training day, and calling it one would undo
@@ -837,10 +843,22 @@ we did not. That is not a missing feature, it is a privacy claim we cannot
 support, and `wearables.test.ts` asserts the exact list of providers that
 implement `revoke` so nobody adds a plausible-looking URL later.
 
-The stored access token is used as-is rather than refreshed first. Refreshing
-in order to revoke would mint a fresh credential at the vendor purely to
-destroy it, and would fail loudly on precisely the dead grants that need no
-revoking.
+**The access token IS refreshed first when it has expired, and the reasoning
+that said otherwise was wrong.** The first version used the stored token as-is,
+on the grounds that refreshing in order to revoke mints a credential purely to
+destroy it. That reads well and it broke Whoop: their revoke authenticates with
+the member's access token, and those last about an hour. Disconnect any time
+after the nightly sync and the stored token is already dead, so Whoop answers
+401, the outcome is logged as "failed", and the grant survives at their end.
+The feature would have worked for one of the two providers that support it, and
+only during the hour after a sync. Fitbit was unaffected either way, because its
+revoke takes the refresh token.
+
+The rotated token is deliberately NOT persisted: the row is about to be
+deleted, and writing it back would only widen the window in which a
+half-finished disconnect leaves live credentials behind. On a genuinely dead
+grant the refresh throws, which lands as "failed", and the row is deleted
+regardless.
 
 ---
 

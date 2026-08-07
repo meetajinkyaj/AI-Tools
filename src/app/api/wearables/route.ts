@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { getPrivyUserId } from "@/lib/api-auth";
 import { resolveApprovedUserId } from "@/lib/app-user";
 import { wearablesConfigured } from "@/lib/wearables/crypto";
-import { configuredProviders, isProviderId } from "@/lib/wearables/providers";
+import {
+  configuredProviders,
+  isProviderId,
+  PROVIDER_IDS,
+  PROVIDERS,
+} from "@/lib/wearables/providers";
 import { revokeAtVendor, syncUser, type ConnectionRow } from "@/lib/wearables/sync";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -42,15 +47,38 @@ export async function GET(request: Request) {
     // connected" rather than offering a Disconnect button for nothing.
     .not("access_token_enc", "is", null);
 
+  const connections = data ?? [];
+
+  /*
+   * A CONNECTION ALWAYS GETS A ROW, even to a provider we have retired.
+   *
+   * The connect list is normally the configured providers, and `unavailable`
+   * removes a provider from that. On its own that would strand anybody already
+   * connected to a retired provider: no row, so no Disconnect button, so no way
+   * to revoke a grant we can no longer sync. Retiring an integration must never
+   * take away the exit.
+   *
+   * Latent today, since Fitbit is the only retired provider and nobody ever
+   * connected it, but the flag is a general mechanism and the next use of it
+   * will not be so lucky.
+   */
+  const listed = configuredProviders();
+  const listedIds = new Set(listed.map((p) => p.id));
+  const stranded = PROVIDER_IDS.map((id) => PROVIDERS[id]).filter(
+    (p) => !listedIds.has(p.id) && connections.some((c) => c.provider === p.id),
+  );
+
   return NextResponse.json({
     enabled: true,
-    available: configuredProviders().map((p) => ({
+    available: [...listed, ...stranded].map((p) => ({
       id: p.id,
       name: p.name,
       blurb: p.blurb,
       pushOnly: p.fetchRange === null,
+      // Present and truthy means "you may leave, but you may not rejoin".
+      retired: p.unavailable ?? null,
     })),
-    connections: data ?? [],
+    connections,
   });
 }
 

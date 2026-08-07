@@ -20,6 +20,12 @@ interface Available {
   blurb: string;
   /** Garmin. Data arrives when the watch next syncs, not on connect. */
   pushOnly: boolean;
+  /**
+   * Why this integration is retired, or null. Present means the row exists
+   * only so somebody already connected can leave: reconnecting is impossible,
+   * so no Connect button is offered.
+   */
+  retired?: string | null;
 }
 
 interface Connection {
@@ -290,14 +296,24 @@ export function WearableSettings({
                     {p.pushOnly && !conn.last_sync_at && " · data arrives after your next watch sync"}
                   </span>
                 )}
-                {needsReauth && (
+                {needsReauth && !p.retired && (
                   <span className="font-body text-[0.7rem] text-accent">
                     Connection expired, reconnect to resume syncing.
                   </span>
                 )}
+                {p.retired && (
+                  <span className="font-body text-[0.7rem] text-accent">
+                    No longer available. Your existing data stays in Trends, and
+                    you can disconnect below.
+                  </span>
+                )}
               </div>
 
-              {conn && !needsReauth ? (
+              {/* A retired provider always offers Disconnect and never Connect,
+                  whatever the connection's status says. Reconnecting cannot
+                  work, and offering it would send somebody to a consent screen
+                  that fails. */}
+              {conn && (p.retired || !needsReauth) ? (
                 <button
                   type="button"
                   onClick={() => askDisconnect(p.id, p.name)}
@@ -306,7 +322,7 @@ export function WearableSettings({
                 >
                   Disconnect
                 </button>
-              ) : (
+              ) : p.retired ? null : (
                 <button
                   type="button"
                   onClick={() => void connect(p.id)}

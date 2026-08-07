@@ -240,11 +240,43 @@ export async function revokeAtVendor(conn: ConnectionRow): Promise<RevokeOutcome
   if (!p?.revoke) return "unsupported";
   try {
     const { id, secret } = clientCreds(p);
-    // The stored access token, NOT a refreshed one. Refreshing to revoke would
-    // mint a fresh credential at the vendor purely to destroy it, and would
-    // fail loudly on exactly the dead grants that need no revoking at all.
-    const accessToken = await decryptToken(conn.access_token_enc);
     const refreshToken = await decryptToken(conn.refresh_token_enc);
+
+    /*
+     * A LIVE ACCESS TOKEN, REFRESHING IF THE STORED ONE HAS EXPIRED.
+     *
+     * The first version used the stored token as-is, reasoning that refreshing
+     * in order to revoke mints a credential purely to destroy it. That reads
+     * well and it broke Whoop, whose revoke authenticates with the member's
+     * access token and whose access tokens last about an hour. Disconnect any
+     * time after the nightly sync and the stored token is already dead: Whoop
+     * answers 401, we log "failed", and the grant survives at their end. The
+     * feature would have worked for one of the two providers that support it,
+     * and only for the hour after a sync.
+     *
+     * Fitbit is unaffected either way, because its revoke takes the refresh
+     * token.
+     *
+     * Refreshing is cheap and the objection was misplaced: a token minted here
+     * is destroyed seconds later by the very call it enables. On a grant that
+     * is genuinely dead the refresh throws, which lands in the catch below as
+     * "failed", and the row is deleted regardless. Nothing is worse off.
+     */
+    let accessToken = await decryptToken(conn.access_token_enc);
+    const expiresAt = conn.expires_at ? Date.parse(conn.expires_at) : null;
+    const expired =
+      expiresAt !== null && expiresAt - EXPIRY_SKEW_SECONDS * 1000 <= Date.now();
+    if ((expired || !accessToken) && refreshToken) {
+      const tokens = await requestTokens(conn.provider, {
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      });
+      accessToken = tokens.accessToken;
+      // NOT persisted, deliberately. The row is about to be deleted, so
+      // writing the rotated token back is work whose only effect would be to
+      // widen the window in which a half-finished disconnect leaves live
+      // credentials behind.
+    }
     if (!accessToken && !refreshToken) return "failed";
 
     // Belt and braces. The signal tears the request down, and the race caps

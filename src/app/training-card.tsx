@@ -63,12 +63,21 @@ const DIRECTION_LABEL: Record<RecoverySignal["direction"], string> = {
   unknown: "Not enough data",
 };
 
-/** Where the week's numbers came from, said plainly. */
-function sourceNote(load: TrainingLoad): string {
-  const both = load.sources.length === 2;
-  if (both) return "From your check-ins and your connected device";
-  if (load.sources[0] === "device") return "From your connected device";
-  return "From what you logged at check-in";
+/**
+ * Where the week's numbers came from, said plainly.
+ *
+ * Reads the list rather than assuming a default. The first version fell
+ * through to the check-in wording whenever `sources` was not exactly
+ * `["device"]`, which told somebody whose week was entirely device-recorded
+ * walks that they had typed it in themselves.
+ */
+function sourceNote(load: TrainingLoad): string | null {
+  const checkin = load.sources.includes("checkin");
+  const device = load.sources.includes("device");
+  if (checkin && device) return "From your check-ins and your connected device";
+  if (device) return "From your connected device";
+  if (checkin) return "From what you logged at check-in";
+  return null;
 }
 
 export function TrainingCard({ getToken }: { getToken: () => Promise<string | null> }) {
@@ -197,9 +206,9 @@ export function TrainingCard({ getToken }: { getToken: () => Promise<string | nu
       )}
 
       <p className="font-body text-[0.7rem] text-muted">
-        {sourceNote(week)}. Training supports bone, muscle and metabolic health over
-        months, so this is a record of the work, not a prediction about your next
-        panel.
+        {sourceNote(week) ? `${sourceNote(week)}. ` : ""}
+        Training supports bone, muscle and metabolic health over months, so this is
+        a record of the work, not a prediction about your next panel.
       </p>
     </Card>
   );

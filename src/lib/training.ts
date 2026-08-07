@@ -117,7 +117,19 @@ export interface TrainingLoad {
  * showed one gym hour as two chips.
  */
 interface ActivityRef {
+  /** Identity WITHIN a source. Two device sports are two things. */
   key: string;
+  /**
+   * Identity ACROSS sources, when we can place the name in our taxonomy.
+   *
+   * Kept apart from `key` because the two questions have different answers.
+   * Football and Tennis both bucket to `sports`, and they are not the same
+   * activity: keying on the bucket collapsed a week of Football and Tennis
+   * into one chip reading "Football". But a ring's "Weight Training" and a
+   * check-in's "Gym / Weights" ARE one activity, and only the bucket can see
+   * that. So the bucket merges across sources and never within one.
+   */
+  bucket: string | null;
   label: string;
   fromCheckin: boolean;
 }
@@ -158,24 +170,31 @@ function windowStart(endDate: string, windowDays: number): string | null {
 /** One logged check-in activity, as something to count and to print. */
 function checkinActivity(e: ExerciseEntry): ActivityRef | null {
   if (isExerciseType(e.type)) {
-    return { key: e.type, label: EXERCISE_TYPE_LABELS[e.type], fromCheckin: true };
+    return {
+      key: e.type,
+      bucket: e.type,
+      label: EXERCISE_TYPE_LABELS[e.type],
+      fromCheckin: true,
+    };
   }
   // "other" carries its own free text; without one there is nothing to show.
   const label = (e.label ?? "").trim();
-  return label ? { key: rawKey(label), label, fromCheckin: true } : null;
+  if (!label) return null;
+  // The free text goes through the same matcher the device names do. Somebody
+  // typing "Padel" under "other" and a ring reporting "Padel" is one activity,
+  // and without this they were two chips reading the same word.
+  return { key: rawKey(label), bucket: matchExerciseType(label), label, fromCheckin: true };
 }
 
 /**
  * One device session's activity.
  *
- * The vendor's own word is kept for display and only the KEY is normalised, so
- * "Padel" stays "Padel" on screen while still colliding with a check-in logged
- * as "Racquet & team sports". Collapsing the label too would trade a specific
- * word the vendor gave us for a vaguer one of ours.
+ * The vendor's own word is kept for display AND for identity, so two different
+ * sports never collapse into each other. The bucket is carried alongside so a
+ * check-in describing the same session can still be recognised as a duplicate.
  */
 function deviceActivity(raw: string): ActivityRef {
-  const matched = matchExerciseType(raw);
-  return { key: matched ?? rawKey(raw), label: raw, fromCheckin: false };
+  return { key: rawKey(raw), bucket: matchExerciseType(raw), label: raw, fromCheckin: false };
 }
 
 /** Group device sessions by day. Auto-detected ones are excluded. */
@@ -287,14 +306,30 @@ export function trainingLoad(
 
   const allDays = new Set([...fromDevice.keys(), ...fromCheckin.keys()]);
   // A week of nothing but walks is still a week with something to say, so the
-  // movement roll-up survives the early return.
-  if (allDays.size === 0) return { ...empty, movement };
+  // movement roll-up survives the early return, and so does the fact that a
+  // device is what reported it.
+  if (allDays.size === 0) {
+    return {
+      ...empty,
+      movement,
+      sources: movement.sessions > 0 ? ["device"] : [],
+    };
+  }
 
   let sessions = 0;
   let minutes = 0;
   let minutesEstimated = false;
-  /** Days on which each activity appeared, so one activity counts once a day. */
-  const activityDays = new Map<string, { label: string; days: number; fromCheckin: boolean }>();
+  /**
+   * Days on which each activity appeared, so one activity counts once a day.
+   *
+   * Days are a SET rather than a counter because the same activity can be
+   * reported twice on one day, by both sources or by two device sessions, and
+   * a counter would make one Tuesday look like two.
+   */
+  const activityDays = new Map<
+    string,
+    { label: string; days: Set<string>; bucket: string | null; fromCheckin: boolean }
+  >();
 
   for (const day of allDays) {
     const d = fromDevice.get(day);
@@ -312,40 +347,71 @@ export function trainingLoad(
 
     // Union the activities: a ring recording a run and a check-in logging
     // weights on the same day are two real activities, not a contradiction to
-    // resolve. The same activity seen by both is one, which is what the
-    // normalised key is for.
+    // resolve.
     //
-    // WHEN BOTH NAMED IT, THE DEVICE'S WORD WINS. It observed the session where
-    // the check-in recalled it, which is the same reason its minutes win, and
-    // its word is usually the more specific one: a ring reporting "Padel"
-    // against a check-in bucketed as "Racquet & team sports" is the case that
-    // decided this.
-    const perDay = new Map<string, ActivityRef>();
-    for (const a of [...(d?.activities ?? []), ...(c?.activities ?? [])]) {
-      const seen = perDay.get(a.key);
-      if (!seen || (seen.fromCheckin && !a.fromCheckin)) perDay.set(a.key, a);
-    }
-
-    for (const [key, ref] of perDay) {
-      const prev = activityDays.get(key);
-      const takeLabel = !prev || (prev.fromCheckin && !ref.fromCheckin);
-      activityDays.set(key, {
-        label: takeLabel ? ref.label : prev.label,
-        days: (prev?.days ?? 0) + 1,
-        // Only true while every sighting has come from a check-in, so the
-        // first device sighting can still upgrade the wording.
-        fromCheckin: (prev?.fromCheckin ?? true) && ref.fromCheckin,
-      });
+    // DEVICE ACTIVITIES ARE NEVER MERGED WITH EACH OTHER. Football on Monday
+    // and Tennis on Wednesday both bucket to "sports", and they are two
+    // things; an earlier version keyed on the bucket and collapsed that week
+    // into a single chip reading "Football".
+    //
+    // A CHECK-IN ENTRY IS DROPPED when a device activity that day shares its
+    // bucket, because that is the one case where two names describe one
+    // session. The device's word survives: it observed the session where the
+    // check-in recalled it, which is the same reason its minutes win, and its
+    // word is usually the more specific one. A ring reporting "Padel" against
+    // a check-in bucketed "Racquet & team sports" is the case that decided it.
+    for (const ref of [...(d?.activities ?? []), ...(c?.activities ?? [])]) {
+      const prev = activityDays.get(ref.key);
+      if (prev) {
+        prev.days.add(day);
+      } else {
+        activityDays.set(ref.key, {
+          label: ref.label,
+          days: new Set([day]),
+          bucket: ref.bucket,
+          fromCheckin: ref.fromCheckin,
+        });
+      }
     }
   }
 
+  /*
+   * COLLAPSE A CHECK-IN INTO THE DEVICE THAT DESCRIBES THE SAME ACTIVITY, and
+   * do it over the whole window rather than day by day.
+   *
+   * Per-day was the first attempt and it leaked across days: somebody who logs
+   * "gym" on Monday, then logs it again on Wednesday when their ring also
+   * records "Weight Training", ended up with both chips, because Monday's
+   * check-in had no device entry beside it to be absorbed by.
+   *
+   * The days are unioned rather than dropped, so the frequency ordering still
+   * reflects every day the activity happened, whichever source saw it.
+   */
+  const bucketOwner = new Map<string, string>();
+  for (const [key, a] of activityDays) {
+    if (!a.fromCheckin && a.bucket !== null && !bucketOwner.has(a.bucket)) {
+      bucketOwner.set(a.bucket, key);
+    }
+  }
+  for (const [key, a] of activityDays) {
+    if (!a.fromCheckin || a.bucket === null) continue;
+    const owner = bucketOwner.get(a.bucket);
+    if (owner === undefined || owner === key) continue;
+    for (const day of a.days) activityDays.get(owner)?.days.add(day);
+    activityDays.delete(key);
+  }
+
   const activities = [...activityDays.values()]
-    .sort((x, y) => y.days - x.days || x.label.localeCompare(y.label))
+    .sort((x, y) => y.days.size - x.days.size || x.label.localeCompare(y.label))
     .map((a) => a.label);
 
   const sources: TrainingSource[] = [];
   if (fromCheckin.size > 0) sources.push("checkin");
-  if (fromDevice.size > 0) sources.push("device");
+  // Movement counts as the device having contributed, even when it produced no
+  // training day. Without this a week of nothing but walks reported its source
+  // as the check-in, which is a plain falsehood about data the member never
+  // typed.
+  if (fromDevice.size > 0 || movement.sessions > 0) sources.push("device");
 
   return {
     sessions,

@@ -398,6 +398,83 @@ describe("trainingLoad, reconciling the two sources", () => {
     expect(load.days).toBe(2);
   });
 
+  it("does not merge two different sports that share one of our buckets", () => {
+    // Football and Tennis both bucket to "sports" and they are two things. An
+    // earlier version keyed activities on the bucket and collapsed a week of
+    // both into a single chip reading "Football".
+    const load = trainingLoad(
+      {
+        workouts: [
+          w("2026-08-03", 18, 60, "Football"),
+          w("2026-08-05", 18, 45, "Tennis"),
+        ],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities.sort()).toEqual(["Football", "Tennis"]);
+    expect(load.days).toBe(2);
+  });
+
+  it("merges a check-in and a device across DIFFERENT days, not just shared ones", () => {
+    // Logged by hand on Monday, and again on Wednesday when the ring also saw
+    // it. Collapsing only within a day left Monday's check-in with nothing
+    // beside it to be absorbed by, so both chips survived.
+    const load = trainingLoad(
+      {
+        checkins: [
+          c("2026-08-03", [{ type: "gym", duration: "long" }]),
+          c("2026-08-05", [{ type: "gym", duration: "long" }]),
+        ],
+        workouts: [w("2026-08-05", 7, 50, "Weight Training")],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities).toEqual(["Weight Training"]);
+    expect(load.days).toBe(2);
+  });
+
+  it("matches a free-text 'other' check-in against the device's word", () => {
+    // Somebody typing "Padel" under "other" and a ring reporting "Padel" is
+    // one activity. Without running the free text through the same matcher the
+    // device names use, this rendered the same word twice.
+    const load = trainingLoad(
+      {
+        checkins: [c("2026-08-07", [{ type: "other", label: "Padel", duration: "long" }])],
+        workouts: [w("2026-08-07", 18, 60, "Padel")],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities).toEqual(["Padel"]);
+  });
+
+  it("counts one day once when both sources report the activity", () => {
+    // Days are a set, not a counter: the same Tuesday seen twice is one
+    // Tuesday, and a counter would order the chip row by double-sightings.
+    const load = trainingLoad(
+      {
+        checkins: [c("2026-08-07", [{ type: "gym", duration: "long" }])],
+        workouts: [
+          w("2026-08-07", 7, 50, "Weight Training"),
+          w("2026-08-07", 18, 30, "Weight Training"),
+        ],
+      },
+      "2026-08-07",
+    );
+    expect(load.activities).toEqual(["Weight Training"]);
+    expect(load.days).toBe(1);
+  });
+
+  it("reports the device as the source on a week of nothing but walks", () => {
+    // The card prints this. Saying "from what you logged at check-in" about
+    // data the member never typed is a plain falsehood.
+    const load = trainingLoad(
+      { workouts: [w("2026-08-07", 8, 25, "Walk", true)] },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(0);
+    expect(load.sources).toEqual(["device"]);
+  });
+
   it("keeps an activity it cannot place under the vendor's own name", () => {
     // Rowing is not in our taxonomy and is not close to anything in it.
     // Forcing it into a category would print a word that misdescribes it.

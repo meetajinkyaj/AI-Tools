@@ -424,6 +424,15 @@ describe("Fitbit distance, which is not reliably metric", () => {
     expect(fitbitDistanceMetres(400, "Meter")).toBe(400);
   });
 
+  it("accepts a plural unit, which an asymmetric table silently dropped", () => {
+    // The first table listed "feet" but neither "yards" nor "miles", so a
+    // plural fell through to "unknown unit" and the distance vanished. That
+    // asymmetry is invisible until somebody's run has no distance on it.
+    expect(fitbitDistanceMetres(2, "Miles")).toBe(3219);
+    expect(fitbitDistanceMetres(5, "Kilometers")).toBe(5000);
+    expect(fitbitDistanceMetres(100, "Yards")).toBe(91);
+  });
+
   it("returns nothing rather than guessing at an unknown unit", () => {
     // A missing distance is a blank field. A wrong one is a lie in a health
     // record, and nothing downstream could tell the difference.
