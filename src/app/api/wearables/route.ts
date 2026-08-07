@@ -58,9 +58,10 @@ export async function GET(request: Request) {
    * to revoke a grant we can no longer sync. Retiring an integration must never
    * take away the exit.
    *
-   * Latent today, since Fitbit is the only retired provider and nobody ever
-   * connected it, but the flag is a general mechanism and the next use of it
-   * will not be so lucky.
+   * NO PROVIDER IS RETIRED TODAY. Fitbit's was, and the Google Health rewrite
+   * cleared it. This path is therefore dormant, which is exactly when it will
+   * be broken by an unrelated change, so `wearables.test.ts` exercises the gate
+   * against a stand-in rather than leaving it untested until it is needed.
    */
   const listed = configuredProviders();
   const listedIds = new Set(listed.map((p) => p.id));
@@ -123,12 +124,14 @@ export async function DELETE(request: Request) {
   // failed revoke that aborted the delete would leave them connected to an app
   // they just left, with live tokens on our side. That is the worse failure.
   //
-  // Only Fitbit and Whoop are asked, because those are the two whose revoke
-  // endpoint is confirmed from their own documentation. For the rest our copy
-  // of the credentials is still destroyed, so we can never call them again;
-  // what survives is the authorisation in the user's vendor account, which is
-  // why reconnecting goes straight to consent with no sign-in. See
-  // `docs/WEARABLES.md` for who is still open and why.
+  // Fitbit (Google), Whoop and Oura are asked, being the three whose revoke
+  // endpoint is confirmed from their own documentation. Ultrahuman, Withings
+  // and Garmin publish none, and a guessed URL 404s quietly while leaving us
+  // believing we destroyed a grant we did not. For those three our copy of the
+  // credentials is still destroyed, so we can never call them again; what
+  // survives is the authorisation in the member's vendor account, which is why
+  // reconnecting goes straight to consent with no sign-in. See
+  // `docs/WEARABLES.md` for the current coverage.
   const { data: existing } = await supabase
     .from("wearable_connections")
     .select("id, user_id, provider, external_user_id, access_token_enc, refresh_token_enc, expires_at, status, failure_count")
