@@ -142,6 +142,11 @@ export function TrainingCard({ getToken }: { getToken: () => Promise<string | nu
             <span className="font-body text-[0.7rem] text-muted">approximate</span>
           )}
         </div>
+        {/* REST MEANS THE MEMBER SAID THEY RESTED. It used to mean "no session
+            on this day", which quietly turned every missed check-in into a
+            decision they never made: one logged rest day and two skipped days
+            read back as three rest days. Days we know nothing about are
+            counted separately, below, and never here. */}
         <div className="flex flex-col gap-1">
           <span className="font-body text-xs text-muted">Rest days</span>
           <span className="font-display text-2xl font-medium text-foreground">
@@ -149,6 +154,15 @@ export function TrainingCard({ getToken }: { getToken: () => Promise<string | nu
           </span>
         </div>
       </div>
+
+      {/* Stated plainly and without a nudge attached. The gap is the member's
+          business; our job is to not describe it as something it was not. */}
+      {week.unloggedDays > 0 && (
+        <p className="font-body text-xs text-muted">
+          {week.unloggedDays} day{week.unloggedDays === 1 ? "" : "s"} not logged, so
+          they are not counted either way.
+        </p>
+      )}
 
       {week.activities.length > 0 && (
         <div className="flex flex-wrap gap-2">

@@ -312,6 +312,20 @@ two together would hand somebody seven training days for a week they trained
 none; dropping the walk, which is what the first version did, throws away the
 only signal we have for it.
 
+**Whoop gives us no such flag**, checked against their v2 workout model on
+2026-08-08: no detection field exists there. So for walking, which is the only
+activity anybody logs by accident, the check-in decides instead. A device walk
+the member did not log is movement; one they logged themselves is training,
+because they said so. Intent is still the line; where the vendor cannot report
+it, the member already has.
+
+**Rest, missing and pending are three different days.** A day with no training
+is rest only when the member checked in and said so; a day with no check-in is
+unknown, and the last day of the window is not over. Reporting all three as
+rest, which the first version did, turned two missed check-ins into a decision
+the member never made. Absence of evidence is not evidence of rest, the same
+rule `summarizeCheckins()` follows.
+
 **Nothing here gives advice.** No "take a rest day", no "you are overtraining".
 A test asserts that no summary contains any of those phrasings, in every branch
 including the empty one. What to do about a hard week is between a person and
