@@ -336,6 +336,19 @@ handover.
    detail, the manual stopgap, and the restore drill to run once backups
    exist.
 
+9. **A green build does not mean a readable repo.** A dedupe key was written
+   with a literal NUL byte in a template string instead of the escape. It
+   compiled, linted, passed 639 tests and merged, because no part of the
+   toolchain minds. What minds is `grep`, which calls any file containing a NUL
+   binary and prints "binary file matches" instead of the line: that file
+   silently left every repo-wide search, including the em dash sweep this very
+   document tells you to run. `git diff` degrades the same way, showing a
+   reviewer "Binary files differ". `src/lib/source-hygiene.test.ts` now fails on
+   any control character outside tab, newline and carriage return, or any file
+   that is not valid UTF-8. The general lesson is worth more than the specific
+   byte: **when a check depends on a tool, something should test that the tool
+   can still see the files.**
+
 **Debugging order when something works locally but fails in production:**
 (a) is it actually deployed? (b) build-time env vars, (c) did the migration run?
 (d) model latency/thinking defaults, (e) idle/connection timeouts, (f) DB CHECK
@@ -371,6 +384,17 @@ Watch two things: does the report land (do people upload a second panel?), and
 does the daily check-in survive week one? Those two answers should reorder
 everything below this line.
 
+There is now also a **Devices and retention** report on that tab, and a **CSV
+export** (`GET /api/admin/report`) with one row per member. Two things about the
+report are deliberate and worth not undoing. It **withholds percentages below
+five eligible users** and shows raw counts instead, because a rate off two
+people is a wrong answer with a decimal point rather than a weak signal; expect
+most of it blank during a closed beta, which is it working. And it says on
+screen that any device-versus-no-device gap is **correlation and largely
+self-selection**, since members who connect a ring are already the more engaged
+ones. The CSV carries **no health data at all**, by design; hold that line when
+somebody asks for "just one marker".
+
 **4. Family vault / multi-profile UI.** The schema has supported it since
 migration 0005, every health row already hangs off `profile_id` and one "self"
 profile is auto-created per user. This is a UI project on a done data model,
@@ -378,13 +402,25 @@ which makes it the cheapest large feature available. It's also the compliant pat
 for under-18 users (guardian accounts) and the "track my parents' health" use
 case, which is the strongest word-of-mouth driver in this category.
 
-**5. Personalized recommendation loop under Partners.** A deterministic
+**5. Finish the wearable set, in this order: Withings, Polar, Coros.** Ordered
+by access model, not effort. Withings is already registered with credentials in
+hand, so its cost is the audit it never had, and **four of four audited adapters
+were wrong the same way**: a field read from the wrong place, so the metric was
+silently never emitted and nothing failed. Polar next, because its AccessLink
+API is self-serve with no approval period, no user cap and no queue, which is
+true of nothing else remaining. Coros last, because it is partner-only.
+[`WEARABLES.md`](./WEARABLES.md) carries the per-vendor traps, including the one
+that will bite Polar: after the OAuth exchange they require an explicit POST
+registering the member with the application, and skipping it makes every data
+request fail while holding a valid token.
+
+**6. Personalized recommendation loop under Partners.** A deterministic
 marker→intervention catalog that the model *presents* rather than invents,
 surfacing partner products and unmonetized food suggestions beside them.
 Deliberately under Partners, not the Report, the Report must stay clinical and
 unmonetized. Blocked on a real partner catalog, not on engineering.
 
-**6. Marketing-site rebuild.** Replace the 12.4MB Babel-in-the-browser snapshot
+**7. Marketing-site rebuild.** Replace the 12.4MB Babel-in-the-browser snapshot
 with a hand-authored static page. It's a design project more than a code one,
 which is why it's deferred; the current site works and converts to the app fine.
 Do it when you have design capacity, not before.
