@@ -388,11 +388,92 @@ function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }
 
       <DeviceReport devices={data.devices} />
 
+      <ReportDownload getToken={getToken} />
+
       <p className="font-body text-xs text-muted">
         Retention counts activity as a check-in or an app open; app-open data
         accrues from the day this instrumentation deployed.
       </p>
     </div>
+  );
+}
+
+/**
+ * The CSV export.
+ *
+ * FETCHED RATHER THAN LINKED. A plain anchor to the route would arrive without
+ * the bearer token and 403, since admin auth is a header and not a cookie. So
+ * the file is fetched, turned into a blob and clicked programmatically, and the
+ * object URL is revoked afterwards rather than left pinning the file in memory.
+ *
+ * THE WARNING IS NOT DECORATION. Everything else in this console stays behind
+ * Cloudflare Access and an email allow-list; a downloaded file does not. It
+ * lands in a Downloads folder, gets attached to an email, syncs to a personal
+ * cloud drive. The row that says so is the only thing standing between those
+ * two facts and somebody forgetting the difference.
+ */
+function ReportDownload({ getToken }: { getToken: () => Promise<string | null> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const download = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      if (!token) return setError("Not signed in.");
+      const res = await fetch("/api/admin/report", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return setError("Couldn't build the report.");
+
+      const blob = await res.blob();
+      // Prefer the filename the server chose, so the date in it is the
+      // server's day rather than the browser's timezone.
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const named = /filename="([^"]+)"/.exec(disposition)?.[1];
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = named ?? "ikigaro-members.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Couldn't build the report.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="flex flex-col gap-2 p-5">
+      <span className="font-body text-[10px] uppercase tracking-wide text-muted">
+        Export
+      </span>
+      <p className="font-body text-sm text-foreground">
+        One row per member: devices connected and syncing, active days, check-ins,
+        streak, panels and points. For the questions this dashboard does not
+        already answer.
+      </p>
+      <div>
+        <button
+          onClick={() => void download()}
+          disabled={busy}
+          className={`${secondaryButtonClass} text-xs`}
+        >
+          {busy ? "Building…" : "Download CSV"}
+        </button>
+      </div>
+      {error && <span className="font-body text-xs text-accent">{error}</span>}
+      <p className="font-body text-[0.7rem] text-muted">
+        Contains member email addresses. It holds no health data and no lab
+        values, by design, but everything else in this console is protected by
+        Cloudflare Access and a downloaded file is not. Treat it as you would the
+        member list itself.
+      </p>
+    </Card>
   );
 }
 

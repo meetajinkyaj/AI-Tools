@@ -124,11 +124,23 @@ operate it, and the known follow-ups. Update this as work lands.
     asks about one specific day and counts somebody active on days 6 and 8 as
     lost at D7. The panel states on screen that any gap is correlation and
     largely self-selection.
-15. **Observability**, `POST /api/telemetry`: `app_opened` beacon (approved
+15. **CSV export** (`GET /api/admin/report`, admin-only), one row per member:
+    devices connected and syncing, last sync, active days over 30, check-ins,
+    streak, panels, points, iki score, days since signup. It exists for the
+    questions the dashboard does not already answer, sorting by device or
+    comparing two exports a month apart. **No tokens and no health data**, not
+    one biomarker value; the counts measure engagement, the contents have no
+    business in an operations spreadsheet, and that rule is the one to hold when
+    somebody asks for "just one marker". Every field goes through `escapeCell`,
+    which quotes properly AND neutralises leading `=`, `+`, `-`, `@`: emails and
+    invite codes are member-controlled, and a spreadsheet executes a cell
+    starting with those, so an export of our data would otherwise attack the
+    admin who opens it (`src/lib/csv.ts`).
+16. **Observability**, `POST /api/telemetry`: `app_opened` beacon (approved
     users only, deduped/day → powers retention) + client error capture
     (window.onerror/unhandledrejection, pre-auth included, capped). Server
     errors: Cloudflare Workers observability.
-16. **Vendor contract check** (`.github/workflows/oura-contract.yml`).
+17. **Vendor contract check** (`.github/workflows/oura-contract.yml`).
     `scripts/verify-oura-sandbox.mjs` calls Oura's sandbox, which returns
     deterministic sample data with no connected ring, and asserts that every
     field path the adapter reads is actually present. Runs on changes to the
@@ -139,11 +151,11 @@ operate it, and the known follow-ups. Update this as work lands.
     because their fixtures come from the same documentation that misled us. A
     genuine mismatch fails the build; being unable to reach Oura only warns,
     since learning nothing is not the same as learning something bad.
-17. **Age policy**, no minimum age (per legal review); under-18s use with
+18. **Age policy**, no minimum age (per legal review); under-18s use with
     parent/guardian consent (Terms §1); onboarding shows the consent note.
     Rewards/points terms live in Terms §14 (`/terms#rewards`, draft pending
     counsel's wording pass).
-18. **Referrals**, name-based codes (`?ref=AJINKYA`; numbered on collision,
+19. **Referrals**, name-based codes (`?ref=AJINKYA`; numbered on collision,
     random fallback, generated lazily) + admin-assigned vanity codes ("FITTR",
     inline editor in the Users tab with live normalize/preview). Attribution
     at signup only (`referred_by`); **tiered milestone earns** to the referrer
@@ -160,14 +172,14 @@ operate it, and the known follow-ups. Update this as work lands.
     invite-only, so a posted card advertising a join link sends strangers at a
     door that will not open. Flip that one flag at ~20 testers; both cards light
     up together and tests cover both states.
-19. **Startup & entry polish**, landing offers **Sign up** (primary) and **Log
+20. **Startup & entry polish**, landing offers **Sign up** (primary) and **Log
     in** (secondary), both opening the same Privy OTP flow (it creates the
     account when the email is new). One branded `Splash` covers every pre-app
     wait, so startup reads as a single moment. `html` carries the linen ground +
     `color-scheme: light` (without it, dark-mode phones painted a black first
     frame and reloads flashed white). Home shows shimmer placeholders instead of
     fake zeros while the summary loads.
-20. **Marketing site** (`ikigaro-os`), the Notion-backed waitlist is retired;
+21. **Marketing site** (`ikigaro-os`), the Notion-backed waitlist is retired;
     every "Join the waitlist" CTA points at `app.ikigaro.com`, and the bottom
     email form is replaced by a signup button. `POST /api/waitlist` answers 410
     for stale cached pages. The landing snapshot's bootstrap **replaces the whole
@@ -175,7 +187,7 @@ operate it, and the known follow-ups. Update this as work lands.
     footer), so the Worker patches the rendered DOM via a persistent idempotent
     interval. The vestigial `src/` TanStack app was deleted (69 deps → 0).
 
-21. **Iki ranks & the enamel badges**, five tiers off `iki_score`: Iki Rookie
+22. **Iki ranks & the enamel badges**, five tiers off `iki_score`: Iki Rookie
     🌱 0 · Iki Apprentice 🛠️ 400 · Iki Pro ⚡ 2,000 · Iki Sensei 🥋 8,000 ·
     **Iki Grandmaster 🏆 25,000 (secret)**. Thresholds were fitted to modelled
     earn rates, not picked: a consistent user reaches Sensei in ~14 months.
@@ -190,7 +202,7 @@ operate it, and the known follow-ups. Update this as work lands.
     nowhere else in the product (there is a test).
     The rank card leads **Home**; the level-up toast fires on Check-in, where
     the earn happens.
-22. **Accelerated Points (partner codes)**, a `partners` row (gym, community,
+23. **Accelerated Points (partner codes)**, a `partners` row (gym, community,
     brand, deliberately not a user) grants a boosted earn rate to everyone who
     signs up through its `?ref` code, on a glide path: 2.0x for 90 days, then
     1.5x for 90 more **if** the activity floor was met (45 check-ins), then
@@ -199,14 +211,14 @@ operate it, and the known follow-ups. Update this as work lands.
     NEW joiners getting the deal without retroactively downgrading anyone
     already in. The floor is evaluated lazily on the first earn after day 90, no scheduled job to own or discover has been failing for a month.
     **Multipliers never touch `iki_score`**, so a community code cannot buy rank.
-23. **Shareable rank card**, the same canvas pipeline as the check-in card
+24. **Shareable rank card**, the same canvas pipeline as the check-in card
     (rendered client-side; nothing uploaded, no image service to run). One card,
     three formats (Story/Post/Square), no templates or field toggles: a check-in
     publishes several separable facts and some are nobody's business unless you
     say so, a rank is one public fact. Habit data only, the input type has
     nowhere to put a biomarker reading.
 
-24. **Cloud wearable integrations**. Oura, Fitbit, Whoop, Withings, Garmin and
+25. **Cloud wearable integrations**. Oura, Fitbit, Whoop, Withings, Garmin and
     Ultrahuman connect by OAuth from the web app. **No native app**: Apple
     HealthKit and Android Health Connect are on-device APIs with no web access
     at all, so they need one, these six do not, which is why they come first.
