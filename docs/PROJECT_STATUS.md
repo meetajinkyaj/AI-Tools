@@ -473,6 +473,24 @@ CHECK constraints, (g) Cloudflare zone features (Access/BFM) in the path.
   Postgres (as `pguser`); live/browser + OTP steps via Cowork. Prod data is
   never mutated without an explicit ask.
 
+- **A raw NUL byte reached production source and nothing noticed.** Fixed
+  2026-08-07. A dedupe key in `sync.ts` was written with a literal control
+  character in a template string rather than the escape. TypeScript compiled it,
+  eslint passed, 639 tests passed and the build succeeded, so it merged.
+  **What broke was every text tool**: `grep` reports "binary file matches" for a
+  file containing a NUL and drops it from the output, so that file silently left
+  every repo-wide search, including the em dash sweep `AGENTS.md` instructs
+  everyone to run. The one file with a control character in it was the one file
+  the house-style check could not see. `git diff` degrades the same way, showing
+  a reviewer "Binary files differ".
+  **The lesson is the check, not the byte**: a passing build is not the same as
+  a readable repo, and nothing tested the difference.
+  `src/lib/source-hygiene.test.ts` now walks `src`, `scripts`, `workers` and
+  `supabase` and fails on any control character outside tab, newline and
+  carriage return, or any file that is not valid UTF-8. It was verified by
+  reintroducing the fault and watching it fail with the file and line, rather
+  than trusted because it was green.
+
 ## 8. Known follow-ups / deferred
 
 - **Referral +150 panel tier**, verified by design + unit-level only (testing
