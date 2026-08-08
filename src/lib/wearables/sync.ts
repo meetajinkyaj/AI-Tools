@@ -349,7 +349,12 @@ export async function storeMetrics(
    * what the upsert itself would have done had the rows arrived separately.
    */
   const byKey = new Map<string, DailyMetric>();
-  for (const m of clean) byKey.set(`${m.date} ${m.metric}`, m);
+  // Separator written as an escape, not a raw byte. A literal control
+  // character in source makes grep treat the whole file as binary, which
+  // silently excludes it from every repo-wide search, including the em dash
+  // sweep in AGENTS.md. `\u0000` cannot occur in a date or a metric key, so
+  // the collision guarantee is unchanged.
+  for (const m of clean) byKey.set(`${m.date}\u0000${m.metric}`, m);
   const deduped = [...byKey.values()];
 
   const supabase = createSupabaseAdmin();
