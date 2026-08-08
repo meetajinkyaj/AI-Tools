@@ -97,8 +97,29 @@ export interface TrainingLoad {
   minutesEstimated: boolean;
   /** Distinct activities, most frequent first. */
   activities: string[];
-  /** Days in the window that had no session at all. */
+  /**
+   * Days the member checked in and said they did not train.
+   *
+   * THIS IS A CHOICE THEY MADE, NOT A GAP IN OUR DATA, and the distinction is
+   * the whole point. The first version counted every day without a session as
+   * rest, so a week with one deliberate rest day and two missed check-ins
+   * reported three rest days. That is the app inventing an intention on the
+   * member's behalf out of its own ignorance. The share card has always used
+   * the honest definition (`activityLabel` calls a day with
+   * `training_logged: false` a rest day); this now agrees with it.
+   */
   restDays: number;
+  /**
+   * Days in the window with no check-in at all, so we know nothing about them.
+   *
+   * Never folded into `restDays`. Absence of evidence, not evidence of rest,
+   * the same rule `summarizeCheckins` follows when it refuses to read a missed
+   * check-in as a zero.
+   *
+   * EXCLUDES THE LAST DAY OF THE WINDOW, which is today and is not over. See
+   * `trainingLoad`.
+   */
+  unloggedDays: number;
   /** Which sources contributed a day, in a stable order. */
   sources: TrainingSource[];
   /**
@@ -197,11 +218,67 @@ function deviceActivity(raw: string): ActivityRef {
   return { key: rawKey(raw), bucket: matchExerciseType(raw), label: raw, fromCheckin: false };
 }
 
-/** Group device sessions by day. Auto-detected ones are excluded. */
+/**
+ * Activities a device reports that are movement rather than training, unless
+ * the member says otherwise.
+ *
+ * WHY THIS EXISTS ALONGSIDE `auto_detected`. That flag is the honest signal and
+ * only one vendor sends it: Google Health says `PASSIVELY_MEASURED`, and
+ * Whoop's v2 workout model has no equivalent field at all (`id`, `start`,
+ * `end`, `timezone_offset`, `sport_name`, `score_state`, `score`, and that is
+ * the lot). So on Whoop a walk their watch noticed arrives looking exactly like
+ * a session the member started, and it was becoming a training day.
+ *
+ * WE DO NOT GUESS AT DETECTION. We answer the question we can answer instead.
+ * The line this app draws is intent, and there is already a record of intent
+ * for every day: the check-in. A walk the member logged themselves is training
+ * because they said it was. A walk only their device mentions is movement.
+ *
+ * ONLY WALKING IS IN HERE. Hiking is its own type in the taxonomy and nobody
+ * hikes by accident; running, cycling and the rest are never ambient. Adding to
+ * this set means claiming a whole category is usually unintentional, which is a
+ * strong claim and should be made one activity at a time.
+ */
+const AMBIENT_BUCKETS = new Set<string>(["walking"]);
+
+/** Training and movement, split. Every session lands in exactly one side. */
+interface SplitWorkouts {
+  training: WorkoutRow[];
+  movement: WorkoutRow[];
+}
+
+/**
+ * Sort device sessions into training and movement.
+ *
+ * `checkinBuckets` is the member's own claim for that day: the activity buckets
+ * they logged at check-in. It is what rescues a deliberate walk from being
+ * filed as ambient.
+ */
+function splitWorkouts(
+  workouts: WorkoutRow[],
+  checkinBuckets: Map<string, Set<string>>,
+): SplitWorkouts {
+  const out: SplitWorkouts = { training: [], movement: [] };
+  for (const w of workouts) {
+    if (w.auto_detected === true) {
+      out.movement.push(w);
+      continue;
+    }
+    const bucket = matchExerciseType(w.activity ?? "");
+    const claimed = bucket !== null && checkinBuckets.get(w.workout_date)?.has(bucket) === true;
+    if (bucket !== null && AMBIENT_BUCKETS.has(bucket) && !claimed) {
+      out.movement.push(w);
+      continue;
+    }
+    out.training.push(w);
+  }
+  return out;
+}
+
+/** Group device sessions by day. */
 function deviceDays(workouts: WorkoutRow[]): Map<string, DayFacts> {
   const out = new Map<string, DayFacts>();
   for (const w of workouts) {
-    if (w.auto_detected === true) continue;
     const day = out.get(w.workout_date) ?? { sessions: 0, minutes: 0, activities: [] };
     day.sessions += 1;
     day.minutes += durationMinutes(w.started_at, w.ended_at) ?? 0;
@@ -212,17 +289,42 @@ function deviceDays(workouts: WorkoutRow[]): Map<string, DayFacts> {
   return out;
 }
 
-/** Roll up the sessions the device noticed rather than the member starting. */
+/** Roll up the sessions that are movement rather than training. */
 function movementLoad(workouts: WorkoutRow[]): MovementLoad {
-  const auto = workouts.filter((w) => w.auto_detected === true);
   return {
-    sessions: auto.length,
-    days: new Set(auto.map((w) => w.workout_date)).size,
-    minutes: auto.reduce(
+    sessions: workouts.length,
+    days: new Set(workouts.map((w) => w.workout_date)).size,
+    minutes: workouts.reduce(
       (sum, w) => sum + (durationMinutes(w.started_at, w.ended_at) ?? 0),
       0,
     ),
   };
+}
+
+/** Every date from `from` to `to` inclusive. */
+function daysBetween(from: string, to: string): string[] {
+  const out: string[] = [];
+  const end = Date.parse(`${to}T00:00:00Z`);
+  for (let ms = Date.parse(`${from}T00:00:00Z`); ms <= end; ms += 86_400_000) {
+    out.push(new Date(ms).toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+/** The activity buckets a member claimed at check-in, by day. */
+function checkinBucketsByDay(checkins: CheckinTrainingRow[]): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const c of checkins) {
+    for (const e of c.exercises ?? []) {
+      if (!e || typeof e !== "object") continue;
+      const ref = checkinActivity(e);
+      if (!ref?.bucket) continue;
+      const set = out.get(c.checkin_date) ?? new Set<string>();
+      set.add(ref.bucket);
+      out.set(c.checkin_date, set);
+    }
+  }
+  return out;
 }
 
 /**
@@ -276,6 +378,17 @@ function checkinDays(checkins: CheckinTrainingRow[]): Map<string, DayFacts> {
  * watch logging a walk to the station is real and worth showing; calling it a
  * training day is how somebody ends up with seven out of seven for a week they
  * trained none.
+ *
+ * A DAY WITHOUT TRAINING IS ONE OF THREE THINGS, not one. The member rested and
+ * said so; the member never checked in and we have no idea; or it is today and
+ * the day is not over. Only the first is a rest day. See `restDays` and
+ * `unloggedDays` on the return type, and the note on `endDate` below.
+ *
+ * THE LAST DAY OF THE WINDOW IS TREATED AS STILL OPEN. The route always ends
+ * the window at today (`todayUTC()`), so at nine on a Monday morning the final
+ * day has had no chance to contain anything. Counting it as a rest day or as a
+ * missed check-in reports a verdict on a day that has not happened. It can
+ * still count as trained, because a session already logged today is a fact.
  */
 export function trainingLoad(
   input: { workouts?: WorkoutRow[]; checkins?: CheckinTrainingRow[] },
@@ -290,7 +403,10 @@ export function trainingLoad(
     minutes: 0,
     minutesEstimated: false,
     activities: [],
-    restDays: from === null ? 0 : windowDays,
+    restDays: 0,
+    // Everything but today, which is not over. An unparseable date gets zero,
+    // because a window we could not compute tells us nothing about any day.
+    unloggedDays: from === null ? 0 : Math.max(0, windowDays - 1),
     sources: [],
     movement: noMovement,
   };
@@ -299,18 +415,39 @@ export function trainingLoad(
   const inWindow = <T,>(rows: T[], date: (r: T) => string) =>
     rows.filter((r) => date(r) >= from && date(r) <= endDate);
 
+  const checkinsInWindow = inWindow(input.checkins ?? [], (c) => c.checkin_date);
   const workoutsInWindow = inWindow(input.workouts ?? [], (w) => w.workout_date);
-  const fromDevice = deviceDays(workoutsInWindow);
-  const fromCheckin = checkinDays(inWindow(input.checkins ?? [], (c) => c.checkin_date));
-  const movement = movementLoad(workoutsInWindow);
+  const split = splitWorkouts(workoutsInWindow, checkinBucketsByDay(checkinsInWindow));
+  const fromDevice = deviceDays(split.training);
+  const fromCheckin = checkinDays(checkinsInWindow);
+  const movement = movementLoad(split.movement);
 
   const allDays = new Set([...fromDevice.keys(), ...fromCheckin.keys()]);
+
+  /**
+   * Split the untrained days into "rested" and "we do not know".
+   *
+   * A check-in exists for the day means the member told us something about it,
+   * and since it produced no training day, what they told us was that they did
+   * not train. No check-in means no claim either way.
+   */
+  const checkedIn = new Set(checkinsInWindow.map((c) => c.checkin_date));
+  let restDays = 0;
+  let unloggedDays = 0;
+  for (const day of daysBetween(from, endDate)) {
+    if (allDays.has(day)) continue;
+    if (checkedIn.has(day)) restDays += 1;
+    else if (day !== endDate) unloggedDays += 1;
+  }
+
   // A week of nothing but walks is still a week with something to say, so the
   // movement roll-up survives the early return, and so does the fact that a
   // device is what reported it.
   if (allDays.size === 0) {
     return {
       ...empty,
+      restDays,
+      unloggedDays,
       movement,
       sources: movement.sessions > 0 ? ["device"] : [],
     };
@@ -422,7 +559,8 @@ export function trainingLoad(
     // Rest is measured against training only. A day spent walking is not a
     // training day, and calling it one would quietly undo the whole point of
     // keeping the two apart.
-    restDays: Math.max(0, windowDays - allDays.size),
+    restDays,
+    unloggedDays,
     sources,
     movement,
   };

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { POINTS, REFERRAL_MAX_TOTAL } from "@/lib/points";
 import type { CheckinTrend, MarkerDelta } from "@/lib/trends";
+import { DeviceDetail } from "./device-detail";
 import { TrainingCard } from "./training-card";
 import { Card, Eyebrow, PageHeader, primaryButtonClass } from "./ui";
 import { WearableTrends } from "./wearable-trends";
@@ -175,6 +176,13 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
           owns a ring. Renders itself away on a week with no training and no
           recovery signal. */}
       <TrainingCard getToken={getToken} />
+
+      {/* The unmerged view, one collapsed panel per connected device. Answers
+          "what is this thing actually sending you", which the merged card
+          above deliberately cannot: it resolves several devices into one
+          number and hides which device won. Renders nothing when no device is
+          connected. */}
+      <DeviceDetail getToken={getToken} />
 
       {/* Outcome-verified rewards, the payoff moment */}
       {bonuses.length > 0 && (

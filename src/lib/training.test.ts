@@ -63,9 +63,12 @@ describe("trainingLoad, from device sessions", () => {
     expect(load.minutes).toBe(75);
   });
 
-  it("counts rest days from the window, not from the sessions", () => {
+  it("does not call a day rest just because no session landed on it", () => {
+    // Six days with no check-in and no session are six days we know nothing
+    // about. Reporting them as rest invents a decision the member never made.
     const load = trainingLoad({ workouts: [w("2026-08-07", 7, 40)] }, "2026-08-07");
-    expect(load.restDays).toBe(6);
+    expect(load.restDays).toBe(0);
+    expect(load.unloggedDays).toBe(6);
   });
 
   it("ranks activities by how often they appear", () => {
@@ -90,9 +93,17 @@ describe("trainingLoad, from device sessions", () => {
     expect(load.sessions).toBe(1);
   });
 
-  it("returns a full rest week rather than throwing on no data", () => {
+  it("returns an empty week rather than throwing on no data", () => {
     const load = trainingLoad({}, "2026-08-07");
-    expect(load).toMatchObject({ sessions: 0, days: 0, minutes: 0, restDays: 7 });
+    // Not one rest day in there. Nobody told us anything, and today is not
+    // over, so six days are unknown and the seventh is still running.
+    expect(load).toMatchObject({
+      sessions: 0,
+      days: 0,
+      minutes: 0,
+      restDays: 0,
+      unloggedDays: 6,
+    });
     expect(load.sources).toEqual([]);
   });
 
@@ -167,7 +178,10 @@ describe("trainingLoad, from check-ins", () => {
       "2026-08-07",
     );
     expect(load.days).toBe(0);
-    expect(load.restDays).toBe(7);
+    // ONE rest day, the one they actually declared. This is the bug the whole
+    // three-state split exists for: it used to say seven.
+    expect(load.restDays).toBe(1);
+    expect(load.unloggedDays).toBe(6);
   });
 
   it("counts an activity with no duration as a session worth zero minutes", () => {
@@ -204,7 +218,7 @@ describe("trainingLoad, movement versus training", () => {
       "2026-08-07",
     );
     expect(load.days).toBe(0);
-    expect(load.restDays).toBe(7);
+    expect(load.restDays).toBe(0);
     expect(load.minutes).toBe(0);
     expect(load.activities).toEqual([]);
   });
@@ -273,6 +287,155 @@ describe("trainingLoad, movement versus training", () => {
     );
     expect(load.days).toBe(1);
     expect(load.movement.sessions).toBe(0);
+  });
+});
+
+describe("trainingLoad, a walk from a vendor that cannot say who started it", () => {
+  /**
+   * Whoop's v2 workout model carries no auto-detection field: `id`, `start`,
+   * `end`, `timezone_offset`, `sport_name`, `score_state`, `score`, and that is
+   * all of it. So a walk their watch noticed is indistinguishable from one the
+   * member began, and it was becoming a training day.
+   *
+   * The answer is not to guess at detection. It is to ask the question this app
+   * already has an answer for: did the member say they trained? The check-in is
+   * the record of intent, and it decides.
+   */
+  it("files an unclaimed walk as movement, not as a training day", () => {
+    const load = trainingLoad(
+      { workouts: [{ ...w("2026-08-07", 8, 35, "Walking"), auto_detected: undefined }] },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(0);
+    expect(load.activities).toEqual([]);
+    expect(load.movement).toEqual({ sessions: 1, days: 1, minutes: 35 });
+  });
+
+  it("counts the same walk as training when the member logged it", () => {
+    const load = trainingLoad(
+      {
+        workouts: [{ ...w("2026-08-07", 8, 35, "Walking"), auto_detected: undefined }],
+        checkins: [c("2026-08-07", [{ type: "walking", duration: "long" }])],
+      },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(1);
+    expect(load.activities).toEqual(["Walking"]);
+    expect(load.movement.sessions).toBe(0);
+    // The device measured it, so its minutes win over the bucket's 75.
+    expect(load.minutes).toBe(35);
+  });
+
+  it("does not let a walk logged on Monday rescue Tuesday's", () => {
+    // The claim is per day. Somebody who deliberately walks on Monday has said
+    // nothing about the walk their watch caught on Tuesday.
+    const load = trainingLoad(
+      {
+        workouts: [
+          { ...w("2026-08-03", 8, 40, "Walking"), auto_detected: undefined },
+          { ...w("2026-08-04", 8, 20, "Walking"), auto_detected: undefined },
+        ],
+        checkins: [c("2026-08-03", [{ type: "walking", duration: "long" }])],
+      },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(1);
+    expect(load.movement).toEqual({ sessions: 1, days: 1, minutes: 20 });
+  });
+
+  it("leaves hiking alone, because nobody hikes by accident", () => {
+    // Only walking is ambient. Widening this set means claiming a whole
+    // category is usually unintentional, which is a much bigger claim.
+    const load = trainingLoad(
+      { workouts: [{ ...w("2026-08-07", 8, 90, "Hiking"), auto_detected: undefined }] },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(1);
+    expect(load.movement.sessions).toBe(0);
+  });
+
+  it("still trusts the vendor that does report detection", () => {
+    // Google Health says PASSIVELY_MEASURED. A run it detected is movement on
+    // their say-so, not on ours, and that path is untouched by the walk rule.
+    const load = trainingLoad({ workouts: [w("2026-08-07", 7, 30, "Run", true)] }, "2026-08-07");
+    expect(load.days).toBe(0);
+    expect(load.movement.sessions).toBe(1);
+  });
+});
+
+describe("trainingLoad, rest versus not logged versus today", () => {
+  /**
+   * THE THREE STATES A DAY WITHOUT TRAINING CAN BE IN. Reported as one number,
+   * they say something false: a week with one declared rest day and two skipped
+   * check-ins read back as three rest days, which is the app inventing an
+   * intention out of its own ignorance.
+   */
+  it("separates a declared rest day from a day nobody logged", () => {
+    const load = trainingLoad(
+      {
+        checkins: [
+          c("2026-08-02", [{ type: "gym", duration: "medium" }]),
+          c("2026-08-03", [{ type: "running", duration: "short" }]),
+          c("2026-08-04", [{ type: "gym", duration: "medium" }]),
+          c("2026-08-05", [{ type: "running", duration: "short" }]),
+          // Checked in, said no training. This is the only rest day.
+          { checkin_date: "2026-08-06", training_logged: false, exercises: [] },
+        ],
+      },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(4);
+    expect(load.restDays).toBe(1);
+    // 2026-08-01 alone. Today is not counted either way.
+    expect(load.unloggedDays).toBe(1);
+  });
+
+  it("never counts today as rest or as missed, because it is not over", () => {
+    // At nine on a Monday morning the last day of the window has had no chance
+    // to contain anything, and a verdict on it is a verdict on nothing.
+    const load = trainingLoad(
+      { checkins: [c("2026-08-06", [{ type: "gym", duration: "medium" }])] },
+      "2026-08-07",
+    );
+    expect(load.restDays).toBe(0);
+    expect(load.unloggedDays).toBe(5);
+  });
+
+  it("still counts today when there is something on it", () => {
+    // Pending is not the same as ignored. Training already done today is a
+    // fact, and waiting until tomorrow to show it would be absurd.
+    const load = trainingLoad(
+      { checkins: [c("2026-08-07", [{ type: "gym", duration: "medium" }])] },
+      "2026-08-07",
+    );
+    expect(load.days).toBe(1);
+    expect(load.restDays).toBe(0);
+    expect(load.unloggedDays).toBe(6);
+  });
+
+  it("counts a rest day declared today, since that is a statement", () => {
+    const load = trainingLoad(
+      { checkins: [{ checkin_date: "2026-08-07", training_logged: false, exercises: [] }] },
+      "2026-08-07",
+    );
+    expect(load.restDays).toBe(1);
+  });
+
+  it("keeps the three states and the training days adding up", () => {
+    // trained + rest + unlogged + today = the window, always. Anything else
+    // means a day fell into two buckets or none.
+    const load = trainingLoad(
+      {
+        workouts: [w("2026-08-05", 7, 40, "Run")],
+        checkins: [
+          c("2026-08-02", [{ type: "gym", duration: "medium" }]),
+          { checkin_date: "2026-08-03", training_logged: false, exercises: [] },
+          { checkin_date: "2026-08-04", training_logged: false, exercises: [] },
+        ],
+      },
+      "2026-08-07",
+    );
+    expect(load.days + load.restDays + load.unloggedDays).toBe(6);
   });
 });
 

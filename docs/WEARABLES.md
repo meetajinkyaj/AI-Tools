@@ -695,6 +695,27 @@ say how a session came to exist, so the column stays false for them: that is
 "they do not say", not "we know they did not", and it preserves exactly the
 behaviour those rows already had.
 
+**And Whoop cannot be made to say.** Checked against their own v2 workout model
+on 2026-08-08, after a Whoop was connected for testing. The complete field list
+is `id`, `v1_id`, `user_id`, `created_at`, `updated_at`, `start`, `end`,
+`timezone_offset`, `sport_name`, `score_state`, `score` and the retired
+`sport_id`. There is no detection flag, and no field that stands in for one, so
+a walk their watch noticed arrives looking exactly like a session the member
+began. Left alone, the Fitbit trap returns wearing a Whoop strap.
+
+The fix does not guess at detection, because guessing would put a fact in the
+database that no vendor told us. It asks the question this app already has an
+answer for. `AMBIENT_BUCKETS` in `src/lib/training.ts` holds one entry,
+`walking`, and a device walk counts as movement UNLESS the member logged a
+walking activity in their own check-in that day, in which case it is training
+because they said it was. The check-in is the record of intent, which is the
+same line drawn in the paragraph above, applied where the vendor is silent.
+
+**Only walking is in that set.** Hiking is its own type and nobody hikes by
+accident; running and cycling are never ambient. Adding an entry means claiming
+a whole category is usually unintentional, which is a strong claim and should
+be made one activity at a time.
+
 A retired provider still gets a row in Settings when somebody is connected to
 it, with Disconnect and no Connect. `unavailable` removes a provider from the
 connect list, and on its own that would strand anyone already connected: no
@@ -702,9 +723,35 @@ row, no Disconnect, no way to revoke a grant we can no longer sync. **Retiring
 an integration must never take away the exit.**
 
 The Training card shows movement on its own line, in its own words, never
-summed into the training numbers. Rest days are still counted against training
-only: a day spent walking is not a training day, and calling it one would undo
-the whole point of keeping them apart.
+summed into the training numbers.
+
+#### A day without training is one of three things
+
+Rest days used to be `windowDays - trainingDays`, which meant every day without
+a session was rest. The founder caught it from the card itself: one deliberate
+rest day plus two missed check-ins read back as three rest days. **That is the
+app inventing an intention out of its own ignorance**, and the product already
+had the honest definition elsewhere, in `activityLabel()` on the share card,
+where a rest day is a check-in that says `training_logged: false`.
+
+So `trainingLoad()` now splits the untrained days three ways:
+
+| State | Test | Reported as |
+|---|---|---|
+| Rested | a check-in exists for that day and produced no training | `restDays` |
+| Not logged | no check-in at all | `unloggedDays` |
+| Today | the last day of the window | neither |
+
+Absence of evidence is not evidence of rest, the same rule `summarizeCheckins`
+follows when it refuses to read a missed check-in as a zero.
+
+**The last day of the window is never judged.** The route ends the window at
+`todayUTC()`, so at nine on a Monday morning that day has had no chance to
+contain anything: counting it as rest or as a missed check-in is a verdict on a
+day that has not happened. It can still count as trained, because a session
+already logged today is a fact. The three states and the training days add up
+to `windowDays - 1`, and there is a test asserting exactly that, because a day
+falling into two buckets or none is the failure mode here.
 
 #### The trap that WAS: VO2 max as a string, sometimes a range
 
@@ -899,10 +946,23 @@ database on its own is not enough to impersonate our users against six vendors.
 
 | Piece | Where |
 |---|---|
-| Nightly sweep | `GET /api/cron/sync-wearables` (CRON_SECRET bearer) |
-| Manual "Sync now" | `POST /api/wearables` `{action:"sync"}` |
+| Nightly sweep | `GET /api/cron/sync-wearables` (CRON_SECRET bearer), 02:00 UTC, 07:30 IST |
+| Sync on connect | the OAuth callback, before it redirects |
+| Manual sync | `POST /api/wearables` `{action:"sync"}`, from Home and from Settings |
+| Per-device raw view | `GET /api/wearables/device?days=7`, Trends |
 | Garmin push | `POST /api/wearables/garmin-push` |
 | Connect / disconnect | Settings → Connected devices |
+
+**Syncing on connect is not a nicety and it already existed.** The callback
+pulls before it redirects, so a member lands back in the app with data on the
+screen rather than an empty card and no way to tell success from failure. It is
+best effort: a failure there is not a failure of the connection, and the sweep
+retries within the day.
+
+**The schedule is stated in the product, not just here.** Home carries a sync
+control once anything is connected, with an information icon that names the
+07:30 IST run in words. Before that, "why is there nothing here" and "is this
+broken" were the same question with no answer in the app.
 
 The sweep re-pulls a **fixed recent window** (7 days, 14 for Withings) rather
 than tracking a high-water mark. Every one of these vendors revises data after
@@ -912,6 +972,24 @@ and more accurate than a cursor that would silently miss every late arrival.
 
 It is bounded per run and ordered by `last_sync_at` ascending, so it cannot
 outgrow the Worker's CPU budget and nobody can be starved.
+
+### The per-device panel is provisional, on purpose
+
+`GET /api/wearables/device` and `DeviceDetail` in Trends show what ONE device
+sent, unmerged, collapsed by default. It exists because two questions had no
+answer inside the app: "your number and Whoop's app disagree" and "I just
+connected this, is it working". Every point carries `used`, which says whether
+that day's number is the one Trends shows, so a member who has two devices can
+see which one won a given night instead of finding a mismatch and assuming a
+bug.
+
+**It is a trial.** It was built to be looked at and then kept or removed, and
+it is deliberately self-contained: one route, one component, one line in
+`trends-view.tsx`. Deleting all three removes it completely and touches nothing
+else. If it survives the trial, delete this paragraph.
+
+It never returns a token, and the columns are named rather than starred, for
+the same reason the connections route does that.
 
 ### Garmin is different
 
