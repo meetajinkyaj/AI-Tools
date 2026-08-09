@@ -9,7 +9,7 @@ import {
   getPushState,
   type PushState,
 } from "./push-client";
-import { Card, Eyebrow, primaryButtonClass, secondaryButtonClass } from "./ui";
+import { Switch } from "./switch";
 
 /**
  * "Daily reminders" control in Settings. Turning it on requests notification
@@ -45,40 +45,42 @@ export function NotificationSettings({
     }
   };
 
+  /*
+   * A SWITCH, WHERE THIS USED TO BE A PAIR OF BUTTONS. "Turn on" and "Turn
+   * off" are two controls describing one state, and which of them you see is
+   * the only thing telling you what that state currently is. A switch shows
+   * the state and changes it with the same object, which is what a setting
+   * wants. Same handlers underneath.
+   */
+  const on = state === "on";
+  const locked = busy || state === "denied" || state === null;
+
   return (
-    <Card className="flex flex-col gap-3 p-5">
-      <Eyebrow>Daily reminders</Eyebrow>
+    <section className="iki-card flex flex-col gap-2">
       <div className="flex items-start justify-between gap-4">
-        <p className="min-w-0 font-body text-sm text-muted">
-          A nudge at 6 PM to log your energy, sleep and training, one a day, only
-          if you haven&rsquo;t checked in yet.
-        </p>
-        {state === "on" ? (
-          <button
-            type="button"
-            onClick={() => toggle(false)}
-            disabled={busy}
-            className={`${secondaryButtonClass} shrink-0`}
-          >
-            {busy ? "…" : "Turn off"}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => toggle(true)}
-            disabled={busy || state === "denied" || state === null}
-            className={`${primaryButtonClass} shrink-0`}
-          >
-            {busy ? "…" : "Turn on"}
-          </button>
-        )}
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <p className="iki-eyebrow">Daily reminder</p>
+          <p className="text-caption text-muted">
+            A nudge at 6 PM to log your energy, sleep and training, one a day, only
+            if you haven&rsquo;t checked in yet.
+          </p>
+        </div>
+        {/* Disabled rather than hidden while the browser has blocked us: the
+            control staying put is what makes the sentence below it make sense. */}
+        <span className={locked ? "pointer-events-none opacity-50" : undefined}>
+          <Switch
+            checked={on}
+            label="Daily reminder"
+            onChange={(next) => void toggle(next)}
+          />
+        </span>
       </div>
       {state === "denied" && (
-        <p className="font-body text-xs text-accent-hover">
+        <p className="text-micro text-primary-deep">
           Notifications are blocked for this site. Enable them in your browser
           settings, then try again.
         </p>
       )}
-    </Card>
+    </section>
   );
 }

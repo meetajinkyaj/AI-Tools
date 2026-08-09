@@ -9,7 +9,6 @@ import {
 import { EXERCISE_TYPE_LABELS, isExerciseType } from "@/lib/exercises";
 import { NotificationSettings } from "./notification-settings";
 import { WearableSettings } from "./wearable-settings";
-import { Card, Eyebrow, secondaryButtonClass } from "./ui";
 
 /**
  * Read-only view of the user's profile. Editing is deliberately gated behind
@@ -24,8 +23,13 @@ export function ProfileView({
   onEdit: () => void;
   getToken: () => Promise<string | null>;
 }) {
+  /*
+   * NO "FULL NAME" ROW. It is the heading immediately above this card, and a
+   * value printed twice within one screenful reads as a rendering fault rather
+   * than as emphasis. The mockup drops it for the same reason; it is the only
+   * row this restyle removes, and nothing else about the profile changed.
+   */
   const rows: { label: string; value: string }[] = [
-    { label: "Full name", value: profile.full_name },
     { label: "Date of birth", value: profile.date_of_birth },
     { label: "Gender", value: BIOLOGICAL_SEX_LABELS[profile.biological_sex] },
     { label: "Primary goal", value: PRIMARY_GOAL_LABELS[profile.primary_goal] },
@@ -47,32 +51,32 @@ export function ProfileView({
   ];
 
   return (
-    <div className="flex w-full max-w-md flex-col gap-6">
+    <div className="flex w-full max-w-md flex-col gap-stack">
       <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <Eyebrow>Profile</Eyebrow>
-          <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
-            {profile.full_name}
-          </h1>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <p className="iki-eyebrow">Profile</p>
+          <h1 className="iki-title">{profile.full_name}</h1>
         </div>
-        <button onClick={onEdit} className={`${secondaryButtonClass} shrink-0`}>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="iki-btn iki-btn-secondary shrink-0"
+        >
           Edit profile
         </button>
       </div>
 
-      <Card className="divide-y divide-border">
+      <section className="iki-card iki-card-tight flex flex-col">
         {rows.map((r) => (
-          <div
-            key={r.label}
-            className="flex items-baseline justify-between gap-4 px-5 py-3.5"
-          >
-            <span className="font-body text-sm text-muted">{r.label}</span>
-            <span className="text-right font-body text-sm font-medium text-foreground">
-              {r.value}
-            </span>
+          <div key={r.label} className="iki-row">
+            {/* The label never wraps and the value takes what is left, so a
+                long list of activities flows onto a second line under itself
+                rather than squeezing "Activities" into two words. */}
+            <span className="iki-row-label shrink-0">{r.label}</span>
+            <span className="iki-row-value">{r.value}</span>
           </div>
         ))}
-      </Card>
+      </section>
 
       <NotificationSettings getToken={getToken} />
 

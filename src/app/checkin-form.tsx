@@ -17,12 +17,8 @@ import {
   isExerciseType,
   OTHER_TYPE,
 } from "@/lib/exercises";
-import {
-  ActivityTile,
-  DurationSegmented,
-  EnergyScale,
-  Switch,
-} from "./checkin-controls";
+import { ActivityTile, DurationSegmented, EnergyScale } from "./checkin-controls";
+import { Switch } from "./switch";
 import { fieldClass } from "./ui";
 
 interface CheckinState {
