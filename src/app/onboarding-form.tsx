@@ -116,7 +116,7 @@ export function OnboardingForm({
               required
               max={today}
             />
-            <span className="font-body text-xs font-normal text-muted">
+            <span className="text-micro font-normal text-muted">
               Under 18? You&rsquo;ll need a parent or guardian&rsquo;s consent to
               use Ikigaro.
             </span>
@@ -180,7 +180,7 @@ export function OnboardingForm({
             <ul className="mt-1 flex flex-col gap-1 text-xs font-normal text-muted">
               {ACTIVITY_LEVEL.map((v) => (
                 <li key={v}>
-                  <span className="font-medium text-foreground/70">
+                  <span className="font-medium text-ink/70">
                     {ACTIVITY_LEVEL_LABELS[v]}:
                   </span>{" "}
                   {ACTIVITY_LEVEL_DESCRIPTIONS[v]}
@@ -200,7 +200,7 @@ export function OnboardingForm({
             </div>
           </div>
 
-          <label className="flex items-start gap-2.5 font-body text-sm text-muted">
+          <label className="flex items-start gap-2.5 text-body-sm text-muted">
             <input
               type="checkbox"
               className="mt-0.5 h-4 w-4 accent-accent"
@@ -210,7 +210,7 @@ export function OnboardingForm({
             Email me occasional product tips and updates.
           </label>
 
-          {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
+          {error && <p className="text-body-sm text-primary-deep">{error}</p>}
 
           <button
             type="submit"

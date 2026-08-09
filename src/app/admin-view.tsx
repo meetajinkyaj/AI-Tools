@@ -123,8 +123,8 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`rounded-control px-4 py-2 font-body text-sm font-medium transition-colors ${
-        active ? "bg-accent text-accent-contrast" : "bg-surface-2 text-muted hover:text-foreground"
+      className={`rounded-ctl px-4 py-2 text-body-sm font-medium transition-colors ${
+        active ? "bg-primary text-primary-fg" : "bg-surface-2 text-muted hover:text-ink"
       }`}
     >
       {children}
@@ -204,16 +204,16 @@ function BackupNotice({ risk }: { risk: AnalyticsData["backupRisk"] }) {
 
   if (risk.overdue) {
     return (
-      <section className="flex flex-col gap-2 rounded-card border-2 border-accent bg-accent/10 p-4">
-        <p className="font-label text-[0.65rem] uppercase tracking-[0.28em] text-accent">
+      <section className="flex flex-col gap-2 rounded-card border-2 border-primary bg-primary/10 p-4">
+        <p className="font-label text-[0.65rem] uppercase tracking-[0.28em] text-primary">
           Act now, database has no backups
         </p>
-        <p className="font-body text-sm text-foreground">
+        <p className="text-body-sm text-ink">
           {risk.users} people have trusted this app with their health data, and
           none of it is backed up. If the database is lost, it is gone
           permanently, there is no recovery path.
         </p>
-        <p className="font-body text-sm text-muted">
+        <p className="text-body-sm text-muted">
           This was an accepted risk below {risk.threshold} testers. That no
           longer holds. Turn on Supabase Pro ($25/mo, daily backups), then set{" "}
           <code className="font-mono text-xs">DB_BACKUPS=protected</code> to
@@ -224,7 +224,7 @@ function BackupNotice({ risk }: { risk: AnalyticsData["backupRisk"] }) {
   }
 
   return (
-    <p className="font-body text-xs text-muted">
+    <p className="text-micro text-muted">
       No database backups, accepted below {risk.threshold} testers ({risk.users}{" "}
       now, {risk.headroom} to go). RUNBOOK §2b.
     </p>
@@ -260,7 +260,7 @@ function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }
   if (status === "error" || !data)
     return (
       <div className="flex flex-col gap-3">
-        <p className="font-body text-sm text-muted">Couldn&rsquo;t load analytics.</p>
+        <p className="text-body-sm text-muted">Couldn&rsquo;t load analytics.</p>
         <button
           onClick={() => {
             setStatus("loading");
@@ -323,10 +323,10 @@ function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }
         </div>
         <Card className="flex flex-col gap-3 p-5">
           <div className="flex items-baseline justify-between">
-            <span className="font-body text-sm font-medium text-foreground">
+            <span className="text-body-sm font-semibold text-ink">
               Check-ins · last 14 days
             </span>
-            <span className="font-body text-xs text-muted">
+            <span className="text-micro text-muted">
               {data.checkinSeries.reduce((a, b) => a + b.count, 0)} total
             </span>
           </div>
@@ -354,13 +354,13 @@ function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }
         <Eyebrow>Client errors · {data.errors.count7d} in the last 7 days</Eyebrow>
         {data.errors.recent.length === 0 ? (
           <Card className="p-5">
-            <p className="font-body text-sm text-muted">No client errors recorded.</p>
+            <p className="text-body-sm text-muted">No client errors recorded.</p>
           </Card>
         ) : (
           <Card className="overflow-x-auto p-0">
             <table className="w-full min-w-[32rem] text-left">
               <thead>
-                <tr className="border-b border-border font-body text-xs text-muted">
+                <tr className="border-b border-line text-micro text-muted">
                   <th className="px-4 py-2 font-medium">When</th>
                   <th className="px-4 py-2 font-medium">Message</th>
                   <th className="px-4 py-2 font-medium">Where</th>
@@ -369,11 +369,11 @@ function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }
               </thead>
               <tbody>
                 {data.errors.recent.map((e) => (
-                  <tr key={e.id} className="border-b border-border/60 font-body text-sm">
+                  <tr key={e.id} className="border-b border-line/60 text-body-sm">
                     <td className="whitespace-nowrap px-4 py-2 text-muted">
                       {new Date(e.created_at).toLocaleString()}
                     </td>
-                    <td className="max-w-[20rem] truncate px-4 py-2 text-foreground" title={e.message}>
+                    <td className="max-w-[20rem] truncate px-4 py-2 text-ink" title={e.message}>
                       {e.message}
                     </td>
                     <td className="px-4 py-2 text-muted">{e.url ?? "-"}</td>
@@ -390,7 +390,7 @@ function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }
 
       <ReportDownload getToken={getToken} />
 
-      <p className="font-body text-xs text-muted">
+      <p className="text-micro text-muted">
         Retention counts activity as a check-in or an app open; app-open data
         accrues from the day this instrumentation deployed.
       </p>
@@ -449,10 +449,10 @@ function ReportDownload({ getToken }: { getToken: () => Promise<string | null> }
 
   return (
     <Card className="flex flex-col gap-2 p-5">
-      <span className="font-body text-[10px] uppercase tracking-wide text-muted">
+      <span className="text-[10px] uppercase tracking-wide text-muted">
         Export
       </span>
-      <p className="font-body text-sm text-foreground">
+      <p className="text-body-sm text-ink">
         One row per member: devices connected and syncing, active days, check-ins,
         streak, panels and points. For the questions this dashboard does not
         already answer.
@@ -466,8 +466,8 @@ function ReportDownload({ getToken }: { getToken: () => Promise<string | null> }
           {busy ? "Building…" : "Download CSV"}
         </button>
       </div>
-      {error && <span className="font-body text-xs text-accent">{error}</span>}
-      <p className="font-body text-[0.7rem] text-muted">
+      {error && <span className="text-micro text-primary">{error}</span>}
+      <p className="text-micro text-muted">
         Contains member email addresses. It holds no health data and no lab
         values, by design, but everything else in this console is protected by
         Cloudflare Access and a downloaded file is not. Treat it as you would the
@@ -519,10 +519,10 @@ function DeviceReport({ devices }: { devices: AnalyticsData["devices"] }) {
 
       {adoption.byProvider.length > 0 && (
         <Card className="flex flex-col gap-2 p-5">
-          <span className="font-body text-[10px] uppercase tracking-wide text-muted">
+          <span className="text-[10px] uppercase tracking-wide text-muted">
             By provider
           </span>
-          <table className="w-full text-left font-body text-sm">
+          <table className="w-full text-left text-body-sm">
             <thead className="text-muted">
               <tr>
                 <th className="py-1 font-medium">Provider</th>
@@ -531,15 +531,15 @@ function DeviceReport({ devices }: { devices: AnalyticsData["devices"] }) {
                 <th className="py-1 font-medium">Needs reconnect</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-line">
               {adoption.byProvider.map((p) => (
                 <tr key={p.provider}>
-                  <td className="py-1.5 text-foreground">{p.provider}</td>
+                  <td className="py-1.5 text-ink">{p.provider}</td>
                   <td className="py-1.5">{p.connected}</td>
-                  <td className={`py-1.5 ${p.syncing < p.connected ? "text-accent" : ""}`}>
+                  <td className={`py-1.5 ${p.syncing < p.connected ? "text-primary" : ""}`}>
                     {p.syncing}
                   </td>
-                  <td className={`py-1.5 ${p.needsReauth > 0 ? "text-accent" : "text-muted"}`}>
+                  <td className={`py-1.5 ${p.needsReauth > 0 ? "text-primary" : "text-muted"}`}>
                     {p.needsReauth}
                   </td>
                 </tr>
@@ -550,39 +550,39 @@ function DeviceReport({ devices }: { devices: AnalyticsData["devices"] }) {
       )}
 
       <Card className="flex flex-col gap-3 p-5">
-        <span className="font-body text-[10px] uppercase tracking-wide text-muted">
+        <span className="text-[10px] uppercase tracking-wide text-muted">
           Engagement by segment, last 30 days
         </span>
         <div className="grid grid-cols-2 gap-3">
           {activity.map((a) => (
             <div key={a.segment} className="flex flex-col gap-0.5">
-              <span className="font-body text-xs text-muted">{label(a.segment)}</span>
-              <span className="font-display text-2xl font-medium text-foreground">
+              <span className="text-micro text-muted">{label(a.segment)}</span>
+              <span className="font-display text-display-md font-medium text-ink">
                 {a.meanActiveDays != null ? a.meanActiveDays : "-"}
-                <span className="ml-1 font-body text-xs text-muted">days each</span>
+                <span className="ml-1 text-micro text-muted">days each</span>
               </span>
-              <span className="font-body text-[11px] text-muted">
+              <span className="text-[11px] text-muted">
                 {a.active} of {a.users} active
               </span>
             </div>
           ))}
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-border pt-3">
-          <span className="font-body text-[10px] uppercase tracking-wide text-muted">
+        <div className="flex flex-col gap-2 border-t border-line pt-3">
+          <span className="text-[10px] uppercase tracking-wide text-muted">
             Day-N retention by segment
           </span>
           {retention.map((r) => (
             <div key={r.segment} className="flex items-center justify-between gap-3">
-              <span className="font-body text-sm text-foreground">
+              <span className="text-body-sm text-ink">
                 {label(r.segment)}
                 <span className="ml-1 text-muted">({r.users})</span>
               </span>
-              <span className="flex gap-3 font-body text-sm">
+              <span className="flex gap-3 text-body-sm">
                 {r.points.map((p) => (
                   <span key={p.day} className="text-muted">
                     D{p.day}{" "}
-                    <span className="text-foreground">
+                    <span className="text-ink">
                       {p.rate != null
                         ? `${Math.round(p.rate * 100)}%`
                         : `${p.retained}/${p.eligible}`}
@@ -594,7 +594,7 @@ function DeviceReport({ devices }: { devices: AnalyticsData["devices"] }) {
           ))}
         </div>
 
-        <p className="font-body text-xs text-muted">
+        <p className="text-micro text-muted">
           Percentages appear once a segment has {minCohort} eligible users; below
           that only the raw counts are shown, because a rate off two people
           reads as evidence and is not. Members who connect a device are already
@@ -609,9 +609,9 @@ function DeviceReport({ devices }: { devices: AnalyticsData["devices"] }) {
 function StatTile({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <Card className="flex flex-col gap-0.5 p-4">
-      <span className="font-body text-[10px] uppercase tracking-wide text-muted">{label}</span>
-      <span className="font-display text-2xl font-medium text-foreground">{value}</span>
-      <span className="font-body text-[11px] text-muted">{sub}</span>
+      <span className="text-[10px] uppercase tracking-wide text-muted">{label}</span>
+      <span className="font-display text-display-md font-medium text-ink">{value}</span>
+      <span className="text-[11px] text-muted">{sub}</span>
     </Card>
   );
 }
@@ -648,7 +648,7 @@ function CheckinBars({ series }: { series: { date: string; count: number }[] }) 
           );
         })}
       </svg>
-      <div className="flex justify-between font-body text-[10px] text-muted">
+      <div className="flex justify-between text-[10px] text-muted">
         <span>{series[0]?.date.slice(5)}</span>
         <span>{series[series.length - 1]?.date.slice(5)}</span>
       </div>
@@ -715,9 +715,9 @@ function PresetField({
   return (
     <div className="flex flex-col gap-1.5 sm:col-span-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="font-body text-sm font-medium text-foreground/80">{label}</span>
+        <span className="text-body-sm font-semibold text-ink/80">{label}</span>
         <select
-          className="rounded-control border border-border bg-surface px-2 py-1 font-body text-xs text-muted"
+          className="rounded-ctl border border-line bg-surface px-2 py-1 text-micro text-muted"
           value=""
           onChange={(e) => {
             const p = presets.find((x) => x.label === e.target.value);
@@ -846,7 +846,7 @@ function VoucherManager({ getToken }: { getToken: () => Promise<string | null> }
   if (status === "error")
     return (
       <div className="flex flex-col gap-3">
-        <p className="font-body text-sm text-muted">Couldn&rsquo;t load the catalog.</p>
+        <p className="text-body-sm text-muted">Couldn&rsquo;t load the catalog.</p>
         <button
           onClick={() => {
             setStatus("loading");
@@ -868,7 +868,7 @@ function VoucherManager({ getToken }: { getToken: () => Promise<string | null> }
         </button>
       </div>
 
-      {msg && <p className="font-body text-sm text-accent-hover">{msg}</p>}
+      {msg && <p className="text-body-sm text-primary-deep">{msg}</p>}
 
       {showAdd && (
         <AddItemForm
@@ -885,8 +885,8 @@ function VoucherManager({ getToken }: { getToken: () => Promise<string | null> }
           <Card key={it.id} className="flex flex-col gap-3 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex min-w-0 flex-col">
-                <span className="font-body text-sm font-medium text-foreground">{it.name}</span>
-                <span className="font-body text-xs text-muted">
+                <span className="text-body-sm font-semibold text-ink">{it.name}</span>
+                <span className="text-micro text-muted">
                   {it.kind} · {it.partner ?? "-"}
                   {it.kind === "voucher"
                     ? ` · ${it.points_cost} pts · ${it.codes_available}/${it.codes_total} codes`
@@ -907,7 +907,7 @@ function VoucherManager({ getToken }: { getToken: () => Promise<string | null> }
                 </select>
                 <button
                   onClick={() => remove(it)}
-                  className="rounded-control px-2 py-1 font-body text-xs text-muted hover:text-accent"
+                  className="rounded-ctl px-2 py-1 text-micro text-muted hover:text-primary"
                 >
                   Delete
                 </button>
@@ -1023,7 +1023,7 @@ function AddItemForm({ authFetch, onDone }: { authFetch: AuthFetch; onDone: () =
           </>
         )}
       </div>
-      {err && <p className="font-body text-sm text-accent-hover">{err}</p>}
+      {err && <p className="text-body-sm text-primary-deep">{err}</p>}
       <button onClick={() => void submit()} disabled={busy} className={`${primaryButtonClass} self-start`}>
         {busy ? "Saving…" : "Create item"}
       </button>
@@ -1069,25 +1069,25 @@ function CodeUploader({
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="self-start font-body text-xs text-accent underline underline-offset-4">
+      <button onClick={() => setOpen(true)} className="self-start text-micro text-primary underline underline-offset-4">
         Add codes
       </button>
     );
   }
   return (
-    <div className="flex flex-col gap-2 border-t border-border pt-3">
+    <div className="flex flex-col gap-2 border-t border-line pt-3">
       <textarea
         className={`${fieldClass} h-24 py-2`}
         placeholder="One code per line"
         value={text}
         onChange={(e) => setText(e.target.value)}
       />
-      {note && <p className="font-body text-xs text-muted">{note}</p>}
+      {note && <p className="text-micro text-muted">{note}</p>}
       <div className="flex gap-2">
         <button onClick={() => void upload()} disabled={busy} className={secondaryButtonClass}>
           {busy ? "Adding…" : "Upload codes"}
         </button>
-        <button onClick={() => setOpen(false)} className="px-2 font-body text-xs text-muted">
+        <button onClick={() => setOpen(false)} className="px-2 text-micro text-muted">
           Done
         </button>
       </div>
@@ -1128,10 +1128,10 @@ function DeviceTags({ devices }: { devices: RosterUser["devices"] }) {
       {devices.map((d) => {
         const dead = d.status === "expired";
         const tone = dead
-          ? "border-accent/40 text-accent"
+          ? "border-primary/40 text-primary"
           : d.synced
             ? "border-clay/40 text-clay"
-            : "border-border text-muted";
+            : "border-line text-muted";
         const why = dead
           ? "needs reconnecting"
           : d.synced
@@ -1141,7 +1141,7 @@ function DeviceTags({ devices }: { devices: RosterUser["devices"] }) {
           <span
             key={d.provider}
             title={why}
-            className={`rounded-pill border px-2 py-0.5 font-body text-[0.65rem] ${tone}`}
+            className={`rounded-pill border px-2 py-0.5 text-[0.65rem] ${tone}`}
           >
             {d.provider}
             {dead ? " !" : d.synced ? "" : " ?"}
@@ -1265,7 +1265,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
   if (status === "error")
     return (
       <div className="flex flex-col gap-3">
-        <p className="font-body text-sm text-muted">Couldn&rsquo;t load users.</p>
+        <p className="text-body-sm text-muted">Couldn&rsquo;t load users.</p>
         <button
           onClick={() => {
             setStatus("loading");
@@ -1298,7 +1298,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
       </Eyebrow>
       {codeMsg && (
         <p
-          className={`font-body text-sm ${codeMsg.ok ? "text-foreground/80" : "text-accent-hover"}`}
+          className={`text-body-sm ${codeMsg.ok ? "text-ink/80" : "text-primary-deep"}`}
         >
           {codeMsg.ok ? "✓ " : ""}
           {codeMsg.text}
@@ -1307,7 +1307,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
       {accessMsg && (
         <p
           role="status"
-          className={`font-body text-sm ${accessMsg.ok ? "text-foreground/80" : "text-accent-hover"}`}
+          className={`text-body-sm ${accessMsg.ok ? "text-ink/80" : "text-primary-deep"}`}
         >
           {accessMsg.ok ? "✓ " : ""}
           {accessMsg.text}
@@ -1316,7 +1316,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
       <Card className="overflow-x-auto p-0">
         <table className="w-full min-w-[48rem] text-left">
           <thead>
-            <tr className="border-b border-border font-body text-xs text-muted">
+            <tr className="border-b border-line text-micro text-muted">
               <th className="px-4 py-2 font-medium">Email</th>
               <th className="px-4 py-2 font-medium">Access</th>
               <th className="px-4 py-2 font-medium">Onboarded</th>
@@ -1331,7 +1331,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
           </thead>
           <tbody>
             {sorted.map((u) => (
-              <tr key={u.id} className="border-b border-border/60 font-body text-sm text-foreground">
+              <tr key={u.id} className="border-b border-line/60 text-body-sm text-ink">
                 <td className="px-4 py-2">
                   {u.email}
                   {u.deleted && <span className="ml-1 text-xs text-muted">(deleted)</span>}
@@ -1339,17 +1339,17 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                 <td className="px-4 py-2">
                   <div className="flex items-center gap-2">
                     <span
-                      className={`rounded-full px-2 py-0.5 font-body text-xs font-medium ${
+                      className={`rounded-full px-2 py-0.5 text-micro font-medium ${
                         u.access_status === "approved"
                           ? "bg-surface-2 text-muted"
-                          : "bg-accent/10 text-accent"
+                          : "bg-primary/10 text-primary"
                       }`}
                     >
                       {u.access_status === "approved" ? "Approved" : "Waitlisted"}
                     </span>
                     <button
                       onClick={() => requestAccessChange(u)}
-                      className="font-body text-xs text-accent underline underline-offset-2"
+                      className="text-micro text-primary underline underline-offset-2"
                     >
                       {u.access_status === "approved" ? "Revoke" : "Approve"}
                     </button>
@@ -1357,7 +1357,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                 </td>
                 <td className="px-4 py-2">
                   {u.onboarded ? (
-                    <span className="font-body text-sm text-foreground" title="Profile completed">
+                    <span className="text-body-sm text-ink" title="Profile completed">
                       <span aria-hidden>✓</span>
                       <span className="sr-only">Onboarding complete</span>
                     </span>
@@ -1366,7 +1366,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                     // pending state, not a failure, and a red ✗ against someone
                     // who signed up an hour ago reads as one.
                     <span
-                      className="font-body text-sm text-muted"
+                      className="text-body-sm text-muted"
                       title={
                         u.access_status === "approved"
                           ? "Approved but has not completed onboarding"
@@ -1384,7 +1384,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                       const normalized = normalizeReferralCode(editingCode.draft);
                       return (
                         <div className="flex flex-col gap-1">
-                          <span className="font-body text-[11px] text-muted">
+                          <span className="text-[11px] text-muted">
                             Current:{" "}
                             <code className="font-mono">{u.referral_code ?? "none"}</code>
                           </span>
@@ -1406,7 +1406,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                             <button
                               onClick={() => void saveCode()}
                               disabled={!normalized}
-                              className="font-body text-xs text-accent underline underline-offset-2 disabled:cursor-not-allowed disabled:text-muted disabled:no-underline"
+                              className="text-micro text-primary underline underline-offset-2 disabled:cursor-not-allowed disabled:text-muted disabled:no-underline"
                             >
                               Save
                             </button>
@@ -1415,12 +1415,12 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                                 setEditingCode(null);
                                 setCodeMsg(null);
                               }}
-                              className="font-body text-xs text-muted"
+                              className="text-micro text-muted"
                             >
                               Cancel
                             </button>
                           </div>
-                          <span className="font-body text-[11px] text-muted">
+                          <span className="text-[11px] text-muted">
                             {normalized ? (
                               <>
                                 Will save as: <code className="font-mono">{normalized}</code>
@@ -1434,7 +1434,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                     })()
                   ) : (
                     <div className="flex items-center gap-2">
-                      <code className="font-mono text-xs text-foreground">
+                      <code className="font-mono text-xs text-ink">
                         {u.referral_code ?? "-"}
                       </code>
                       <button
@@ -1446,7 +1446,7 @@ function UserRoster({ getToken }: { getToken: () => Promise<string | null> }) {
                             draft: u.referral_code ?? "",
                           });
                         }}
-                        className="font-body text-xs text-accent underline underline-offset-2"
+                        className="text-micro text-primary underline underline-offset-2"
                       >
                         {u.referral_code ? "Edit" : "Set"}
                       </button>
@@ -1604,7 +1604,7 @@ function PartnerManager({ getToken }: { getToken: () => Promise<string | null> }
   if (status === "error") {
     return (
       <div className="flex flex-col gap-3">
-        <p className="font-body text-sm text-muted">Couldn&rsquo;t load partners.</p>
+        <p className="text-body-sm text-muted">Couldn&rsquo;t load partners.</p>
         <button onClick={() => { setStatus("loading"); void load(); }} className={secondaryButtonClass}>
           Retry
         </button>
@@ -1636,7 +1636,7 @@ function PartnerManager({ getToken }: { getToken: () => Promise<string | null> }
             />
           </label>
         </div>
-        <p className="font-body text-xs text-muted">
+        <p className="text-micro text-muted">
           {preview ? (
             <>
               Link: <code className="font-mono">app.ikigaro.com/?ref={preview}</code>, 2× for 90
@@ -1656,12 +1656,12 @@ function PartnerManager({ getToken }: { getToken: () => Promise<string | null> }
           </button>
         </div>
         {msg && (
-          <p className={`font-body text-xs ${msg.ok ? "text-muted" : "text-accent"}`}>{msg.text}</p>
+          <p className={`text-micro ${msg.ok ? "text-muted" : "text-primary"}`}>{msg.text}</p>
         )}
       </Card>
 
       {partners.length === 0 && (
-        <p className="font-body text-sm text-muted">
+        <p className="text-body-sm text-muted">
           No partners yet. Create one above and share its link.
         </p>
       )}
@@ -1670,8 +1670,8 @@ function PartnerManager({ getToken }: { getToken: () => Promise<string | null> }
         <Card key={p.id} className="flex flex-col gap-3 p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <div className="flex items-baseline gap-3">
-              <p className="font-display text-lg font-medium text-foreground">{p.name}</p>
-              <code className="font-mono text-xs text-accent">{p.code}</code>
+              <p className="font-display text-lg font-medium text-ink">{p.name}</p>
+              <code className="font-mono text-xs text-primary">{p.code}</code>
               {!p.active && (
                 <span className="font-label text-[0.55rem] uppercase tracking-[0.14em] text-muted">
                   inactive
@@ -1680,7 +1680,7 @@ function PartnerManager({ getToken }: { getToken: () => Promise<string | null> }
             </div>
             <button
               onClick={() => void setActive(p, !p.active)}
-              className="font-body text-xs text-accent underline underline-offset-2"
+              className="text-micro text-primary underline underline-offset-2"
             >
               {p.active ? "Deactivate" : "Reactivate"}
             </button>
@@ -1696,7 +1696,7 @@ function PartnerManager({ getToken }: { getToken: () => Promise<string | null> }
           <div>
             <button
               onClick={() => void openRoster(p.id)}
-              className="font-body text-xs text-accent underline underline-offset-2"
+              className="text-micro text-primary underline underline-offset-2"
             >
               {openId === p.id ? "Hide members" : `Show members (${p.signups})`}
             </button>
@@ -1704,7 +1704,7 @@ function PartnerManager({ getToken }: { getToken: () => Promise<string | null> }
 
           {openId === p.id && (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[36rem] text-left font-body text-xs">
+              <table className="w-full min-w-[36rem] text-left text-micro">
                 <thead className="text-muted">
                   <tr>
                     <th className="px-3 py-2">Email</th>
@@ -1717,8 +1717,8 @@ function PartnerManager({ getToken }: { getToken: () => Promise<string | null> }
                 </thead>
                 <tbody>
                   {members.map((m) => (
-                    <tr key={m.id} className="border-t border-border">
-                      <td className="px-3 py-2 text-foreground">{m.email}</td>
+                    <tr key={m.id} className="border-t border-line">
+                      <td className="px-3 py-2 text-ink">{m.email}</td>
                       <td className="px-3 py-2 text-muted">
                         {new Date(m.joined).toLocaleDateString()}
                       </td>

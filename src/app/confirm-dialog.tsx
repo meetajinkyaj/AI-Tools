@@ -29,10 +29,10 @@ export function ConfirmDialog({
       <Card className="flex w-full max-w-sm flex-col gap-4 p-6">
         <div className="flex flex-col gap-1">
           <Eyebrow>Are you sure?</Eyebrow>
-          <p className="font-display text-xl font-medium text-foreground">
+          <p className="font-display text-display-sm font-medium text-ink">
             {request.title}
           </p>
-          <p className="font-body text-sm text-muted">{request.body}</p>
+          <p className="text-body-sm text-muted">{request.body}</p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row-reverse">
           <button

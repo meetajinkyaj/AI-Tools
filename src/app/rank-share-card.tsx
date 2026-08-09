@@ -109,7 +109,7 @@ export function RankShareCard({
   return (
     <div className="flex w-full flex-col gap-6">
       <div className="flex items-center justify-between">
-        <p className="font-label text-[0.65rem] uppercase tracking-[0.3em] text-accent">
+        <p className="font-label text-[0.65rem] uppercase tracking-[0.3em] text-primary">
           Share your rank
         </p>
         {onClose && (
@@ -117,7 +117,7 @@ export function RankShareCard({
             type="button"
             onClick={onClose}
             aria-label="Close share"
-            className="px-2 font-body text-lg leading-none text-muted"
+            className="px-2 text-body-lg leading-none text-muted"
           >
             ✕
           </button>
@@ -127,7 +127,7 @@ export function RankShareCard({
       <canvas
         ref={canvasRef}
         aria-label={`Your shareable ${input.rankName} card`}
-        className="w-full rounded-card border border-border"
+        className="w-full rounded-card border border-line"
         style={{ aspectRatio: `${w} / ${h}` }}
       />
 
@@ -144,13 +144,13 @@ export function RankShareCard({
               aria-pressed={format === f.id}
               className={`flex flex-col gap-1 rounded-card border px-3 py-2 text-left transition-colors ${
                 format === f.id
-                  ? "border-accent bg-accent/5"
-                  : "border-border hover:border-muted"
+                  ? "border-primary bg-primary/5"
+                  : "border-line hover:border-muted"
               }`}
             >
-              <span className="font-body text-xs text-foreground">{f.name}</span>
+              <span className="text-micro text-ink">{f.name}</span>
               {/* Nobody thinks in ratios; they think "this is for my story". */}
-              <span className="font-body text-[0.6rem] leading-tight text-muted">
+              <span className="text-tab leading-tight text-muted">
                 {f.where}
               </span>
             </button>
@@ -163,20 +163,20 @@ export function RankShareCard({
           <button
             type="button"
             onClick={() => void onShare()}
-            className="flex-1 rounded-pill bg-accent px-4 py-3 font-label text-[0.65rem] uppercase tracking-[0.2em] text-white"
+            className="flex-1 rounded-pill bg-primary px-4 py-3 font-label text-[0.65rem] uppercase tracking-[0.2em] text-white"
           >
             Share
           </button>
           <button
             type="button"
             onClick={() => void onSave()}
-            className="rounded-pill border border-border px-4 py-3 font-label text-[0.65rem] uppercase tracking-[0.2em] text-foreground"
+            className="rounded-pill border border-line px-4 py-3 font-label text-[0.65rem] uppercase tracking-[0.2em] text-ink"
           >
             Save
           </button>
         </div>
         {status && (
-          <p role="status" className="font-body text-xs text-muted">
+          <p role="status" className="text-micro text-muted">
             {status}
           </p>
         )}

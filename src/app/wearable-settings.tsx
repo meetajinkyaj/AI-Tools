@@ -142,7 +142,7 @@ function SourcePicker({
       ? brandName(payload, payload.connections[0].provider)
       : null;
     return (
-      <p className="border-t border-border pt-3 font-body text-xs text-muted">
+      <p className="border-t border-line pt-3 text-micro text-muted">
         {only
           ? `Every reading in Trends comes from your ${only}.`
           : "Your devices each answer for different readings, so there is nothing to choose between."}
@@ -151,12 +151,12 @@ function SourcePicker({
   }
 
   return (
-    <div className="flex flex-col gap-3 border-t border-border pt-3">
+    <div className="flex flex-col gap-3 border-t border-line pt-3">
       <div className="flex flex-col gap-1">
         <p className="font-label text-[0.55rem] uppercase tracking-[0.24em] text-muted">
           Which device to use
         </p>
-        <p className="font-body text-xs text-muted">
+        <p className="text-micro text-muted">
           More than one of your devices reports these. Your choice goes first; if it
           has nothing for a day, the other one still fills it in.
         </p>
@@ -167,8 +167,8 @@ function SourcePicker({
         return (
           <div key={s.family} className="flex flex-col gap-1.5">
             <div className="flex flex-col gap-0.5">
-              <span className="font-body text-sm text-foreground">{s.label}</span>
-              <span className="font-body text-[0.7rem] text-muted">{s.blurb}</span>
+              <span className="text-body-sm text-ink">{s.label}</span>
+              <span className="text-micro text-muted">{s.blurb}</span>
             </div>
             <div className="flex flex-wrap gap-2">
               <Chip
@@ -192,7 +192,7 @@ function SourcePicker({
               ))}
             </div>
             {working && (
-              <span className="font-body text-[0.7rem] text-muted">Saving…</span>
+              <span className="text-micro text-muted">Saving…</span>
             )}
           </div>
         );
@@ -218,10 +218,10 @@ function Chip({
       onClick={onClick}
       disabled={disabled}
       aria-pressed={selected}
-      className={`rounded-pill border px-3 py-1 font-body text-xs transition-colors disabled:opacity-60 ${
+      className={`rounded-pill border px-3 py-1 text-micro transition-colors disabled:opacity-60 ${
         selected
-          ? "border-accent text-accent"
-          : "border-border text-foreground/70 hover:border-accent hover:text-accent"
+          ? "border-primary text-primary"
+          : "border-line text-ink/70 hover:border-primary hover:text-primary"
       }`}
     >
       {children}
@@ -429,14 +429,14 @@ export function WearableSettings({
             type="button"
             onClick={() => void syncNow()}
             disabled={busy !== null}
-            className="font-body text-xs text-accent underline underline-offset-2 disabled:text-muted disabled:no-underline"
+            className="text-micro text-primary underline underline-offset-2 disabled:text-muted disabled:no-underline"
           >
             {busy === "sync" ? "Syncing…" : "Sync now"}
           </button>
         )}
       </div>
 
-      <p className="font-body text-sm text-muted">
+      <p className="text-body-sm text-muted">
         {data.available.length > 0
           ? "Connect a ring, watch or scale and your sleep, recovery and activity flow into Trends automatically. You can disconnect at any time."
           : // Nothing is connectable yet, so promising a connect action here
@@ -445,7 +445,7 @@ export function WearableSettings({
       </p>
 
       {message && (
-        <p role="status" className="font-body text-sm text-foreground">
+        <p role="status" className="text-body-sm text-ink">
           {message}
         </p>
       )}
@@ -457,13 +457,13 @@ export function WearableSettings({
           return (
             <li
               key={p.id}
-              className="flex items-start justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0"
+              className="flex items-start justify-between gap-3 border-t border-line pt-3 first:border-t-0 first:pt-0"
             >
               <div className="flex flex-col gap-0.5">
-                <span className="font-body text-sm font-medium text-foreground">{p.name}</span>
-                <span className="font-body text-xs text-muted">{p.blurb}</span>
+                <span className="text-body-sm font-semibold text-ink">{p.name}</span>
+                <span className="text-micro text-muted">{p.blurb}</span>
                 {conn && !needsReauth && (
-                  <span className="font-body text-[0.7rem] text-muted">
+                  <span className="text-micro text-muted">
                     {whenSynced(conn.last_sync_at)}
                     {/* Garmin only sends data when the watch next syncs, which
                         otherwise looks like a broken connection for hours. */}
@@ -471,12 +471,12 @@ export function WearableSettings({
                   </span>
                 )}
                 {needsReauth && !p.retired && (
-                  <span className="font-body text-[0.7rem] text-accent">
+                  <span className="text-[0.7rem] text-primary">
                     Connection expired, reconnect to resume syncing.
                   </span>
                 )}
                 {p.retired && (
-                  <span className="font-body text-[0.7rem] text-accent">
+                  <span className="text-[0.7rem] text-primary">
                     No longer available. Your existing data stays in Trends, and
                     you can disconnect below.
                   </span>
@@ -517,14 +517,14 @@ export function WearableSettings({
         onChoose={(family, provider) => void setSource(family, provider)}
       />
 
-      <div className="flex flex-col gap-2 border-t border-border pt-3">
+      <div className="flex flex-col gap-2 border-t border-line pt-3">
         <p className="font-label text-[0.55rem] uppercase tracking-[0.24em] text-muted">
           Coming soon
         </p>
         {COMING_SOON.map((c) => (
           <div key={c.name} className="flex flex-col gap-0.5">
-            <span className="font-body text-sm text-muted">{c.name}</span>
-            <span className="font-body text-xs text-muted/70">{c.blurb}</span>
+            <span className="text-body-sm text-muted">{c.name}</span>
+            <span className="text-micro text-muted/70">{c.blurb}</span>
           </div>
         ))}
       </div>

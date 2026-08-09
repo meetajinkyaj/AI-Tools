@@ -22,17 +22,17 @@ export function LegalShell({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-full flex-1 flex-col bg-background">
-      <header className="border-b border-border">
+    <div className="flex min-h-full flex-1 flex-col bg-canvas">
+      <header className="border-b border-line">
         <div className="mx-auto flex w-full max-w-[760px] items-center justify-between px-6 py-5">
-          <Link href="/" className="text-2xl text-foreground" aria-label="Ikigaro home">
+          <Link href="/" className="text-2xl text-ink" aria-label="Ikigaro home">
             <Wordmark />
           </Link>
-          <nav className="flex gap-5 font-body text-xs uppercase tracking-[0.18em] text-muted">
-            <Link href="/privacy" className="transition-colors hover:text-foreground">
+          <nav className="flex gap-5 text-micro uppercase tracking-[0.18em] text-muted">
+            <Link href="/privacy" className="transition-colors hover:text-ink">
               Privacy
             </Link>
-            <Link href="/terms" className="transition-colors hover:text-foreground">
+            <Link href="/terms" className="transition-colors hover:text-ink">
               Terms
             </Link>
           </nav>
@@ -42,21 +42,21 @@ export function LegalShell({
       <main className="mx-auto w-full max-w-[760px] flex-1 px-6 py-12">
         <div className="flex flex-col gap-2">
           <Eyebrow>{eyebrow}</Eyebrow>
-          <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
+          <h1 className="font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl">
             {title}
           </h1>
-          <p className="font-body text-sm text-muted">
+          <p className="text-body-sm text-muted">
             Effective {LEGAL_EFFECTIVE_DATE}
           </p>
         </div>
 
         <article
-          className="mt-10 flex flex-col gap-5 font-body text-sm leading-relaxed text-foreground/80 [&_a]:text-accent [&_a]:underline [&_h2]:mt-6 [&_h2]:font-display [&_h2]:text-2xl [&_h2]:font-medium [&_h2]:text-foreground [&_h3]:mt-3 [&_h3]:font-body [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-foreground [&_li]:mt-1.5 [&_strong]:font-semibold [&_strong]:text-foreground [&_ul]:list-disc [&_ul]:pl-5"
+          className="mt-10 flex flex-col gap-5 text-body-sm leading-relaxed text-ink/80 [&_a]:text-primary [&_a]:underline [&_h2]:mt-6 [&_h2]:font-display [&_h2]:text-2xl [&_h2]:font-medium [&_h2]:text-ink [&_h3]:mt-3 [&_h3]:[&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-ink [&_li]:mt-1.5 [&_strong]:font-semibold [&_strong]:text-ink [&_ul]:list-disc [&_ul]:pl-5"
         >
           {children}
         </article>
 
-        <footer className="mt-14 border-t border-border pt-6 font-body text-xs text-muted">
+        <footer className="mt-14 border-t border-line pt-6 text-micro text-muted">
           <p>
             This page is provided for general information and is not legal or
             medical advice. Ikigaro is a wellness product and does not provide

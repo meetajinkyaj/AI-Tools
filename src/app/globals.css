@@ -1067,6 +1067,92 @@ summary {
     opacity: 0.75;
   }
 
+  /* --- Avatar chip, handoff §2 ------------------------------------------- */
+
+  .iki-avatar {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--spacing) * 9.5);
+    height: calc(var(--spacing) * 9.5);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    color: var(--ink);
+    font-size: var(--text-unit);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: border-color 140ms ease-out, transform 100ms var(--ease-press);
+  }
+  .iki-avatar:active {
+    transform: scale(0.97);
+  }
+
+  /* --- More sheet, handoff §2 -------------------------------------------- */
+
+  /*
+   * A sheet, not a menu. It holds the three sections that did not fit in the
+   * bar, and it slides from the bottom because that is where the thumb that
+   * opened it already is.
+   *
+   * The backdrop is a sibling rather than a parent, so a tap anywhere outside
+   * the panel closes it without the panel having to stop the event on its way
+   * up.
+   */
+  .iki-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(27, 24, 21, 0.32);
+    animation: iki-fade-in 240ms ease-out;
+  }
+  .iki-sheet {
+    position: fixed;
+    right: calc(var(--spacing) * 2 + var(--spacing-safe-r));
+    bottom: calc(var(--spacing) * 2 + var(--spacing-safe-b));
+    left: calc(var(--spacing) * 2 + var(--spacing-safe-l));
+    z-index: 51;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+    padding: calc(var(--spacing) * 3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sheet);
+    background: var(--surface);
+    box-shadow: var(--shadow-sheet);
+    animation: iki-sheet-up 340ms var(--ease-spring);
+  }
+  /* The grab handle. Decorative: the sheet is not draggable, and the handle is
+     there because a panel that rose from the bottom edge reads as one that can
+     be pushed back down. */
+  .iki-sheet-handle {
+    align-self: center;
+    width: calc(var(--spacing) * 9);
+    height: calc(var(--spacing));
+    border-radius: var(--radius-pill);
+    background: var(--line-strong);
+  }
+
+  @keyframes iki-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes iki-sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
   /* --- Bottom navigation, handoff §2 ------------------------------------- */
 
   /*

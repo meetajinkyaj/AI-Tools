@@ -57,7 +57,7 @@ function Toggle({
       aria-label={label}
       onClick={onClick}
       className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-        on ? "bg-accent" : "bg-border-strong/40"
+        on ? "bg-primary" : "bg-border-strong/40"
       }`}
     >
       <span
@@ -103,8 +103,8 @@ function BackdropSwatch({
       onClick={onClick}
       aria-pressed={selected}
       title={name}
-      className={`overflow-hidden rounded-control border transition-colors ${
-        selected ? "border-accent" : "border-border hover:border-accent/50"
+      className={`overflow-hidden rounded-ctl border transition-colors ${
+        selected ? "border-primary" : "border-line hover:border-primary/50"
       }`}
     >
       <canvas ref={ref} aria-hidden className="block h-16 w-[3.2rem]" />
@@ -128,10 +128,10 @@ function Choice({
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className={`flex-1 rounded-control border px-2 py-3 font-label text-[0.65rem] uppercase tracking-[0.16em] transition-colors ${
+      className={`flex-1 rounded-ctl border px-2 py-3 font-label text-[0.65rem] uppercase tracking-[0.16em] transition-colors ${
         selected
-          ? "border-accent bg-accent text-accent-contrast"
-          : "border-border bg-surface text-muted hover:border-accent/50"
+          ? "border-primary bg-primary text-primary-fg"
+          : "border-line bg-surface text-muted hover:border-primary/50"
       }`}
     >
       {children}
@@ -272,7 +272,7 @@ export function ShareCheckinCard({
   return (
     <div className="flex w-full flex-col gap-6">
       <div className="flex items-center justify-between">
-        <p className="font-label text-[0.65rem] uppercase tracking-[0.3em] text-accent">
+        <p className="font-label text-[0.65rem] uppercase tracking-[0.3em] text-primary">
           Share check-in
         </p>
         {onClose && (
@@ -280,7 +280,7 @@ export function ShareCheckinCard({
             type="button"
             onClick={onClose}
             aria-label="Close share"
-            className="px-2 font-body text-lg leading-none text-muted"
+            className="px-2 text-body-lg leading-none text-muted"
           >
             ✕
           </button>
@@ -290,7 +290,7 @@ export function ShareCheckinCard({
       <canvas
         ref={canvasRef}
         aria-label="Your shareable check-in card"
-        className="w-full rounded-card border border-border"
+        className="w-full rounded-card border border-line"
         style={{ aspectRatio: `${w} / ${h}` }}
       />
 
@@ -325,10 +325,10 @@ export function ShareCheckinCard({
               setBackdrop(null);
             }}
             aria-pressed={photo === null && backdrop === null}
-            className={`h-16 w-[3.2rem] rounded-control border font-label text-[0.5rem] uppercase tracking-[0.14em] transition-colors ${
+            className={`h-16 w-[3.2rem] rounded-ctl border font-label text-[0.5rem] uppercase tracking-[0.14em] transition-colors ${
               photo === null && backdrop === null
-                ? "border-accent bg-surface-2 text-foreground"
-                : "border-border bg-surface text-muted"
+                ? "border-primary bg-surface-2 text-ink"
+                : "border-line bg-surface text-muted"
             }`}
           >
             None
@@ -352,7 +352,7 @@ export function ShareCheckinCard({
           <button
             type="button"
             onClick={() => uploadRef.current?.click()}
-            className="flex h-16 w-[3.2rem] flex-col items-center justify-center gap-1 rounded-control border border-dashed border-border-strong bg-surface-2 font-label text-[0.5rem] uppercase tracking-[0.14em] text-muted"
+            className="flex h-16 w-[3.2rem] flex-col items-center justify-center gap-1 rounded-ctl border border-dashed border-line-strong bg-surface-2 font-label text-[0.5rem] uppercase tracking-[0.14em] text-muted"
           >
             <span className="text-base leading-none">+</span>
             Upload
@@ -360,7 +360,7 @@ export function ShareCheckinCard({
           <button
             type="button"
             onClick={() => cameraRef.current?.click()}
-            className="flex h-16 w-[3.2rem] flex-col items-center justify-center gap-1 rounded-control border border-dashed border-border-strong bg-surface-2 font-label text-[0.5rem] uppercase tracking-[0.14em] text-muted"
+            className="flex h-16 w-[3.2rem] flex-col items-center justify-center gap-1 rounded-ctl border border-dashed border-line-strong bg-surface-2 font-label text-[0.5rem] uppercase tracking-[0.14em] text-muted"
           >
             <span className="text-sm leading-none">◉</span>
             Camera
@@ -393,12 +393,12 @@ export function ShareCheckinCard({
         {FIELD_ROWS.map((row) => (
           <div
             key={row.key}
-            className="flex items-center justify-between border-t border-border py-3"
+            className="flex items-center justify-between border-t border-line py-3"
           >
-            <span className="font-body text-sm text-foreground">
+            <span className="text-body-sm text-ink">
               {row.label}
               {row.note && (
-                <span className="ml-2 font-body text-xs text-muted">{row.note}</span>
+                <span className="ml-2 text-micro text-muted">{row.note}</span>
               )}
             </span>
             <Toggle
@@ -424,7 +424,7 @@ export function ShareCheckinCard({
               {/* Nobody thinks in aspect ratios, they think "this goes on my
                   story". Naming the platforms removes a guess at the exact
                   moment we are asking someone to post. */}
-              <span className="mt-1 block font-body text-[0.6rem] normal-case tracking-normal opacity-70">
+              <span className="mt-1 block text-[0.6rem] normal-case tracking-normal opacity-70">
                 {f.where}
               </span>
             </Choice>
@@ -437,18 +437,18 @@ export function ShareCheckinCard({
         <button
           type="button"
           onClick={() => void onShare()}
-          className="inline-flex h-12 items-center justify-center rounded-control bg-accent px-6 font-body text-sm font-medium text-accent-contrast transition-colors hover:bg-accent-hover"
+          className="inline-flex h-12 items-center justify-center rounded-ctl bg-primary px-6 text-body-sm font-medium text-primary-fg transition-colors hover:bg-primary-hover"
         >
           Share
         </button>
         <button
           type="button"
           onClick={() => void onSave()}
-          className="inline-flex h-12 items-center justify-center rounded-control border border-border-strong bg-transparent px-6 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-2"
+          className="inline-flex h-12 items-center justify-center rounded-ctl border border-line-strong bg-transparent px-6 text-body-sm font-semibold text-ink transition-colors hover:bg-surface-2"
         >
           Save to photos
         </button>
-        <p className="font-body text-xs text-muted">
+        <p className="text-micro text-muted">
           {/* Do not promise a link the card is not carrying, during the
               closed beta it carries none. See INVITE_LINK_ON_SHARED_CARDS. */}
           {INVITE_LINK_ON_SHARED_CARDS
@@ -458,7 +458,7 @@ export function ShareCheckinCard({
             : ""}
           Your photo stays on your device.
         </p>
-        {status && <p className="font-body text-xs text-muted">{status}</p>}
+        {status && <p className="text-micro text-muted">{status}</p>}
       </div>
     </div>
   );
