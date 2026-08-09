@@ -289,6 +289,12 @@
   --spacing-fab: 54px;
   --spacing-sheet-row: 52px;
   --spacing-bar: 7px;      /* progress track height */
+  /* Switch geometry, handoff §2. Off the 4px grid on purpose: this is a
+     hardware-like control whose proportions the spec fixes exactly. */
+  --spacing-switch-w: 50px;
+  --spacing-switch-h: 30px;
+  --spacing-switch-knob: 22px;
+  --spacing-tile: 104px;   /* activity tile minimum height */
   --spacing-bar-max: 150px;/* progress track cap, so it never spans the card */
 
   /* Notch and home-indicator insets. Zero on every device without them, and
@@ -856,6 +862,209 @@ summary {
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--primary);
+  }
+
+  /* --- Energy scale, handoff §2 ------------------------------------------ */
+
+  /*
+   * FIVE CELLS THAT BEHAVE AS ONE SLIDER.
+   *
+   * The cells are not buttons. A slider containing five buttons is six things
+   * in the tab order and reads to a screen reader as a toolbar, when what it
+   * is, is one value between one and five. So the track carries
+   * `role="slider"` with its aria values and the single tab stop, and the
+   * cells are inert marks the track fills in.
+   *
+   * `touch-action: none` is what makes the drag work at all on a phone. Without
+   * it the browser claims the gesture for scrolling the moment the finger moves
+   * vertically, and the value stops following it halfway through.
+   */
+  .iki-energy {
+    display: flex;
+    gap: calc(var(--spacing) * 2);
+    touch-action: none;
+  }
+  .iki-energy-cell {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--spacing-ctl);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-ctl);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: var(--text-body);
+    font-weight: 600;
+    user-select: none;
+    transition:
+      background-color 140ms ease-out,
+      border-color 140ms ease-out,
+      color 140ms ease-out,
+      transform 140ms var(--ease-press);
+  }
+  /* Filled up to the value, not just at it: the scale reads as a level rather
+     than as five radio buttons. */
+  .iki-energy-cell[data-filled="true"] {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--primary-fg);
+  }
+  /* The cell under the finger lifts, so a drag has something to follow. */
+  .iki-energy-cell[data-active="true"] {
+    transform: scale(1.08);
+  }
+
+  /* --- Switch, handoff §2 ------------------------------------------------ */
+
+  .iki-switch {
+    position: relative;
+    flex-shrink: 0;
+    width: var(--spacing-switch-w);
+    height: var(--spacing-switch-h);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    cursor: pointer;
+    transition: background-color 200ms ease-out, border-color 200ms ease-out;
+  }
+  .iki-switch[aria-checked="true"] {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+  .iki-switch-knob {
+    position: absolute;
+    top: calc(var(--spacing) * 0.75);
+    left: calc(var(--spacing) * 0.75);
+    width: var(--spacing-switch-knob);
+    height: var(--spacing-switch-knob);
+    border-radius: var(--radius-pill);
+    background: var(--muted);
+    transition: left 240ms var(--ease-spring), background-color 200ms ease-out;
+  }
+  .iki-switch[aria-checked="true"] .iki-switch-knob {
+    left: calc(var(--spacing-switch-w) - var(--spacing-switch-knob) - var(--spacing) * 0.75 - 2px);
+    background: var(--primary-fg);
+  }
+
+  /* --- Activity tile, handoff §2 ----------------------------------------- */
+
+  .iki-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: var(--spacing-tile);
+    padding: calc(var(--spacing) * 3) calc(var(--spacing) * 3) calc(var(--spacing) * 2.5);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-tile);
+    background: var(--surface);
+    text-align: left;
+    cursor: pointer;
+    transition:
+      background-color 160ms ease-out,
+      border-color 160ms ease-out,
+      box-shadow 160ms ease-out,
+      transform 100ms var(--ease-press);
+  }
+  .iki-tile:active {
+    transform: scale(0.97);
+  }
+  /*
+   * Selected is a RING plus a transparent border, not a thicker border. The box
+   * keeps its exact size, so a grid of tiles does not shift by a pixel when one
+   * is chosen, which reads as a jump on a screen full of them.
+   */
+  .iki-tile[aria-pressed="true"] {
+    background: var(--primary-wash);
+    border-color: transparent;
+    box-shadow: var(--shadow-ring);
+  }
+  .iki-tile-label {
+    /* Clears the check badge, so a long label never runs under it. */
+    padding-right: calc(var(--spacing) * 5);
+    font-size: var(--text-body);
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .iki-tile-icon {
+    position: absolute;
+    right: calc(var(--spacing) * 3);
+    bottom: calc(var(--spacing) * 2.5);
+    color: var(--muted);
+    opacity: 0.55;
+    transition: color 160ms ease-out, opacity 160ms ease-out;
+  }
+  .iki-tile[aria-pressed="true"] .iki-tile-icon {
+    color: var(--primary);
+    opacity: 1;
+  }
+  .iki-tile-check {
+    position: absolute;
+    top: calc(var(--spacing) * 2.25);
+    right: calc(var(--spacing) * 2.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--spacing) * 5.5);
+    height: calc(var(--spacing) * 5.5);
+    border-radius: var(--radius-pill);
+    background: var(--primary);
+    color: var(--primary-fg);
+  }
+
+  /* --- Segmented control, handoff §2 ------------------------------------- */
+
+  /*
+   * ONE PILL THAT TRAVELS, never two that cross-fade.
+   *
+   * The pill is a single absolutely positioned element whose `left` animates
+   * between the three slots, so the movement is the feedback: you can see which
+   * option you came from. Two pills fading into each other is the obvious
+   * implementation and it loses exactly that.
+   *
+   * Its width and offset are set inline by the caller from the option index,
+   * because they are arithmetic on the track's own width and cannot be
+   * expressed as a static class.
+   */
+  .iki-segmented {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: var(--spacing);
+    border-radius: var(--radius-inset);
+    background: var(--surface-2);
+  }
+  .iki-segmented-pill {
+    position: absolute;
+    top: var(--spacing);
+    bottom: var(--spacing);
+    border-radius: var(--radius-inset-pill);
+    background: var(--primary);
+    pointer-events: none;
+    transition: left 300ms var(--ease-spring), opacity 160ms ease-out;
+  }
+  .iki-segmented-option {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--spacing-tap);
+    border-radius: var(--radius-inset-pill);
+    color: var(--muted);
+    font-size: var(--text-caption);
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 160ms ease-out;
+  }
+  .iki-segmented-option[aria-checked="true"] {
+    color: var(--primary-fg);
+  }
+  .iki-segmented-sub {
+    font-size: var(--text-eyebrow-sm);
+    font-weight: 400;
+    opacity: 0.75;
   }
 
   /* --- Bottom navigation, handoff §2 ------------------------------------- */
