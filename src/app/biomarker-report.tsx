@@ -123,17 +123,40 @@ function rangeText(low: number | null, high: number | null, unit: string | null)
   return "-";
 }
 
-/** A status chip coloured by severity: strong for low/high, soft for borderline. */
-function StatusPill({ severity, label }: { severity: Severity; label: string }) {
-  const cls =
-    severity === "low" || severity === "high"
-      ? "bg-accent/10 text-accent"
-      : severity === "borderline"
-        ? "bg-clay/10 text-clay"
-        : "bg-surface-2 text-muted";
+/**
+ * A status chip coloured by severity.
+ *
+ * The semantic flag ramp from the design tokens, and it is deliberately NOT
+ * red and green: a value outside a reference range is information, not an
+ * alarm, and nothing in this app diagnoses. Burnt cedar for out of range,
+ * taupe for borderline, clay for in range, all inside the brand.
+ */
+const SEVERITY_VARIANT: Record<Severity, string> = {
+  low: "iki-badge-bad",
+  high: "iki-badge-bad",
+  borderline: "iki-badge-warn",
+  optimal: "iki-badge-good",
+  in_range: "iki-badge-good",
+  unknown: "iki-badge-neutral",
+};
+
+function StatusPill({
+  severity,
+  label,
+  flag = false,
+}: {
+  severity: Severity;
+  label: string;
+  /**
+   * Caps and tracking, for the LOW / HIGH / BORDERLINE chips that are read at
+   * a glance down a column rather than inside a sentence. Off elsewhere, since
+   * a band name like "Insufficiency" in caps reads as shouting.
+   */
+  flag?: boolean;
+}) {
   return (
     <span
-      className={`shrink-0 rounded-full px-2.5 py-0.5 font-body text-xs font-medium ${cls}`}
+      className={`iki-badge ${SEVERITY_VARIANT[severity]} ${flag ? "iki-badge-flag" : ""} shrink-0`}
     >
       {label}
     </span>
@@ -154,21 +177,31 @@ function readingStatus(
   return { severity, label: band ? band.label : SEVERITY_LABELS[severity] };
 }
 
-/** A short, educational line for an out-of-range reading (numeric or qualitative). */
-function calloutText(r: ReadingRow, band: Band | null): string {
+/**
+ * The value line under a marker's name: "24 ng/mL · 30-100 typical".
+ *
+ * REPLACES A SENTENCE WITH A ROW. This used to read "Vitamin D is below the
+ * typical range (30-100 ng/mL) at 24 ng/mL", which is fine to read once and
+ * slow to scan three times. The design puts the same four facts (marker,
+ * value, typical range, severity) into a row whose severity is carried by the
+ * badge beside it, so a column of them can be read at a glance.
+ *
+ * The unit rides with the VALUE and is dropped from the range, so it appears
+ * once rather than twice.
+ *
+ * A hyphen in the range, where the mockup draws an en dash. House style bans
+ * that character everywhere (AGENTS.md), including in a comment describing it,
+ * and `rangeText` has always used a hyphen.
+ */
+function attentionValueLine(r: ReadingRow): string {
   if (r.result_kind === "qualitative") {
-    return `came back ${r.value_text}, worth confirming with your doctor.`;
+    return `${r.value_text} · screening result`;
   }
-  const at = `at ${r.value}${r.unit ? ` ${r.unit}` : ""}`;
-  if (band) {
-    return `is in the ${band.label} range (${at}).`;
-  }
-  const dir = r.flag === "low" ? "below" : "above";
-  return `is ${dir} the typical range (${rangeText(
-    r.reference_range_low,
-    r.reference_range_high,
-    r.unit,
-  )}) ${at}.`;
+  const value = `${r.value}${r.unit ? ` ${r.unit}` : ""}`;
+  const range = rangeText(r.reference_range_low, r.reference_range_high, null);
+  // `rangeText` returns "-" when the lab printed no range at all. Saying
+  // "- typical" would be worse than saying nothing about it.
+  return range === "-" ? value : `${value} · ${range} typical`;
 }
 
 const DISCLAIMER = "Educational, not a diagnosis. Please consult a doctor.";
@@ -850,41 +883,30 @@ export function BiomarkerReport({
   }
 
   return (
-    <div className="flex w-full max-w-xl flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
-        <PageHeader
-          eyebrow="Report"
-          title="Your baseline"
-          subtitle={panelSubtitle(latestPanel?.panel)}
-        />
-        <div className="flex shrink-0 flex-col gap-2">
-          <button
-            onClick={() => {
-              setError(null);
-              setFile(null);
-              setMode("upload");
-            }}
-            className={secondaryButtonClass}
-          >
-            Add panel
-          </button>
-          <button onClick={() => setShowSummary(true)} className={secondaryButtonClass}>
-            For your doctor
-          </button>
-        </div>
-      </div>
+    <div className="flex w-full max-w-xl flex-col gap-stack">
+      {/* The design's header stack: eyebrow, title, lede, 6px gaps. Written out
+          rather than using PageHeader, whose tracking and title size predate
+          the token scale; that component still serves the upload, review and
+          entry modes, which this mockup does not cover. */}
+      <header className="flex flex-col gap-1.5">
+        <p className="iki-eyebrow">Report</p>
+        <h1 className="iki-title">Your baseline</h1>
+        {panelSubtitle(latestPanel?.panel) && (
+          <p className="iki-lede">{panelSubtitle(latestPanel?.panel)}</p>
+        )}
+      </header>
 
       {awardNote && (
-        <Card className="flex flex-col gap-4 border-accent/20 bg-accent/5 p-6">
+        <section className="iki-card iki-card-accent flex flex-col gap-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 flex-col gap-1">
-              <Eyebrow>You earned</Eyebrow>
-              <p className="font-display text-2xl font-medium text-foreground">
+              <p className="iki-eyebrow">You earned</p>
+              <p className="font-display text-display-md font-medium text-ink">
                 +{awardNote.pointsAwarded}
-                <span className="ml-2 font-body text-sm text-muted">iki points</span>
+                <span className="ml-2 font-sans text-unit text-muted">iki points</span>
               </p>
               {awardNote.bonuses.length > 0 && (
-                <p className="font-body text-xs text-muted">
+                <p className="text-micro text-muted">
                   Includes an improvement bonus for{" "}
                   {awardNote.bonuses
                     .map((b) => b.marker_name)
@@ -898,13 +920,13 @@ export function BiomarkerReport({
               type="button"
               onClick={() => setAwardNote(null)}
               aria-label="Dismiss"
-              className="shrink-0 rounded-full px-2 py-1 font-body text-xs text-muted hover:text-foreground"
+              className="iki-tap iki-press shrink-0 text-micro text-muted hover:text-ink"
             >
               Dismiss
             </button>
           </div>
-          <div className="flex flex-col gap-3 border-t border-accent/15 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="font-body text-sm text-foreground/80">
+          <div className="flex flex-col gap-3 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-body-sm text-ink/80">
               Spend them with our Partners, or keep accumulating for better
               redemptions.
             </p>
@@ -912,63 +934,91 @@ export function BiomarkerReport({
               <button
                 type="button"
                 onClick={onExploreRewards}
-                className={`${secondaryButtonClass} shrink-0`}
+                className="iki-btn iki-btn-secondary shrink-0"
               >
                 Explore Partners
               </button>
             )}
           </div>
-        </Card>
+        </section>
       )}
 
-      <Card className="flex flex-col gap-1 p-6">
-        <Eyebrow>Summary</Eyebrow>
-        {outOfRange.length > 0 ? (
-          <>
-            <p className="font-display text-2xl font-medium text-foreground">
-              {outOfRange.length} of {readings.length}
-              <span className="ml-2 font-body text-sm text-muted">
-                {outOfRange.length === 1 ? "marker" : "markers"} to review
-              </span>
-            </p>
-            {inRangeCount > 0 && (
-              <p className="font-body text-sm text-muted">
-                The other {inRangeCount} are in a healthy range.
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="font-display text-2xl font-medium text-foreground">
-            All {readings.length} in range
-            <span className="ml-2 font-body text-sm text-muted">nothing to review</span>
-          </p>
-        )}
-      </Card>
-
+      {/*
+        NEEDS ATTENTION LEADS THE SCREEN. The old order opened with a count and
+        made you scroll to find out which markers it meant. This is the reason
+        somebody opened the report, so it goes first and the tally follows it.
+      */}
       {outOfRange.length > 0 && (
-        <Card className="flex flex-col gap-3 p-6">
-          <Eyebrow>Worth a look</Eyebrow>
-          <ul className="flex flex-col gap-2">
-            {outOfRange.map((r) => (
-              <li key={r.id} className="font-body text-sm text-foreground/80">
-                <span className="font-medium text-foreground">{r.marker_name}</span>{" "}
-                {calloutText(r, bandOf(r))}
-              </li>
-            ))}
-          </ul>
-          <p className="font-body text-xs text-muted">
+        <section className="iki-card flex flex-col gap-1.5">
+          <p className="iki-eyebrow">Needs attention</p>
+          {outOfRange.map((r) => {
+            const status = readingStatus(r, bandOf(r));
+            return (
+              <div key={r.id} className="iki-row">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <span className="truncate text-body-sm font-semibold text-ink">
+                    {r.marker_name}
+                  </span>
+                  {/* Never wrapped: "24 ng/mL · 30-100 typical" broken across
+                      two lines reads as two separate numbers. */}
+                  <span className="whitespace-nowrap text-micro text-muted">
+                    {attentionValueLine(r)}
+                  </span>
+                </div>
+                <StatusPill severity={status.severity} label={status.label} flag />
+              </div>
+            );
+          })}
+          <p className="pt-1 text-micro text-muted">
             General information, not a diagnosis, worth discussing with a
             qualified professional.
           </p>
-        </Card>
+        </section>
       )}
 
+      {/*
+        COUNTED THE OTHER WAY UP. This card used to say "3 of 34 markers to
+        review". Same two numbers, and leading with what is wrong when
+        thirty-one things are right is a framing this app should not use.
+      */}
+      {readings.length > 0 && (
+        <section className="iki-card iki-card-tight flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="font-display text-display-sm font-medium leading-none text-ink">
+              {inRangeCount} of {readings.length}
+            </span>
+            <span className="text-small text-muted">markers in range</span>
+          </div>
+          <div
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={readings.length}
+            aria-valuenow={inRangeCount}
+            aria-label="Markers in range"
+            className="iki-bar w-full max-w-bar-max flex-1"
+          >
+            {/* Data, so it is inline: a proportion of real readings rather than
+                a design value. Everything about how it looks is in .iki-bar. */}
+            <div
+              className="iki-bar-fill"
+              style={{ width: `${(inRangeCount / readings.length) * 100}%` }}
+            />
+          </div>
+        </section>
+      )}
+
+      {/*
+        NOT IN THE MOCKUP, KEPT ANYWAY. The full per-category breakdown is real
+        data this screen has always shown, and the design omitting it is not
+        the same as the design removing it. Collapsed, so it stays out of the
+        way of the two cards above.
+      */}
       {readings.length > 0 && (
         <button
           type="button"
           onClick={() => setShowAll((v) => !v)}
           aria-expanded={showAll}
-          className={`${secondaryButtonClass} w-full justify-center`}
+          className="iki-btn iki-btn-secondary w-full"
         >
           {showAll
             ? "Hide the full breakdown"
@@ -978,39 +1028,32 @@ export function BiomarkerReport({
 
       {showAll &&
         readingGroups.map((group) => (
-          <Card key={group.category} className="flex flex-col divide-y divide-border">
-            <div className="px-5 pt-4 pb-2">
-              <Eyebrow>{categoryLabel(group.category)}</Eyebrow>
-            </div>
+          <section key={group.category} className="iki-card iki-card-tight flex flex-col">
+            <p className="iki-eyebrow pb-1">{categoryLabel(group.category)}</p>
             {group.readings.map((r) => {
               const qualitative = r.result_kind === "qualitative";
               const status = readingStatus(r, bandOf(r));
               return (
-                <div
-                  key={r.id}
-                  className="flex items-center justify-between gap-3 px-5 py-3"
-                >
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate font-body text-sm text-foreground">
+                <div key={r.id} className="iki-row">
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="truncate text-body-sm text-ink">
                       {r.marker_name}
                     </span>
-                    <span className="font-body text-xs text-muted">
+                    <span className="whitespace-nowrap text-micro text-muted">
                       {qualitative
                         ? "Screening"
                         : rangeText(r.reference_range_low, r.reference_range_high, r.unit)}
                     </span>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
-                    <span className="font-body text-sm font-medium text-foreground">
+                    <span className="text-caption font-semibold text-ink">
                       {qualitative ? (
                         r.value_text
                       ) : (
                         <>
                           {r.value}
                           {r.unit ? (
-                            <span className="ml-1 text-xs font-normal text-muted">
-                              {r.unit}
-                            </span>
+                            <span className="ml-1 font-normal text-muted">{r.unit}</span>
                           ) : null}
                         </>
                       )}
@@ -1020,10 +1063,35 @@ export function BiomarkerReport({
                 </div>
               );
             })}
-          </Card>
+          </section>
         ))}
 
-      <p className="font-body text-xs text-muted">{DISCLAIMER}</p>
+      {/*
+        THE TWO ACTIONS MOVED TO THE BOTTOM, full width, primary then secondary.
+        They were a stacked pair of outline buttons crammed beside the title,
+        which on a phone puts the screen's main action in the hardest corner to
+        reach one-handed. Same handlers, same state.
+      */}
+      <button
+        type="button"
+        onClick={() => {
+          setError(null);
+          setFile(null);
+          setMode("upload");
+        }}
+        className="iki-btn iki-btn-primary w-full"
+      >
+        Upload a new panel
+      </button>
+      <button
+        type="button"
+        onClick={() => setShowSummary(true)}
+        className="iki-btn iki-btn-secondary w-full"
+      >
+        Health summary for your doctor
+      </button>
+
+      <p className="text-micro text-muted">{DISCLAIMER}</p>
     </div>
   );
 }

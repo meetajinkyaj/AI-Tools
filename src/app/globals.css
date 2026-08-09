@@ -71,8 +71,19 @@
   --primary: #b5562d;                       /* terracotta: CTAs, active nav, eyebrows */
   --primary-deep: #8f3f1d;                  /* link hover, pressed */
   --primary-fg: #f6efe3;                    /* text on primary */
-  --primary-wash: rgba(181, 86, 45, 0.07);  /* selected-tile fill */
+  --primary-wash: rgba(181, 86, 45, 0.07);  /* selected-tile and tinted-card fill */
+  --primary-wash-strong: rgba(181, 86, 45, 0.1); /* status pill */
+  --primary-edge: rgba(181, 86, 45, 0.2);   /* border of the tinted card */
+  --primary-hover: #9f4c28;                 /* primary button, pressed or hovered */
   --clay: #cd7144;                          /* positive movement: sparklines, up deltas */
+
+  /*
+   * The nav's translucent ground, so it blurs whatever scrolls under it.
+   *
+   * A LITERAL RGBA RATHER THAN color-mix(). See the note above @layer
+   * components: color-mix() with a var() input does not survive the build.
+   */
+  --surface-translucent: rgba(251, 247, 240, 0.78);
 
   /*
    * --- Biomarker flags ---
@@ -122,6 +133,10 @@
   --primary-deep: #b5562d;
   --primary-fg: #1b1815;
   --primary-wash: rgba(205, 113, 68, 0.1);
+  --primary-wash-strong: rgba(205, 113, 68, 0.14);
+  --primary-edge: rgba(205, 113, 68, 0.26);
+  --primary-hover: #b4643c;
+  --surface-translucent: rgba(36, 32, 25, 0.78);
   --clay: #cd7144;
   --good: #cd7144;
   --good-wash: rgba(205, 113, 68, 0.14);
@@ -150,6 +165,10 @@
   --color-primary-deep: var(--primary-deep);
   --color-primary-fg: var(--primary-fg);
   --color-primary-wash: var(--primary-wash);
+  --color-primary-wash-strong: var(--primary-wash-strong);
+  --color-primary-edge: var(--primary-edge);
+  --color-primary-hover: var(--primary-hover);
+  --color-surface-translucent: var(--surface-translucent);
   --color-clay: var(--clay);
   --color-good: var(--good);
   --color-good-wash: var(--good-wash);
@@ -269,6 +288,8 @@
   --spacing-nav: 66px;
   --spacing-fab: 54px;
   --spacing-sheet-row: 52px;
+  --spacing-bar: 7px;      /* progress track height */
+  --spacing-bar-max: 150px;/* progress track cap, so it never spans the card */
 
   /* Notch and home-indicator insets. Zero on every device without them, and
      zero everywhere unless viewport-fit=cover is set (it is, in layout.tsx). */
@@ -469,8 +490,8 @@ summary {
   /* The one tinted card in the app (Future You scoreboard). Deliberately a
      single exception, so it reads as emphasis rather than as a second style. */
   .iki-card-accent {
-    background: color-mix(in srgb, var(--primary) 6%, transparent);
-    border-color: color-mix(in srgb, var(--primary) 20%, transparent);
+    background: var(--primary-wash);
+    border-color: var(--primary-edge);
   }
 
   /* --- Badges and pills, handoff §2 -------------------------------------- */
@@ -514,7 +535,7 @@ summary {
   }
   /* Brand pill: "Set up to improve". */
   .iki-badge-primary {
-    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    background: var(--primary-wash-strong);
     color: var(--primary);
   }
 
@@ -552,10 +573,11 @@ summary {
     color: var(--primary-fg);
     font-size: var(--text-body);
   }
-  /* Darkened from the token rather than hardcoded, so the hover follows the
-     ground: in dark mode --primary is already a step lighter. */
+  /* Its own token rather than a computed darkening, so the hover follows the
+     ground: dark mode redefines it, because --primary is a step lighter there
+     and the same arithmetic would take it the wrong way. */
   .iki-btn-primary:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--primary) 88%, black);
+    background: var(--primary-hover);
   }
 
   .iki-btn-secondary {
@@ -632,6 +654,30 @@ summary {
     color: var(--muted);
   }
 
+  /* --- Progress bar, handoff §2 ------------------------------------------ */
+
+  /*
+   * The fill's WIDTH is set inline by the caller, because it is data (a
+   * proportion of real readings) rather than a design value. Everything about
+   * how the bar looks lives here.
+   *
+   * Always give the track `role="progressbar"` with its aria values. A bar
+   * with no accessible name is a decorative stripe to a screen reader, and
+   * this one is carrying the headline number of the screen.
+   */
+  .iki-bar {
+    height: var(--spacing-bar);
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+  }
+  .iki-bar-fill {
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--clay);
+    transition: width 300ms var(--ease-spring);
+  }
+
   /* --- List row, handoff §2 ---------------------------------------------- */
 
   /*
@@ -696,7 +742,7 @@ summary {
     padding-inline: calc(var(--spacing) * 2);
     border: 1px solid var(--line);
     border-radius: calc(var(--spacing-nav) / 2);
-    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    background: var(--surface-translucent);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     box-shadow: var(--shadow-nav);
