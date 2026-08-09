@@ -6,7 +6,6 @@ import { POINTS, REFERRAL_MAX_TOTAL } from "@/lib/points";
 import type { CheckinTrend, MarkerDelta } from "@/lib/trends";
 import { DeviceDetail } from "./device-detail";
 import { TrainingCard } from "./training-card";
-import { Card, Eyebrow, PageHeader, primaryButtonClass } from "./ui";
 import { WearableTrends } from "./wearable-trends";
 
 interface CheckinSeriesPoint {
@@ -60,21 +59,24 @@ const FAQ: { q: string; a: string }[] = [
 
 function RewardsFaq() {
   return (
-    <Card className="flex flex-col gap-2 p-6">
-      <Eyebrow>Rewards &amp; trends. FAQ</Eyebrow>
-      <div className="flex flex-col divide-y divide-border">
+    <section className="iki-card flex flex-col gap-2">
+      <p className="iki-eyebrow">Rewards &amp; trends. FAQ</p>
+      <div className="flex flex-col">
         {FAQ.map((item) => (
-          <details key={item.q} className="group py-2">
-            <summary className="cursor-pointer list-none font-body text-sm font-medium text-foreground marker:hidden">
-              <span className="text-accent group-open:hidden">＋ </span>
-              <span className="hidden text-accent group-open:inline">− </span>
+          <details key={item.q} className="group border-b border-line py-2 last:border-b-0">
+            {/* The summary carries the 44px hit area rather than a min-height,
+                so an answered question does not leave a band of dead space
+                above its answer. */}
+            <summary className="iki-tap iki-press list-none text-body-sm font-semibold text-ink marker:hidden">
+              <span className="text-primary group-open:hidden">＋ </span>
+              <span className="hidden text-primary group-open:inline">− </span>
               {item.q}
             </summary>
-            <p className="pt-2 font-body text-sm text-muted">{item.a}</p>
+            <p className="pt-2 text-body-sm text-muted">{item.a}</p>
           </details>
         ))}
       </div>
-    </Card>
+    </section>
   );
 }
 
@@ -112,7 +114,7 @@ function deltaLabel(delta: number | null, unit = "", betterWhenDown = false): {
 }
 
 function toneClass(tone: "up" | "down" | "flat"): string {
-  return tone === "up" ? "text-clay" : tone === "down" ? "text-accent" : "text-muted";
+  return tone === "up" ? "text-clay" : tone === "down" ? "text-primary" : "text-muted";
 }
 
 export function TrendsView({ getToken }: { getToken: () => Promise<string | null> }) {
@@ -142,13 +144,17 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
   }, [load]);
 
   if (status === "loading") {
-    return <p className="font-body text-sm text-muted">Loading your trends…</p>;
+    return <p className="text-body-sm text-muted">Loading your trends…</p>;
   }
   if (status === "error" || !data) {
     return (
-      <div className="flex flex-col gap-4">
-        <p className="font-body text-sm text-muted">Couldn&rsquo;t load your trends.</p>
-        <button onClick={() => void load()} className={primaryButtonClass}>
+      <div className="flex w-full max-w-xl flex-col gap-4">
+        <p className="text-body-sm text-muted">Couldn&rsquo;t load your trends.</p>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="iki-btn iki-btn-primary w-full"
+        >
           Try again
         </button>
       </div>
@@ -160,61 +166,43 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
   const sleepDelta = deltaLabel(checkin.trend.sleepDelta, "h");
 
   return (
-    <div className="flex w-full max-w-xl flex-col gap-6">
-      <PageHeader
-        eyebrow="Trends"
-        title="Your movement"
-        subtitle="Day-to-day from your check-ins, and the bigger picture from your lab panels."
-      />
+    <div className="flex w-full max-w-xl flex-col gap-stack">
+      {/* Written out rather than using PageHeader, whose tracking and title
+          size predate the token scale. That component still serves the screens
+          this restyle has not reached. */}
+      <header className="flex flex-col gap-1.5">
+        <p className="iki-eyebrow">Trends</p>
+        <h1 className="iki-title">Your movement</h1>
+        <p className="iki-lede">
+          Day-to-day from your check-ins, and the bigger picture from your lab panels.
+        </p>
+      </header>
 
-      {/* Device data, merged across everything connected. Renders itself away
-          when nothing is connected or nothing has synced. */}
-      <WearableTrends getToken={getToken} />
-
-      {/* What you did this week, and whether the body is absorbing it. Reads
-          the check-in first and a device second, so it works before anyone
-          owns a ring. Renders itself away on a week with no training and no
-          recovery signal. */}
-      <TrainingCard getToken={getToken} />
-
-      {/* The unmerged view, one collapsed panel per connected device. Answers
-          "what is this thing actually sending you", which the merged card
-          above deliberately cannot: it resolves several devices into one
-          number and hides which device won. Renders nothing when no device is
-          connected. */}
-      <DeviceDetail getToken={getToken} />
-
-      {/* Outcome-verified rewards, the payoff moment */}
-      {bonuses.length > 0 && (
-        <Card className="flex flex-col gap-2 p-6">
-          <Eyebrow>You improved</Eyebrow>
-          <ul className="flex flex-col gap-1">
-            {bonuses.map((b, i) => (
-              <li key={i} className="font-body text-sm text-foreground/80">
-                <span className="font-medium text-foreground">{b.marker_key.toUpperCase()}</span>{" "}
-                moved into range{b.delta_value != null ? ` (${b.delta_value})` : ""} -{" "}
-                <span className="font-medium text-clay">+{b.amount} iki points</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      {/* Check-in trend, the frequent signal */}
-      <Card className="flex flex-col gap-4 p-6">
-        <Eyebrow>Check-in trend</Eyebrow>
+      {/*
+        CHECK-IN TREND LEADS. Everybody has check-ins; the device cards below
+        render for the few people with a ring, and leading with a section that
+        is empty for most members put the page's first screenful in the hands
+        of the smallest group on it.
+      */}
+      <section className="iki-card flex flex-col gap-3.5">
+        <p className="iki-eyebrow">Check-in trend</p>
         {checkin.trend.count === 0 ? (
-          <p className="font-body text-sm text-muted">
+          <p className="text-body-sm text-muted">
             Check in daily and your energy &amp; sleep trend will build here.
           </p>
         ) : (
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-3.5">
+            <div className="grid grid-cols-2 gap-3.5">
               <div className="flex flex-col gap-1">
-                <span className="font-body text-xs text-muted">Avg energy (7d)</span>
-                <span className="font-display text-2xl font-medium text-foreground">
+                <span className="text-micro text-muted">Avg energy (7d)</span>
+                <span className="font-display text-display-md font-medium leading-none text-ink">
                   {checkin.trend.avgEnergy ?? "-"}
-                  <span className={`ml-2 font-body text-xs ${toneClass(energyDelta.tone)}`}>
+                  {/* The delta drops into the sans face beside the numeral,
+                      the same treatment a unit gets: a serif arrow reads as an
+                      ornament rather than as a value. `text-micro` and not
+                      `text-eyebrow`, which carries 0.2em of tracking that
+                      would push the arrow away from its own number. */}
+                  <span className={`ml-2 font-sans text-micro ${toneClass(energyDelta.tone)}`}>
                     {checkin.trend.energyDelta != null ? energyDelta.text : ""}
                   </span>
                 </span>
@@ -223,10 +211,10 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
                 </span>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="font-body text-xs text-muted">Avg sleep (7d)</span>
-                <span className="font-display text-2xl font-medium text-foreground">
+                <span className="text-micro text-muted">Avg sleep (7d)</span>
+                <span className="font-display text-display-md font-medium leading-none text-ink">
                   {checkin.trend.avgSleep != null ? `${checkin.trend.avgSleep}h` : "-"}
-                  <span className={`ml-2 font-body text-xs ${toneClass(sleepDelta.tone)}`}>
+                  <span className={`ml-2 font-sans text-micro ${toneClass(sleepDelta.tone)}`}>
                     {checkin.trend.sleepDelta != null ? sleepDelta.text : ""}
                   </span>
                 </span>
@@ -240,57 +228,95 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
                 connected device; two counts of the same week on one page
                 differ the moment a ring is connected, and the user has no way
                 to tell which one to believe. */}
-            <p className="font-body text-xs text-muted">
+            <p className="text-micro text-muted">
               {checkin.trend.count} check-in{checkin.trend.count === 1 ? "" : "s"} logged
             </p>
           </div>
         )}
-      </Card>
+      </section>
 
-      {/* Biomarker since-baseline, the infrequent, high-value signal */}
-      <Card className="flex flex-col gap-4 p-6">
-        <Eyebrow>Since your baseline</Eyebrow>
+      {/* Outcome-verified rewards, the payoff moment. */}
+      {bonuses.length > 0 && (
+        <section className="iki-card iki-card-tight flex flex-col gap-2">
+          <p className="iki-eyebrow">You improved</p>
+          <ul className="flex flex-col gap-1">
+            {bonuses.map((b, i) => (
+              <li key={i} className="text-body-sm leading-relaxed text-ink">
+                <span className="font-semibold">{b.marker_key.toUpperCase()}</span>{" "}
+                moved into range{b.delta_value != null ? ` (${b.delta_value})` : ""} -{" "}
+                <span className="font-semibold text-clay">+{b.amount} iki points</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Biomarker since-baseline, the infrequent, high-value signal. */}
+      <section className="iki-card flex flex-col gap-2.5">
+        <p className="iki-eyebrow">Since your baseline</p>
         {biomarker.panelCount < 2 ? (
-          <p className="font-body text-sm text-muted">
+          <p className="text-body-sm text-muted">
             You have one lab panel so far. Lab work is usually months apart. When you
             upload your next panel you&rsquo;ll see exactly which markers moved, and earn
             iki points for any that improve into range.
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
-            <p className="font-body text-xs text-muted">
+          <>
+            <p className="text-micro text-muted">
               {biomarker.baselineDate} → {biomarker.latestDate}
             </p>
-            <ul className="flex flex-col divide-y divide-border">
+            <ul className="flex flex-col">
               {biomarker.deltas.slice(0, 12).map((d) => {
                 const dl = deltaLabel(d.delta, "");
                 return (
-                  <li key={d.marker_key} className="flex items-center justify-between gap-3 py-2">
-                    <span className="min-w-0 font-body text-sm text-foreground">
+                  <li key={d.marker_key} className="iki-row">
+                    <span className="min-w-0 text-body-sm text-ink">
                       {d.marker_name ?? d.marker_key}
                       {(d.moved_into_range || d.improved) && (
-                        <span className="ml-2 rounded-full bg-clay/10 px-2 py-0.5 font-body text-xs text-clay">
+                        <span className="iki-badge iki-badge-good ml-2">
                           {d.moved_into_range ? "into range" : "improved"}
                         </span>
                       )}
                     </span>
-                    <span className="shrink-0 font-body text-sm">
-                      <span className="text-muted">{d.baseline_value} → {d.latest_value}</span>
+                    {/* Never wrapped: "24 → 31" split over two lines reads as
+                        two unrelated numbers rather than one movement. */}
+                    <span className="shrink-0 whitespace-nowrap text-caption text-muted">
+                      {d.baseline_value} → {d.latest_value}
                       {/* Direction of "good" varies per marker, so keep the delta neutral;
                           the into-range badge is the health signal. */}
-                      <span className="ml-2 text-muted">{d.delta != null ? dl.text : ""}</span>
+                      <span className="ml-2">{d.delta != null ? dl.text : ""}</span>
                     </span>
                   </li>
                 );
               })}
             </ul>
-          </div>
+          </>
         )}
-      </Card>
+      </section>
+
+      {/*
+        NOT IN THE MOCKUP, KEPT ANYWAY, and placed after its three cards.
+        Each renders itself away when there is nothing to show, which is why
+        they can sit here without leaving holes in the page for most members.
+      */}
+
+      {/* Device data, merged across everything connected. */}
+      <WearableTrends getToken={getToken} />
+
+      {/* What you did this week, and whether the body is absorbing it. Reads
+          the check-in first and a device second, so it works before anyone
+          owns a ring. */}
+      <TrainingCard getToken={getToken} />
+
+      {/* The unmerged view, one collapsed panel per connected device. Answers
+          "what is this thing actually sending you", which the merged card
+          above deliberately cannot: it resolves several devices into one
+          number and hides which device won. */}
+      <DeviceDetail getToken={getToken} />
 
       <RewardsFaq />
 
-      <p className="font-body text-xs text-muted">{DISCLAIMER}</p>
+      <p className="text-micro text-muted">{DISCLAIMER}</p>
     </div>
   );
 }
