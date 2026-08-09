@@ -55,7 +55,11 @@ Utilities follow Tailwind's normal namespaces: `bg-canvas`, `text-ink`,
 | `primary` | `#b5562d` | `#cd7144` | CTAs, active nav, selection, eyebrows |
 | `primary-deep` | `#8f3f1d` | `#b5562d` | link hover, pressed |
 | `primary-fg` | `#f6efe3` | `#1b1815` | text on primary |
-| `primary-wash` | 7% primary | 10% primary | selected-tile fill |
+| `primary-wash` | 7% primary | 10% primary | selected-tile and tinted-card fill |
+| `primary-wash-strong` | 10% primary | 14% primary | status pill |
+| `primary-edge` | 20% primary | 26% primary | border of the tinted card |
+| `primary-hover` | `#9f4c28` | `#b4643c` | primary button hover and press |
+| `surface-translucent` | 78% surface | 78% surface | the floating nav's ground |
 | `clay` | `#cd7144` | `#cd7144` | positive movement: sparklines, up deltas |
 
 **Biomarker flags.** Each has a matching `-wash` for its pill background.
@@ -72,8 +76,9 @@ information, not an alarm, and this app never diagnoses.
 **Fixed brand colors** that must NOT follow the ground, for the charcoal
 marketing hero: `obsidian`, `linen`, `terracotta`, `tan`.
 
-`primary` is the only saturated hue in the system. If a new tint is needed,
-derive it with `color-mix()` from these rather than introducing one.
+`primary` is the only saturated hue in the system. If a new tint is needed, add
+a token beside `--primary-wash` rather than introducing a hue or mixing at use
+time. See §9 for why mixing at use time does not survive the build.
 
 ---
 
@@ -131,6 +136,8 @@ a spacing value: `p-`, `px-`, `gap-`, `h-`, `min-h-`, `mt-`.
 | `nav` | 66px | bottom nav height |
 | `fab` | 54px | check-in button |
 | `sheet-row` | 52px | More sheet rows |
+| `bar` | 7px | progress track height |
+| `bar-max` | 150px | progress track cap |
 | `safe-t` `safe-r` `safe-b` `safe-l` | `env(safe-area-inset-*)` | notch and home indicator |
 
 ---
@@ -192,6 +199,19 @@ finds every use. Compose them with utilities; they set structure, not layout.
 **Header**
 - `.iki-eyebrow`, `.iki-title`, `.iki-lede`.
 
+**Progress bar**
+- `.iki-bar` track, `.iki-bar-fill` fill. The fill's width is set inline by the
+  caller, because it is data rather than a design value. Add
+  `.iki-bar-fill-primary` for a bar the member is being asked to move: clay is
+  this system's colour for something that already happened, primary is the
+  colour of an action.
+- Always give the track `role="progressbar"` and its aria values.
+
+**Stat well**
+- `.iki-well` with `.iki-well-label`, `.iki-well-value`, `.iki-well-meta`. An
+  inset panel rather than a card: no border, recessed fill, tighter radius, so
+  four of them under one headline read as a summary rather than four things.
+
 **List rows**
 - `.iki-row` with `.iki-row-label` and `.iki-row-value`. The divider is on the
   row, so the last one loses its rule with no special case at the call site.
@@ -252,7 +272,23 @@ not.
 
 ---
 
-## 9. What was deliberately not done
+## 9. No `color-mix()` in the CSS we write
+
+Lightning CSS lowers `color-mix()` for older targets. It cannot compute one
+whose inputs are `var()`, and it emits the fallback **unconditionally**, which
+silently rewrites `color-mix(in srgb, var(--primary) 6%, transparent)` to
+`var(--primary)`. Solid terracotta where a six percent tint was intended.
+
+Tailwind's own opacity modifiers (`bg-accent/10`) are safe: it pairs the
+fallback with an `@supports` block. Hand-written CSS in `@layer components` gets
+no such help, so four rules shipped broken in the first token PR and were caught
+by reading the compiled stylesheet.
+
+**Use a literal rgba token instead.** There is nothing left to compute, so
+nothing can be lowered wrongly. If a new tint is needed, add a token beside
+`--primary-wash` rather than mixing at use time.
+
+## 10. What was deliberately not done
 
 - **No Noto Sans JP.** The handoff asks for it for the four rank kanji. This
   repo already solves that better: `src/lib/rank-kanji.ts` carries them as

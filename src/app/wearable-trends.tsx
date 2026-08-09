@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Card, Eyebrow } from "./ui";
 
 /**
  * "From your devices" in Trends.
@@ -123,24 +122,21 @@ export function WearableTrends({ getToken }: { getToken: () => Promise<string | 
   if (!series || series.length === 0) return null;
 
   return (
-    <Card className="flex flex-col gap-4 p-5">
+    <section className="iki-card flex flex-col gap-3.5">
       <div className="flex flex-col gap-1">
-        <Eyebrow>From your devices</Eyebrow>
-        <p className="font-body text-xs text-muted">Last 30 days</p>
+        <p className="iki-eyebrow">From your devices</p>
+        <p className="text-micro text-muted">Last 30 days</p>
       </div>
 
-      <ul className="flex flex-col gap-3">
+      <ul className="flex flex-col">
         {series.map((s) => {
           const latest = s.points[s.points.length - 1];
           const mixed = s.sources.length > 1;
           return (
-            <li
-              key={s.metric}
-              className="flex items-center justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0"
-            >
-              <div className="flex flex-col gap-0.5">
-                <span className="font-body text-sm text-foreground">{s.label}</span>
-                <span className="font-body text-[0.7rem] text-muted">
+            <li key={s.metric} className="iki-row">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-body-sm text-ink">{s.label}</span>
+                <span className="text-micro text-muted">
                   {/* Naming the devices matters when there is more than one:
                       a user reconciling against a vendor's own app needs to
                       know which nights came from which device. */}
@@ -149,9 +145,9 @@ export function WearableTrends({ getToken }: { getToken: () => Promise<string | 
                     : `${brandName(s.sources[0])} · ${s.points.length} days`}
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-accent">
+              <div className="flex shrink-0 items-center gap-3 text-clay">
                 <Sparkline points={s.points} />
-                <span className="min-w-[4.5rem] text-right font-display text-lg font-medium text-foreground">
+                <span className="min-w-[4.5rem] text-right font-display text-display-sm font-medium text-ink">
                   {display(s.metric, latest.value, s.unit)}
                 </span>
               </div>
@@ -159,6 +155,6 @@ export function WearableTrends({ getToken }: { getToken: () => Promise<string | 
           );
         })}
       </ul>
-    </Card>
+    </section>
   );
 }

@@ -677,6 +677,49 @@ summary {
     background: var(--clay);
     transition: width 300ms var(--ease-spring);
   }
+  /*
+   * Clay by default, terracotta for a bar the member is being asked to move.
+   *
+   * The distinction is not decoration. Clay is this system's colour for
+   * something that already happened (a marker in range, a rising sparkline);
+   * primary is the colour of an action. Habit momentum is the second kind: the
+   * bar sits directly above a button asking for today's check-in.
+   */
+  .iki-bar-fill-primary {
+    background: var(--primary);
+  }
+
+  /* --- Stat well, handoff §2 --------------------------------------------- */
+
+  /*
+   * An inset panel rather than a card: no border, a recessed fill, and a
+   * tighter radius. It reads as part of the card it sits in, which is the
+   * point. Four of them in a 2x2 under one headline is a summary, whereas four
+   * bordered cards would read as four separate things.
+   */
+  .iki-well {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 0.5);
+    padding: calc(var(--spacing) * 2.5) calc(var(--spacing) * 3);
+    border-radius: var(--radius-inset);
+    background: var(--surface-2);
+  }
+  .iki-well-label {
+    font-size: var(--text-eyebrow);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .iki-well-value {
+    font-size: var(--text-body);
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .iki-well-meta {
+    font-size: var(--text-eyebrow);
+    color: var(--muted);
+  }
 
   /* --- List row, handoff §2 ---------------------------------------------- */
 

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Card, Eyebrow } from "./ui";
 
 /**
  * "What your Whoop says", one panel per connected device.
@@ -99,10 +98,10 @@ function MetricRow({ m }: { m: Metric }) {
   const anyUnused = points.some((p) => !p.used);
 
   return (
-    <div className="flex flex-col gap-1 border-t border-border pt-3 first:border-t-0 first:pt-0">
+    <div className="flex flex-col gap-1 border-t border-line pt-3 first:border-t-0 first:pt-0">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-body text-sm text-foreground">{m.label}</span>
-        <span className="font-body text-[0.7rem] text-muted">
+        <span className="text-body-sm text-ink">{m.label}</span>
+        <span className="text-micro text-muted">
           {points.length} day{points.length === 1 ? "" : "s"}
         </span>
       </div>
@@ -113,12 +112,12 @@ function MetricRow({ m }: { m: Metric }) {
           merge involved. Our sleep is light plus deep plus REM, so it reads
           lower than an app whose headline is time in bed. A source label
           cannot explain that; only a definition can. */}
-      {m.note && <p className="font-body text-[0.7rem] text-muted">{m.note}</p>}
+      {m.note && <p className="text-micro text-muted">{m.note}</p>}
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         {points.map((p) => (
-          <span key={p.date} className="font-body text-xs text-muted">
+          <span key={p.date} className="text-micro text-muted">
             {shortDay(p.date)}{" "}
-            <span className={p.used ? "text-foreground" : "text-muted line-through"}>
+            <span className={p.used ? "text-ink" : "text-muted line-through"}>
               {display(m.metric, p.value, m.unit, m.precision)}
             </span>
           </span>
@@ -127,7 +126,7 @@ function MetricRow({ m }: { m: Metric }) {
       {/* Only said when it happened. A permanent legend explaining a state the
           member may never see is noise on every other visit. */}
       {anyUnused && (
-        <p className="font-body text-[0.7rem] text-muted">
+        <p className="text-micro text-muted">
           Struck through means another connected device supplied that day in Trends.
         </p>
       )}
@@ -147,20 +146,18 @@ function WorkoutRow({ w }: { w: Workout }) {
   if (w.maxHeartRate !== null) parts.push(`max ${w.maxHeartRate} bpm`);
 
   return (
-    <li className="flex flex-col gap-0.5 border-t border-border pt-2 first:border-t-0 first:pt-0">
+    <li className="flex flex-col gap-0.5 border-t border-line pt-2 first:border-t-0 first:pt-0">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-body text-sm text-foreground">
-          {w.activity ?? "Session"}
-        </span>
-        <span className="font-body text-[0.7rem] text-muted">{shortDay(w.date)}</span>
+        <span className="text-body-sm text-ink">{w.activity ?? "Session"}</span>
+        <span className="text-micro text-muted">{shortDay(w.date)}</span>
       </div>
       {parts.length > 0 && (
-        <span className="font-body text-xs text-muted">{parts.join(" · ")}</span>
+        <span className="text-micro text-muted">{parts.join(" · ")}</span>
       )}
       {/* Only one vendor tells us this. Where it is absent we say nothing,
           because "they do not say" is not the same as "they started it". */}
       {w.autoDetected && (
-        <span className="font-body text-[0.7rem] text-muted">
+        <span className="text-micro text-muted">
           Your device noticed this rather than you starting it.
         </span>
       )}
@@ -173,16 +170,16 @@ function DevicePanel({ device, days }: { device: Device; days: number }) {
   const hasData = device.metrics.length > 0 || device.workouts.length > 0;
 
   return (
-    <Card className="flex flex-col gap-3 p-5">
+    <section className="iki-card flex flex-col gap-3">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex items-center justify-between gap-3 text-left"
+        className="iki-press flex min-h-tap items-center justify-between gap-3 text-left"
       >
         <div className="flex flex-col gap-1">
-          <Eyebrow>What your {device.name} says</Eyebrow>
-          <span className="font-body text-xs text-muted">
+          <p className="iki-eyebrow">What your {device.name} says</p>
+          <span className="text-micro text-muted">
             {hasData
               ? `Exactly what it sent, last ${days} days`
               : // Said plainly rather than hidden. An empty panel with no
@@ -191,7 +188,7 @@ function DevicePanel({ device, days }: { device: Device; days: number }) {
                 "Nothing received yet"}
           </span>
         </div>
-        <span className="font-body text-xs text-accent">{open ? "Hide" : "Show"}</span>
+        <span className="text-micro text-primary">{open ? "Hide" : "Show"}</span>
       </button>
 
       {open && hasData && (
@@ -205,10 +202,8 @@ function DevicePanel({ device, days }: { device: Device; days: number }) {
           )}
 
           {device.workouts.length > 0 && (
-            <div className="flex flex-col gap-2 border-t border-border pt-3">
-              <p className="font-label text-[0.55rem] uppercase tracking-[0.24em] text-muted">
-                Sessions
-              </p>
+            <div className="flex flex-col gap-2 border-t border-line pt-3">
+              <p className="font-label text-eyebrow-sm uppercase text-muted">Sessions</p>
               <ul className="flex flex-col gap-2">
                 {device.workouts.map((w) => (
                   <WorkoutRow key={`${w.startedAt}-${w.activity ?? ""}`} w={w} />
@@ -217,7 +212,7 @@ function DevicePanel({ device, days }: { device: Device; days: number }) {
             </div>
           )}
 
-          <p className="font-body text-[0.7rem] text-muted">
+          <p className="text-micro text-muted">
             These are the readings as stored, before Trends decides which device to
             show for each day. Anything your device records that is not listed here
             is something we do not currently read.
@@ -226,13 +221,13 @@ function DevicePanel({ device, days }: { device: Device; days: number }) {
       )}
 
       {open && !hasData && (
-        <p className="font-body text-xs text-muted">
+        <p className="text-micro text-muted">
           Nothing has arrived in the last {days} days. A new connection can take a
           day to fill up, and some readings are only finalised hours after they are
           taken.
         </p>
       )}
-    </Card>
+    </section>
   );
 }
 
