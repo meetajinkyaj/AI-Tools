@@ -198,6 +198,15 @@ finds every use. Compose them with utilities; they set structure, not layout.
 
 **Header**
 - `.iki-eyebrow`, `.iki-title`, `.iki-lede`.
+- `.iki-eyebrow-sm` is the muted small eyebrow, for a partner name above their
+  own offer. Muted rather than terracotta on purpose: a brand name should not
+  out-shout the offer it introduces.
+
+**Code chip**
+- `.iki-code` with `.iki-code-value` and `.iki-code-action`. Monospace, because
+  these are read character by character and typed by hand when the clipboard
+  fails. The whole chip is the target and carries the 44px height: a 10px
+  "COPY" is not something to ask a thumb to hit.
 
 **Progress bar**
 - `.iki-bar` track, `.iki-bar-fill` fill. The fill's width is set inline by the
