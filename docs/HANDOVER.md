@@ -451,6 +451,13 @@ deliberately.
   rehearsed on a throwaway Postgres before they touch production.
 - **The disclaimer is fixed copy:** "Educational, not a diagnosis, please
   consult a doctor." Don't soften it without counsel.
+- **No app gamification on the doctor summary.** Streaks, ranks, points and
+  badges exist to make somebody open the app tomorrow; printed beside a lipid
+  panel on a document a clinician reads, they borrow an authority they have not
+  got. `src/app/doctor-summary.test.ts` reads the source and fails on any of
+  them. The one number that stays is the count of days of self-report, because
+  it is the sample size behind the averages next to it, and it is worded as an
+  observation period rather than as a tally of app visits.
 
 ---
 
