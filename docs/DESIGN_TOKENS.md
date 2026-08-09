@@ -233,7 +233,8 @@ finds every use. Compose them with utilities; they set structure, not layout.
   row, so the last one loses its rule with no special case at the call site.
 - `.iki-row-sheet` h52 tappable row for the More sheet.
 
-**Check-in controls** (behaviour lives in `src/app/checkin-controls.tsx`)
+**Controls** (behaviour lives in `src/app/checkin-controls.tsx`, and the switch
+in `src/app/switch.tsx`, since Profile uses one too)
 - `.iki-energy` / `.iki-energy-cell` the five-cell energy scale. The track is
   one `role="slider"`, not five buttons: five buttons is five tab stops and
   reads as a toolbar, when what it is, is one value between one and five.

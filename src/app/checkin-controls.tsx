@@ -12,10 +12,14 @@ import {
 import { ActivityIcon, CheckIcon } from "./activity-icon";
 
 /**
- * The four controls the check-in mockup specifies as behaviour rather than as
- * paint. They live here rather than inside `checkin-form.tsx` because each one
- * carries real interaction logic, and a 600 line form with four gesture
- * handlers threaded through it is a file nobody can read.
+ * The check-in controls the mockup specifies as behaviour rather than as paint.
+ * They live here rather than inside `checkin-form.tsx` because each carries
+ * real interaction logic, and a 600 line form with gesture handlers threaded
+ * through it is a file nobody can read.
+ *
+ * The switch used to be here too and now lives in `./switch`, because Profile
+ * needs one as well and a general control should not be imported out of a
+ * module named for one screen.
  *
  * None of them owns any state. Every one takes a value and an onChange, so the
  * form remains the single place a check-in exists.
@@ -154,37 +158,6 @@ export function EnergyScale({
         {value ? `${ENERGY_LABELS[value]}, press and slide` : "Press and slide"}
       </span>
     </div>
-  );
-}
-
-/**
- * The "I trained today" switch.
- *
- * `role="switch"` on a real button, so it is reachable, toggles on Space and
- * Enter for free, and announces its state. The knob's travel is computed from
- * the track's own tokens rather than a second hardcoded offset, so changing the
- * switch's size in `globals.css` cannot leave the knob short of the end.
- */
-export function Switch({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className="iki-switch"
-    >
-      <span className="iki-switch-knob" />
-    </button>
   );
 }
 
