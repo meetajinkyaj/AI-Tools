@@ -640,6 +640,18 @@ summary {
     text-transform: uppercase;
     color: var(--primary);
   }
+  /*
+   * The SMALL eyebrow is muted, not terracotta, and that is the whole point of
+   * it existing separately. It labels a partner above their own offer, and a
+   * terracotta brand name would out-shout the offer it introduces.
+   */
+  .iki-eyebrow-sm {
+    font-family: var(--font-label), serif;
+    font-size: var(--text-eyebrow-sm);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
   .iki-title {
     font-family: var(--font-display), serif;
     font-size: var(--text-display-xl);
@@ -761,6 +773,49 @@ summary {
     font-weight: 600;
     color: var(--ink);
     cursor: pointer;
+  }
+
+  /* --- Code chip, handoff §3.7 ------------------------------------------- */
+
+  /*
+   * A voucher code, and the button that copies it.
+   *
+   * Monospace because these are read character by character and typed by hand
+   * when the clipboard fails; a proportional 0 and O are the same shape at this
+   * size. The inset fill rather than a border, so a row of history entries does
+   * not turn into a row of boxes.
+   *
+   * The whole chip is the target, not the word COPY inside it: a 10px word is
+   * not something to ask a thumb to hit.
+   */
+  .iki-code {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    min-height: var(--spacing-tap);
+    padding-inline: calc(var(--spacing) * 2.5);
+    border-radius: var(--radius-ctl);
+    background: var(--surface-2);
+    cursor: pointer;
+    transition: background-color 140ms ease-out, transform 100ms var(--ease-press);
+  }
+  .iki-code:active {
+    transform: scale(0.97);
+  }
+  .iki-code:hover {
+    background: var(--line);
+  }
+  .iki-code-value {
+    font-family: var(--font-mono), monospace;
+    font-size: var(--text-micro);
+    color: var(--ink);
+  }
+  .iki-code-action {
+    font-size: var(--text-tab);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--primary);
   }
 
   /* --- Bottom navigation, handoff §2 ------------------------------------- */

@@ -2,13 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  Card,
-  Eyebrow,
-  PageHeader,
-  primaryButtonClass,
-  secondaryButtonClass,
-} from "./ui";
+
 
 /**
  * Partners / Rewards, the redemption loop. Users spend iki points on brand
@@ -83,12 +77,10 @@ function CopyableCode({ code, className = "" }: { code: string; className?: stri
       type="button"
       onClick={copy}
       aria-label={`Copy code ${code}`}
-      className={`inline-flex items-center gap-2 rounded-control bg-surface-2 px-2.5 py-1 transition-colors hover:bg-border ${className}`}
+      className={`iki-code ${className}`}
     >
-      <code className="font-mono text-xs text-foreground">{code}</code>
-      <span className="font-body text-[10px] uppercase tracking-wide text-accent">
-        {copied ? "Copied" : "Copy"}
-      </span>
+      <code className="iki-code-value">{code}</code>
+      <span className="iki-code-action">{copied ? "Copied" : "Copy"}</span>
     </button>
   );
 }
@@ -201,13 +193,17 @@ export function PartnersView({
   }
 
   if (status === "loading") {
-    return <p className="font-body text-sm text-muted">Loading rewards…</p>;
+    return <p className="text-body-sm text-muted">Loading rewards…</p>;
   }
   if (status === "error") {
     return (
-      <div className="flex flex-col gap-4">
-        <p className="font-body text-sm text-muted">Couldn&rsquo;t load rewards.</p>
-        <button onClick={() => void load()} className={primaryButtonClass}>
+      <div className="flex w-full max-w-xl flex-col gap-4">
+        <p className="text-body-sm text-muted">Couldn&rsquo;t load rewards.</p>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="iki-btn iki-btn-primary w-full"
+        >
           Try again
         </button>
       </div>
@@ -221,43 +217,50 @@ export function PartnersView({
   const history = data?.history ?? [];
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-8">
-      <PageHeader
-        eyebrow="Rewards"
-        title="Spend your iki points"
-        subtitle="Redeem points for partner vouchers, or shop products we'd use ourselves."
-      />
+    <div className="flex w-full max-w-xl flex-col gap-stack">
+      <header className="flex flex-col gap-1.5">
+        <p className="iki-eyebrow">Rewards</p>
+        <h1 className="iki-title">Spend your iki points</h1>
+        <p className="iki-lede">
+          Redeem points for partner vouchers, or shop products we&rsquo;d use ourselves.
+        </p>
+      </header>
 
-      <Card className="flex items-center justify-between gap-4 p-6">
-        <div className="flex flex-col gap-1">
-          <Eyebrow>Your iki points</Eyebrow>
-          <p className="font-display text-3xl font-medium text-foreground">{balance}</p>
+      <section className="iki-card iki-card-tight flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-0.5">
+          <p className="iki-eyebrow">Your iki points</p>
+          {/* The one hero numeral on this screen, so it takes the largest step
+              in the scale below the page title. */}
+          <p className="font-display text-display-lg font-medium leading-none text-ink">
+            {balance}
+          </p>
         </div>
         <button
           type="button"
           onClick={() => setShowFaq((v) => !v)}
-          className="font-body text-xs text-muted underline underline-offset-4 hover:text-foreground"
+          aria-expanded={showFaq}
+          className="iki-btn-link iki-tap shrink-0"
         >
           How to redeem
         </button>
-      </Card>
+      </section>
 
       {showFaq && <HowToRedeem />}
 
       <InviteCard getToken={getToken} />
 
       {items.length === 0 && (
-        <Card className="p-6">
-          <p className="font-body text-sm text-muted">
+        <section className="iki-card">
+          <p className="text-body-sm text-muted">
             Partners are being onboarded. Keep earning, redemptions open here soon.
           </p>
-        </Card>
+        </section>
       )}
 
       {vouchers.length > 0 && (
-        <section className="flex flex-col gap-4">
-          <Eyebrow>Vouchers</Eyebrow>
-          <div className="grid gap-4 sm:grid-cols-2">
+        <section className="flex flex-col gap-2">
+          <p className="iki-eyebrow">Vouchers</p>
+          <div className="grid gap-2 sm:grid-cols-2">
             {vouchers.map((item) => (
               <VoucherCard
                 key={item.id}
@@ -274,13 +277,15 @@ export function PartnersView({
       )}
 
       {affiliates.length > 0 && (
-        <section className="flex flex-col gap-4">
-          <Eyebrow>Shop our picks</Eyebrow>
-          <p className="font-body text-xs text-muted">
+        <section className="flex flex-col gap-2">
+          <p className="iki-eyebrow">Shop our picks</p>
+          {/* NOT IN THE MOCKUP AND NOT OPTIONAL. Affiliate disclosure has to sit
+              with the links it describes, not in the terms page. */}
+          <p className="pb-1 text-micro text-muted">
             Affiliate links, we may earn a commission, at no extra cost to you.
             Not medical advice.
           </p>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             {affiliates.map((item) => (
               <AffiliateCard key={item.id} item={item} onOpen={() => openAffiliate(item)} />
             ))}
@@ -289,28 +294,39 @@ export function PartnersView({
       )}
 
       {history.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <Eyebrow>Redemption history{showHistory ? "" : ` · ${history.length}`}</Eyebrow>
+        <section className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="iki-eyebrow">
+              Redemption history{showHistory ? "" : ` · ${history.length}`}
+            </p>
+            {/* Tucking history away is remembered per device. Kept: a member
+                who has redeemed a lot should not have to scroll past all of it
+                to reach the terms. */}
             <button
               type="button"
               onClick={toggleHistory}
-              className="font-body text-xs text-muted underline underline-offset-4 hover:text-foreground"
+              aria-expanded={showHistory}
+              className="iki-btn-link iki-tap shrink-0"
             >
               {showHistory ? "Hide" : "Show"}
             </button>
           </div>
           {showHistory && (
-            <Card className="flex flex-col divide-y divide-border">
+            <div className="flex flex-col gap-2">
               {history.map((row) => {
                 const it = itemOf(row);
                 return (
-                  <div key={row.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <div
+                    key={row.id}
+                    className="iki-card iki-card-tight flex items-center justify-between gap-2.5"
+                  >
                     <div className="flex min-w-0 flex-col">
-                      <span className="truncate font-body text-sm text-foreground">
+                      {/* The snapshot first, the join second. A deleted catalog
+                          item must not erase a code somebody paid points for. */}
+                      <span className="truncate text-caption font-semibold text-ink">
                         {row.item_name ?? it?.name ?? "Reward"}
                       </span>
-                      <span className="font-body text-xs text-muted">
+                      <span className="text-micro text-muted">
                         {new Date(row.redeemed_at ?? row.created_at).toLocaleDateString()} ·{" "}
                         {row.points_spent} points
                       </span>
@@ -321,14 +337,14 @@ export function PartnersView({
                   </div>
                 );
               })}
-            </Card>
+            </div>
           )}
         </section>
       )}
 
-      <p className="font-body text-xs text-muted">
+      <p className="text-micro text-muted">
         iki points have no cash value. See the{" "}
-        <a href="/terms#rewards" className="text-accent underline">
+        <a href="/terms#rewards" className="text-primary underline underline-offset-2">
           rewards terms
         </a>
         .
@@ -419,57 +435,59 @@ function InviteCard({ getToken }: { getToken: () => Promise<string | null> }) {
   };
 
   return (
-    <Card className="flex flex-col gap-3 p-6">
+    <section className="iki-card flex flex-col gap-2.5">
       <div className="flex items-baseline justify-between gap-3">
-        <Eyebrow>Invite friends</Eyebrow>
+        <p className="iki-eyebrow">Invite friends</p>
         {info.completed > 0 && (
-          <span className="font-body text-xs text-muted">
+          <span className="text-micro text-muted">
             {info.completed} joined &amp; onboarded
           </span>
         )}
       </div>
-      <p className="font-body text-sm text-foreground/80">
+      <p className="text-caption leading-relaxed text-ink">
         Share your link, earn up to{" "}
-        <span className="font-medium text-foreground">
-          +{info.maxTotal} iki points
-        </span>{" "}
-        per friend:
+        <span className="font-bold">+{info.maxTotal} iki points</span> per friend:
       </p>
-      <ul className="flex flex-col gap-1 font-body text-xs text-muted">
+      {/* Amounts in ink and bold, the condition in muted. The number is what
+          somebody scans for; the sentence is what they read once. */}
+      <ul className="flex flex-col gap-1 text-small text-muted">
         <li>
-          <span className="font-medium text-foreground">+{info.tiers.onboard}</span>{" "}
-          when they join and complete onboarding
+          <span className="font-bold text-ink">+{info.tiers.onboard}</span> when they
+          join and complete onboarding
         </li>
         <li>
-          <span className="font-medium text-foreground">+{info.tiers.streak}</span>{" "}
-          when they build a daily habit (their first 7-day check-in streak)
+          <span className="font-bold text-ink">+{info.tiers.streak}</span> when they
+          build a daily habit (their first 7-day check-in streak)
         </li>
         <li>
-          <span className="font-medium text-foreground">+{info.tiers.panel}</span>{" "}
-          when they upload their first blood report within{" "}
-          {info.tiers.panelWindowDays} days of joining
+          <span className="font-bold text-ink">+{info.tiers.panel}</span> when they
+          upload their first blood report within {info.tiers.panelWindowDays} days
+          of joining
         </li>
       </ul>
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <button
           type="button"
           onClick={() => void share()}
-          className={`${primaryButtonClass} shrink-0`}
+          className="iki-btn iki-btn-primary shrink-0"
         >
           {copied ? "Link copied" : "Share your link"}
         </button>
+        {/* KEPT, THOUGH THE MOCKUP HAS ONLY THE SHARE BUTTON. The share sheet is
+            awkward or absent on desktop, and the visible link is the fallback
+            when the clipboard is blocked. */}
         <button
           type="button"
           onClick={() => void copyLink()}
-          className={`${secondaryButtonClass} shrink-0`}
+          className="iki-btn iki-btn-secondary shrink-0"
         >
           {linkCopied ? "Copied" : "Copy link"}
         </button>
-        <code className="min-w-0 truncate rounded-control bg-surface-2 px-3 py-2 font-mono text-xs text-muted">
+        <code className="min-w-0 truncate rounded-ctl bg-surface-2 px-3 py-2 font-mono text-micro text-muted">
           {info.link}
         </code>
       </div>
-    </Card>
+    </section>
   );
 }
 
@@ -482,17 +500,17 @@ function HowToRedeem() {
     "Vouchers are single-use and may have an expiry or minimum spend, check the terms on the voucher.",
   ];
   return (
-    <Card className="flex flex-col gap-3 p-6">
-      <Eyebrow>How to redeem</Eyebrow>
+    <section className="iki-card flex flex-col gap-2.5">
+      <p className="iki-eyebrow">How to redeem</p>
       <ol className="flex flex-col gap-2">
         {steps.map((s, i) => (
-          <li key={i} className="flex gap-3 font-body text-sm text-foreground/80">
-            <span className="font-body text-sm font-medium text-accent">{i + 1}.</span>
+          <li key={i} className="flex gap-3 text-body-sm text-ink">
+            <span className="font-semibold text-primary">{i + 1}.</span>
             {s}
           </li>
         ))}
       </ol>
-    </Card>
+    </section>
   );
 }
 
@@ -515,55 +533,63 @@ function VoucherCard({
       : `Redeem · ${item.points_cost}`;
 
   return (
-    <Card className="flex flex-col gap-3 p-5">
-      <div className="flex flex-col gap-1">
-        {item.partner && <Eyebrow>{item.partner}</Eyebrow>}
-        <p className="font-body text-sm font-medium text-foreground">{item.name}</p>
+    <section className="iki-card iki-card-tight flex flex-col gap-2.5">
+      <div className="flex flex-col gap-0.5">
+        {/* Muted, not terracotta: a brand name should not out-shout the offer
+            it introduces. */}
+        {item.partner && <p className="iki-eyebrow-sm">{item.partner}</p>}
+        <p className="text-body font-semibold text-ink">{item.name}</p>
         {item.discount_value && (
-          <p className="font-body text-xs text-muted">{item.discount_value}</p>
+          <p className="text-small text-muted">{item.discount_value}</p>
         )}
         {item.description && (
-          <p className="font-body text-xs text-muted">{item.description}</p>
+          <p className="text-small text-muted">{item.description}</p>
         )}
       </div>
       <button
         type="button"
         onClick={onRedeem}
         disabled={comingSoon || soldOut || tooPoor}
-        className={`${primaryButtonClass} mt-auto`}
+        className="iki-btn iki-btn-primary mt-auto w-full"
       >
         {label}
       </button>
+      {/* The gap is stated rather than the button just going dead. "Redeem"
+          greyed out with no reason reads as broken. */}
       {tooPoor && (
-        <p className="font-body text-xs text-muted">
+        <p className="text-micro text-muted">
           {item.points_cost - balance} more points to unlock.
         </p>
       )}
-    </Card>
+    </section>
   );
 }
 
 function AffiliateCard({ item, onOpen }: { item: CatalogItem; onOpen: () => void }) {
   return (
-    <Card className="flex flex-col gap-3 p-5">
-      <div className="flex flex-col gap-1">
-        {item.partner && <Eyebrow>{item.partner}</Eyebrow>}
-        <p className="font-body text-sm font-medium text-foreground">{item.name}</p>
+    <section className="iki-card iki-card-tight flex flex-col gap-2.5">
+      <div className="flex flex-col gap-0.5">
+        {item.partner && <p className="iki-eyebrow-sm">{item.partner}</p>}
+        <p className="text-body font-semibold text-ink">{item.name}</p>
         {item.description && (
-          <p className="font-body text-xs text-muted">{item.description}</p>
+          <p className="text-small text-muted">{item.description}</p>
         )}
       </div>
-      <button type="button" onClick={onOpen} className={`${secondaryButtonClass} mt-auto`}>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="iki-btn iki-btn-secondary mt-auto w-full"
+      >
         Shop&nbsp;&rarr;
       </button>
-    </Card>
+    </section>
   );
 }
 
 /** A lightweight full-screen overlay (no modal lib) shared by confirm + issued. */
 function Overlay({ children }: { children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
       <div className="w-full max-w-sm">{children}</div>
     </div>
   );
@@ -586,22 +612,22 @@ function ConfirmRedeem({
 }) {
   return (
     <Overlay>
-      <Card className="flex flex-col gap-4 p-6">
+      <div className="iki-card flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <Eyebrow>Redeem</Eyebrow>
-          <p className="font-display text-xl font-medium text-foreground">{item.name}</p>
-          <p className="font-body text-sm text-muted">
+          <p className="iki-eyebrow">Redeem</p>
+          <p className="font-display text-display-sm font-medium text-ink">{item.name}</p>
+          <p className="text-body-sm text-muted">
             {item.points_cost} points · you have {balance}
           </p>
         </div>
-        {item.terms && <p className="font-body text-xs text-muted">{item.terms}</p>}
-        {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
-        <div className="flex flex-col gap-3 sm:flex-row-reverse">
+        {item.terms && <p className="text-micro text-muted">{item.terms}</p>}
+        {error && <p role="alert" className="text-body-sm text-primary-deep">{error}</p>}
+        <div className="flex flex-col gap-3">
           <button
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className={`${primaryButtonClass} w-full sm:flex-1`}
+            className="iki-btn iki-btn-primary w-full"
           >
             {busy ? "Redeeming…" : "Confirm"}
           </button>
@@ -609,12 +635,12 @@ function ConfirmRedeem({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className={`${secondaryButtonClass} w-full sm:flex-1`}
+            className="iki-btn iki-btn-secondary w-full"
           >
             Cancel
           </button>
         </div>
-      </Card>
+      </div>
     </Overlay>
   );
 }
@@ -632,29 +658,34 @@ function VoucherIssued({ issued, onClose }: { issued: Issued; onClose: () => voi
   };
   return (
     <Overlay>
-      <Card className="flex flex-col gap-4 border-accent/20 bg-accent/5 p-6">
+      <div className="iki-card iki-card-accent flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <Eyebrow>Voucher unlocked</Eyebrow>
-          <p className="font-display text-xl font-medium text-foreground">{issued.name}</p>
+          <p className="iki-eyebrow">Voucher unlocked</p>
+          <p className="font-display text-display-sm font-medium text-ink">{issued.name}</p>
         </div>
+        {/* Bigger than the history chip on purpose: this is the moment the code
+            exists, and it is the only thing on screen worth reading. */}
         <button
           type="button"
           onClick={copy}
-          className="flex items-center justify-between gap-3 rounded-control border border-border-strong bg-surface px-4 py-3 text-left"
+          aria-label={`Copy code ${issued.code}`}
+          className="iki-press flex min-h-ctl items-center justify-between gap-3 rounded-ctl border border-line-strong bg-surface px-4 text-left"
         >
-          <code className="font-mono text-base text-foreground">{issued.code}</code>
-          <span className="shrink-0 font-body text-xs text-accent">
-            {copied ? "Copied" : "Copy"}
-          </span>
+          <code className="font-mono text-body-lg text-ink">{issued.code}</code>
+          <span className="iki-code-action shrink-0">{copied ? "Copied" : "Copy"}</span>
         </button>
-        <p className="font-body text-xs text-muted">
+        <p className="text-micro text-muted">
           {issued.redeem_instructions ??
             "Use this code at the partner's checkout. It's saved in your Redemption history too."}
         </p>
-        <button type="button" onClick={onClose} className={primaryButtonClass}>
+        <button
+          type="button"
+          onClick={onClose}
+          className="iki-btn iki-btn-primary w-full"
+        >
           Done
         </button>
-      </Card>
+      </div>
     </Overlay>
   );
 }
