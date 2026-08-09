@@ -229,7 +229,7 @@ export function ProfileEditForm({
             </div>
           </div>
 
-          <label className="flex items-start gap-2.5 font-body text-sm text-muted">
+          <label className="flex items-start gap-2.5 text-body-sm text-muted">
             <input
               type="checkbox"
               className="mt-0.5 h-4 w-4 accent-accent"
@@ -239,7 +239,7 @@ export function ProfileEditForm({
             Email me occasional product tips and updates.
           </label>
 
-          {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
+          {error && <p className="text-body-sm text-primary-deep">{error}</p>}
 
           <div className="mt-2 flex flex-col gap-3 sm:flex-row-reverse">
             <button

@@ -31,8 +31,8 @@ export function ActivityChips({
             aria-pressed={selected}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               selected
-                ? "border-accent bg-accent text-accent-contrast"
-                : "border-border bg-surface text-foreground hover:border-accent/50"
+                ? "border-primary bg-primary text-primary-fg"
+                : "border-line bg-surface text-ink hover:border-primary/50"
             }`}
           >
             {EXERCISE_TYPE_LABELS[type]}

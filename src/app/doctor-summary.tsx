@@ -184,12 +184,12 @@ export function DoctorSummary({
   }
 
   if (status === "loading") {
-    return <p className="font-body text-sm text-muted">Preparing your summary…</p>;
+    return <p className="text-body-sm text-muted">Preparing your summary…</p>;
   }
   if (status === "error" || !data) {
     return (
       <div className="flex flex-col gap-4">
-        <p className="font-body text-sm text-muted">Couldn&rsquo;t load your summary.</p>
+        <p className="text-body-sm text-muted">Couldn&rsquo;t load your summary.</p>
         <div className="flex gap-3">
           <button onClick={() => void load()} className={primaryButtonClass}>Try again</button>
           <button onClick={onBack} className={secondaryButtonClass}>Back</button>
@@ -214,8 +214,8 @@ export function DoctorSummary({
       {/* On-screen preview, mirrors the PDF */}
       <Card className="flex flex-col gap-5 p-6">
         <div className="flex flex-col gap-0.5">
-          <span className="font-display text-lg font-medium text-foreground">{profile.name}</span>
-          <span className="font-body text-xs text-muted">
+          <span className="font-display text-lg font-medium text-ink">{profile.name}</span>
+          <span className="text-micro text-muted">
             {[profile.sex, profile.dob ? `DOB ${profile.dob}` : null].filter(Boolean).join(" · ") || "-"}
           </span>
         </div>
@@ -224,25 +224,25 @@ export function DoctorSummary({
           <Eyebrow>Latest lab panel</Eyebrow>
           {latestPanel ? (
             <>
-              <p className="font-body text-xs text-muted">
+              <p className="text-micro text-muted">
                 {latestPanel.date}
                 {latestPanel.lab ? ` · ${latestPanel.lab}` : ""}
               </p>
               {latestPanel.flagged.length === 0 ? (
-                <p className="font-body text-sm text-foreground/80">
+                <p className="text-body-sm text-ink/80">
                   All {latestPanel.totalCount} measured markers within range.
                 </p>
               ) : (
-                <ul className="flex flex-col divide-y divide-border">
+                <ul className="flex flex-col divide-y divide-line">
                   {latestPanel.flagged.map((m) => (
                     <li key={m.name} className="flex items-center justify-between gap-3 py-1.5">
-                      <span className="min-w-0 truncate font-body text-sm text-foreground">{m.name}</span>
-                      <span className="shrink-0 font-body text-sm">
-                        <span className="font-medium text-foreground">
+                      <span className="min-w-0 truncate text-body-sm text-ink">{m.name}</span>
+                      <span className="shrink-0 text-body-sm">
+                        <span className="font-medium text-ink">
                           {m.value}{m.unit ? ` ${m.unit}` : ""}
                         </span>
                         <span className="ml-2 text-muted">({rangeText(m.refLow, m.refHigh, m.unit)})</span>
-                        <span className="ml-2 uppercase text-accent">{m.flag}</span>
+                        <span className="ml-2 uppercase text-primary">{m.flag}</span>
                       </span>
                     </li>
                   ))}
@@ -250,24 +250,24 @@ export function DoctorSummary({
               )}
             </>
           ) : (
-            <p className="font-body text-sm text-muted">No lab panel on file yet.</p>
+            <p className="text-body-sm text-muted">No lab panel on file yet.</p>
           )}
         </div>
 
         {sinceBaseline && sinceBaseline.deltas.length > 0 && (
           <div className="flex flex-col gap-2">
             <Eyebrow>Since baseline</Eyebrow>
-            <p className="font-body text-xs text-muted">
+            <p className="text-micro text-muted">
               {sinceBaseline.baselineDate} → {sinceBaseline.latestDate}
             </p>
-            <ul className="flex flex-col divide-y divide-border">
+            <ul className="flex flex-col divide-y divide-line">
               {sinceBaseline.deltas.map((d) => (
                 <li key={d.marker_key} className="flex items-center justify-between gap-3 py-1.5">
-                  <span className="min-w-0 truncate font-body text-sm text-foreground">
+                  <span className="min-w-0 truncate text-body-sm text-ink">
                     {d.marker_name ?? d.marker_key}
                     {d.improved && <span className="ml-2 text-xs text-clay">improved</span>}
                   </span>
-                  <span className="shrink-0 font-body text-sm text-muted">
+                  <span className="shrink-0 text-body-sm text-muted">
                     {d.baseline_value} → {d.latest_value}
                   </span>
                 </li>
@@ -278,15 +278,15 @@ export function DoctorSummary({
 
         <div className="flex flex-col gap-2">
           <Eyebrow>Lifestyle context</Eyebrow>
-          <p className="font-body text-sm text-foreground/80">
+          <p className="text-body-sm text-ink/80">
             {lifestyleLine(lifestyle, " · ")}
           </p>
           {lifestyle.interventions.length > 0 && (
             <div className="flex flex-col gap-1">
-              <span className="font-body text-xs text-muted">Current interventions</span>
+              <span className="text-micro text-muted">Current interventions</span>
               <ul className="flex flex-col gap-0.5">
                 {lifestyle.interventions.map((it, i) => (
-                  <li key={i} className="font-body text-sm text-foreground/80">
+                  <li key={i} className="text-body-sm text-ink/80">
                     {it.label}
                     {it.dose_note ? `, ${it.dose_note}` : ""}
                     <span className="text-muted"> (since {it.started_at})</span>
@@ -297,10 +297,10 @@ export function DoctorSummary({
           )}
         </div>
 
-        <p className="font-body text-xs text-muted">{DISCLAIMER}</p>
+        <p className="text-micro text-muted">{DISCLAIMER}</p>
       </Card>
 
-      {note && <p className="font-body text-sm text-muted">{note}</p>}
+      {note && <p className="text-body-sm text-muted">{note}</p>}
 
       <div className="flex flex-col gap-3 sm:flex-row-reverse">
         <button onClick={() => void handleShare()} disabled={busy} className={`${primaryButtonClass} w-full sm:flex-1`}>

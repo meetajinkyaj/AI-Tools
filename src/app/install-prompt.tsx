@@ -71,13 +71,13 @@ export function InstallPrompt() {
   };
 
   return (
-    <Card className="flex flex-col gap-3 border-accent/20 bg-accent/5 p-5">
+    <Card className="flex flex-col gap-3 border-primary/20 bg-primary/5 p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
-          <p className="font-body text-sm font-medium text-foreground">
+          <p className="text-body-sm font-semibold text-ink">
             Add Ikigaro to your home screen
           </p>
-          <p className="font-body text-xs text-muted">
+          <p className="text-micro text-muted">
             {ios
               ? "Tap the Share button, then “Add to Home Screen”. It opens full-screen and you’ll get daily check-in reminders."
               : "Install it for a full-screen, app-like experience and daily check-in reminders."}
@@ -87,7 +87,7 @@ export function InstallPrompt() {
           type="button"
           onClick={dismiss}
           aria-label="Dismiss"
-          className="shrink-0 rounded-full px-2 py-1 font-body text-xs text-muted hover:text-foreground"
+          className="shrink-0 rounded-full px-2 py-1 text-micro text-muted hover:text-ink"
         >
           Not now
         </button>

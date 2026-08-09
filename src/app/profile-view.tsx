@@ -17,10 +17,13 @@ import { WearableSettings } from "./wearable-settings";
 export function ProfileView({
   profile,
   onEdit,
+  onLogout,
   getToken,
 }: {
   profile: ProfileRow;
   onEdit: () => void;
+  /** Moved here from the shell header when the bottom nav replaced it. */
+  onLogout?: () => void;
   getToken: () => Promise<string | null>;
 }) {
   /*
@@ -81,6 +84,34 @@ export function ProfileView({
       <NotificationSettings getToken={getToken} />
 
       <WearableSettings getToken={getToken} />
+
+      {/*
+        LOG OUT LIVES HERE NOW. It used to sit in the shell's header, which the
+        bottom nav replaced; the design puts it at the foot of Profile, which is
+        also where somebody looks for it. Bare and quiet on purpose: it is not
+        an action the screen is encouraging.
+      */}
+      {onLogout && (
+        <button
+          type="button"
+          onClick={onLogout}
+          className="iki-btn iki-btn-ceremonial w-full border-0"
+        >
+          Log out
+        </button>
+      )}
+
+      {/* The old shell footer carried these. Losing the only route to the
+          privacy policy and the terms from inside the app would be a
+          regression a redesign has no business causing. */}
+      <p className="flex justify-center gap-4 text-micro text-muted">
+        <a href="/privacy" className="iki-tap underline underline-offset-2">
+          Privacy
+        </a>
+        <a href="/terms" className="iki-tap underline underline-offset-2">
+          Terms
+        </a>
+      </p>
     </div>
   );
 }

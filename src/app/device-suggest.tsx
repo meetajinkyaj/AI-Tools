@@ -133,11 +133,11 @@ export function DeviceSuggest({ getToken }: { getToken: () => Promise<string | n
   if (rows === null) return null;
 
   return (
-    <div className="flex flex-col gap-3 border-t border-border pt-3">
+    <div className="flex flex-col gap-3 border-t border-line pt-3">
       <p className="font-label text-[0.55rem] uppercase tracking-[0.24em] text-muted">
         Don&apos;t see your device?
       </p>
-      <p className="font-body text-xs text-muted">
+      <p className="text-micro text-muted">
         Tell us what you use and we&apos;ll look at adding it next.
       </p>
 
@@ -146,15 +146,15 @@ export function DeviceSuggest({ getToken }: { getToken: () => Promise<string | n
           {rows.map((r) => (
             <li
               key={r.device_key}
-              className="flex items-center gap-1.5 rounded-pill border border-border px-3 py-1"
+              className="flex items-center gap-1.5 rounded-pill border border-line px-3 py-1"
             >
-              <span className="font-body text-xs text-foreground">{r.raw_text}</span>
+              <span className="text-micro text-ink">{r.raw_text}</span>
               <button
                 type="button"
                 onClick={() => void remove(r.device_key)}
                 disabled={busy}
                 aria-label={`Remove ${r.raw_text}`}
-                className="font-body text-xs leading-none text-muted hover:text-foreground"
+                className="text-micro leading-none text-muted hover:text-ink"
               >
                 ✕
               </button>
@@ -177,7 +177,7 @@ export function DeviceSuggest({ getToken }: { getToken: () => Promise<string | n
           maxLength={MAX_SUGGESTION_LENGTH}
           placeholder="e.g. Samsung Galaxy Ring"
           aria-label="Suggest a device"
-          className="min-w-0 flex-1 rounded-pill border border-border bg-transparent px-4 py-2 font-body text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
+          className="min-w-0 flex-1 rounded-pill border border-line bg-transparent px-4 py-2 text-body-sm text-ink placeholder:text-muted focus:border-primary focus:outline-none"
         />
         {/* Hints, not a menu, the field stays free text so the devices we have
             never heard of can still be named. */}
@@ -197,7 +197,7 @@ export function DeviceSuggest({ getToken }: { getToken: () => Promise<string | n
       </div>
 
       {rows.length > 0 && (
-        <label className="flex items-center gap-2 font-body text-xs text-muted">
+        <label className="flex items-center gap-2 text-micro text-muted">
           <input
             type="checkbox"
             checked={notifyOn}
@@ -209,7 +209,7 @@ export function DeviceSuggest({ getToken }: { getToken: () => Promise<string | n
       )}
 
       {message && (
-        <p role="status" className="font-body text-xs text-foreground">
+        <p role="status" className="text-micro text-ink">
           {message}
         </p>
       )}

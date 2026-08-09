@@ -191,7 +191,7 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
   return (
     <div className="flex flex-col gap-4">
       {!configured && (
-        <Card className="p-4 font-body text-sm text-muted">
+        <Card className="p-4 text-body-sm text-muted">
           Email isn&rsquo;t configured on this environment, so nothing can be sent yet.
         </Card>
       )}
@@ -226,7 +226,7 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
             placeholder={"Plain text only.\n\nLeave a blank line between paragraphs."}
             className={`${fieldClass} resize-y`}
           />
-          <p className="font-body text-xs text-muted">
+          <p className="text-micro text-muted">
             Plain text, blank lines become paragraphs. Links are not clickable.
             An unsubscribe link is added automatically.
           </p>
@@ -248,14 +248,14 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
               </option>
             ))}
           </select>
-          <p className="font-body text-xs text-muted">
+          <p className="text-micro text-muted">
             {count === null
               ? "Counting…"
               : `${count} ${count === 1 ? "person" : "people"} will receive this. Unsubscribed and deleted accounts are already excluded.`}
           </p>
         </div>
 
-        <label className="flex items-start gap-2 font-body text-sm text-foreground">
+        <label className="flex items-start gap-2 text-body-sm text-ink">
           <input
             type="checkbox"
             checked={includeAppButton}
@@ -264,7 +264,7 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
           />
           <span className="flex flex-col gap-0.5">
             <span>Include an &ldquo;Open Ikigaro&rdquo; button</span>
-            <span className="font-body text-xs text-muted">
+            <span className="text-micro text-muted">
               Only worth it when the message is actually asking someone to open
               the app. Otherwise it competes with what you wrote.
             </span>
@@ -274,7 +274,7 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
         {msg && (
           <p
             role="status"
-            className={`font-body text-sm ${msg.ok ? "text-foreground/80" : "text-accent-hover"}`}
+            className={`text-body-sm ${msg.ok ? "text-ink/80" : "text-primary-deep"}`}
           >
             {msg.ok ? "✓ " : ""}
             {msg.text}
@@ -303,24 +303,24 @@ export function BroadcastPanel({ getToken }: { getToken: () => Promise<string | 
         </div>
 
         {!valid.ok && (subject.length > 0 || body.length > 0) && (
-          <p className="font-body text-xs text-muted">{valid.error}</p>
+          <p className="text-micro text-muted">{valid.error}</p>
         )}
       </Card>
 
       <Card className="flex flex-col gap-3 p-5">
         <Eyebrow>Sent</Eyebrow>
         {history.length === 0 ? (
-          <p className="font-body text-sm text-muted">Nothing sent yet.</p>
+          <p className="text-body-sm text-muted">Nothing sent yet.</p>
         ) : (
           <ul className="flex flex-col">
             {history.map((b) => (
               <li
                 key={b.id}
-                className="flex flex-wrap items-start justify-between gap-3 border-t border-border py-3 first:border-t-0 first:pt-0"
+                className="flex flex-wrap items-start justify-between gap-3 border-t border-line py-3 first:border-t-0 first:pt-0"
               >
                 <div className="flex min-w-0 flex-col gap-0.5">
-                  <span className="font-body text-sm text-foreground">{b.subject}</span>
-                  <span className="font-body text-xs text-muted">
+                  <span className="text-body-sm text-ink">{b.subject}</span>
+                  <span className="text-micro text-muted">
                     {b.audience} · {new Date(b.created_at).toLocaleDateString()} · {b.stats.sent} sent
                     {b.stats.failed > 0 && ` · ${b.stats.failed} failed`}
                     {b.stats.pending > 0 && ` · ${b.stats.pending} queued`}

@@ -22,5 +22,15 @@ export function callbackUrl(provider: ProviderId): string {
 
 /** Where the user lands after consent, with a result to show. */
 export function connectResultUrl(status: "connected" | "failed", provider: string): string {
-  return `${appOrigin()}/?wearable=${status}&provider=${encodeURIComponent(provider)}`;
+  /*
+   * Back to PROFILE, which is where connected devices live.
+   *
+   * This used to land on Home, and the row that reports the outcome only
+   * mounts on Profile: a member who had just approved access at Oura was
+   * returned to a screen that said nothing about it, and the result banner
+   * waited, unseen, until they happened to open Settings. It was the best that
+   * could be done while the section was React state and the URL could not name
+   * one; the shell's `?tab=` makes the right target expressible.
+   */
+  return `${appOrigin()}/?tab=profile&wearable=${status}&provider=${encodeURIComponent(provider)}`;
 }

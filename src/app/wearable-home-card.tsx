@@ -63,20 +63,20 @@ function SyncInfoDialog({ onClose }: { onClose: () => void }) {
       <Card className="flex w-full max-w-sm flex-col gap-4 p-6">
         <div className="flex flex-col gap-2">
           <Eyebrow>About syncing</Eyebrow>
-          <p className="font-display text-xl font-medium text-foreground">
+          <p className="font-display text-display-sm font-medium text-ink">
             You do not have to press this
           </p>
-          <p className="font-body text-sm text-muted">
+          <p className="text-body-sm text-muted">
             Ikigaro pulls your last 7 days from your device every morning at 7:30 AM
             IST, and again the moment you connect a new device. Everything it finds
             goes straight into Trends.
           </p>
-          <p className="font-body text-sm text-muted">
+          <p className="text-body-sm text-muted">
             Syncing now asks your device maker for that data straight away. It is
             useful right after a workout, when you would rather not wait until
             tomorrow to see it.
           </p>
-          <p className="font-body text-sm text-muted">
+          <p className="text-body-sm text-muted">
             Some readings take time to appear at their end. A night&apos;s sleep is
             usually finalised a few hours after you wake, so an early sync can come
             back with nothing new and nothing wrong.
@@ -178,12 +178,12 @@ export function WearableHomeCard({
                 type="button"
                 onClick={() => setInfo(true)}
                 aria-label="How syncing works"
-                className="flex h-4 w-4 items-center justify-center rounded-full border border-border font-body text-[0.6rem] leading-none text-muted transition-colors hover:border-accent hover:text-accent"
+                className="flex h-4 w-4 items-center justify-center rounded-full border border-line text-[0.6rem] leading-none text-muted transition-colors hover:border-primary hover:text-primary"
               >
                 i
               </button>
             </div>
-            <p className="font-body text-xs text-muted">{whenSynced(lastSync)}</p>
+            <p className="text-micro text-muted">{whenSynced(lastSync)}</p>
           </div>
 
           <button
@@ -218,18 +218,18 @@ export function WearableHomeCard({
             setDismissed(true);
           }}
           aria-label="Hide this"
-          className="px-1 font-body text-sm leading-none text-muted"
+          className="px-1 text-body-sm leading-none text-muted"
         >
           ✕
         </button>
       </div>
 
-      <p className="font-body text-sm text-foreground">
+      <p className="text-body-sm text-ink">
         {live > 0
           ? "Sync your ring or watch and see sleep and recovery next to your lab results."
           : "Wearable device syncing is coming soon."}
       </p>
-      <p className="font-body text-xs text-muted">
+      <p className="text-micro text-muted">
         Apple Health and Google Health Connect coming soon.
       </p>
 
@@ -238,7 +238,7 @@ export function WearableHomeCard({
           <button
             type="button"
             onClick={onOpenSettings}
-            className="rounded-pill border border-border px-4 py-2 font-label text-[0.65rem] uppercase tracking-[0.2em] text-foreground transition-colors hover:border-accent hover:text-accent"
+            className="rounded-pill border border-line px-4 py-2 font-label text-[0.65rem] uppercase tracking-[0.2em] text-ink transition-colors hover:border-primary hover:text-primary"
           >
             Connect a device
           </button>

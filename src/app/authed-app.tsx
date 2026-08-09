@@ -4,7 +4,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ProfileRow } from "@/lib/profile";
-import { AppShell, type NavKey } from "./app-shell";
+import { AppShell, NAV_ITEMS, type NavKey } from "./app-shell";
 import { BiomarkerReport } from "./biomarker-report";
 import { CheckinForm } from "./checkin-form";
 import { Dashboard } from "./dashboard";
@@ -16,7 +16,7 @@ import { ProfileEditForm } from "./profile-edit-form";
 import { ProfileView } from "./profile-view";
 import { TrendsView } from "./trends-view";
 import { FutureView } from "./future-view";
-import { primaryButtonClass, Screen, Splash } from "./ui";
+import { Screen, Splash } from "./ui";
 import { WaitlistScreen } from "./waitlist-screen";
 
 type Status = "loading" | "waitlisted" | "onboarding" | "ready" | "error";
@@ -35,15 +35,68 @@ export function AuthedApp() {
   const [status, setStatus] = useState<Status>("loading");
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [tab, setTab] = useState<NavKey>("home");
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [summaryVersion, setSummaryVersion] = useState(0);
   const [profileMode, setProfileMode] = useState<"view" | "edit">("view");
   const startedRef = useRef(false);
 
-  // Navigating always lands on the Profile tab in view mode (edit is explicit).
-  const navigate = (key: NavKey) => {
+  /*
+   * THE SECTION LIVES IN THE URL, as `?tab=`.
+   *
+   * The handoff asks for deep-linkable sections where back and forward work.
+   * That was not true: the section was React state, so a shared link always
+   * opened Home and the back button left the app entirely, which on a phone is
+   * the gesture people use to mean "go back one screen".
+   *
+   * DONE WITH THE HISTORY API RATHER THAN ROUTE SEGMENTS. Every section here is
+   * a client component behind one auth gate that runs once, so splitting them
+   * into real routes would duplicate that gate per route and rebuild the whole
+   * authenticated tree to change what is a design detail. A query parameter is
+   * a real URL: it shares, it deep-links, and popstate makes back and forward
+   * behave. If these ever need server rendering, that is the moment for route
+   * segments.
+   */
+  const navigate = useCallback((key: NavKey, push = true) => {
+    // Navigating always lands on the Profile tab in view mode (edit is explicit).
     if (key === "profile") setProfileMode("view");
     setTab(key);
+    setSheetOpen(false);
+    if (!push || typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    // Home is the bare URL. A canonical "/" is what people paste, and
+    // "/?tab=home" would be a second address for the same screen.
+    if (key === "home") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", key);
+    window.history.pushState({ tab: key }, "", url);
+  }, []);
+
+  /** Read the section out of the URL, ignoring anything we do not recognise. */
+  const tabFromUrl = (): NavKey => {
+    const raw = new URLSearchParams(window.location.search).get("tab");
+    return NAV_ITEMS.some((i) => i.key === raw) ? (raw as NavKey) : "home";
   };
+
+  useEffect(() => {
+    /*
+     * The first read has to happen AFTER mount. The server has no URL, so
+     * computing this during render (or as lazy initial state) makes the server
+     * say "home" and the client say "trends", which is a hydration mismatch.
+     *
+     * Wrapped in an async IIFE for the same reason the other effects in this
+     * app are: the lint rule wants to see that no setState happens
+     * synchronously in an effect body.
+     */
+    void (async () => {
+      setTab(tabFromUrl());
+    })();
+
+    const onPop = () => {
+      setTab(tabFromUrl());
+      setSheetOpen(false);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -128,10 +181,14 @@ export function AuthedApp() {
     return (
       <Screen>
         <div className="flex flex-col items-center gap-4 text-center">
-          <p className="font-body text-sm text-muted">
+          <p className="text-body-sm text-muted">
             Something went wrong loading your account.
           </p>
-          <button onClick={() => void load()} className={primaryButtonClass}>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="iki-btn iki-btn-primary"
+          >
             Try again
           </button>
         </div>
@@ -152,15 +209,22 @@ export function AuthedApp() {
   }
 
   return (
-    <AppShell active={tab} onNavigate={navigate} onLogout={() => void logout()}>
+    <AppShell
+      active={tab}
+      onNavigate={navigate}
+      sheetOpen={sheetOpen}
+      onSheetOpen={() => setSheetOpen(true)}
+      onSheetClose={() => setSheetOpen(false)}
+      displayName={profile?.full_name}
+    >
       {tab === "home" && (
-        <div className="flex w-full max-w-xl flex-col gap-6">
+        <div className="flex w-full max-w-xl flex-col gap-stack">
           <InstallPrompt />
           <Dashboard
             profile={profile as ProfileRow}
             getToken={getAccessToken}
-            onCheckIn={() => setTab("checkin")}
-            onOpenSettings={() => setTab("profile")}
+            onCheckIn={() => navigate("checkin")}
+            onOpenSettings={() => navigate("profile")}
             refreshKey={summaryVersion}
           />
           <InterventionLog getToken={getAccessToken} />
@@ -177,6 +241,7 @@ export function AuthedApp() {
         <ProfileView
           profile={profile as ProfileRow}
           onEdit={() => setProfileMode("edit")}
+          onLogout={() => void logout()}
           getToken={getAccessToken}
         />
       )}
@@ -194,15 +259,15 @@ export function AuthedApp() {
       {tab === "report" && (
         <BiomarkerReport
           getToken={getAccessToken}
-          onExploreRewards={() => setTab("partners")}
+          onExploreRewards={() => navigate("partners")}
         />
       )}
       {tab === "trends" && <TrendsView getToken={getAccessToken} />}
       {tab === "future" && (
         <FutureView
           getToken={getAccessToken}
-          onCheckIn={() => setTab("checkin")}
-          onUploadPanel={() => setTab("report")}
+          onCheckIn={() => navigate("checkin")}
+          onUploadPanel={() => navigate("report")}
         />
       )}
       {tab === "partners" && <PartnersView getToken={getAccessToken} />}

@@ -27,7 +27,7 @@ export function Screen({
 export function CenteredMessage({ children }: { children: ReactNode }) {
   return (
     <Screen>
-      <p className="font-body text-sm text-muted">{children}</p>
+      <p className="text-body-sm text-muted">{children}</p>
     </Screen>
   );
 }
@@ -42,11 +42,11 @@ export function Splash({ caption }: { caption?: string }) {
   return (
     <Screen>
       <div className="flex flex-col items-center gap-5">
-        <Wordmark className="animate-pulse text-5xl text-foreground" />
+        <Wordmark className="animate-pulse text-5xl text-ink" />
         <p className="font-label text-[0.7rem] uppercase tracking-[0.34em] text-muted">
           Performance · Recovery · Longevity
         </p>
-        <p className="min-h-5 font-body text-sm text-muted">{caption ?? ""}</p>
+        <p className="min-h-5 text-body-sm text-muted">{caption ?? ""}</p>
       </div>
     </Screen>
   );
@@ -91,7 +91,7 @@ export function Eyebrow({
 }) {
   return (
     <p
-      className={`font-label text-[0.7rem] uppercase tracking-[0.28em] text-accent ${className}`}
+      className={`iki-eyebrow ${className}`}
     >
       {children}
     </p>
@@ -111,12 +111,12 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <div className={`flex flex-col gap-2 ${className}`}>
+    <div className={`flex flex-col gap-1.5 ${className}`}>
       {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
-      <h1 className="font-display text-3xl font-medium leading-tight tracking-tight text-foreground sm:text-4xl">
+      <h1 className="iki-title">
         {title}
       </h1>
-      {subtitle && <p className="font-body text-sm text-muted">{subtitle}</p>}
+      {subtitle && <p className="iki-lede">{subtitle}</p>}
     </div>
   );
 }
@@ -131,7 +131,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-card border border-border bg-surface ${className}`}
+      className={`rounded-card border border-line bg-surface ${className}`}
     >
       {children}
     </div>
@@ -145,16 +145,16 @@ export function Card({
 
 /** Primary action: terracotta fill, cream text (radius 8). */
 export const primaryButtonClass =
-  "inline-flex h-11 items-center justify-center rounded-control bg-accent px-6 font-body text-sm font-medium text-accent-contrast transition-colors hover:bg-accent-hover disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex h-11 items-center justify-center rounded-ctl bg-primary px-6 text-body-sm font-medium text-primary-fg transition-colors hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-50";
 
 /** Secondary action: outline on the current ground. */
 export const secondaryButtonClass =
-  "inline-flex h-11 items-center justify-center rounded-control border border-border-strong bg-transparent px-5 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex h-11 items-center justify-center rounded-ctl border border-line-strong bg-transparent px-5 text-body-sm font-semibold text-ink transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-50";
 
 /** Form input / select / textarea base (radius 8, terracotta focus). */
 export const fieldClass =
-  "h-11 w-full rounded-control border border-border bg-surface px-3 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted/60 focus:border-accent focus:ring-2 focus:ring-accent/20";
+  "h-11 w-full rounded-ctl border border-line bg-surface px-3 text-body-sm text-ink outline-none transition-colors placeholder:text-muted/60 focus:border-primary focus:ring-2 focus:ring-primary/20";
 
 /** Form field label wrapper. */
 export const labelClass =
-  "flex flex-col gap-1.5 font-body text-sm font-medium text-foreground/80";
+  "flex flex-col gap-1.5 text-body-sm font-semibold text-ink/80";

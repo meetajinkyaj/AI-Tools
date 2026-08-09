@@ -70,14 +70,14 @@ export function DeviceRequestsPanel({ getToken }: { getToken: () => Promise<stri
     })();
   }, [load]);
 
-  if (error) return <Card className="p-5 font-body text-sm text-muted">{error}</Card>;
+  if (error) return <Card className="p-5 text-body-sm text-muted">{error}</Card>;
   if (!data) return null;
 
   if (data.tally.length === 0) {
     return (
       <Card className="flex flex-col gap-2 p-5">
         <Eyebrow>Device requests</Eyebrow>
-        <p className="font-body text-sm text-muted">
+        <p className="text-body-sm text-muted">
           Nobody has suggested a device yet. The box sits under Connected devices in Settings.
         </p>
       </Card>
@@ -91,7 +91,7 @@ export function DeviceRequestsPanel({ getToken }: { getToken: () => Promise<stri
       <Card className="flex flex-col gap-4 p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <Eyebrow>What to add next</Eyebrow>
-          <span className="font-body text-xs text-muted">
+          <span className="text-micro text-muted">
             {data.requesterCount} {data.requesterCount === 1 ? "person" : "people"} asked ·{" "}
             {totalNotify} want an email on launch
           </span>
@@ -102,7 +102,7 @@ export function DeviceRequestsPanel({ getToken }: { getToken: () => Promise<stri
             const open = expanded === d.key;
             const forThis = data.entries.filter((e) => e.deviceKey === d.key);
             return (
-              <li key={d.key} className="border-t border-border py-3 first:border-t-0 first:pt-0">
+              <li key={d.key} className="border-t border-line py-3 first:border-t-0 first:pt-0">
                 <button
                   type="button"
                   onClick={() => setExpanded(open ? null : d.key)}
@@ -110,7 +110,7 @@ export function DeviceRequestsPanel({ getToken }: { getToken: () => Promise<stri
                 >
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span className="flex flex-wrap items-center gap-2">
-                      <span className="font-body text-sm font-medium text-foreground">
+                      <span className="text-body-sm font-semibold text-ink">
                         {d.label}
                       </span>
                       {d.supported && (
@@ -123,31 +123,31 @@ export function DeviceRequestsPanel({ getToken }: { getToken: () => Promise<stri
                         number against a blocked device reads as "go talk to
                         the vendor", not as a backlog item. */}
                     {d.reason && (
-                      <span className="font-body text-xs text-muted">{d.reason}</span>
+                      <span className="text-micro text-muted">{d.reason}</span>
                     )}
                     {d.notifyCount > 0 && (
-                      <span className="font-body text-[0.7rem] text-muted">
+                      <span className="text-micro text-muted">
                         {d.notifyCount} want an email when it lands
                       </span>
                     )}
                   </span>
 
                   <span className="flex shrink-0 items-baseline gap-1">
-                    <span className="font-display text-lg text-foreground">{d.count}</span>
-                    <span className="font-body text-xs text-muted">
+                    <span className="font-display text-lg text-ink">{d.count}</span>
+                    <span className="text-micro text-muted">
                       {d.count === 1 ? "person" : "people"}
                     </span>
                   </span>
                 </button>
 
                 {open && (
-                  <ul className="mt-2 flex flex-col gap-1 border-l border-border pl-3">
+                  <ul className="mt-2 flex flex-col gap-1 border-l border-line pl-3">
                     {forThis.map((e) => (
                       <li
                         key={`${e.email}-${e.createdAt}`}
-                        className="flex flex-wrap items-baseline gap-x-2 font-body text-xs text-muted"
+                        className="flex flex-wrap items-baseline gap-x-2 text-micro text-muted"
                       >
-                        <span className="text-foreground">{e.name || e.email || "unknown"}</span>
+                        <span className="text-ink">{e.name || e.email || "unknown"}</span>
                         {/* Verbatim, so a bad fold is visible. */}
                         <span>typed &ldquo;{e.rawText}&rdquo;</span>
                         <span>· {when(e.createdAt)}</span>
@@ -163,7 +163,7 @@ export function DeviceRequestsPanel({ getToken }: { getToken: () => Promise<stri
         </ul>
       </Card>
 
-      <p className="font-body text-xs text-muted">
+      <p className="text-micro text-muted">
         Counts are distinct people, one person can suggest several devices, but
         cannot vote twice for the same one. Tap a row to see who asked and what
         they typed.
@@ -175,10 +175,10 @@ export function DeviceRequestsPanel({ getToken }: { getToken: () => Promise<stri
 function Tag({ tone, children }: { tone: "ok" | "warn" | "muted"; children: React.ReactNode }) {
   const cls =
     tone === "ok"
-      ? "border-accent/40 text-accent"
+      ? "border-primary/40 text-primary"
       : tone === "warn"
-        ? "border-border text-foreground"
-        : "border-border text-muted";
+        ? "border-line text-ink"
+        : "border-line text-muted";
   return (
     <span
       className={`rounded-pill border px-2 py-0.5 font-label text-[0.55rem] uppercase tracking-[0.18em] ${cls}`}

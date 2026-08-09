@@ -251,6 +251,13 @@ in `src/app/switch.tsx`, since Profile uses one too)
   movement is most of what tells you something changed. The pill's width and
   offset are inline, being arithmetic on the track's width.
 
+**Header and sheet**
+- `.iki-avatar` the 38px initials chip in the header.
+- `.iki-sheet-backdrop`, `.iki-sheet`, `.iki-sheet-handle` the More sheet. The
+  handle is decorative: the sheet is not draggable, and it is there because a
+  panel that rose from the bottom edge reads as one that can be pushed back
+  down.
+
 **Navigation**
 - `.iki-nav` the floating pill, with the safe-area inset already in its offset.
 - `.iki-nav-item` 56x54, styled off `aria-current="page"` rather than a class,
@@ -306,7 +313,25 @@ not.
 
 ---
 
-## 9. No `color-mix()` in the CSS we write
+## 9. The shell owns the section, and the URL owns the shell
+
+`AppShell` renders the bottom bar and the More sheet; `authed-app.tsx` owns
+which section is showing and mirrors it into the URL as `?tab=`, with
+`pushState` on navigate and a `popstate` listener for back and forward. Home is
+the bare URL, so `/` stays the canonical address for it.
+
+This is the History API rather than route segments, on purpose. Every section is
+a client component behind one auth gate that runs once; real routes would
+duplicate that gate per route and rebuild the authenticated tree to change what
+is a design detail. A query parameter still shares, deep-links, and makes the
+back gesture mean "back one screen". If a section ever needs server rendering,
+that is the moment for route segments.
+
+The first read happens in an effect, not as lazy initial state: the server has
+no URL, so computing it during render makes the server say "home" and the client
+say "trends", which is a hydration mismatch.
+
+## 10. No `color-mix()` in the CSS we write
 
 Lightning CSS lowers `color-mix()` for older targets. It cannot compute one
 whose inputs are `var()`, and it emits the fallback **unconditionally**, which
@@ -322,7 +347,7 @@ by reading the compiled stylesheet.
 nothing can be lowered wrongly. If a new tint is needed, add a token beside
 `--primary-wash` rather than mixing at use time.
 
-## 10. What was deliberately not done
+## 11. What was deliberately not done
 
 - **No Noto Sans JP.** The handoff asks for it for the four rank kanji. This
   repo already solves that better: `src/lib/rank-kanji.ts` carries them as

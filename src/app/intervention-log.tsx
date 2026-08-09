@@ -98,7 +98,7 @@ export function InterventionLog({
     <Card className="flex flex-col gap-4 p-6">
       <div className="flex flex-col gap-1">
         <Eyebrow>Log a change</Eyebrow>
-        <p className="font-body text-sm text-muted">
+        <p className="text-body-sm text-muted">
           Started a supplement, changed your training or diet? Note it and we&rsquo;ll
           connect it to how your markers move.
         </p>
@@ -133,7 +133,7 @@ export function InterventionLog({
           placeholder="Optional note, e.g. 400mg nightly"
         />
 
-        {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
+        {error && <p className="text-body-sm text-primary-deep">{error}</p>}
 
         <button
           type="submit"
@@ -145,17 +145,17 @@ export function InterventionLog({
       </form>
 
       {items.length > 0 && (
-        <ul className="flex flex-col divide-y divide-border border-t border-border">
+        <ul className="flex flex-col divide-y divide-line border-t border-line">
           {items.slice(0, 5).map((it) => (
             <li key={it.id} className="flex items-baseline justify-between gap-3 py-2">
-              <span className="min-w-0 font-body text-sm text-foreground">
+              <span className="min-w-0 text-body-sm text-ink">
                 <span className="text-muted">{INTERVENTION_TYPE_LABELS[it.type]} · </span>
                 {it.label}
                 {it.dose_note ? (
                   <span className="text-muted">, {it.dose_note}</span>
                 ) : null}
               </span>
-              <span className="shrink-0 font-body text-xs text-muted">
+              <span className="shrink-0 text-micro text-muted">
                 {it.started_at}
               </span>
             </li>

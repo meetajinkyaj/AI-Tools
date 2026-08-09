@@ -23,23 +23,23 @@ export function WaitlistScreen({
       <div className="mx-auto flex w-full max-w-md flex-col gap-6">
         <div className="flex flex-col gap-2">
           <Eyebrow>Private beta</Eyebrow>
-          <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
+          <h1 className="font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl">
             You&rsquo;re on the list.
           </h1>
-          <p className="font-body text-sm leading-relaxed text-muted">
+          <p className="text-body-sm leading-relaxed text-muted">
             Ikigaro is in a small private beta and we&rsquo;re letting people in
             deliberately, in batches, so every tester gets our full attention.
             {email ? (
               <>
                 {" "}Your spot is reserved under{" "}
-                <span className="font-medium text-foreground">{email}</span>.
+                <span className="font-medium text-ink">{email}</span>.
               </>
             ) : null}
           </p>
         </div>
 
         <Card className="flex flex-col gap-2 p-5">
-          <p className="font-body text-sm text-foreground/80">
+          <p className="text-body-sm text-ink/80">
             Nothing else to do, when your access opens, this screen becomes the
             app. If you were invited personally, tell the person who invited you
             and they&rsquo;ll wave you through.
