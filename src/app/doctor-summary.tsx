@@ -49,10 +49,41 @@ interface SummaryData {
   lifestyle: {
     avgEnergy: number | null;
     avgSleep: number | null;
+    /**
+     * Days of self-report behind the averages. NOT a streak, and not a count
+     * of app visits: it is the sample size, which is the only reason a
+     * clinician needs a number here at all. See the note in /api/summary.
+     */
     checkinCount: number;
-    streak: number;
     interventions: Intervention[];
   };
+}
+
+/**
+ * The self-reported line, written for a clinician rather than for the member.
+ *
+ * WHAT IS NOT IN IT. The streak used to be, and it was app gamification on a
+ * medical document: a number engineered to make somebody open the app tomorrow,
+ * printed beside real measurements where it borrowed their authority.
+ *
+ * The observation period stays because it qualifies the averages. "Energy 4/5"
+ * over twenty days and over two days are different claims, and stripping the
+ * denominator would make the line less honest, not more clinical.
+ */
+export function lifestyleLine(
+  l: Pick<SummaryData["lifestyle"], "avgEnergy" | "avgSleep" | "checkinCount">,
+  separator: string,
+): string {
+  const parts = [
+    `Avg energy ${l.avgEnergy ?? "-"}/5`,
+    `Avg sleep ${l.avgSleep != null ? `${l.avgSleep}h` : "-"}`,
+  ];
+  const line = parts.join(separator);
+  // Said in the singular when it is one day, because "self-reported over 1
+  // days" on a document a doctor reads is the kind of small wrongness that
+  // makes the whole page look automated.
+  if (l.checkinCount <= 0) return line;
+  return `${line}${separator}self-reported over ${l.checkinCount} day${l.checkinCount === 1 ? "" : "s"}`;
 }
 
 const DISCLAIMER = "Educational, not a diagnosis. Please consult a doctor.";
@@ -248,9 +279,7 @@ export function DoctorSummary({
         <div className="flex flex-col gap-2">
           <Eyebrow>Lifestyle context</Eyebrow>
           <p className="font-body text-sm text-foreground/80">
-            Avg energy {lifestyle.avgEnergy ?? "-"}/5 · Avg sleep{" "}
-            {lifestyle.avgSleep != null ? `${lifestyle.avgSleep}h` : "-"} · {lifestyle.streak}-day streak ·{" "}
-            {lifestyle.checkinCount} check-ins
+            {lifestyleLine(lifestyle, " · ")}
           </p>
           {lifestyle.interventions.length > 0 && (
             <div className="flex flex-col gap-1">
@@ -400,10 +429,7 @@ function buildSummaryPdf(
 
   // Lifestyle
   line("LIFESTYLE CONTEXT", 9, "bold", 150);
-  line(
-    `Avg energy ${data.lifestyle.avgEnergy ?? "-"}/5   ·   Avg sleep ${data.lifestyle.avgSleep != null ? `${data.lifestyle.avgSleep}h` : "-"}   ·   ${data.lifestyle.streak}-day streak   ·   ${data.lifestyle.checkinCount} check-ins`,
-    10,
-  );
+  line(lifestyleLine(data.lifestyle, "   ·   "), 10);
   if (data.lifestyle.interventions.length > 0) {
     gap(1);
     line("Current interventions:", 9, "bold", 110);

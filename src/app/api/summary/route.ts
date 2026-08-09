@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { getPrivyUserId } from "@/lib/api-auth";
 import { resolveApprovedUserId } from "@/lib/app-user";
-import { displayStreak, todayUTC } from "@/lib/checkin";
 import { getOrCreateSelfProfileId } from "@/lib/profiles";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -114,18 +113,28 @@ export async function GET(request: Request) {
       }
     }
 
-    // Lifestyle context.
+    /*
+     * Lifestyle context.
+     *
+     * NO STREAK, DELIBERATELY. The streak is a habit mechanic: it exists to
+     * make somebody open the app tomorrow, and it says nothing about their
+     * health. On a document a clinician reads it is worse than noise, because
+     * a number printed next to real measurements borrows their authority.
+     * `streak_count` is therefore not even selected here.
+     *
+     * The check-in count stays, because it is the sample size behind the two
+     * averages beside it: "energy 4/5" across twenty days and across two days
+     * are different claims, and a doctor cannot weigh the first without it. It
+     * is rendered as an observation period rather than as a count of app
+     * visits, which is the same fact stated in the register of the document.
+     */
     const { data: checkins } = await supabase
       .from("daily_checkins")
-      .select("checkin_date, energy_score, sleep_hours, training_logged, streak_count")
+      .select("checkin_date, energy_score, sleep_hours, training_logged")
       .eq("profile_id", profileId)
       .order("checkin_date", { ascending: false })
       .limit(30);
-    const points = (checkins ?? []) as (CheckinPoint & { streak_count: number })[];
-    const trend = summarizeCheckins(points);
-    const streak = points[0]
-      ? displayStreak(points[0].checkin_date, points[0].streak_count, todayUTC())
-      : 0;
+    const trend = summarizeCheckins((checkins ?? []) as CheckinPoint[]);
 
     const { data: interventions } = await supabase
       .from("intervention_log")
@@ -147,8 +156,8 @@ export async function GET(request: Request) {
       lifestyle: {
         avgEnergy: trend.avgEnergy,
         avgSleep: trend.avgSleep,
+        /** Days of self-report behind the averages above. Not a streak. */
         checkinCount: trend.count,
-        streak,
         interventions: interventions ?? [],
       },
     });
