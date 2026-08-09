@@ -119,6 +119,73 @@ export const VENDOR_SPECIFIC: ReadonlySet<MetricKey> = new Set<MetricKey>([
   "metabolic_score",
 ]);
 
+/**
+ * What each number MEANS, in a sentence, for the member reading it.
+ *
+ * WHY THIS IS NOT DECORATION. The commonest way our screen and a vendor's app
+ * disagree is not the merge picking a different device. It is the two of them
+ * defining the same word differently, and that happens with ONE device
+ * connected, where no merge is involved at all. Our sleep is light plus deep
+ * plus REM, so it reads lower than an app whose headline figure is time in bed.
+ * Somebody who does not know that reasonably concludes we are wrong.
+ *
+ * A source label cannot fix this. Naming the device tells a member where the
+ * number came from, not what it counts, and only the second explains the gap.
+ *
+ * WRITTEN AS DEFINITIONS, NEVER AS INTERPRETATION. "Time actually asleep",
+ * not "good sleep is above seven hours". These say what we measured; what it
+ * means for a person is between them and their doctor.
+ *
+ * A missing entry is fine for anything self-explanatory, and is a bug for
+ * anything a vendor displays differently. Sleep is the one that started this.
+ */
+export const METRIC_NOTES: Partial<Record<MetricKey, string>> = {
+  sleep_minutes:
+    "Time actually asleep: light, deep and REM added together. This reads lower " +
+    "than time in bed, which is the headline figure in some device apps.",
+  sleep_score:
+    "Your device's own sleep score. Each vendor computes it differently, so it is " +
+    "comparable to your own past nights and to nothing else.",
+  readiness_score:
+    "Your device's own readiness score. Whoop calls it recovery and Oura calls it " +
+    "readiness; they answer the same question with different maths.",
+  hrv:
+    "Heart rate variability overnight. Devices sample it at different points in " +
+    "the night and average it differently, so two of them can both be right and " +
+    "still disagree.",
+  resting_heart_rate: "Your lowest sustained heart rate while asleep.",
+  respiratory_rate: "Breaths per minute while asleep.",
+  spo2:
+    "Blood oxygen while asleep, read through the skin. A wearable sensor, not a " +
+    "medical oximeter.",
+  temperature_deviation:
+    "How far your skin temperature sat from your own recent baseline. Not an " +
+    "absolute temperature, so it is normal for this to sit near zero.",
+  steps:
+    "Steps over the day. Rings count fewer than wrist devices for the same walk, " +
+    "which is a property of where they sit rather than an error.",
+  active_calories: "Calories burned above resting, by your device's own model.",
+  vo2max:
+    "Your device's estimate of VO₂ max from heart rate and pace. An estimate, not " +
+    "a lab measurement.",
+  weight_kg: "From a connected scale.",
+  body_fat_pct:
+    "A bioimpedance estimate from a scale, which moves with how hydrated you are.",
+  glucose_avg: "Your average glucose across the day, from a continuous monitor.",
+  glucose_variability:
+    "How much your glucose swung during the day, independent of how high it was.",
+  glucose_time_in_target: "The share of the day your glucose sat inside the target range.",
+  hba1c_estimated:
+    "Estimated from a few weeks of glucose averages. This is NOT the lab HbA1c on " +
+    "your panel, which measures something different over about three months.",
+  metabolic_score: "One vendor's composite of how the day's glucose behaved.",
+  stress_high_minutes: "Time your device read as physiologically stressed.",
+  recovery_high_minutes: "Time your device read as restored.",
+  vascular_age:
+    "Your device's predicted cardiovascular age. A model's output, not a " +
+    "measurement, and not a clinical assessment.",
+};
+
 export const METRIC_KEYS = Object.keys(METRICS) as MetricKey[];
 
 export function isMetricKey(k: string): k is MetricKey {

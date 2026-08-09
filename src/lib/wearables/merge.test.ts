@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { measuredSleepHours, mergeMetrics, recentAverage, SOURCE_RANK, type MetricRow } from "./merge";
-import { METRIC_KEYS } from "./metrics";
+import {
+  isMetricFamily,
+  measuredSleepHours,
+  mergeMetrics,
+  METRIC_FAMILIES,
+  METRIC_FAMILY,
+  rankedForFamily,
+  recentAverage,
+  SOURCE_RANK,
+  type MetricRow,
+} from "./merge";
+import { METRIC_KEYS, METRIC_NOTES } from "./metrics";
 import { PROVIDER_IDS, PROVIDERS } from "./providers";
 import { PROVIDER_NAMES } from "./types";
 
@@ -228,6 +238,153 @@ describe("naming whose number it is", () => {
     // the same device.
     for (const id of PROVIDER_IDS) {
       expect(PROVIDERS[id].name).toBe(PROVIDER_NAMES[id]);
+    }
+  });
+});
+
+describe("a member's own choice of device", () => {
+  /**
+   * The ranking is ours and it is invisible. A member reads 6h50m here and
+   * 7h12m in Whoop's app and cannot tell a rule from a bug. Letting them choose
+   * turns an unseen decision into one they made, which is the only version of
+   * it they can check.
+   */
+  it("puts the chosen device ahead of the default ranking", () => {
+    // Oura outranks Whoop for sleep. The member says otherwise.
+    const rows = [
+      row("oura", "2026-07-04", "sleep_minutes", 431),
+      row("whoop", "2026-07-04", "sleep_minutes", 402),
+    ];
+    expect(mergeMetrics(rows)[0].points[0].source).toBe("oura");
+    expect(mergeMetrics(rows, { sleep: "whoop" })[0].points[0].source).toBe("whoop");
+  });
+
+  it("promotes rather than excludes, so a missed night is still filled", () => {
+    // THE PROPERTY THAT MATTERS MOST. Read as a filter, a preference would cost
+    // the member every night their chosen device was on the charger, which is
+    // the opposite of why anybody owns two.
+    const merged = mergeMetrics(
+      [
+        row("whoop", "2026-07-04", "sleep_minutes", 402),
+        row("oura", "2026-07-05", "sleep_minutes", 455),
+      ],
+      { sleep: "whoop" },
+    );
+    expect(merged[0].points).toEqual([
+      { date: "2026-07-04", value: 402, source: "whoop" },
+      { date: "2026-07-05", value: 455, source: "oura" },
+    ]);
+  });
+
+  it("applies to every metric in the family, not just the one named", () => {
+    // Sleep, HRV and resting heart rate come off the same device on the same
+    // night. Splitting them would produce an incoherent picture.
+    const rows = [
+      row("oura", "2026-07-04", "hrv", 40),
+      row("whoop", "2026-07-04", "hrv", 52),
+      row("oura", "2026-07-04", "resting_heart_rate", 55),
+      row("whoop", "2026-07-04", "resting_heart_rate", 53),
+    ];
+    for (const s of mergeMetrics(rows, { sleep: "whoop" })) {
+      expect(s.points[0].source, s.metric).toBe("whoop");
+    }
+  });
+
+  it("leaves other families alone", () => {
+    // Choosing a sleep device says nothing about who counts your steps.
+    const merged = mergeMetrics(
+      [
+        row("garmin", "2026-07-04", "steps", 9_000),
+        row("whoop", "2026-07-04", "steps", 8_100),
+      ],
+      { sleep: "whoop" },
+    );
+    expect(merged[0].points[0].source).toBe("garmin");
+  });
+
+  it("ignores a preference for a provider that reported nothing", () => {
+    const merged = mergeMetrics([row("oura", "2026-07-04", "sleep_minutes", 431)], {
+      sleep: "whoop",
+    });
+    expect(merged[0].points[0].source).toBe("oura");
+  });
+
+  it("names the chosen device first in the series sources", () => {
+    // The card prints "Whoop + Oura", and the order should be the order the
+    // member asked for rather than ours.
+    const merged = mergeMetrics(
+      [
+        row("oura", "2026-07-04", "sleep_minutes", 431),
+        row("whoop", "2026-07-05", "sleep_minutes", 402),
+      ],
+      { sleep: "whoop" },
+    );
+    expect(merged[0].sources).toEqual(["whoop", "oura"]);
+  });
+
+  it("is still deterministic with a preference applied", () => {
+    const rows = [
+      row("oura", "2026-07-04", "sleep_minutes", 431),
+      row("whoop", "2026-07-04", "sleep_minutes", 402),
+      row("fitbit", "2026-07-04", "sleep_minutes", 390),
+    ];
+    const a = mergeMetrics(rows, { sleep: "whoop" });
+    const b = mergeMetrics([...rows].reverse(), { sleep: "whoop" });
+    expect(a).toEqual(b);
+  });
+});
+
+describe("metric families", () => {
+  it("gives every metric exactly one family", () => {
+    // SOURCE_RANK is derived from this map, so a metric missing a family would
+    // have no ranking at all. The compiler enforces it; this catches a cast.
+    for (const key of METRIC_KEYS) {
+      expect(METRIC_FAMILY[key], key).toBeDefined();
+      expect(METRIC_FAMILIES).toContain(METRIC_FAMILY[key]);
+    }
+  });
+
+  it("keeps the derived ranking identical to the family's own", () => {
+    for (const key of METRIC_KEYS) {
+      expect(SOURCE_RANK[key], key).toEqual(
+        rankedForFamily(METRIC_FAMILY[key], PROVIDER_IDS),
+      );
+    }
+  });
+
+  it("lists only connected devices for a family, in ranked order", () => {
+    expect(rankedForFamily("sleep", ["whoop", "oura"])).toEqual(["oura", "whoop"]);
+    expect(rankedForFamily("movement", ["whoop", "garmin"])).toEqual(["garmin", "whoop"]);
+    expect(rankedForFamily("sleep", [])).toEqual([]);
+  });
+
+  it("recognises its own family names and nothing else", () => {
+    expect(isMetricFamily("sleep")).toBe(true);
+    expect(isMetricFamily("cardio")).toBe(false);
+    expect(isMetricFamily(null)).toBe(false);
+  });
+});
+
+describe("metric notes", () => {
+  it("explains sleep, which is the number vendors define differently", () => {
+    // Our sleep is light plus deep plus REM. A vendor app showing time in bed
+    // reads higher, and without this a member concludes we are wrong.
+    expect(METRIC_NOTES.sleep_minutes).toMatch(/light, deep and REM/);
+  });
+
+  it("keeps the estimated HbA1c apart from the lab one", () => {
+    // The single worst confusion available here: a device estimate read as a
+    // clinical value that measures something else over three months.
+    expect(METRIC_NOTES.hba1c_estimated).toMatch(/NOT the lab/);
+  });
+
+  it("gives no advice, only definitions", () => {
+    // These say what we measured. What it means for a person is between them
+    // and their doctor, which is the rule the whole app runs on.
+    for (const [key, note] of Object.entries(METRIC_NOTES)) {
+      for (const word of ["should", "aim for", "healthy range", "too low", "improve your"]) {
+        expect(note?.toLowerCase(), `${key}: ${word}`).not.toContain(word);
+      }
     }
   });
 });

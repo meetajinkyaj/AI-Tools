@@ -14,6 +14,7 @@ import {
 import { getOrCreateSelfProfileId } from "@/lib/profiles";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { measuredSleepHours, mergeMetrics, type MetricRow } from "@/lib/wearables/merge";
+import { loadSourcePreferences } from "@/lib/wearables/source-preferences";
 import type { CheckinPoint } from "@/lib/trends";
 
 /**
@@ -62,8 +63,11 @@ export async function GET(request: Request) {
           .toISOString()
           .slice(0, 10),
       );
+    // The member's chosen device wins here too. The model reading a different
+    // night's sleep from the one on their Trends page is the exact split this
+    // merge was written to avoid.
     const measuredSleep = measuredSleepHours(
-      mergeMetrics((wearableRows ?? []) as MetricRow[]),
+      mergeMetrics((wearableRows ?? []) as MetricRow[], await loadSourcePreferences(userId)),
       MOMENTUM_WINDOW_DAYS,
     );
 
