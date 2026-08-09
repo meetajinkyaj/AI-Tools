@@ -12,11 +12,24 @@ import { defineConfig } from "vitest/config";
  */
 export default defineConfig({
   resolve: {
-    // See test/server-only-stub.ts for why this alias exists.
     alias: [
+      // See test/server-only-stub.ts for why this alias exists.
       {
         find: /^server-only$/,
         replacement: new URL("./test/server-only-stub.ts", import.meta.url).pathname,
+      },
+      /*
+       * The same "@/" path alias tsconfig and Next already use.
+       *
+       * Vitest resolves imports itself and does not read tsconfig paths, so a
+       * test that pulls in any component fails at the first "@/lib/..." with
+       * "Cannot find package", which reads as a missing dependency rather than
+       * as a missing alias. Everything under src/lib avoided it by importing
+       * relatively; anything under src/app cannot.
+       */
+      {
+        find: /^@\//,
+        replacement: new URL("./src/", import.meta.url).pathname,
       },
     ],
   },

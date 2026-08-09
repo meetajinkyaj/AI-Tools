@@ -7,16 +7,8 @@ import { RankUpToast } from "./rank-badge";
 import { ShareCheckinCard } from "./share-card";
 import { ShareModal } from "./share-modal";
 
+import type { CheckinRow } from "@/lib/checkin";
 import {
-  type CheckinRow,
-  ENERGY_LABELS,
-  MAX_ENERGY,
-  MIN_ENERGY,
-} from "@/lib/checkin";
-import {
-  DURATION_BUCKETS,
-  DURATION_HINTS,
-  DURATION_LABELS,
   type DurationBucket,
   EXERCISE_TYPE_LABELS,
   EXERCISE_TYPES,
@@ -26,14 +18,12 @@ import {
   OTHER_TYPE,
 } from "@/lib/exercises";
 import {
-  Card,
-  Eyebrow,
-  fieldClass,
-  labelClass,
-  PageHeader,
-  primaryButtonClass,
-  secondaryButtonClass,
-} from "./ui";
+  ActivityTile,
+  DurationSegmented,
+  EnergyScale,
+  Switch,
+} from "./checkin-controls";
+import { fieldClass } from "./ui";
 
 interface CheckinState {
   checkin: CheckinRow | null;
@@ -43,11 +33,6 @@ interface CheckinState {
   /** Lifetime, unboosted, drives the rank badge. */
   ikiScore?: number;
 }
-
-const ENERGY_VALUES = Array.from(
-  { length: MAX_ENERGY - MIN_ENERGY + 1 },
-  (_, i) => MIN_ENERGY + i,
-);
 
 /**
  * The Daily Check-in tab: a 30-second flow (energy, sleep, training, a note)
@@ -270,15 +255,17 @@ export function CheckinForm({
   );
 
   if (status === "loading") {
-    return <p className="font-body text-sm text-muted">Loading your check-in…</p>;
+    return <p className="text-body-sm text-muted">Loading your check-in…</p>;
   }
   if (status === "error") {
     return (
-      <div className="flex flex-col gap-4">
-        <p className="font-body text-sm text-muted">
-          Couldn&rsquo;t load your check-in.
-        </p>
-        <button onClick={() => void load()} className={primaryButtonClass}>
+      <div className="flex w-full max-w-md flex-col gap-4">
+        <p className="text-body-sm text-muted">Couldn&rsquo;t load your check-in.</p>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="iki-btn iki-btn-primary w-full"
+        >
           Try again
         </button>
       </div>
@@ -302,29 +289,47 @@ export function CheckinForm({
   ];
 
   return (
-    <div className="flex w-full max-w-md flex-col gap-6">
-      <PageHeader
-        eyebrow="Daily Check-in"
-        title={checkedInToday ? "Today's check-in" : "How are you today?"}
-        subtitle="A few seconds to log how you feel. Your first check-in each day earns iki points."
-      />
+    <div className="flex w-full max-w-md flex-col gap-stack">
+      <header className="flex flex-col gap-1.5">
+        <p className="iki-eyebrow">Daily check-in</p>
+        <h1 className="iki-title">
+          {checkedInToday ? "Today's check-in" : "How are you today?"}
+        </h1>
+        <p className="iki-lede">
+          A few seconds to log how you feel. Your first check-in each day earns iki
+          points.
+        </p>
+      </header>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="flex flex-col gap-1 p-5">
-          <Eyebrow>Streak</Eyebrow>
-          <p className="font-display text-2xl font-medium text-foreground">
+      {/* Announced rather than only shown. Saving a check-in changes a button
+          label and adds a card, neither of which a screen reader would mention
+          on its own. */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {submitting
+          ? "Saving your check-in."
+          : justSaved
+            ? earned && earned > 0
+              ? `Saved. You earned ${earned} iki points.`
+              : "Saved. Your check-in has been updated."
+            : ""}
+      </p>
+
+      <div className="grid grid-cols-2 gap-2.5">
+        <section className="iki-card iki-card-tight flex flex-col gap-1">
+          <p className="iki-eyebrow">Streak</p>
+          <p className="font-display text-display-md font-medium leading-none text-ink">
             {state?.streak ?? 0}
-            <span className="ml-1 font-body text-sm text-muted">
+            <span className="ml-1 font-sans text-unit text-muted">
               {state?.streak === 1 ? "day" : "days"}
             </span>
           </p>
-        </Card>
-        <Card className="flex flex-col gap-1 p-5">
-          <Eyebrow>iki points</Eyebrow>
-          <p className="font-display text-2xl font-medium text-foreground">
+        </section>
+        <section className="iki-card iki-card-tight flex flex-col gap-1">
+          <p className="iki-eyebrow">iki points</p>
+          <p className="font-display text-display-md font-medium leading-none text-ink">
             {state?.pointsBalance ?? 0}
           </p>
-        </Card>
+        </section>
       </div>
 
       {/*
@@ -339,9 +344,9 @@ export function CheckinForm({
       {rankUp && <RankUpToast rank={rankUp} onClose={() => setRankUp(null)} />}
 
       {(justSaved || checkedInToday) && (
-        <Card className="flex flex-col gap-4 border-accent/40 bg-surface-2 p-4">
+        <section className="iki-card iki-card-accent iki-card-tight flex flex-col gap-3">
           {justSaved && (
-            <p className="font-body text-sm font-medium text-foreground">
+            <p className="text-body-sm font-semibold text-ink">
               {earned && earned > 0
                 ? `Done ✓ You're checked in for today and earned ${earned} iki points.`
                 : "Done ✓ Your check-in has been updated."}
@@ -362,55 +367,33 @@ export function CheckinForm({
                     setShowShare(true);
                     void loadInviteCode();
                   }}
-                  className={justSaved ? primaryButtonClass : secondaryButtonClass}
+                  className={`iki-btn ${justSaved ? "iki-btn-primary" : "iki-btn-secondary"}`}
                 >
                   Share your streak
                 </button>
               </div>
-              <p className="font-body text-xs text-muted">
+              <p className="text-micro text-muted">
                 Make an image for Instagram or WhatsApp, add your own photo if
                 you like.
               </p>
             </div>
           )}
-        </Card>
+        </section>
       )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-        <div className={labelClass}>
-          <span>Energy</span>
-          <div className="grid grid-cols-5 gap-2">
-            {ENERGY_VALUES.map((v) => {
-              const selected = energy === v;
-              return (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => {
-                    setEnergy(v);
-                    markEdited();
-                  }}
-                  aria-pressed={selected}
-                  title={ENERGY_LABELS[v]}
-                  className={`flex h-11 items-center justify-center rounded-control border text-sm font-medium transition-colors ${
-                    selected
-                      ? "border-accent bg-accent text-accent-contrast"
-                      : "border-border bg-surface text-foreground hover:border-accent/50"
-                  }`}
-                >
-                  {v}
-                </button>
-              );
-            })}
-          </div>
-          {energy !== null && (
-            <span className="text-xs font-normal text-muted">
-              {ENERGY_LABELS[energy]}
-            </span>
-          )}
+        <div className="flex flex-col gap-2">
+          <span className="text-body-sm font-semibold text-ink">Energy</span>
+          <EnergyScale
+            value={energy}
+            onChange={(v) => {
+              setEnergy(v);
+              markEdited();
+            }}
+          />
         </div>
 
-        <label className={labelClass}>
+        <label className="flex flex-col gap-2 text-body-sm font-semibold text-ink">
           Sleep last night (hours)
           <input
             className={fieldClass}
@@ -428,108 +411,82 @@ export function CheckinForm({
           />
         </label>
 
-        <div className="flex flex-col gap-3 font-body">
-          <label className="flex items-start gap-2.5 text-sm text-muted">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 accent-accent"
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-body-sm font-semibold text-ink">I trained today</span>
+            <Switch
               checked={trainingLogged}
-              onChange={(e) => {
-                setTrainingLogged(e.target.checked);
+              label="I trained today"
+              onChange={(v) => {
+                setTrainingLogged(v);
                 markEdited();
               }}
             />
-            I trained today.
-          </label>
+          </div>
 
           {trainingLogged && (
             <div className="flex flex-col gap-3">
-              <span className="text-xs text-muted">
+              <span className="text-micro text-muted">
                 Tap what you did, then set how long.
               </span>
-              <div className="flex flex-wrap gap-2">
-                {[...chipTypes, OTHER_TYPE].map((type) => {
-                  const on = selectedTypes.includes(type);
-                  const label =
-                    type === OTHER_TYPE
-                      ? "Other"
-                      : EXERCISE_TYPE_LABELS[type as ExerciseType];
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => toggleExercise(type)}
-                      aria-pressed={on}
-                      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                        on
-                          ? "border-accent bg-accent text-accent-contrast"
-                          : "border-border bg-surface text-foreground hover:border-accent/50"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
+              {/* Tiles rather than chips: a grid of nine reads at a glance and
+                  gives a thumb something to hit, where a wrapped row of pills
+                  is a paragraph of small targets. */}
+              <div className="grid grid-cols-2 gap-2.5">
+                {[...chipTypes, OTHER_TYPE].map((type) => (
+                  <ActivityTile
+                    key={type}
+                    type={type}
+                    label={
+                      type === OTHER_TYPE
+                        ? "Other"
+                        : EXERCISE_TYPE_LABELS[type as ExerciseType]
+                    }
+                    selected={selectedTypes.includes(type)}
+                    onToggle={() => toggleExercise(type)}
+                  />
+                ))}
               </div>
 
-              {exercises.map((e) => (
-                <div
-                  key={e.type}
-                  className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-foreground">
-                      {e.type === OTHER_TYPE
-                        ? "Other"
-                        : EXERCISE_TYPE_LABELS[e.type as ExerciseType]}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => toggleExercise(e.type)}
-                      className="text-xs text-muted underline transition-colors hover:text-foreground"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  {e.type === OTHER_TYPE && (
-                    <input
-                      className={fieldClass}
-                      value={e.label ?? ""}
-                      onChange={(ev) => setOtherLabel(ev.target.value)}
-                      maxLength={60}
-                      placeholder="What did you do?"
+              {exercises.map((e) => {
+                const name =
+                  e.type === OTHER_TYPE
+                    ? "Other"
+                    : EXERCISE_TYPE_LABELS[e.type as ExerciseType];
+                return (
+                  <div key={e.type} className="iki-card iki-card-tight flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-body-sm font-semibold text-ink">{name}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleExercise(e.type)}
+                        className="iki-btn-link iki-tap"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    {e.type === OTHER_TYPE && (
+                      <input
+                        className={fieldClass}
+                        value={e.label ?? ""}
+                        onChange={(ev) => setOtherLabel(ev.target.value)}
+                        maxLength={60}
+                        placeholder="What did you do?"
+                      />
+                    )}
+                    <DurationSegmented
+                      label={`How long: ${name}`}
+                      value={e.duration}
+                      onChange={(b) => setDuration(e.type, b)}
                     />
-                  )}
-                  <div className="grid grid-cols-3 gap-2">
-                    {DURATION_BUCKETS.map((b) => {
-                      const on = e.duration === b;
-                      return (
-                        <button
-                          key={b}
-                          type="button"
-                          onClick={() => setDuration(e.type, b)}
-                          aria-pressed={on}
-                          className={`flex h-10 flex-col items-center justify-center rounded-control border text-xs transition-colors ${
-                            on
-                              ? "border-accent bg-accent text-accent-contrast"
-                              : "border-border bg-surface text-foreground hover:border-accent/50"
-                          }`}
-                        >
-                          <span className="text-sm font-medium">
-                            {DURATION_LABELS[b]}
-                          </span>
-                          <span className="opacity-70">{DURATION_HINTS[b]}</span>
-                        </button>
-                      );
-                    })}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        <label className={labelClass}>
+        <label className="flex flex-col gap-2 text-body-sm font-semibold text-ink">
           Nutrition note
           <textarea
             className={`${fieldClass} h-auto min-h-20 resize-y py-2`}
@@ -543,12 +500,13 @@ export function CheckinForm({
           />
         </label>
 
-        {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
+        {error && <p role="alert" className="text-body-sm text-primary-deep">{error}</p>}
 
         <button
           type="submit"
           disabled={submitting}
-          className={`${primaryButtonClass} w-full`}
+          aria-busy={submitting}
+          className="iki-btn iki-btn-primary w-full"
         >
           {submitting
             ? "Saving…"
@@ -558,6 +516,10 @@ export function CheckinForm({
                 ? "Update check-in"
                 : "Check in"}
         </button>
+
+        <p className="text-center text-micro text-muted">
+          First check-in of the day earns iki points.
+        </p>
       </form>
 
       {shareModal && (

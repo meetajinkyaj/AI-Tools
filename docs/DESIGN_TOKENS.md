@@ -233,6 +233,23 @@ finds every use. Compose them with utilities; they set structure, not layout.
   row, so the last one loses its rule with no special case at the call site.
 - `.iki-row-sheet` h52 tappable row for the More sheet.
 
+**Check-in controls** (behaviour lives in `src/app/checkin-controls.tsx`)
+- `.iki-energy` / `.iki-energy-cell` the five-cell energy scale. The track is
+  one `role="slider"`, not five buttons: five buttons is five tab stops and
+  reads as a toolbar, when what it is, is one value between one and five.
+  `touch-action: none` on the track is what stops the browser claiming the
+  gesture for scrolling halfway through a drag. Cells fill up TO the value, so
+  it reads as a level.
+- `.iki-switch` / `.iki-switch-knob`. The knob's travel is computed from the
+  track's own tokens, so resizing the switch cannot leave the knob short.
+- `.iki-tile` / `-label` / `-icon` / `-check`. Selected is a ring plus a
+  transparent border, never a thicker border, so a grid does not shift by a
+  pixel when one is chosen.
+- `.iki-segmented` / `-pill` / `-option` / `-sub`. One pill that travels, never
+  two that cross-fade: on a control whose choices differ only by a word, the
+  movement is most of what tells you something changed. The pill's width and
+  offset are inline, being arithmetic on the track's width.
+
 **Navigation**
 - `.iki-nav` the floating pill, with the safe-area inset already in its offset.
 - `.iki-nav-item` 56x54, styled off `aria-current="page"` rather than a class,
