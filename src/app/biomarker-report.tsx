@@ -18,15 +18,7 @@ import {
 } from "@/lib/biomarkers";
 import type { ExtractedReading, ExtractionResult } from "@/lib/extraction";
 import { DoctorSummary } from "./doctor-summary";
-import {
-  Card,
-  Eyebrow,
-  fieldClass,
-  labelClass,
-  PageHeader,
-  primaryButtonClass,
-  secondaryButtonClass,
-} from "./ui";
+import { fieldClass, labelClass } from "./ui";
 
 interface ReadingRow {
   id: string;
@@ -483,13 +475,17 @@ export function BiomarkerReport({
   }
 
   if (status === "loading") {
-    return <p className="font-body text-sm text-muted">Loading your report…</p>;
+    return <p className="text-body-sm text-muted">Loading your report…</p>;
   }
   if (status === "error") {
     return (
-      <div className="flex flex-col gap-4">
-        <p className="font-body text-sm text-muted">Couldn&rsquo;t load your report.</p>
-        <button onClick={() => void load()} className={primaryButtonClass}>
+      <div className="flex w-full max-w-xl flex-col gap-4">
+        <p className="text-body-sm text-muted">Couldn&rsquo;t load your report.</p>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="iki-btn iki-btn-primary w-full"
+        >
           Try again
         </button>
       </div>
@@ -503,16 +499,18 @@ export function BiomarkerReport({
   // ---------------------------------------------------------------- Upload
   if (mode === "upload") {
     return (
-      <div className="flex w-full max-w-xl flex-col gap-6">
-        <PageHeader
-          eyebrow="Report"
-          title="Upload your lab report"
-          subtitle="Drop in the PDF from your blood test. We'll read the values, you confirm them, no typing required."
-        />
+      <div className="flex w-full max-w-xl flex-col gap-stack">
+        <header className="flex flex-col gap-1.5">
+          <p className="iki-eyebrow">Report</p>
+          <h1 className="iki-title">Upload your lab report</h1>
+          <p className="iki-lede">
+            Drop in the PDF from your blood test. We&rsquo;ll read the values, you confirm them, no typing required.
+          </p>
+        </header>
 
         <form onSubmit={handleExtract} className="flex flex-col gap-5">
           <label
-            className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border-strong bg-surface px-6 py-10 text-center transition-colors hover:bg-surface-2"
+            className="iki-press flex flex-col items-center justify-center gap-2 rounded-card border border-dashed border-line-strong bg-surface px-6 py-10 text-center transition-colors hover:bg-surface-2"
           >
             <input
               type="file"
@@ -523,23 +521,23 @@ export function BiomarkerReport({
                 setError(null);
               }}
             />
-            <span className="font-body text-sm font-medium text-foreground">
+            <span className="text-body-sm font-semibold text-ink">
               {file ? file.name : "Choose a PDF"}
             </span>
-            <span className="font-body text-xs text-muted">
+            <span className="text-micro text-muted">
               {file ? "Tap to pick a different file" : "PDF up to 15 MB"}
             </span>
           </label>
 
-          {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
+          {error && <p role="alert" className="text-body-sm text-primary-deep">{error}</p>}
 
-          <p className="font-body text-xs text-muted">{DISCLAIMER}</p>
+          <p className="text-micro text-muted">{DISCLAIMER}</p>
 
-          <div className="flex flex-col gap-3 sm:flex-row-reverse">
+          <div className="flex flex-col gap-3">
             <button
               type="submit"
               disabled={extracting || !file}
-              className={`${primaryButtonClass} w-full sm:flex-1`}
+              className="iki-btn iki-btn-primary w-full"
             >
               {extracting ? "Reading your report…" : "Read my report"}
             </button>
@@ -551,7 +549,7 @@ export function BiomarkerReport({
                   setMode("report");
                 }}
                 disabled={extracting}
-                className={`${secondaryButtonClass} w-full sm:flex-1`}
+                className="iki-btn iki-btn-secondary w-full"
               >
                 Cancel
               </button>
@@ -564,7 +562,7 @@ export function BiomarkerReport({
               setError(null);
               setMode("entry");
             }}
-            className="self-center font-body text-xs text-muted underline underline-offset-4 hover:text-foreground"
+            className="iki-btn-link iki-tap self-center"
           >
             Or enter values manually
           </button>
@@ -584,12 +582,14 @@ export function BiomarkerReport({
       setDraft((prev) => prev.filter((d) => d.marker_key !== key));
 
     return (
-      <div className="flex w-full max-w-xl flex-col gap-6">
-        <PageHeader
-          eyebrow="Report"
-          title="Check your results"
-          subtitle="We read these from your PDF. Fix anything that looks off, then save."
-        />
+      <div className="flex w-full max-w-xl flex-col gap-stack">
+        <header className="flex flex-col gap-1.5">
+          <p className="iki-eyebrow">Report</p>
+          <h1 className="iki-title">Check your results</h1>
+          <p className="iki-lede">
+            We read these from your PDF. Fix anything that looks off, then save.
+          </p>
+        </header>
 
         <form onSubmit={handleSaveDraft} className="flex flex-col gap-6">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -616,14 +616,14 @@ export function BiomarkerReport({
           </div>
 
           {draft.length === 0 && (
-            <p className="font-body text-sm text-muted">
+            <p className="text-body-sm text-muted">
               No markers left. Re-upload your report or enter values manually.
             </p>
           )}
 
           {groups.map((group) => (
             <div key={group.category} className="flex flex-col gap-3">
-              <Eyebrow>{categoryLabel(group.category)}</Eyebrow>
+              <p className="iki-eyebrow">{categoryLabel(group.category)}</p>
               <div className="flex flex-col gap-2">
                 {group.rows.map((d) => {
                   const entry = catalogByKey.get(d.marker_key);
@@ -634,11 +634,11 @@ export function BiomarkerReport({
                       className="flex items-center justify-between gap-3"
                     >
                       <div className="flex min-w-0 flex-col">
-                        <span className="truncate font-body text-sm text-foreground">
+                        <span className="truncate text-body-sm text-ink">
                           {d.marker_name}
                         </span>
                         {!qualitative && (
-                          <span className="font-body text-xs text-muted">
+                          <span className="text-micro text-muted">
                             {rangeText(entry?.ref_low ?? null, entry?.ref_high ?? null, d.unit)}
                           </span>
                         )}
@@ -676,7 +676,7 @@ export function BiomarkerReport({
                           type="button"
                           onClick={() => remove(d.marker_key)}
                           aria-label={`Remove ${d.marker_name}`}
-                          className="shrink-0 rounded-full px-2 py-1 font-body text-xs text-muted hover:text-accent"
+                          className="iki-btn-link iki-tap shrink-0 no-underline"
                         >
                           Remove
                         </button>
@@ -689,24 +689,24 @@ export function BiomarkerReport({
           ))}
 
           {unmatched.length > 0 && (
-            <Card className="flex flex-col gap-1 p-4">
-              <Eyebrow>Not matched</Eyebrow>
-              <p className="font-body text-xs text-muted">
+            <section className="iki-card iki-card-tight flex flex-col gap-1">
+              <p className="iki-eyebrow">Not matched</p>
+              <p className="text-micro text-muted">
                 We saw these on your report but don&rsquo;t track them yet:{" "}
                 {unmatched.join(", ")}.
               </p>
-            </Card>
+            </section>
           )}
 
-          {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
+          {error && <p role="alert" className="text-body-sm text-primary-deep">{error}</p>}
 
-          <p className="font-body text-xs text-muted">{DISCLAIMER}</p>
+          <p className="text-micro text-muted">{DISCLAIMER}</p>
 
-          <div className="flex flex-col gap-3 sm:flex-row-reverse">
+          <div className="flex flex-col gap-3">
             <button
               type="submit"
               disabled={submitting || draft.length === 0}
-              className={`${primaryButtonClass} w-full sm:flex-1`}
+              className="iki-btn iki-btn-primary w-full"
             >
               {submitting ? "Saving…" : "Save report"}
             </button>
@@ -718,7 +718,7 @@ export function BiomarkerReport({
                 setMode("upload");
               }}
               disabled={submitting}
-              className={`${secondaryButtonClass} w-full sm:flex-1`}
+              className="iki-btn iki-btn-secondary w-full"
             >
               Re-upload
             </button>
@@ -733,12 +733,14 @@ export function BiomarkerReport({
     const groups = groupByCategory(catalog.filter(isEnterableNumeric));
     const qualGroups = groupByCategory(catalog.filter(isQualitative));
     return (
-      <div className="flex w-full max-w-xl flex-col gap-6">
-        <PageHeader
-          eyebrow="Report"
-          title="Enter your blood panel"
-          subtitle="Type the markers you have, leave the rest blank. We'll flag anything outside its typical range."
-        />
+      <div className="flex w-full max-w-xl flex-col gap-stack">
+        <header className="flex flex-col gap-1.5">
+          <p className="iki-eyebrow">Report</p>
+          <h1 className="iki-title">Enter your blood panel</h1>
+          <p className="iki-lede">
+            Type the markers you have, leave the rest blank. We&rsquo;ll flag anything outside its typical range.
+          </p>
+        </header>
 
         <form onSubmit={handleManualSubmit} className="flex flex-col gap-6">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -766,7 +768,7 @@ export function BiomarkerReport({
 
           {groups.map((group) => (
             <div key={group.category} className="flex flex-col gap-3">
-              <Eyebrow>{categoryLabel(group.category)}</Eyebrow>
+              <p className="iki-eyebrow">{categoryLabel(group.category)}</p>
               <div className="flex flex-col gap-2">
                 {group.entries.map((entry) => (
                   <div
@@ -774,10 +776,10 @@ export function BiomarkerReport({
                     className="flex items-center justify-between gap-3"
                   >
                     <div className="flex min-w-0 flex-col">
-                      <span className="truncate font-body text-sm text-foreground">
+                      <span className="truncate text-body-sm text-ink">
                         {entry.display_name}
                       </span>
-                      <span className="font-body text-xs text-muted">
+                      <span className="text-micro text-muted">
                         {rangeText(entry.ref_low, entry.ref_high, entry.unit)}
                       </span>
                     </div>
@@ -803,14 +805,14 @@ export function BiomarkerReport({
 
           {qualGroups.map((group) => (
             <div key={group.category} className="flex flex-col gap-3">
-              <Eyebrow>{categoryLabel(group.category)}</Eyebrow>
+              <p className="iki-eyebrow">{categoryLabel(group.category)}</p>
               <div className="flex flex-col gap-2">
                 {group.entries.map((entry) => (
                   <div
                     key={entry.marker_key}
                     className="flex items-center justify-between gap-3"
                   >
-                    <span className="min-w-0 truncate font-body text-sm text-foreground">
+                    <span className="min-w-0 truncate text-body-sm text-ink">
                       {entry.display_name}
                     </span>
                     <select
@@ -836,15 +838,15 @@ export function BiomarkerReport({
             </div>
           ))}
 
-          {error && <p className="font-body text-sm text-accent-hover">{error}</p>}
+          {error && <p role="alert" className="text-body-sm text-primary-deep">{error}</p>}
 
-          <p className="font-body text-xs text-muted">{DISCLAIMER}</p>
+          <p className="text-micro text-muted">{DISCLAIMER}</p>
 
-          <div className="flex flex-col gap-3 sm:flex-row-reverse">
+          <div className="flex flex-col gap-3">
             <button
               type="submit"
               disabled={submitting}
-              className={`${primaryButtonClass} w-full sm:flex-1`}
+              className="iki-btn iki-btn-primary w-full"
             >
               {submitting ? "Saving…" : "Generate report"}
             </button>
@@ -855,7 +857,7 @@ export function BiomarkerReport({
                 setMode("upload");
               }}
               disabled={submitting}
-              className={`${secondaryButtonClass} w-full sm:flex-1`}
+              className="iki-btn iki-btn-secondary w-full"
             >
               Back to upload
             </button>

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { RecoverySignal, TrainingLoad } from "@/lib/training";
-import { Card, Eyebrow } from "./ui";
 
 /**
  * "Training and recovery" in Trends.
@@ -51,8 +50,8 @@ function readableMinutes(total: number): string {
  */
 const DIRECTION_TONE: Record<RecoverySignal["direction"], string> = {
   recovering: "text-clay",
-  holding: "text-foreground",
-  straining: "text-accent",
+  holding: "text-ink",
+  straining: "text-primary",
   unknown: "text-muted",
 };
 
@@ -116,30 +115,30 @@ export function TrainingCard({ getToken }: { getToken: () => Promise<string | nu
   }
 
   return (
-    <Card className="flex flex-col gap-4 p-6">
+    <section className="iki-card flex flex-col gap-3.5">
       <div className="flex flex-col gap-1">
-        <Eyebrow>Training &amp; recovery</Eyebrow>
-        <p className="font-body text-xs text-muted">Last {window.days} days</p>
+        <p className="iki-eyebrow">Training &amp; recovery</p>
+        <p className="text-micro text-muted">Last {window.days} days</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3.5">
         <div className="flex flex-col gap-1">
-          <span className="font-body text-xs text-muted">Training days</span>
-          <span className="font-display text-2xl font-medium text-foreground">
+          <span className="text-micro text-muted">Training days</span>
+          <span className="font-display text-display-md font-medium leading-none text-ink">
             {week.days}
-            <span className="ml-1 font-body text-xs text-muted">/ {window.days}</span>
+            <span className="ml-1 font-sans text-micro text-muted">/ {window.days}</span>
           </span>
         </div>
         <div className="flex flex-col gap-1">
-          <span className="font-body text-xs text-muted">Time</span>
-          <span className="font-display text-2xl font-medium text-foreground">
+          <span className="text-micro text-muted">Time</span>
+          <span className="font-display text-display-md font-medium leading-none text-ink">
             {week.minutes > 0 ? readableMinutes(week.minutes) : "-"}
           </span>
           {/* "about" is load-bearing. A duration chip is a bucket we turned
               into a number on the user's behalf, and a total built from those
               must not look like a stopwatch reading. */}
           {week.minutesEstimated && week.minutes > 0 && (
-            <span className="font-body text-[0.7rem] text-muted">approximate</span>
+            <span className="text-micro text-muted">approximate</span>
           )}
         </div>
         {/* REST MEANS THE MEMBER SAID THEY RESTED. It used to mean "no session
@@ -148,8 +147,8 @@ export function TrainingCard({ getToken }: { getToken: () => Promise<string | nu
             read back as three rest days. Days we know nothing about are
             counted separately, below, and never here. */}
         <div className="flex flex-col gap-1">
-          <span className="font-body text-xs text-muted">Rest days</span>
-          <span className="font-display text-2xl font-medium text-foreground">
+          <span className="text-micro text-muted">Rest days</span>
+          <span className="font-display text-display-md font-medium leading-none text-ink">
             {week.restDays}
           </span>
         </div>
@@ -158,7 +157,7 @@ export function TrainingCard({ getToken }: { getToken: () => Promise<string | nu
       {/* Stated plainly and without a nudge attached. The gap is the member's
           business; our job is to not describe it as something it was not. */}
       {week.unloggedDays > 0 && (
-        <p className="font-body text-xs text-muted">
+        <p className="text-micro text-muted">
           {week.unloggedDays} day{week.unloggedDays === 1 ? "" : "s"} not logged, so
           they are not counted either way.
         </p>
@@ -169,7 +168,7 @@ export function TrainingCard({ getToken }: { getToken: () => Promise<string | nu
           {week.activities.slice(0, 6).map((a) => (
             <span
               key={a.toLowerCase()}
-              className="rounded-pill border border-border px-3 py-1 font-body text-xs text-foreground/80"
+              className="rounded-pill border border-line px-3 py-1 text-micro text-ink/80"
             >
               {a}
             </span>
@@ -185,9 +184,9 @@ export function TrainingCard({ getToken }: { getToken: () => Promise<string | nu
           a week they trained none. So: its own line, its own words, never
           summed into the numbers above. */}
       {week.movement.sessions > 0 && (
-        <p className="font-body text-xs text-muted">
+        <p className="text-micro text-muted">
           Your device also picked up{" "}
-          <span className="text-foreground">
+          <span className="text-ink">
             {week.movement.sessions} movement session
             {week.movement.sessions === 1 ? "" : "s"}
           </span>
@@ -199,15 +198,15 @@ export function TrainingCard({ getToken }: { getToken: () => Promise<string | nu
       )}
 
       {recovery.direction !== "unknown" && (
-        <div className="flex flex-col gap-1 border-t border-border pt-3">
+        <div className="flex flex-col gap-1 border-t border-line pt-3">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="font-body text-xs text-muted">Recovery</span>
-            <span className={`font-body text-sm font-medium ${DIRECTION_TONE[recovery.direction]}`}>
+            <span className="text-micro text-muted">Recovery</span>
+            <span className={`text-body-sm font-semibold ${DIRECTION_TONE[recovery.direction]}`}>
               {DIRECTION_LABEL[recovery.direction]}
             </span>
           </div>
-          <p className="font-body text-sm text-foreground/80">{recovery.summary}</p>
-          <p className="font-body text-[0.7rem] text-muted">
+          <p className="text-body-sm text-ink/80">{recovery.summary}</p>
+          <p className="text-micro text-muted">
             {/* Two different kinds of claim, and the card says which one it is
                 making. Self-report drifts with mood; a ring does not, and
                 letting the first borrow the credibility of the second is the
@@ -219,11 +218,11 @@ export function TrainingCard({ getToken }: { getToken: () => Promise<string | nu
         </div>
       )}
 
-      <p className="font-body text-[0.7rem] text-muted">
+      <p className="text-micro text-muted">
         {sourceNote(week) ? `${sourceNote(week)}. ` : ""}
         Training supports bone, muscle and metabolic health over months, so this is
         a record of the work, not a prediction about your next panel.
       </p>
-    </Card>
+    </section>
   );
 }
