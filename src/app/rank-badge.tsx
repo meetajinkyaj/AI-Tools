@@ -2,7 +2,6 @@
 
 import { rankProgress, visibleRanks, type Rank } from "@/lib/iki-rank";
 import { RANK_ART, rankChipSvg, rankPinSvg } from "@/lib/rank-pin";
-import { Card, Eyebrow } from "./ui";
 
 /**
  * The Iki rank badge, to Claude Design's "Iki Badges v3".
@@ -47,9 +46,7 @@ export function RankChip({
     <span className="inline-flex items-center gap-2">
       <Glyph svg={rankChipSvg(rank.id, rank.name)} size={size} />
       {label && (
-        <span className="font-label text-[0.6rem] uppercase tracking-[0.2em] text-muted">
-          {rank.name}
-        </span>
+        <span className="iki-eyebrow-sm">{rank.name}</span>
       )}
     </span>
   );
@@ -88,33 +85,41 @@ export function RankBadge({
     return (
       <div className="flex items-center gap-2" title={rank.blurb}>
         <RankChip rank={rank} size={28} />
-        <span className="font-label text-[0.6rem] uppercase tracking-[0.2em] text-muted">
-          {rank.name}
-        </span>
+        <span className="iki-eyebrow-sm">{rank.name}</span>
       </div>
     );
   }
 
   return (
-    <Card className="flex flex-col gap-4 p-5">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <RankPin rank={rank} size={132} />
-          <div className="flex flex-col gap-0.5">
-            <Eyebrow>Your rank</Eyebrow>
-            <p className="font-display text-2xl font-medium text-foreground">{rank.name}</p>
-            <p className="font-label text-[0.55rem] uppercase tracking-[0.24em] text-accent">
-              {rank.scene} · {score.toLocaleString()} iki
-            </p>
-            <p className="mt-1 font-body text-xs text-muted">{rank.blurb}</p>
-          </div>
+    <section className="iki-card flex flex-col gap-3.5">
+      <div className="flex items-center gap-4">
+        {/*
+          THE FULL PIN, NOT THE 86px SEAL THE MOCKUP DRAWS. The handoff's own
+          §5 says the prototype's seal is a placeholder that production
+          `rank-pin.ts` replaces, and the pin's scene turns to mud below about
+          120px. So the card keeps the pin at full size and the ladder below
+          keeps chips, which is the same threshold argument in the other
+          direction.
+        */}
+        <RankPin rank={rank} size={132} />
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <p className="iki-eyebrow">Your rank</p>
+          <p className="font-display text-display-md font-medium leading-none text-ink">
+            {rank.name}
+          </p>
+          <p className="font-label text-eyebrow-sm uppercase text-primary">
+            {rank.scene} · {score.toLocaleString()} iki
+          </p>
+          <p className="mt-1 text-caption text-muted">{rank.blurb}</p>
         </div>
       </div>
 
       {next ? (
         <div className="flex flex-col gap-2">
+          {/* Terracotta rather than clay: this bar is about a rank still to be
+              earned, which is an action, not a thing that already happened. */}
           <div
-            className="h-2 w-full overflow-hidden rounded-full bg-surface-2"
+            className="iki-bar w-full"
             role="progressbar"
             aria-valuenow={Math.round(fraction * 100)}
             aria-valuemin={0}
@@ -122,39 +127,39 @@ export function RankBadge({
             aria-label={`Progress to ${next.name}`}
           >
             <div
-              className="h-full rounded-full bg-accent transition-all"
+              className="iki-bar-fill iki-bar-fill-primary"
               style={{ width: `${Math.round(fraction * 100)}%` }}
             />
           </div>
-          <p className="font-body text-xs text-muted">
+          <p className="text-micro text-muted">
             {remaining.toLocaleString()} to {next.name}
           </p>
         </div>
       ) : nextIsSecret ? (
         // Deliberately vague. Naming the rank or its threshold here would give
         // away the surprise to exactly the people about to reach it.
-        <p className="font-body text-xs text-accent">
+        <p className="text-micro text-primary">
           You&rsquo;re at the top of the ladder. Word is there&rsquo;s something
           past it.
         </p>
       ) : (
-        <p className="font-body text-xs text-accent">
-          Top rank. There is nothing above this.
-        </p>
+        <p className="text-micro text-primary">Top rank. There is nothing above this.</p>
       )}
 
       <RankLadder score={score} current={rank} />
 
+      {/* The ceremonial button. Reserved for brand moments, and a member's own
+          rank is the clearest one on this screen. */}
       {onShare && (
         <button
           type="button"
           onClick={onShare}
-          className="rounded-pill border border-border px-4 py-2 font-label text-[0.65rem] uppercase tracking-[0.2em] text-foreground transition-colors hover:border-accent hover:text-accent"
+          className="iki-btn iki-btn-ceremonial w-full"
         >
           Share your rank
         </button>
       )}
-    </Card>
+    </section>
   );
 }
 
@@ -167,7 +172,7 @@ export function RankBadge({
 export function RankLadder({ score, current }: { score: number; current: Rank }) {
   const ranks = visibleRanks(score);
   return (
-    <ol className="flex items-center justify-between gap-2 border-t border-border pt-4">
+    <ol className="flex items-center justify-between gap-2 border-t border-line pt-4">
       {ranks.map((r) => {
         const reached = score >= r.threshold;
         const isCurrent = r.id === current.id;
@@ -179,8 +184,8 @@ export function RankLadder({ score, current }: { score: number; current: Rank })
               className={reached ? undefined : "opacity-25 grayscale"}
             />
             <span
-              className={`font-label text-[0.5rem] uppercase tracking-[0.14em] ${
-                isCurrent ? "text-accent" : "text-muted/70"
+              className={`font-label text-tab uppercase tracking-[0.14em] ${
+                isCurrent ? "text-primary" : "text-muted/70"
               }`}
             >
               {r.threshold.toLocaleString()}
@@ -221,18 +226,16 @@ export function RankUpToast({
         <div className="flex items-center gap-4">
           <RankPin rank={rank} size={128} />
           <div className="flex flex-col gap-1">
-            <p className="font-label text-[0.6rem] uppercase tracking-[0.28em] text-accent">
-              New rank
-            </p>
-            <p className="font-display text-2xl font-medium text-foreground">{rank.name}</p>
-            <p className="font-body text-sm text-muted">{rank.blurb}</p>
+            <p className="iki-eyebrow">New rank</p>
+            <p className="font-display text-display-md font-medium text-ink">{rank.name}</p>
+            <p className="text-body-sm text-muted">{rank.blurb}</p>
           </div>
         </div>
         <button
           type="button"
           onClick={onClose}
           aria-label="Dismiss"
-          className="px-2 font-body text-lg leading-none text-muted"
+          className="iki-tap iki-press px-2 text-body-lg leading-none text-muted"
         >
           ✕
         </button>
@@ -242,7 +245,7 @@ export function RankUpToast({
           <button
             type="button"
             onClick={onShare}
-            className="rounded-pill bg-accent px-4 py-2 font-label text-[0.65rem] uppercase tracking-[0.2em] text-white"
+            className="iki-press rounded-pill bg-primary px-4 py-2 font-label text-eyebrow uppercase text-primary-fg"
           >
             Share it
           </button>
@@ -250,7 +253,7 @@ export function RankUpToast({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-pill px-3 py-2 font-label text-[0.65rem] uppercase tracking-[0.2em] text-muted"
+          className="iki-tap iki-press rounded-pill px-3 py-2 font-label text-eyebrow uppercase text-muted"
         >
           Later
         </button>
