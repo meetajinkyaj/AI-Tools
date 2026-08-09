@@ -4,8 +4,9 @@ import { getPrivyUserId } from "@/lib/api-auth";
 import { resolveApprovedUserId } from "@/lib/app-user";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { mergeMetrics, type MetricRow } from "@/lib/wearables/merge";
-import { METRICS, type MetricKey } from "@/lib/wearables/metrics";
+import { METRIC_NOTES, METRICS, type MetricKey } from "@/lib/wearables/metrics";
 import { isProviderId, PROVIDERS } from "@/lib/wearables/providers";
+import { loadSourcePreferences } from "@/lib/wearables/source-preferences";
 import type { ProviderId } from "@/lib/wearables/types";
 
 /**
@@ -57,8 +58,12 @@ export async function GET(request: Request) {
   try {
     const supabase = createSupabaseAdmin();
 
-    const [{ data: connections }, { data: metricRows }, { data: workoutRows }] =
+    const [prefs, { data: connections }, { data: metricRows }, { data: workoutRows }] =
       await Promise.all([
+        // The `used` flag below is the member's own merge rule applied back to
+        // them. Merging here without their preferences would make this panel
+        // contradict the card it exists to explain.
+        loadSourcePreferences(userId),
         supabase
           .from("wearable_connections")
           .select("provider, status, last_sync_at")
@@ -90,7 +95,7 @@ export async function GET(request: Request) {
      * Oura reported that Tuesday, so a per-provider query could not answer it.
      */
     const winner = new Map<string, ProviderId>();
-    for (const s of mergeMetrics(rows)) {
+    for (const s of mergeMetrics(rows, prefs)) {
       for (const p of s.points) winner.set(`${s.metric}:${p.date}`, p.source);
     }
 
@@ -161,6 +166,9 @@ export async function GET(request: Request) {
               label: METRICS[metric].label,
               unit: METRICS[metric].unit,
               precision: METRICS[metric].precision,
+              // What the number counts, which is the commonest reason our
+              // screen and a vendor's app disagree. See METRIC_NOTES.
+              note: METRIC_NOTES[metric] ?? null,
               points: points.sort((a, b) => a.date.localeCompare(b.date)),
             })),
           workouts: workoutsByProvider.get(id) ?? [],

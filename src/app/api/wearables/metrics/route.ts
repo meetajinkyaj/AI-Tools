@@ -4,6 +4,7 @@ import { getPrivyUserId } from "@/lib/api-auth";
 import { resolveApprovedUserId } from "@/lib/app-user";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { mergeMetrics, type MetricRow } from "@/lib/wearables/merge";
+import { loadSourcePreferences } from "@/lib/wearables/source-preferences";
 
 /**
  * GET /api/wearables/metrics?days=30
@@ -29,18 +30,23 @@ export async function GET(request: Request) {
   const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
 
   const supabase = createSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("wearable_daily_metrics")
-    .select("provider, metric_date, metric, value")
-    .eq("user_id", userId)
-    .gte("metric_date", since)
-    .order("metric_date", { ascending: true });
+  // Read alongside the rows, not after them: the merge cannot start without
+  // both, and two round trips in series is a wasted one.
+  const [prefs, { data, error }] = await Promise.all([
+    loadSourcePreferences(userId),
+    supabase
+      .from("wearable_daily_metrics")
+      .select("provider, metric_date, metric, value")
+      .eq("user_id", userId)
+      .gte("metric_date", since)
+      .order("metric_date", { ascending: true }),
+  ]);
 
   if (error) {
     console.error("wearable metrics read failed:", error);
     return NextResponse.json({ error: "Couldn't load device data" }, { status: 500 });
   }
 
-  const series = mergeMetrics((data ?? []) as MetricRow[]);
+  const series = mergeMetrics((data ?? []) as MetricRow[], prefs);
   return NextResponse.json({ days, series });
 }

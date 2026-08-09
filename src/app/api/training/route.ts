@@ -12,6 +12,7 @@ import {
   type WorkoutRow,
 } from "@/lib/training";
 import { mergeMetrics, type MetricRow } from "@/lib/wearables/merge";
+import { loadSourcePreferences } from "@/lib/wearables/source-preferences";
 
 /**
  * GET /api/training
@@ -70,7 +71,8 @@ export async function GET(request: Request) {
 
     // Check-ins are keyed by profile; wearable rows by user. Both are read
     // together because the load reconciles them per day.
-    const [checkinRes, workoutRes, metricRes] = await Promise.all([
+    const [prefs, checkinRes, workoutRes, metricRes] = await Promise.all([
+      loadSourcePreferences(userId),
       supabase
         .from("daily_checkins")
         .select("checkin_date, training_logged, exercises, energy_score, sleep_hours")
@@ -105,7 +107,7 @@ export async function GET(request: Request) {
     const checkins = (checkinRes.data ?? []) as CheckinTrainingRow[];
     const workouts = (workoutRes.data ?? []) as WorkoutRow[];
     const byMetric = new Map(
-      mergeMetrics((metricRes.data ?? []) as MetricRow[]).map((s) => [s.metric, s]),
+      mergeMetrics((metricRes.data ?? []) as MetricRow[], prefs).map((s) => [s.metric, s]),
     );
 
     return NextResponse.json({

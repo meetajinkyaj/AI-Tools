@@ -78,29 +78,109 @@ const CGM_FIRST: ProviderId[] = [
   "withings",
 ];
 
-export const SOURCE_RANK: Record<MetricKey, ProviderId[]> = {
-  glucose_avg: CGM_FIRST,
-  glucose_variability: CGM_FIRST,
-  glucose_time_in_target: CGM_FIRST,
-  hba1c_estimated: CGM_FIRST,
-  metabolic_score: CGM_FIRST,
-  stress_high_minutes: SLEEP_FIRST,
-  recovery_high_minutes: SLEEP_FIRST,
-  vascular_age: SLEEP_FIRST,
-  sleep_minutes: SLEEP_FIRST,
-  sleep_score: SLEEP_FIRST,
-  hrv: SLEEP_FIRST,
-  readiness_score: SLEEP_FIRST,
-  respiratory_rate: SLEEP_FIRST,
-  spo2: SLEEP_FIRST,
-  temperature_deviation: SLEEP_FIRST,
-  resting_heart_rate: SLEEP_FIRST,
-  steps: MOVEMENT_FIRST,
-  active_calories: MOVEMENT_FIRST,
-  vo2max: MOVEMENT_FIRST,
-  weight_kg: SCALE_FIRST,
-  body_fat_pct: SCALE_FIRST,
+/**
+ * The four rankings above, named.
+ *
+ * WHY A MEMBER CHOOSES A FAMILY AND NOT A METRIC. Sleep, HRV, resting heart
+ * rate, readiness, respiratory rate and blood oxygen all come off the same
+ * device on the same night. Asking somebody to pick a source for each of them
+ * is six questions with one answer, and it invites an incoherent state where
+ * their sleep comes from the ring and their HRV from the watch that was not on
+ * their wrist.
+ */
+export const METRIC_FAMILIES = ["sleep", "movement", "body", "glucose"] as const;
+export type MetricFamily = (typeof METRIC_FAMILIES)[number];
+
+/** Written for a member reading a settings screen, not for us. */
+export const FAMILY_LABELS: Record<MetricFamily, string> = {
+  sleep: "Sleep and recovery",
+  movement: "Movement and activity",
+  body: "Body composition",
+  glucose: "Glucose",
 };
+
+/** What each family covers, so a picker can say what it is about to change. */
+export const FAMILY_BLURBS: Record<MetricFamily, string> = {
+  sleep: "Sleep, sleep score, readiness, HRV, resting heart rate, breathing, blood oxygen",
+  movement: "Steps, active calories, VO₂ max",
+  body: "Weight and body fat",
+  glucose: "Average glucose, variability, time in target",
+};
+
+const FAMILY_RANK: Record<MetricFamily, ProviderId[]> = {
+  sleep: SLEEP_FIRST,
+  movement: MOVEMENT_FIRST,
+  body: SCALE_FIRST,
+  glucose: CGM_FIRST,
+};
+
+export const METRIC_FAMILY: Record<MetricKey, MetricFamily> = {
+  glucose_avg: "glucose",
+  glucose_variability: "glucose",
+  glucose_time_in_target: "glucose",
+  hba1c_estimated: "glucose",
+  metabolic_score: "glucose",
+  stress_high_minutes: "sleep",
+  recovery_high_minutes: "sleep",
+  vascular_age: "sleep",
+  sleep_minutes: "sleep",
+  sleep_score: "sleep",
+  hrv: "sleep",
+  readiness_score: "sleep",
+  respiratory_rate: "sleep",
+  spo2: "sleep",
+  temperature_deviation: "sleep",
+  resting_heart_rate: "sleep",
+  steps: "movement",
+  active_calories: "movement",
+  vo2max: "movement",
+  weight_kg: "body",
+  body_fat_pct: "body",
+};
+
+/**
+ * A member's chosen source per family. Absent means "use the default ranking".
+ *
+ * IT IS A PROMOTION, NOT A LOCK. The chosen provider sorts first and everything
+ * else keeps its relative order behind it, so a night the preferred device
+ * missed is still filled by the next best. Turning a preference into an
+ * exclusive filter would mean a member who picked their ring loses every night
+ * it was on the charger, which is the opposite of why anyone owns two devices.
+ */
+export type SourcePreferences = Partial<Record<MetricFamily, ProviderId>>;
+
+export function isMetricFamily(v: unknown): v is MetricFamily {
+  return typeof v === "string" && (METRIC_FAMILIES as readonly string[]).includes(v);
+}
+
+/**
+ * The provider that will supply a family, given who is connected.
+ *
+ * Used by the settings screen to say what "Automatic" currently resolves to,
+ * which is the difference between a member trusting the default and a member
+ * wondering what it does. Returns null when nothing connected reports it.
+ */
+export function rankedForFamily(
+  family: MetricFamily,
+  connected: readonly ProviderId[],
+): ProviderId[] {
+  const set = new Set(connected);
+  return FAMILY_RANK[family].filter((p) => set.has(p));
+}
+
+/**
+ * DERIVED from the family map rather than written out again.
+ *
+ * This used to be a second literal listing all twenty-one metrics against the
+ * four lists, which meant a new metric had to be added in two places and the
+ * failure mode of forgetting one was silent: the metric would rank by one rule
+ * and take its member preference from another. `Record<MetricKey, ...>` on
+ * `METRIC_FAMILY` makes the compiler demand a family for every metric, so
+ * there is now exactly one list to keep complete and it cannot be incomplete.
+ */
+export const SOURCE_RANK: Record<MetricKey, ProviderId[]> = Object.fromEntries(
+  (Object.keys(METRIC_FAMILY) as MetricKey[]).map((m) => [m, FAMILY_RANK[METRIC_FAMILY[m]]]),
+) as Record<MetricKey, ProviderId[]>;
 
 /** One row as it comes out of `wearable_daily_metrics`. */
 export interface MetricRow {
@@ -148,7 +228,17 @@ export function seriesLabel(metric: MetricKey, sources: readonly ProviderId[]): 
   return name ? `${base} (${name})` : base;
 }
 
-function rankOf(metric: MetricKey, provider: string): number {
+function rankOf(
+  metric: MetricKey,
+  provider: string,
+  prefs: SourcePreferences = {},
+): number {
+  // The member's own choice sorts ahead of everything, and ahead of nothing
+  // else: the rest of the list keeps its order behind it, so this promotes a
+  // device rather than excluding the others. -1 rather than 0 so it cannot tie
+  // with the top of the default ranking.
+  if (prefs[METRIC_FAMILY[metric]] === provider) return -1;
+
   const i = SOURCE_RANK[metric].indexOf(provider as ProviderId);
   // Unknown providers sort last rather than being dropped: a provider added to
   // the adapters but forgotten here should degrade to "used only when it is the
@@ -172,8 +262,22 @@ function toNumber(v: number | string): number | null {
  * Resolve many providers' rows into one series per metric.
  *
  * Deterministic: same input, same output, regardless of row order.
+ *
+ * `prefs` is the member's own choice of device per family, which promotes that
+ * provider to the front of the ranking. Passing nothing is the default
+ * behaviour and is correct for anyone who has not chosen, which is everybody
+ * with fewer than two devices.
+ *
+ * EVERY CALLER MUST PASS THE SAME PREFERENCES. Two screens merging the same
+ * rows with different rules is precisely the disagreement this whole file
+ * exists to prevent, and it would be invisible: both numbers are real, they
+ * just came from different devices. `loadSourcePreferences` is the one way to
+ * read them.
  */
-export function mergeMetrics(rows: MetricRow[]): MergedSeries[] {
+export function mergeMetrics(
+  rows: MetricRow[],
+  prefs: SourcePreferences = {},
+): MergedSeries[] {
   // metric -> date -> best row so far
   const best = new Map<MetricKey, Map<string, { value: number; source: ProviderId; rank: number }>>();
 
@@ -183,7 +287,7 @@ export function mergeMetrics(rows: MetricRow[]): MergedSeries[] {
     const value = toNumber(row.value);
     if (value === null) continue;
 
-    const rank = rankOf(metric, row.provider);
+    const rank = rankOf(metric, row.provider, prefs);
     const byDate = best.get(metric) ?? new Map();
     const current = byDate.get(row.metric_date);
 
@@ -204,7 +308,7 @@ export function mergeMetrics(rows: MetricRow[]): MergedSeries[] {
     if (points.length === 0) continue;
 
     const contributing = [...new Set(points.map((p) => p.source))].sort(
-      (a, b) => rankOf(metric, a) - rankOf(metric, b),
+      (a, b) => rankOf(metric, a, prefs) - rankOf(metric, b, prefs),
     );
 
     out.push({

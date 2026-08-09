@@ -10,6 +10,17 @@ native app, no app store, no review.
 
 ---
 
+## Migration 0022 has to run on production before that code merges
+
+`wearable_source_preferences`, which lets a member choose which device answers
+for each metric family. Migration-first, as always.
+
+The code is written to survive the wrong order (`loadSourcePreferences` catches
+its own read failure and returns the default ranking), so the app degrades to
+today's behaviour rather than breaking. That is a safety net, not a plan.
+
+---
+
 ## Do these two things today
 
 Garmin and Ultrahuman are **not self-serve**, both need an application
@@ -972,6 +983,67 @@ and more accurate than a cursor that would silently miss every late arrival.
 
 It is bounded per run and ordered by `last_sync_at` ascending, so it cannot
 outgrow the Worker's CPU budget and nobody can be starved.
+
+### Two devices, one number: the member decides (migration 0022)
+
+`mergeMetrics` picks one source per metric per day by a ranked preference,
+never an average. That ranking is ours, it is defensible, and it is
+**invisible**: a member reads 6h50m on our screen, 7h12m in Whoop's own app,
+and has no way to tell a rule from a bug.
+
+So the ranking became a default rather than a verdict.
+`wearable_source_preferences` holds one row per member per metric family, and
+`mergeMetrics(rows, prefs)` promotes the chosen provider to the front.
+
+**Per family, not per metric.** Sleep, HRV, resting heart rate, readiness,
+respiratory rate and blood oxygen come off the same device on the same night.
+Four families, matching the four rankings that already existed: `sleep`,
+`movement`, `body`, `glucose`. `SOURCE_RANK` is now DERIVED from `METRIC_FAMILY`
+rather than written out a second time, so a new metric cannot rank by one rule
+and take its preference from another.
+
+**A preference is a promotion, not a lock.** The chosen provider sorts first and
+the rest keep their order behind it, so a night the preferred device missed is
+still filled by the next best. Read as a filter it would cost a member every
+night their ring was on the charger, which is the opposite of why anyone owns
+two devices. There is a test named for exactly that property.
+
+**No row is written automatically.** A member with one device needs no
+preference: the merge already picks the only source there is, and the settings
+screen says so in a sentence instead of offering a control. Writing a row on
+connect would lock in a device chosen before there was anything to choose
+between.
+
+**The picker appears only where a choice exists.** A family is offered only once
+two connected devices have actually reported in it within thirty days. Every
+provider appears in every ranking, so "who is connected" would have offered a
+Whoop and Oura owner a choice of glucose source, for a number neither device
+measures.
+
+**Every merge call site must pass the same preferences.** Four of them exist:
+Trends, the training card, Future You and the per-device panel. One of them
+merging without the member's choice would make that screen disagree with the
+others invisibly, because both numbers are real readings from real devices.
+`loadSourcePreferences` is the only reader and it never throws: a failed read
+degrades to the default ranking rather than emptying somebody's Trends.
+
+Disconnecting prunes any preference naming the departed device, after the
+delete and best effort, because tidying must never be able to fail a
+disconnect.
+
+### The definitions matter more than the source label
+
+The commonest way our screen disagrees with a vendor's app is **not** the merge.
+It is the two of us defining the same word differently, and it happens with one
+device connected and no merge involved: our `sleep_minutes` is light plus deep
+plus REM, so it reads lower than an app whose headline figure is time in bed.
+
+Naming the device cannot explain that. Only a definition can. `METRIC_NOTES` in
+`metrics.ts` carries one sentence per metric, rendered in the per-device panel.
+
+They are **definitions, never interpretation**: "time actually asleep", not
+"good sleep is above seven hours". A test asserts that none of them contains
+advice wording, in the same spirit as the training card's.
 
 ### The per-device panel is provisional, on purpose
 

@@ -38,6 +38,8 @@ interface Metric {
   label: string;
   unit: string;
   precision: number;
+  /** What the number counts. Null when it needs no explaining. */
+  note: string | null;
   points: Point[];
 }
 
@@ -104,6 +106,14 @@ function MetricRow({ m }: { m: Metric }) {
           {points.length} day{points.length === 1 ? "" : "s"}
         </span>
       </div>
+      {/* WHAT THE NUMBER COUNTS, not what it means for the reader.
+          The commonest mismatch against a vendor's own app is not the merge
+          picking a different device: it is the two of us defining the same
+          word differently, which happens with one device connected and no
+          merge involved. Our sleep is light plus deep plus REM, so it reads
+          lower than an app whose headline is time in bed. A source label
+          cannot explain that; only a definition can. */}
+      {m.note && <p className="font-body text-[0.7rem] text-muted">{m.note}</p>}
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         {points.map((p) => (
           <span key={p.date} className="font-body text-xs text-muted">

@@ -35,10 +35,25 @@ interface Connection {
   last_sync_at: string | null;
 }
 
+/** One metric family, and which device answers for it. */
+interface Source {
+  family: string;
+  label: string;
+  blurb: string;
+  /** The member's explicit choice, or null for the default ranking. */
+  preferred: string | null;
+  /**
+   * Connected devices that have actually reported in this family, best-ranked
+   * first. Empty or one long means there is nothing to choose.
+   */
+  ranked: string[];
+}
+
 interface Payload {
   enabled: boolean;
   available: Available[];
   connections: Connection[];
+  sources?: Source[];
 }
 
 /**
@@ -81,6 +96,137 @@ function whenSynced(iso: string | null): string {
   const hrs = Math.round(mins / 60);
   if (hrs < 24) return `synced ${hrs}h ago`;
   return `synced ${Math.round(hrs / 24)}d ago`;
+}
+
+/**
+ * "Which device to believe", when more than one answers the same question.
+ *
+ * WHY THIS EXISTS. Two devices reporting the same night is a contradiction the
+ * app has to resolve, and it resolves it with a ranking of ours that nobody can
+ * see: a member reads 6h50m here and 7h12m in Whoop's own app and has no way to
+ * tell a rule from a bug. Making the choice theirs turns an invisible decision
+ * into a visible one, which is the only version of it that can be trusted.
+ *
+ * IT APPEARS ONLY WHEN THERE IS SOMETHING TO CHOOSE. One device answers
+ * everything and there is no conflict to resolve, so the section states that in
+ * one line and offers no controls. A family is listed only once two connected
+ * devices have actually reported in it, so nobody is asked to pick a glucose
+ * source for two devices that do not measure glucose.
+ *
+ * "AUTOMATIC" IS A REAL OPTION AND IT NAMES ITS OWN ANSWER. Presenting the
+ * default as a nameless fallback would be the same opacity in a new place.
+ *
+ * A CHOICE IS A PROMOTION, NOT A LOCK, and the copy says so. The chosen device
+ * goes first; a night it missed is still filled by the other one. Anybody who
+ * read this as "only use my ring" would expect gaps, and would be wrong in the
+ * direction that loses them data.
+ */
+function SourcePicker({
+  payload,
+  busy,
+  onChoose,
+}: {
+  payload: Payload;
+  busy: string | null;
+  onChoose: (family: string, provider: string | null) => void;
+}) {
+  if (payload.connections.length === 0) return null;
+
+  const choosable = (payload.sources ?? []).filter((s) => s.ranked.length > 1);
+
+  if (choosable.length === 0) {
+    // One device, or two that do not overlap. Said rather than left blank: a
+    // member who has just read about the merge somewhere should be able to see
+    // that it is not doing anything to them.
+    const only = payload.connections.length === 1
+      ? brandName(payload, payload.connections[0].provider)
+      : null;
+    return (
+      <p className="border-t border-border pt-3 font-body text-xs text-muted">
+        {only
+          ? `Every reading in Trends comes from your ${only}.`
+          : "Your devices each answer for different readings, so there is nothing to choose between."}
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-border pt-3">
+      <div className="flex flex-col gap-1">
+        <p className="font-label text-[0.55rem] uppercase tracking-[0.24em] text-muted">
+          Which device to use
+        </p>
+        <p className="font-body text-xs text-muted">
+          More than one of your devices reports these. Your choice goes first; if it
+          has nothing for a day, the other one still fills it in.
+        </p>
+      </div>
+
+      {choosable.map((s) => {
+        const working = busy === `source:${s.family}`;
+        return (
+          <div key={s.family} className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-0.5">
+              <span className="font-body text-sm text-foreground">{s.label}</span>
+              <span className="font-body text-[0.7rem] text-muted">{s.blurb}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Chip
+                selected={s.preferred === null}
+                disabled={busy !== null}
+                onClick={() => onChoose(s.family, null)}
+              >
+                {/* The default names the device it currently resolves to, so
+                    "Automatic" is a described behaviour rather than a shrug. */}
+                Automatic ({brandName(payload, s.ranked[0])})
+              </Chip>
+              {s.ranked.map((id) => (
+                <Chip
+                  key={id}
+                  selected={s.preferred === id}
+                  disabled={busy !== null}
+                  onClick={() => onChoose(s.family, id)}
+                >
+                  {brandName(payload, id)}
+                </Chip>
+              ))}
+            </div>
+            {working && (
+              <span className="font-body text-[0.7rem] text-muted">Saving…</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Chip({
+  selected,
+  disabled,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={selected}
+      className={`rounded-pill border px-3 py-1 font-body text-xs transition-colors disabled:opacity-60 ${
+        selected
+          ? "border-accent text-accent"
+          : "border-border text-foreground/70 hover:border-accent hover:text-accent"
+      }`}
+    >
+      {children}
+    </button>
+  );
 }
 
 export function WearableSettings({
@@ -228,6 +374,34 @@ export function WearableSettings({
     });
   };
 
+  /**
+   * Choose the device for one family, or hand it back to the default.
+   *
+   * Reloads rather than patching state locally. The server owns which choices
+   * are even offered (a device has to have reported in that family), and a
+   * client that guessed at the new shape would be right until it was not.
+   */
+  const setSource = async (family: string, provider: string | null) => {
+    setBusy(`source:${family}`);
+    setMessage(null);
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch("/api/wearables", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set-source", family, provider }),
+      });
+      if (!res.ok) {
+        setMessage("Couldn't save that choice. Please try again.");
+        return;
+      }
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const syncNow = async () => {
     setBusy("sync");
     setMessage(null);
@@ -336,6 +510,12 @@ export function WearableSettings({
           );
         })}
       </ul>
+
+      <SourcePicker
+        payload={data}
+        busy={busy}
+        onChoose={(family, provider) => void setSource(family, provider)}
+      />
 
       <div className="flex flex-col gap-2 border-t border-border pt-3">
         <p className="font-label text-[0.55rem] uppercase tracking-[0.24em] text-muted">
