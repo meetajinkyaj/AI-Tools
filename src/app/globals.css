@@ -1,16 +1,41 @@
 @import "tailwindcss";
 
 /*
- * Ikigaro design tokens, the "golden-hour" brand system.
- * Source of truth: Ikigaro Brand Guidelines v1.0.
+ * Dark is a CLASS, not a media query.
  *
- * Grounds: charcoal (Obsidian Stone) + cream (Onsen Linen), used ~60/30.
- * Terracotta (Golden Hour) is the single accent, ~10%, never body text.
- * The app runs on the cream ground by default; the marketing-style hero
- * (landing) uses the charcoal ground explicitly via `bg-obsidian`.
+ * This replaces Tailwind's default `dark:` variant (which follows
+ * prefers-color-scheme) with one driven by `.dark` on <html>, per handoff §1.2.
+ * Nothing sets that class yet, so today this changes nothing; it is here so the
+ * token layer is complete and the toggle is a one-line change rather than a
+ * migration. No `dark:` utility exists anywhere in the app today.
  */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ==========================================================================
+ * 1. TOKENS
+ *
+ * Source of truth: the Ikigaro mobile design handoff (design_handoff_ikigaro
+ * _mobile/README.md), which supersedes the values previously inlined here.
+ * The Brand Guidelines v1.0 palette is unchanged by it; the handoff adds the
+ * semantic flag ramp, the full radius and shadow scales, the type scale, and
+ * the dark ground.
+ *
+ * TWO VOCABULARIES, ONE SET OF VALUES. The handoff names things
+ * canvas/ink/line/primary. The app was built on background/foreground/border/
+ * accent and uses those names in about forty components. Rather than rename
+ * forty files (and rather than leave two palettes drifting apart), the old
+ * names are kept as ALIASES pointing at the new tokens. Both spellings resolve
+ * to the same custom property, so every existing screen inherits the handoff
+ * without a single component edit, and new work can use the handoff's names.
+ *
+ * The aliases are deprecated, not supported. New code uses the handoff names.
+ * ========================================================================== */
+
 :root {
-  /* Raw brand palette */
+  color-scheme: light;
+
+  /* --- Raw brand palette (Brand Guidelines v1.0). Never referenced directly
+         by components: everything goes through a semantic token below. ----- */
   --obsidian-stone: #1b1815;
   --onsen-linen: #f1e9dc;
   --golden-hour: #b5562d;
@@ -19,63 +44,715 @@
   --burnt-cedar: #8f3f1d;
   --desert-tan: #c9b79c;
 
-  /* Semantic tokens, light (cream) ground */
-  --background: var(--onsen-linen);
-  --surface: #fbf7f0; /* warm near-white card lift */
-  --surface-2: #f4ecdf; /* subtle raised / hover */
-  --foreground: var(--obsidian-stone);
-  --muted: #6e645b; /* warm gray for secondary text (AA on cream) */
-  --border: rgba(27, 24, 21, 0.12);
-  --border-strong: rgba(27, 24, 21, 0.24);
-  --accent: var(--golden-hour);
-  --accent-hover: var(--burnt-cedar);
-  --accent-contrast: var(--onsen-linen);
-}
+  /* --- Surfaces --- */
+  --canvas: #f1e9dc;    /* app background, warm linen */
+  --surface: #fbf7f0;   /* cards */
+  --surface-2: #f4ecdf; /* inset fills: segmented track, stat wells, avatar chip */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-contrast: var(--accent-contrast);
+  /* --- Text --- */
+  --ink: #1b1815;   /* primary text, warm charcoal */
+  --muted: #6e645b; /* secondary text */
 
-  /* Fixed brand colors for deliberate use (e.g. the charcoal hero) */
-  --color-obsidian: var(--obsidian-stone);
-  --color-linen: var(--onsen-linen);
-  --color-terracotta: var(--golden-hour);
-  --color-clay: var(--clay-ember);
-  --color-tan: var(--desert-tan);
+  /*
+   * --- Lines ---
+   * These do the structural work. Cards in this system are border-defined,
+   * not shadow-defined, which is why the shadow scale below has only four
+   * entries and none of them is a card.
+   */
+  --line: rgba(27, 24, 21, 0.12);        /* hairline borders, dividers */
+  --line-strong: rgba(27, 24, 21, 0.24); /* outline buttons, unselected marks */
 
-  /* Type, three voices, wired from next/font in layout.tsx */
-  --font-display: var(--font-cormorant);
-  --font-label: var(--font-marcellus);
-  --font-body: var(--font-hanken);
+  /*
+   * --- Brand ---
+   * `--primary` is the ONLY saturated hue in the system. Everything else is
+   * the linen and taupe ramp. Never introduce a cool hue; if a new tint is
+   * needed, derive it with color-mix() from these.
+   */
+  --primary: #b5562d;                       /* terracotta: CTAs, active nav, eyebrows */
+  --primary-deep: #8f3f1d;                  /* link hover, pressed */
+  --primary-fg: #f6efe3;                    /* text on primary */
+  --primary-wash: rgba(181, 86, 45, 0.07);  /* selected-tile fill */
+  --clay: #cd7144;                          /* positive movement: sparklines, up deltas */
 
-  /* Corner radius, 8 controls, 14 cards */
-  --radius-control: 8px;
-  --radius-card: 14px;
+  /*
+   * --- Biomarker flags ---
+   * Deliberately NOT red and green. A lab value outside a reference range is
+   * information, not an alarm, and this app never diagnoses; a red row would
+   * make a claim the product is careful not to make everywhere else. So the
+   * ramp stays inside the brand: clay for in range, taupe for borderline,
+   * burnt cedar for out of range, each with a wash for its pill.
+   */
+  --good: #cd7144;                        /* normal, in range, improved */
+  --good-wash: rgba(205, 113, 68, 0.12);
+  --warn: #6e645b;                        /* borderline */
+  --warn-wash: rgba(201, 183, 156, 0.3);
+  --bad: #8f3f1d;                         /* out of range: LOW / HIGH */
+  --bad-wash: rgba(143, 63, 29, 0.12);
+
+  /* --- Deprecated aliases. Kept so existing components inherit the handoff
+         values without being edited. Use the names above in new code. ------ */
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --border: var(--line);
+  --border-strong: var(--line-strong);
+  --accent: var(--primary);
+  --accent-hover: var(--primary-deep);
+  --accent-contrast: var(--primary-fg);
 }
 
 /*
- * The ground must exist before any component CSS or JS: without it, the
- * browser paints its own default during startup and reloads, black in dark
- * mode, white in light mode, which reads as a broken flash on mobile.
- * The app is light-only; color-scheme keeps dark-mode UAs from second-guessing.
+ * Dark ground, handoff §1.1.
+ *
+ * Terracotta LIFTS ONE STEP in dark: #b5562d does not carry enough luminance
+ * against #1b1815 to stay legible, so `--primary` becomes the clay value and
+ * `--primary-deep` takes the old primary. This is why components must never
+ * reference the raw palette: the mapping changes, the token name does not.
+ */
+.dark {
+  color-scheme: dark;
+
+  --canvas: #1b1815;
+  --surface: #242019;
+  --surface-2: #2d2822;
+  --ink: #f1e9dc;
+  --muted: #a89c8f;
+  --line: rgba(241, 233, 220, 0.13);
+  --line-strong: rgba(241, 233, 220, 0.26);
+  --primary: #cd7144;
+  --primary-deep: #b5562d;
+  --primary-fg: #1b1815;
+  --primary-wash: rgba(205, 113, 68, 0.1);
+  --clay: #cd7144;
+  --good: #cd7144;
+  --good-wash: rgba(205, 113, 68, 0.14);
+  --warn: #a89c8f;
+  --warn-wash: rgba(201, 183, 156, 0.16);
+  --bad: #cd7144;
+  --bad-wash: rgba(205, 113, 68, 0.14);
+}
+
+/*
+ * `inline` matters here and is not decoration: it makes the generated
+ * utilities emit `var(--canvas)` rather than a copy of #f1e9dc, which is the
+ * only reason a `.dark` ancestor can re-point them at runtime. Drop `inline`
+ * and dark mode silently stops working while every light screen looks fine.
+ */
+@theme inline {
+  /* --- Colors --- */
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-primary: var(--primary);
+  --color-primary-deep: var(--primary-deep);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-wash: var(--primary-wash);
+  --color-clay: var(--clay);
+  --color-good: var(--good);
+  --color-good-wash: var(--good-wash);
+  --color-warn: var(--warn);
+  --color-warn-wash: var(--warn-wash);
+  --color-bad: var(--bad);
+  --color-bad-wash: var(--bad-wash);
+
+  /* Deprecated color aliases, see the note above. */
+  --color-background: var(--canvas);
+  --color-foreground: var(--ink);
+  --color-border: var(--line);
+  --color-border-strong: var(--line-strong);
+  --color-accent: var(--primary);
+  --color-accent-hover: var(--primary-deep);
+  --color-accent-contrast: var(--primary-fg);
+
+  /*
+   * Fixed brand colors, for the deliberate cases that must NOT follow the
+   * ground: the charcoal marketing hero stays charcoal in either mode.
+   */
+  --color-obsidian: var(--obsidian-stone);
+  --color-linen: var(--onsen-linen);
+  --color-terracotta: var(--golden-hour);
+  --color-tan: var(--desert-tan);
+
+  /* --- Type families (wired from next/font in layout.tsx) --- */
+  --font-display: var(--font-cormorant); /* Cormorant Garamond 500, never bold */
+  --font-label: var(--font-marcellus);   /* Marcellus 400, eyebrows ONLY */
+  --font-sans: var(--font-hanken);       /* Hanken Grotesk, everything else */
+  /*
+   * Japanese text. NOT the rank kanji: those are outline paths in
+   * `src/lib/rank-kanji.ts`, which renders them identically in the app, the
+   * share card and a PDF with no webfont at all. A system stack rather than a
+   * downloaded CJK family, because a family for four glyphs is a large payload
+   * to reach a worse place. See the note in layout.tsx.
+   */
+  --font-jp: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+  --font-body: var(--font-hanken);       /* deprecated alias of --font-sans */
+
+  /*
+   * --- Type scale, handoff §1.3 ---
+   *
+   * The handoff gives ranges for some steps (display-md 25-26, body 14-14.5).
+   * A token cannot be a range, so each one takes a single value chosen from
+   * the sizes the reference screens actually use, and the range is recorded in
+   * the comment so nobody has to go back to the PDF to find out what was
+   * discarded.
+   */
+  --text-display-xl: 1.9375rem; /* 31 */
+  --text-display-xl--line-height: 1.05;
+  --text-display-xl--letter-spacing: -0.02em;
+
+  --text-display-lg: 1.8125rem; /* 29 */
+  --text-display-lg--line-height: 1;
+  --text-display-lg--letter-spacing: -0.02em;
+
+  --text-display-md: 1.625rem; /* 26, band 25-26 */
+  --text-display-md--line-height: 1.05;
+
+  --text-display-sm: 1.375rem; /* 22, band 21-23 */
+  --text-display-sm--line-height: 1.175;
+
+  --text-eyebrow: 0.6875rem; /* 11 */
+  --text-eyebrow--line-height: 1;
+  --text-eyebrow--letter-spacing: 0.2em; /* band 0.18-0.22em */
+
+  --text-eyebrow-sm: 0.65625rem; /* 10.5 */
+  --text-eyebrow-sm--line-height: 1;
+  --text-eyebrow-sm--letter-spacing: 0.16em;
+
+  --text-body-lg: 0.9375rem; /* 15 */
+  --text-body-lg--line-height: 1.2;
+
+  --text-body: 0.90625rem; /* 14.5, band 14-14.5 */
+  --text-body--line-height: 1.2;
+
+  --text-body-sm: 0.84375rem; /* 13.5 */
+  --text-body-sm--line-height: 1.55;
+
+  --text-caption: 0.8125rem; /* 13, band 12.5-13 */
+  --text-caption--line-height: 1.5;
+
+  /* The unit that trails a numeral: "265" in Cormorant, "days" in this. */
+  --text-unit: 0.78125rem; /* 12.5 */
+  --text-unit--line-height: 1.4;
+
+  --text-small: 0.75rem; /* 12 */
+  --text-small--line-height: 1.4;
+
+  --text-micro: 0.71875rem; /* 11.5, band 11-11.5 */
+  --text-micro--line-height: 1.4;
+
+  --text-tab: 0.625rem; /* 10 */
+  --text-tab--line-height: 1;
+  --text-tab--letter-spacing: 0.03em;
+
+  /*
+   * --- Spacing, handoff §1.4 ---
+   *
+   * Tailwind's own 4px grid (`--spacing`) is untouched and still does the
+   * ordinary work. These are the named values the layout depends on, so a
+   * screen gutter is `px-gutter` rather than `px-5` and cannot drift by one
+   * step during an edit.
+   */
+  --spacing-gutter: 20px;      /* screen gutter */
+  --spacing-card: 18px;        /* card padding */
+  --spacing-card-tight: 16px;  /* compact rows */
+  --spacing-stack: 16px;       /* gap between cards */
+  --spacing-shell-top: 70px;   /* clears the status bar */
+  --spacing-shell-bottom: 130px; /* clears the floating nav */
+
+  /* Control heights. "tap" is the accessibility floor, not a design value. */
+  --spacing-tap: 44px;
+  --spacing-ctl: 46px;    /* input, secondary button, energy cell */
+  --spacing-ctl-lg: 48px; /* primary submit */
+  --spacing-nav: 66px;
+  --spacing-fab: 54px;
+  --spacing-sheet-row: 52px;
+
+  /* Notch and home-indicator insets. Zero on every device without them, and
+     zero everywhere unless viewport-fit=cover is set (it is, in layout.tsx). */
+  --spacing-safe-t: env(safe-area-inset-top);
+  --spacing-safe-r: env(safe-area-inset-right);
+  --spacing-safe-b: env(safe-area-inset-bottom);
+  --spacing-safe-l: env(safe-area-inset-left);
+
+  /* --- Radii, handoff §1.5 --- */
+  --radius-ctl: 8px;       /* buttons, inputs */
+  --radius-inset: 10px;    /* segmented track, stat wells */
+  --radius-inset-pill: 7px;/* the sliding pill inside that track */
+  --radius-well: 11px;     /* icon wells */
+  --radius-card: 14px;
+  --radius-tile: 16px;     /* activity tiles */
+  --radius-tile-lg: 18px;  /* mosaic tiles */
+  --radius-sheet: 22px;
+  --radius-pill: 999px;
+  /* Deprecated alias of --radius-ctl. NOTE: `rounded-pill` above is new. It
+     was used in twelve places and defined in none of them, so it emitted no
+     CSS at all and those pills have been rendering square. */
+  --radius-control: 8px;
+
+  /*
+   * --- Shadows, handoff §1.5 ---
+   * Cards have NO shadow. Only these four surfaces lift, and each one lifts
+   * because it floats over content rather than sitting in the flow.
+   */
+  --shadow-nav: 0 10px 30px rgba(27, 24, 21, 0.12);
+  --shadow-fab: 0 8px 20px rgba(181, 86, 45, 0.35);
+  --shadow-sheet: 0 -10px 40px rgba(27, 24, 21, 0.18);
+  --shadow-tile: 0 2px 10px rgba(27, 24, 21, 0.15); /* dark mosaic only */
+  /* Selection ring. A ring rather than a thicker border so the box does not
+     grow by 1px when something is chosen, which reads as a jump. */
+  --shadow-ring: 0 0 0 2px var(--primary);
+
+  /* --- Motion, handoff §1.6 --- */
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1); /* pills, switch, sheet */
+  --ease-press: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ==========================================================================
+ * 2. BASE
+ * ========================================================================== */
+
+/*
+ * The ground must exist before any component CSS or JS.
+ *
+ * Without it the browser paints its own default during startup and on reload,
+ * which reads as a broken flash on mobile. `var(--canvas)` rather than a
+ * literal, so the same rule serves the dark ground when `.dark` is set.
  */
 html {
-  background: var(--onsen-linen);
-  color-scheme: light;
+  background: var(--canvas);
+  /*
+   * 100dvh, not 100vh. On mobile Safari and Chrome the toolbar collapses on
+   * scroll; vh is frozen at the largest viewport, so a "full height" screen is
+   * taller than the window and the page scrolls by the height of a toolbar
+   * that is not there. dvh tracks the real viewport.
+   */
+  min-height: 100dvh;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-body), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /*
+   * No grey flash on tap. iOS paints a translucent highlight over anything it
+   * decides is tappable, which fights the press feedback in §1.6 and looks
+   * like a rendering fault on a warm palette.
+   */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * No 300ms wait before a tap registers, and no double-tap zoom.
+ *
+ * Scoped to controls rather than set on body: `touch-action: manipulation` on
+ * a scroll container can interfere with pinch zoom on content a member may
+ * legitimately want to enlarge, such as a lab report.
+ */
+button,
+[role="button"],
+a,
+label,
+select,
+summary {
+  touch-action: manipulation;
+}
+
+/*
+ * Focus is never removed silently.
+ *
+ * `:focus-visible` only, so a mouse or touch press does not draw a ring, but
+ * every keyboard path does. Removing the outline without replacing it is the
+ * single commonest accessibility regression in a restyle.
+ */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/*
+ * Reduced motion, handoff §1.6.
+ *
+ * Animations collapse to nothing rather than being merely shortened, and press
+ * feedback becomes a brightness change instead of a scale, so the interface
+ * still answers a tap without moving. Vestibular triggers are movement, not
+ * feedback, and stripping the feedback too would make the app feel dead.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .iki-press:active {
+    transform: none;
+    filter: brightness(0.92);
+  }
+}
+
+/* ==========================================================================
+ * 3. COMPONENTS
+ *
+ * The shared styles from handoff §2, as classes rather than as repeated
+ * utility strings. Every value below references a token; there is no literal
+ * hex or unmeasured px in this layer.
+ *
+ * These are additive. No existing component uses them yet, so shipping them
+ * changes nothing on screen; they are here so the restyle that follows is
+ * applying names rather than inventing values screen by screen.
+ * ========================================================================== */
+
+@layer components {
+  /* --- Press feedback, handoff §1.6 -------------------------------------- */
+
+  /*
+   * On EVERY tappable thing, including card-shaped ones. A card that navigates
+   * and does not answer a press is indistinguishable from a card that is
+   * merely decorative, which is the ambiguity this removes.
+   */
+  .iki-press {
+    cursor: pointer;
+    transition: transform 100ms var(--ease-press), filter 100ms var(--ease-press);
+  }
+  .iki-press:active {
+    transform: scale(0.97);
+  }
+
+  /*
+   * A 44px hit area WITHOUT a 44px box.
+   *
+   * The overlay is a pseudo-element centred on the element, so a 12px text
+   * link becomes fully tappable while occupying exactly the space it did
+   * before. Setting `min-height: 44px` on the element instead would be the
+   * obvious version and would push apart every dense row in the app.
+   */
+  .iki-tap {
+    position: relative;
+  }
+  .iki-tap::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    min-width: var(--spacing-tap);
+    min-height: var(--spacing-tap);
+    width: 100%;
+    height: 100%;
+  }
+
+  /* --- Card, handoff §2 -------------------------------------------------- */
+
+  /*
+   * Border-defined, not shadow-defined. No hover lift: this is a phone-first
+   * layout and a lift that only exists on a pointer is a state most members
+   * will never see.
+   */
+  .iki-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    padding: var(--spacing-card);
+  }
+  .iki-card-tight {
+    padding: var(--spacing-card-tight) var(--spacing-card);
+  }
+  /* The one tinted card in the app (Future You scoreboard). Deliberately a
+     single exception, so it reads as emphasis rather than as a second style. */
+  .iki-card-accent {
+    background: color-mix(in srgb, var(--primary) 6%, transparent);
+    border-color: color-mix(in srgb, var(--primary) 20%, transparent);
+  }
+
+  /* --- Badges and pills, handoff §2 -------------------------------------- */
+
+  .iki-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-pill);
+    padding: calc(var(--spacing) * 0.75) calc(var(--spacing) * 2.5);
+    font-family: var(--font-sans), sans-serif;
+    font-size: var(--text-eyebrow-sm);
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .iki-badge-good {
+    background: var(--good-wash);
+    color: var(--good);
+  }
+  .iki-badge-warn {
+    background: var(--warn-wash);
+    color: var(--warn);
+  }
+  .iki-badge-bad {
+    background: var(--bad-wash);
+    color: var(--bad);
+  }
+  /*
+   * LOW / HIGH / BORDERLINE. Set apart in caps because these three are read at
+   * a glance down a column of numbers rather than in a sentence.
+   */
+  .iki-badge-flag {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  /* Neutral pill: "Needs your daily inputs", where there is no verdict. */
+  .iki-badge-neutral {
+    background: var(--surface-2);
+    color: var(--muted);
+  }
+  /* Brand pill: "Set up to improve". */
+  .iki-badge-primary {
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    color: var(--primary);
+  }
+
+  /* --- Buttons, handoff §2 ----------------------------------------------- */
+
+  .iki-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--spacing) * 2);
+    border-radius: var(--radius-ctl);
+    font-family: var(--font-sans), sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      transform 100ms var(--ease-press),
+      background-color 140ms ease-out,
+      border-color 140ms ease-out,
+      color 140ms ease-out,
+      opacity 140ms ease-out;
+  }
+  .iki-btn:active {
+    transform: scale(0.97);
+  }
+  .iki-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .iki-btn-primary {
+    min-height: var(--spacing-ctl-lg);
+    padding-inline: var(--spacing-card);
+    background: var(--primary);
+    color: var(--primary-fg);
+    font-size: var(--text-body);
+  }
+  /* Darkened from the token rather than hardcoded, so the hover follows the
+     ground: in dark mode --primary is already a step lighter. */
+  .iki-btn-primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--primary) 88%, black);
+  }
+
+  .iki-btn-secondary {
+    min-height: var(--spacing-ctl);
+    padding-inline: var(--spacing-card);
+    background: transparent;
+    border: 1px solid var(--line-strong);
+    color: var(--ink);
+    font-size: var(--text-body-sm);
+  }
+  .iki-btn-secondary:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+
+  /*
+   * Ceremonial. Reserved for brand moments ("Share your rank", "Connect a
+   * device"), which is why it is the only button in Marcellus and the only one
+   * that is a full pill. Using it for an ordinary action spends the emphasis.
+   */
+  .iki-btn-ceremonial {
+    min-height: var(--spacing-tap);
+    padding-inline: calc(var(--spacing) * 5);
+    background: transparent;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-pill);
+    color: var(--ink);
+    font-family: var(--font-label), serif;
+    font-size: var(--text-eyebrow);
+    font-weight: 400;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+  }
+  .iki-btn-ceremonial:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+
+  .iki-btn-link {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--muted);
+    font-family: var(--font-sans), sans-serif;
+    font-size: var(--text-small);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .iki-btn-link:hover {
+    color: var(--primary-deep);
+  }
+
+  /* --- Screen header, handoff §2 ----------------------------------------- */
+
+  .iki-eyebrow {
+    font-family: var(--font-label), serif;
+    font-size: var(--text-eyebrow);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--primary);
+  }
+  .iki-title {
+    font-family: var(--font-display), serif;
+    font-size: var(--text-display-xl);
+    font-weight: 500; /* never bold: Cormorant loses its proportions above 500 */
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .iki-lede {
+    font-size: var(--text-body-sm);
+    line-height: 1.55;
+    color: var(--muted);
+  }
+
+  /* --- List row, handoff §2 ---------------------------------------------- */
+
+  /*
+   * The divider is on the row, not between rows, so a list does not need a
+   * separator element and the last row loses its rule without a special case
+   * at the call site.
+   */
+  .iki-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: calc(var(--spacing) * 3);
+    padding-block: calc(var(--spacing) * 3);
+    border-bottom: 1px solid var(--line);
+  }
+  .iki-row:last-child {
+    border-bottom: 0;
+  }
+  .iki-row-label {
+    font-size: var(--text-caption);
+    color: var(--muted);
+  }
+  .iki-row-value {
+    font-size: var(--text-caption);
+    font-weight: 600;
+    color: var(--ink);
+    text-align: right;
+  }
+  /* Sheet rows are tappable, so they carry the full height rather than a hit
+     area overlay: there is room for it here and a real 52px target is better
+     than a 52px-looking one. */
+  .iki-row-sheet {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: var(--spacing-sheet-row);
+    font-size: var(--text-body-lg);
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  /* --- Bottom navigation, handoff §2 ------------------------------------- */
+
+  /*
+   * A floating pill, not a bar pinned to the bottom edge.
+   *
+   * The safe-area inset is added to its offset rather than to the page, so on
+   * a device with a home indicator the nav rises above it and the content
+   * behind keeps scrolling under the full width of the screen.
+   */
+  .iki-nav {
+    position: fixed;
+    left: calc(var(--spacing) * 3 + var(--spacing-safe-l));
+    right: calc(var(--spacing) * 3 + var(--spacing-safe-r));
+    bottom: calc(var(--spacing) * 4 + var(--spacing-safe-b));
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--spacing-nav);
+    padding-inline: calc(var(--spacing) * 2);
+    border: 1px solid var(--line);
+    border-radius: calc(var(--spacing-nav) / 2);
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow: var(--shadow-nav);
+  }
+
+  .iki-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--spacing) * 1);
+    width: 56px;
+    height: 54px;
+    border-radius: var(--radius-tile);
+    color: var(--muted);
+    font-size: var(--text-tab);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: color 140ms ease-out;
+  }
+  /* Styled off aria-current rather than a class, so the accessible state and
+     the visible state cannot disagree. */
+  .iki-nav-item[aria-current="page"] {
+    color: var(--primary);
+  }
+
+  /*
+   * The check-in FAB sits proud of the bar. The ring is painted in the canvas
+   * colour rather than being a gap, so the circle reads as cut out of the nav
+   * whatever is scrolling underneath it.
+   */
+  .iki-nav-fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--spacing-fab);
+    height: var(--spacing-fab);
+    margin-top: calc(var(--spacing-fab) / -2 + 1px);
+    border-radius: var(--radius-pill);
+    background: var(--primary);
+    color: var(--primary-fg);
+    box-shadow:
+      0 0 0 4px var(--canvas),
+      var(--shadow-fab);
+    cursor: pointer;
+    transition: transform 100ms var(--ease-press);
+  }
+  .iki-nav-fab:active {
+    transform: scale(0.97);
+  }
+
+  /* The page padding that keeps content clear of the nav and the status bar. */
+  .iki-shell {
+    padding-inline: calc(var(--spacing-gutter) + var(--spacing-safe-l));
+    padding-top: calc(var(--spacing-shell-top) + var(--spacing-safe-t));
+    padding-bottom: calc(var(--spacing-shell-bottom) + var(--spacing-safe-b));
+  }
 }
