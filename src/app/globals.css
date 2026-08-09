@@ -471,6 +471,46 @@ summary {
     height: 100%;
   }
 
+  /* --- Status ping, handoff §1.6 ----------------------------------------- */
+
+  /*
+   * THE ONE DECORATIVE ANIMATION IN THE APP, and it is spent here on purpose:
+   * beside "Ready for today's check-in?", which is the single action Home
+   * exists to prompt. A second loop anywhere else would cost this one its
+   * meaning, since a page with two things pulsing has nothing pulsing.
+   *
+   * The dot itself never moves. Only the halo scales and fades, so the mark
+   * stays legible while the motion happens around it, and under
+   * prefers-reduced-motion the global reset stops the halo and leaves the dot.
+   */
+  .iki-ping {
+    position: relative;
+    flex-shrink: 0;
+    width: calc(var(--spacing) * 2);
+    height: calc(var(--spacing) * 2);
+    border-radius: var(--radius-pill);
+    background: var(--primary);
+  }
+  .iki-ping::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-pill);
+    background: var(--primary);
+    animation: iki-ping 2.2s ease-out infinite;
+  }
+
+  @keyframes iki-ping {
+    0% {
+      transform: scale(1);
+      opacity: 0.45;
+    }
+    100% {
+      transform: scale(2.4);
+      opacity: 0;
+    }
+  }
+
   /* --- Card, handoff §2 -------------------------------------------------- */
 
   /*

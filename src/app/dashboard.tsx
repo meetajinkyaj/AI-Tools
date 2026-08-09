@@ -8,7 +8,6 @@ import type { RankCardInput } from "@/lib/rank-share-card";
 import { RankBadge } from "./rank-badge";
 import { RankShareModal } from "./rank-share-modal";
 import { WearableHomeCard } from "./wearable-home-card";
-import { Card, Eyebrow, PageHeader, primaryButtonClass } from "./ui";
 
 interface Summary {
   streak: number;
@@ -19,7 +18,7 @@ interface Summary {
 
 /** Shimmer stand-in for a stat value while the summary loads, never a fake 0. */
 function StatPlaceholder() {
-  return <div className="h-8 w-16 animate-pulse rounded bg-surface-2" />;
+  return <div className="h-8 w-16 animate-pulse rounded-ctl bg-surface-2" />;
 }
 
 /**
@@ -93,12 +92,14 @@ export function Dashboard({
   const checkedInToday = summary?.checkedInToday ?? false;
 
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader
-        eyebrow="Home"
-        title={`Welcome, ${firstName}`}
-        subtitle="Your baseline is set up. Check in daily to build your streak."
-      />
+    <div className="flex flex-col gap-stack">
+      <header className="flex flex-col gap-1.5">
+        <p className="iki-eyebrow">Home</p>
+        <h1 className="iki-title">Welcome, {firstName}</h1>
+        <p className="iki-lede">
+          Your baseline is set up. Check in daily to build your streak.
+        </p>
+      </header>
 
       {/*
         The rank card leads Home. It used to sit on the Check-in tab, which
@@ -110,71 +111,83 @@ export function Dashboard({
         <RankBadge score={summary.ikiScore} onShare={() => void openShare()} />
       )}
 
-      <WearableHomeCard getToken={getToken} onOpenSettings={onOpenSettings} />
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="flex flex-col gap-2 p-6">
-          <Eyebrow>Primary goal</Eyebrow>
-          <p className="font-display text-2xl font-medium text-foreground">
-            {PRIMARY_GOAL_LABELS[profile.primary_goal]}
-          </p>
-        </Card>
-
-        <Card className="flex flex-col gap-2 p-6">
-          <Eyebrow>Streak</Eyebrow>
+      {/* THE STAT DUO, then the goal. The three used to share one row, which
+          put a number you watch daily beside a preference you set once and
+          gave all three the same weight. */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <section className="iki-card iki-card-tight flex flex-col gap-1">
+          <p className="iki-eyebrow">Streak</p>
           {summary ? (
-            <p className="font-display text-2xl font-medium text-foreground">
+            <p className="font-display text-display-md font-medium leading-none text-ink">
               {summary.streak}
-              <span className="ml-1 font-body text-sm text-muted">
+              <span className="ml-1 font-sans text-unit text-muted">
                 {summary.streak === 1 ? "day" : "days"}
               </span>
             </p>
           ) : (
             <StatPlaceholder />
           )}
-        </Card>
+        </section>
 
-        <Card className="flex flex-col gap-2 p-6">
-          <Eyebrow>iki points</Eyebrow>
+        <section className="iki-card iki-card-tight flex flex-col gap-1">
+          <p className="iki-eyebrow">iki points</p>
           {summary ? (
-            <p className="font-display text-2xl font-medium text-foreground">
+            <p className="font-display text-display-md font-medium leading-none text-ink">
               {summary.pointsBalance}
             </p>
           ) : (
             <StatPlaceholder />
           )}
-        </Card>
+        </section>
       </div>
 
+      <section className="iki-card iki-card-tight flex flex-col gap-1">
+        <p className="iki-eyebrow">Primary goal</p>
+        <p className="font-display text-display-sm font-medium text-ink">
+          {PRIMARY_GOAL_LABELS[profile.primary_goal]}
+        </p>
+      </section>
+
       {summary ? (
-        <Card className="flex flex-col gap-4 p-6">
+        <section className="iki-card flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <p className="font-body text-sm font-medium text-foreground">
+            <p className="flex items-center gap-2.5 text-body font-semibold text-ink">
+              {/* The one decorative loop in the app, spent on the single action
+                  this screen exists to prompt, and only while it is still
+                  outstanding. Once today is logged there is nothing to nudge. */}
+              {!checkedInToday && <span className="iki-ping" aria-hidden />}
               {checkedInToday
                 ? "You've checked in today. Nice work."
                 : "Ready for today's check-in?"}
             </p>
-            <p className="font-body text-sm text-muted">
+            <p className="text-caption leading-relaxed text-muted">
               {checkedInToday
                 ? "Come back tomorrow to keep your streak alive."
                 : "A 30-second check-in earns iki points and grows your streak."}
             </p>
           </div>
-          <div>
-            <button onClick={onCheckIn} className={primaryButtonClass}>
-              {checkedInToday ? "View check-in" : "Check in"}
-            </button>
-          </div>
-        </Card>
+          <button
+            type="button"
+            onClick={onCheckIn}
+            className="iki-btn iki-btn-primary w-full"
+          >
+            {checkedInToday ? "View check-in" : "Check in"}
+          </button>
+        </section>
       ) : (
-        <Card className="flex flex-col gap-4 p-6">
+        <section className="iki-card flex flex-col gap-3">
           <div className="flex animate-pulse flex-col gap-2">
-            <div className="h-4 w-48 rounded bg-surface-2" />
-            <div className="h-4 w-64 max-w-full rounded bg-surface-2" />
+            <div className="h-4 w-48 rounded-ctl bg-surface-2" />
+            <div className="h-4 w-64 max-w-full rounded-ctl bg-surface-2" />
           </div>
-          <div className="h-11 w-32 animate-pulse rounded-control bg-surface-2" />
-        </Card>
+          <div className="h-ctl-lg w-full animate-pulse rounded-ctl bg-surface-2" />
+        </section>
       )}
+
+      {/* NOT IN THE MOCKUP, KEPT. Either the pitch to connect a device or, once
+          one is connected, the sync control and the schedule behind it. It
+          renders itself away when neither applies. */}
+      <WearableHomeCard getToken={getToken} onOpenSettings={onOpenSettings} />
 
       {shareOpen && summary && (
         <RankShareModal

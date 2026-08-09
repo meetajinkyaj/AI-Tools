@@ -208,6 +208,13 @@ finds every use. Compose them with utilities; they set structure, not layout.
   fails. The whole chip is the target and carries the 44px height: a 10px
   "COPY" is not something to ask a thumb to hit.
 
+**Status ping**
+- `.iki-ping` is the one decorative loop in the app, spent beside "Ready for
+  today's check-in?" on Home. The dot never moves; only the halo scales and
+  fades, so the mark stays legible and `prefers-reduced-motion` leaves the dot
+  behind when it stops the halo. A second loop anywhere else would cost this one
+  its meaning.
+
 **Progress bar**
 - `.iki-bar` track, `.iki-bar-fill` fill. The fill's width is set inline by the
   caller, because it is data rather than a design value. Add
