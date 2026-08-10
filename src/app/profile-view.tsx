@@ -8,6 +8,7 @@ import {
 } from "@/lib/profile";
 import { EXERCISE_TYPE_LABELS, isExerciseType } from "@/lib/exercises";
 import { NotificationSettings } from "./notification-settings";
+import { ThemeControl } from "./theme-control";
 import { WearableSettings } from "./wearable-settings";
 
 /**
@@ -80,6 +81,8 @@ export function ProfileView({
           </div>
         ))}
       </section>
+
+      <ThemeControl />
 
       <NotificationSettings getToken={getToken} />
 

@@ -295,21 +295,33 @@ restyle of the whole app rather than a token change.
 
 ---
 
-## 8. Dark mode is defined but not switched on
+## 8. Dark mode is on
 
-The `.dark` block and the `@custom-variant dark` rule are in place, so every
-token flips correctly the moment something adds `dark` to `<html>`. Nothing
-does yet, so today this changes nothing on screen.
+Three preferences, two grounds. **System** is the default and follows the
+device, live: a member on system whose phone flips at dusk flips with it while
+the app is open, because the control subscribes to the media query rather than
+sampling it at mount. **Light** and **Dark** are overrides, and an override
+ignores the device entirely.
 
-Turning it on is a behaviour change, not a token change: it needs the class
-toggled from `prefers-color-scheme` with a manual override, and
-`layout.tsx` still declares `colorScheme: "light"` in its viewport export.
+The preference is what gets stored, never the resolved ground. Storing the
+ground would freeze a system member into whichever mode they happened to be in
+the first time they opened the app.
+
+`src/lib/theme.ts` holds the pure resolution and is tested. `theme-control.tsx`
+is the control on Profile. **`layout.tsx` inlines the same rules a third time**,
+as a `<script>` before anything paints, and that duplication is deliberate: by
+the time a React component can read `localStorage`, the browser has already
+painted the light ground, and a member on dark gets a full-screen white flash on
+every cold load.
 
 Note that **terracotta lifts one step in dark**: `#b5562d` has too little
 luminance against `#1b1815`, so `--primary` becomes the clay value and
-`--primary-deep` takes the old primary. This is exactly why components must
-reference tokens and never the raw palette: the mapping changes, the name does
-not.
+`--primary-deep` takes the old primary. This is exactly why components reference
+tokens and never the raw palette: the mapping changes, the name does not.
+
+`viewport` declares `colorScheme: "light dark"` and a theme colour per scheme,
+so the browser chrome, form controls and scrollbars follow the page instead of
+staying light under a dark app.
 
 ---
 
