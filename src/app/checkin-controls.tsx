@@ -10,6 +10,7 @@ import {
   type DurationBucket,
 } from "@/lib/exercises";
 import { ActivityIcon, CheckIcon } from "./activity-icon";
+import { Segmented } from "./segmented";
 
 /**
  * The check-in controls the mockup specifies as behaviour rather than as paint.
@@ -198,21 +199,15 @@ export function ActivityTile({
 }
 
 /**
- * How long, as a segmented control with one pill that travels.
+ * How long, as a segmented control.
  *
- * THE PILL IS A SINGLE ELEMENT that animates its `left` between the three
- * slots, never two pills cross-fading. The movement is the feedback: you can
- * see which option you came from, and on a control whose three choices differ
- * only by a word, that is most of what tells you something changed.
+ * The pill mechanics live in `./segmented`, which the theme switcher also uses.
+ * This is the duration vocabulary poured into it: the buckets, their labels and
+ * their minute hints, in the order `exercises.ts` declares them.
  *
- * Its geometry is inline because it is arithmetic on the track's own width.
- * The track has 4px of padding either side, so each slot is a third of what is
- * left, and the pill's offset is the padding plus that slot times its index.
- *
- * `role="radiogroup"` with `aria-checked` options, because the three are
- * mutually exclusive and one of them can be none: tapping the selected option
- * clears it, which the form already allowed and which the pill expresses by
- * fading to nothing rather than sliding somewhere arbitrary.
+ * `null` is a real value here. Tapping the selected option clears it, which the
+ * form has always allowed, and the pill fades out rather than sliding somewhere
+ * arbitrary.
  */
 export function DurationSegmented({
   value,
@@ -223,38 +218,16 @@ export function DurationSegmented({
   onChange: (b: DurationBucket) => void;
   label: string;
 }) {
-  const index = value ? DURATION_BUCKETS.indexOf(value) : -1;
-  // The track carries 4px of padding on each side, so the three slots share
-  // what is left of its width. Written out rather than measured, because a
-  // resize observer to place a pill would be four times the code and one more
-  // thing to get wrong on the first paint.
-  const PAD = 4;
-  const slot = `((100% - ${PAD * 2}px) / ${DURATION_BUCKETS.length})`;
-
   return (
-    <div role="radiogroup" aria-label={label} className="iki-segmented">
-      <span
-        className="iki-segmented-pill"
-        style={{
-          width: `calc(${slot})`,
-          left: `calc(${PAD}px + ${index < 0 ? 0 : index} * ${slot})`,
-          opacity: index < 0 ? 0 : 1,
-        }}
-        aria-hidden
-      />
-      {DURATION_BUCKETS.map((b) => (
-        <button
-          key={b}
-          type="button"
-          role="radio"
-          aria-checked={value === b}
-          onClick={() => onChange(b)}
-          className="iki-segmented-option"
-        >
-          <span>{DURATION_LABELS[b]}</span>
-          <span className="iki-segmented-sub">{DURATION_HINTS[b]}</span>
-        </button>
-      ))}
-    </div>
+    <Segmented
+      label={label}
+      value={value}
+      onChange={onChange}
+      options={DURATION_BUCKETS.map((b) => ({
+        value: b,
+        label: DURATION_LABELS[b],
+        sub: DURATION_HINTS[b],
+      }))}
+    />
   );
 }

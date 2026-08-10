@@ -54,8 +54,18 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#b5562d",
-  colorScheme: "light",
+  /*
+   * The browser chrome follows the ground now. Two entries rather than one:
+   * a terracotta status bar over a dark app reads as a stripe of the wrong
+   * colour at the top of every screen.
+   */
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f1e9dc" },
+    { media: "(prefers-color-scheme: dark)", color: "#1b1815" },
+  ],
+  // Both, so form controls, scrollbars and the keyboard follow suit rather
+  // than staying light under a dark page.
+  colorScheme: "light dark",
   /*
    * REQUIRED FOR env(safe-area-inset-*) TO BE ANYTHING BUT ZERO.
    *
@@ -79,6 +89,28 @@ export default function RootLayout({
       className={`${cormorant.variable} ${marcellus.variable} ${hanken.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {/*
+          THE GROUND, DECIDED BEFORE ANYTHING PAINTS.
+          
+          This has to be an inline script and it has to run before the first
+          paint. React cannot do it: by the time a component reads localStorage,
+          the browser has already painted the light ground, and a member on dark
+          gets a full-screen white flash on every cold load. That flash is the
+          single most-reported bug in every hand-rolled dark mode.
+
+          It duplicates the resolution rules in `src/lib/theme.ts` rather than
+          importing them, because an import would mean a bundle, and a bundle is
+          the thing that arrives too late. Three lines, and the module beside it
+          is the version everything else uses and the tests cover.
+
+          Wrapped in try/catch: localStorage throws outright in some private
+          modes, and a theme preference is not worth taking the page down for.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var p=localStorage.getItem("ikigaro.theme");var d=p==="dark"||((!p||p==="system")&&matchMedia("(prefers-color-scheme: dark)").matches);if(d)document.documentElement.classList.add("dark")}catch(e){}`,
+          }}
+        />
         <ServiceWorkerRegistrar />
         <EnvBanner />
         {children}

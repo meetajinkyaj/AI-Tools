@@ -45,23 +45,85 @@ const PATHS: Record<string, string[]> = {
     "M3.9 3.9 2.5 2.5",
     "M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z",
   ],
+  /*
+   * A LIFTER, NOT A FLAME. The flame from the icon set is the "calories burned"
+   * glyph and says nothing about what CrossFit is; beside a dumbbell for Gym it
+   * read as a second, vaguer intensity marker. This is an overhead press: bar,
+   * plates, arms, figure. Drawn here rather than taken from the set, which has
+   * no lifter in it.
+   */
   crossfit: [
-    "M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z",
+    "M3 3h18",
+    "M6 1.5v3",
+    "M18 1.5v3",
+    "M9 11V3",
+    "M15 11V3",
+    "M10 12.5a2 2 0 1 0 4 0 2 2 0 1 0-4 0",
+    "M12 14.5V17",
+    "m12 17-3 5",
+    "m12 17 3 5",
   ],
+  /*
+   * A FORWARD FOLD, NOT A SPARKLE. The sparkle is the set's "magic" glyph and
+   * was doing no work here beyond looking calm. This is the silhouette anybody
+   * recognises as stretching: legs out, torso folded over them, arms reaching
+   * for the foot.
+   */
   yoga_mobility: [
-    "M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z",
+    "M5 19h12",
+    "M17 19v-3.5",
+    "M9.5 8.5a2 2 0 1 0 4 0 2 2 0 1 0-4 0",
+    "m6 19 4.5-8.5",
+    "m10.5 10.5 6 5.5",
   ],
   hiking: ["m8 3 4 8 5-5 5 15H2L8 3z"],
+
+  /*
+   * THE FIVE THE HANDOFF'S SET HAD NO GLYPH FOR.
+   *
+   * They were left blank when the tiles shipped, which was the honest thing to
+   * do at the time: a dumbbell beside "Racquet & team sports" is worse than
+   * empty space. It is not the right thing to leave, because those five are as
+   * selectable as the other eight and a tile without an icon reads as one that
+   * failed to load. Drawn at the same 1.7 stroke as the rest.
+   */
+  functional: ["M13 2 3 14h9l-1 8 10-12h-9l1-8z"],
+  hyrox: [
+    "M22 12h-2.5l-2.5 8-5-16-2.5 8H7",
+    "M5 12H2",
+  ],
+  gymnastics: [
+    "M7 3v5",
+    "M17 3v5",
+    "M4 14a3 3 0 1 0 6 0 3 3 0 1 0-6 0",
+    "M14 14a3 3 0 1 0 6 0 3 3 0 1 0-6 0",
+    "M10 14h4",
+  ],
+  sports: [
+    "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z",
+    "M5.6 5.6c3.2 3.2 3.2 9.6 0 12.8",
+    "M18.4 5.6c-3.2 3.2-3.2 9.6 0 12.8",
+  ],
+  boxing: [
+    "M7 9a4 4 0 0 1 4-4h3a4 4 0 0 1 4 4v4a4 4 0 0 1-4 4h-3a4 4 0 0 1-4-4z",
+    "M7 10.5H5.5a1.5 1.5 0 0 0 0 3H7",
+    "M9 17v2a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-2",
+  ],
   [OTHER_TYPE]: ["M12 5v14", "M5 12h14"],
 };
 
 /**
- * No glyph is a fine answer.
+ * Every type in the taxonomy has a glyph now.
  *
- * Four of the taxonomy's types (functional, hyrox, gymnastics, sports, boxing)
- * have no icon in the set. Inventing one from a neighbour would put a dumbbell
- * beside "Racquet & team sports", and a tile reads perfectly well as a label
- * with empty space where the glyph would be.
+ * Five of them (functional, hyrox, gymnastics, sports, boxing) had none when
+ * the tiles shipped, because the handoff's set does not contain them and
+ * borrowing a neighbour's would have put a dumbbell beside "Racquet & team
+ * sports". Drawing them was the answer; leaving them blank made a real,
+ * selectable tile look like one whose image failed to load.
+ *
+ * The guard stays: an unknown key still renders nothing rather than a wrong
+ * picture, which is what happens if a type is added to `exercises.ts` and
+ * forgotten here.
  */
 export function ActivityIcon({
   type,
