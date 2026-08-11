@@ -779,6 +779,105 @@ summary {
     color: var(--muted);
   }
 
+  /* --- Device metric tile ------------------------------------------------ */
+
+  /*
+   * One reading from a connected device: icon, label, number, and the previous
+   * value under it.
+   *
+   * A TILE RATHER THAN A RULED ROW. Six hairline rows of text at one size read
+   * as a paragraph; the eye has nothing to land on and has to read the whole
+   * card to find one number. Giving each reading its own inset surface is what
+   * makes this scan like a dashboard, which is what somebody arriving from
+   * their device's own app is expecting to see.
+   *
+   * Not `.iki-well`, which is a stacked label-over-value block. This is a
+   * three-column head with an optional chart beneath it, and the two would have
+   * fought over padding within a week.
+   */
+  .iki-metric {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+    padding: calc(var(--spacing) * 3) calc(var(--spacing) * 3.5);
+    border-radius: var(--radius-inset);
+    background: var(--surface-2);
+  }
+  .iki-metric-head {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2.5);
+  }
+  .iki-metric-icon {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+  }
+  .iki-metric-label {
+    font-size: var(--text-body-sm);
+    line-height: 1.25;
+    color: var(--ink);
+  }
+  .iki-metric-note {
+    font-size: var(--text-micro);
+    line-height: 1.3;
+    color: var(--muted);
+  }
+  /* Pushed right, and the only thing allowed to hold its width: a number that
+     wraps is a different number. */
+  .iki-metric-figures {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    align-items: flex-end;
+    gap: calc(var(--spacing) * 0.5);
+    margin-left: auto;
+    text-align: right;
+  }
+  .iki-metric-value {
+    font-family: var(--font-display);
+    font-size: var(--text-display-sm);
+    font-weight: 500;
+    line-height: 1;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  /* The unit is not part of the number. Set at the same size it drowns "59" in
+     "59 bpm"; smaller and quieter, the eye reads the figure first and the unit
+     only if it needs it. */
+  .iki-metric-unit {
+    margin-left: calc(var(--spacing) * 1);
+    font-family: var(--font-sans);
+    font-size: var(--text-unit);
+    font-weight: 400;
+    color: var(--muted);
+  }
+  /*
+   * The previous reading. NEUTRAL ON PURPOSE: a vendor's dashboard would paint
+   * this amber for a fall and green for a rise, which scores day-to-day noise
+   * as good and bad news. The arrow says which way it went; nothing here says
+   * whether that is something to feel about.
+   */
+  .iki-metric-delta {
+    font-size: var(--text-micro);
+    line-height: 1.2;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  /*
+   * The 30-day line, full width beneath the numbers, and only drawn when there
+   * are enough readings to have a shape. Stretched rather than fitted, so the
+   * stroke keeps its weight at any width (`vector-effect` on the path).
+   */
+  .iki-metric-spark {
+    width: 100%;
+    height: 20px;
+    color: var(--primary);
+    opacity: 0.85;
+  }
+
   /* --- List row, handoff §2 ---------------------------------------------- */
 
   /*
