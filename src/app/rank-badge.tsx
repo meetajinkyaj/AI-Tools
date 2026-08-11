@@ -245,7 +245,7 @@ export function RankUpToast({
           <button
             type="button"
             onClick={onShare}
-            className="iki-press rounded-pill bg-primary px-4 py-2 font-label text-eyebrow uppercase text-primary-fg"
+            className="iki-tap iki-press rounded-pill bg-primary px-4 py-2 font-label text-eyebrow uppercase text-primary-fg"
           >
             Share it
           </button>

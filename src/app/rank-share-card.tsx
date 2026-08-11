@@ -117,7 +117,7 @@ export function RankShareCard({
             type="button"
             onClick={onClose}
             aria-label="Close share"
-            className="px-2 text-body-lg leading-none text-muted"
+            className="iki-tap px-2 text-body-lg leading-none text-muted"
           >
             ✕
           </button>
@@ -142,7 +142,7 @@ export function RankShareCard({
               type="button"
               onClick={() => setFormat(f.id)}
               aria-pressed={format === f.id}
-              className={`flex flex-col gap-1 rounded-card border px-3 py-2 text-left transition-colors ${
+              className={`iki-tap flex flex-col gap-1 rounded-card border px-3 py-2 text-left transition-colors ${
                 format === f.id
                   ? "border-primary bg-primary/5"
                   : "border-line hover:border-muted"
@@ -163,14 +163,14 @@ export function RankShareCard({
           <button
             type="button"
             onClick={() => void onShare()}
-            className="flex-1 rounded-pill bg-primary px-4 py-3 font-label text-[0.65rem] uppercase tracking-[0.2em] text-white"
+            className="iki-tap flex-1 rounded-pill bg-primary px-4 py-3 font-label text-[0.65rem] uppercase tracking-[0.2em] text-white"
           >
             Share
           </button>
           <button
             type="button"
             onClick={() => void onSave()}
-            className="rounded-pill border border-line px-4 py-3 font-label text-[0.65rem] uppercase tracking-[0.2em] text-ink"
+            className="iki-tap rounded-pill border border-line px-4 py-3 font-label text-[0.65rem] uppercase tracking-[0.2em] text-ink"
           >
             Save
           </button>

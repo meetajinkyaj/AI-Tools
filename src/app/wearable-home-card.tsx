@@ -178,7 +178,7 @@ export function WearableHomeCard({
                 type="button"
                 onClick={() => setInfo(true)}
                 aria-label="How syncing works"
-                className="flex h-4 w-4 items-center justify-center rounded-full border border-line text-[0.6rem] leading-none text-muted transition-colors hover:border-primary hover:text-primary"
+                className="iki-tap flex h-4 w-4 items-center justify-center rounded-full border border-line text-[0.6rem] leading-none text-muted transition-colors hover:border-primary hover:text-primary"
               >
                 i
               </button>
@@ -218,7 +218,7 @@ export function WearableHomeCard({
             setDismissed(true);
           }}
           aria-label="Hide this"
-          className="px-1 text-body-sm leading-none text-muted"
+          className="iki-tap px-1 text-body-sm leading-none text-muted"
         >
           ✕
         </button>
@@ -238,7 +238,7 @@ export function WearableHomeCard({
           <button
             type="button"
             onClick={onOpenSettings}
-            className="rounded-pill border border-line px-4 py-2 font-label text-[0.65rem] uppercase tracking-[0.2em] text-ink transition-colors hover:border-primary hover:text-primary"
+            className="iki-tap rounded-pill border border-line px-4 py-2 font-label text-[0.65rem] uppercase tracking-[0.2em] text-ink transition-colors hover:border-primary hover:text-primary"
           >
             Connect a device
           </button>

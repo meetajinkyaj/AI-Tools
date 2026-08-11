@@ -285,13 +285,26 @@ in `src/app/switch.tsx`, since Profile uses one too)
   feedback into a brightness change, so the interface still answers a tap
   without moving.
 
-**The 44px minimum is `.iki-tap`, not a blanket rule.** Setting
-`min-height: 44px` on every button would be the obvious reading of it and would
-push apart every dense row in about forty components I was asked not to touch:
-the ✕ dismiss, the Show/Hide toggles, the copy chip. Every component class
-above already meets 44px natively; `.iki-tap` covers the text links. If you do
-want the blanket version, it is four lines in the base layer, and it is a
-restyle of the whole app rather than a token change.
+**The 44px minimum is enforced, and it is enforced by a test rather than by a
+blanket CSS rule.** Setting `min-height: 44px` on every button is the obvious
+reading of the handoff and it is the wrong mechanism here: it grows the box, so
+every dense row in the app, the ✕ dismiss, the Show/Hide toggles, the copy chip,
+gets pushed apart at once. The design's own screens show tight rows and large
+hit areas together, which a box rule cannot give you.
+
+So the 44px lives in `.iki-tap`, a centred pseudo-element that changes the hit
+area and not the layout, and `src/app/tap-target.test.ts` checks that every
+`<button>` in the member app carries either `.iki-tap` or a class that is
+already at least 44px tall. The guarantee is therefore blanket even though the
+CSS is not: adding a small control without a hit area fails `npm test` with the
+file and line to fix. The switch carries its halo inside `.iki-switch`, since it
+is 28px by design and always will be.
+
+Two things are deliberately outside it. **The admin console is exempt** (`EXEMPT`
+in that test): it is a desktop tool behind an allow-list, and applying a phone's
+touch minimum to a dense table is a different product, not an improvement.
+And the scan covers `<button>`, which is what this app uses for tappable things;
+a future `<a>`-based control would need adding to it.
 
 ---
 

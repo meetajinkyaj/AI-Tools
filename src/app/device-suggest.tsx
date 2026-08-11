@@ -154,7 +154,7 @@ export function DeviceSuggest({ getToken }: { getToken: () => Promise<string | n
                 onClick={() => void remove(r.device_key)}
                 disabled={busy}
                 aria-label={`Remove ${r.raw_text}`}
-                className="text-micro leading-none text-muted hover:text-ink"
+                className="iki-tap text-micro leading-none text-muted hover:text-ink"
               >
                 ✕
               </button>

@@ -218,7 +218,7 @@ function Chip({
       onClick={onClick}
       disabled={disabled}
       aria-pressed={selected}
-      className={`rounded-pill border px-3 py-1 text-micro transition-colors disabled:opacity-60 ${
+      className={`iki-tap rounded-pill border px-3 py-1 text-micro transition-colors disabled:opacity-60 ${
         selected
           ? "border-primary text-primary"
           : "border-line text-ink/70 hover:border-primary hover:text-primary"
@@ -429,7 +429,7 @@ export function WearableSettings({
             type="button"
             onClick={() => void syncNow()}
             disabled={busy !== null}
-            className="text-micro text-primary underline underline-offset-2 disabled:text-muted disabled:no-underline"
+            className="iki-tap text-micro text-primary underline underline-offset-2 disabled:text-muted disabled:no-underline"
           >
             {busy === "sync" ? "Syncing…" : "Sync now"}
           </button>

@@ -51,6 +51,36 @@ export interface ConnectionRow {
   expires_at: string | null;
   status: string;
   failure_count: number;
+  /**
+   * Null until a sync has succeeded, which is what marks a connection as new.
+   * Optional on the type because several call sites build one of these from a
+   * `select("*")`, where it is always present, and treating it as required
+   * would make those casts lie in the other direction.
+   */
+  last_sync_at?: string | null;
+}
+
+/**
+ * How far back this sync should ask for.
+ *
+ * FIRST SYNC OR ROUTINE SYNC, and the difference is `last_sync_at`. A
+ * connection that has never completed a sync gets the provider's backfill
+ * window, so the member's own history is on the screen they land on after
+ * connecting; everything after that gets the small nightly window, which is
+ * all a correction or a late-arriving night needs.
+ *
+ * A RECONNECT IS NOT A FIRST SYNC. The callback upserts on (user, provider)
+ * and leaves `last_sync_at` alone, so somebody who reconnects after a token
+ * expiry keeps their history and takes the cheap window. That is deliberate:
+ * their data is already stored, and re-pulling two months to re-write rows we
+ * already hold is a request budget spent on nothing.
+ */
+export function syncWindowFor(
+  provider: WearableProvider,
+  conn: Pick<ConnectionRow, "last_sync_at">,
+): number {
+  const firstSync = !conn.last_sync_at;
+  return firstSync ? (provider.backfillWindowDays ?? provider.syncWindowDays) : provider.syncWindowDays;
 }
 
 /* ------------------------------- token I/O -------------------------------- */
@@ -459,7 +489,7 @@ export async function syncConnection(conn: ConnectionRow): Promise<SyncResult> {
   try {
     const token = await accessTokenFor(conn);
     const end = new Date();
-    const start = new Date(end.getTime() - provider.syncWindowDays * 86_400_000);
+    const start = new Date(end.getTime() - syncWindowFor(provider, conn) * 86_400_000);
 
     const metrics = await provider.fetchRange({
       accessToken: token,

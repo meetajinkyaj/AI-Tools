@@ -56,7 +56,7 @@ function Toggle({
       aria-checked={on}
       aria-label={label}
       onClick={onClick}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+      className={`iki-tap relative h-6 w-11 shrink-0 rounded-full transition-colors ${
         on ? "bg-primary" : "bg-border-strong/40"
       }`}
     >
@@ -103,7 +103,7 @@ function BackdropSwatch({
       onClick={onClick}
       aria-pressed={selected}
       title={name}
-      className={`overflow-hidden rounded-ctl border transition-colors ${
+      className={`iki-tap overflow-hidden rounded-ctl border transition-colors ${
         selected ? "border-primary" : "border-line hover:border-primary/50"
       }`}
     >
@@ -128,7 +128,7 @@ function Choice({
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className={`flex-1 rounded-ctl border px-2 py-3 font-label text-[0.65rem] uppercase tracking-[0.16em] transition-colors ${
+      className={`iki-tap flex-1 rounded-ctl border px-2 py-3 font-label text-[0.65rem] uppercase tracking-[0.16em] transition-colors ${
         selected
           ? "border-primary bg-primary text-primary-fg"
           : "border-line bg-surface text-muted hover:border-primary/50"
@@ -280,7 +280,7 @@ export function ShareCheckinCard({
             type="button"
             onClick={onClose}
             aria-label="Close share"
-            className="px-2 text-body-lg leading-none text-muted"
+            className="iki-tap px-2 text-body-lg leading-none text-muted"
           >
             ✕
           </button>
