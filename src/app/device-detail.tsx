@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { display } from "./metric-format";
+import { MetricIcon } from "./metric-icon";
 
 /**
  * "What your Whoop says", one panel per connected device.
@@ -64,21 +66,6 @@ interface Device {
   workouts: Workout[];
 }
 
-/** The same rules the merged card uses, so two screens never format one number two ways. */
-function display(metric: string, value: number, unit: string, precision: number): string {
-  if (metric === "sleep_minutes") {
-    const h = Math.floor(value / 60);
-    const m = Math.round(value % 60);
-    return `${h}h ${String(m).padStart(2, "0")}m`;
-  }
-  const n = value.toLocaleString("en-US", {
-    minimumFractionDigits: precision,
-    maximumFractionDigits: precision,
-  });
-  const bare = unit === "count" || unit === "score";
-  return `${n}${bare ? "" : ` ${unit}`}`;
-}
-
 /** "Mon 4 Aug", short enough for a dense list. */
 function shortDay(date: string): string {
   const d = new Date(`${date}T00:00:00Z`);
@@ -91,46 +78,72 @@ function shortDay(date: string): string {
   });
 }
 
+/**
+ * One metric, and every day of it this device sent.
+ *
+ * A TABLE, NOT A PARAGRAPH. These readings used to flow inline and wrap, so
+ * "Mon 4 Aug 6h 48m Tue 5 Aug 7h 02m" ran together into prose and the numbers
+ * did not line up with each other. That is the wrong shape for the one job this
+ * panel has: sitting with the vendor's own app open and checking our figure
+ * against theirs, night by night. A dated row per reading, values aligned on the
+ * right, is a list you can run a finger down.
+ *
+ * The unit moves up beside the label, so seven rows do not repeat "bpm" seven
+ * times, and the column stays a column of numbers.
+ */
 function MetricRow({ m }: { m: Metric }) {
   // Newest first: the reason somebody opens this panel is almost always the
   // most recent night.
   const points = [...m.points].sort((a, b) => b.date.localeCompare(a.date));
   const anyUnused = points.some((p) => !p.used);
+  // Read off the first reading rather than the raw unit, since sleep carries
+  // its units inside the figure ("6h 48m") and scores have none at all.
+  const unit = points[0] ? display(m.metric, points[0].value, m.unit, m.precision).unit : "";
 
   return (
-    <div className="flex flex-col gap-1 border-t border-line pt-3 first:border-t-0 first:pt-0">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-body-sm text-ink">{m.label}</span>
-        <span className="text-micro text-muted">
+    <li className="iki-metric">
+      <div className="iki-metric-head">
+        <span className="iki-metric-icon">
+          <MetricIcon metric={m.metric} />
+        </span>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="iki-metric-label">
+            {m.label}
+            {unit && <span className="iki-metric-unit">{unit}</span>}
+          </span>
+          {/* WHAT THE NUMBER COUNTS, not what it means for the reader.
+              The commonest mismatch against a vendor's own app is not the merge
+              picking a different device: it is the two of us defining the same
+              word differently, which happens with one device connected and no
+              merge involved. Our sleep is light plus deep plus REM, so it reads
+              lower than an app whose headline is time in bed. A source label
+              cannot explain that; only a definition can. */}
+          {m.note && <span className="iki-metric-note">{m.note}</span>}
+        </div>
+        <span className="iki-metric-count">
           {points.length} day{points.length === 1 ? "" : "s"}
         </span>
       </div>
-      {/* WHAT THE NUMBER COUNTS, not what it means for the reader.
-          The commonest mismatch against a vendor's own app is not the merge
-          picking a different device: it is the two of us defining the same
-          word differently, which happens with one device connected and no
-          merge involved. Our sleep is light plus deep plus REM, so it reads
-          lower than an app whose headline is time in bed. A source label
-          cannot explain that; only a definition can. */}
-      {m.note && <p className="text-micro text-muted">{m.note}</p>}
-      <div className="flex flex-wrap gap-x-4 gap-y-1">
+
+      <ul className="iki-metric-days">
         {points.map((p) => (
-          <span key={p.date} className="text-micro text-muted">
-            {shortDay(p.date)}{" "}
-            <span className={p.used ? "text-ink" : "text-muted line-through"}>
-              {display(m.metric, p.value, m.unit, m.precision)}
+          <li key={p.date} className="iki-metric-day">
+            <span>{shortDay(p.date)}</span>
+            <span className={p.used ? "iki-metric-day-value" : "iki-metric-day-unused"}>
+              {display(m.metric, p.value, m.unit, m.precision).value}
             </span>
-          </span>
+          </li>
         ))}
-      </div>
+      </ul>
+
       {/* Only said when it happened. A permanent legend explaining a state the
           member may never see is noise on every other visit. */}
       {anyUnused && (
-        <p className="text-micro text-muted">
+        <p className="iki-metric-note">
           Struck through means another connected device supplied that day in Trends.
         </p>
       )}
-    </div>
+    </li>
   );
 }
 
@@ -146,18 +159,20 @@ function WorkoutRow({ w }: { w: Workout }) {
   if (w.maxHeartRate !== null) parts.push(`max ${w.maxHeartRate} bpm`);
 
   return (
-    <li className="flex flex-col gap-0.5 border-t border-line pt-2 first:border-t-0 first:pt-0">
+    <li className="iki-metric-session">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-body-sm text-ink">{w.activity ?? "Session"}</span>
-        <span className="text-micro text-muted">{shortDay(w.date)}</span>
+        {/* Capitalised on the way out: vendors send "running" and "weight
+            lifting", which are ids as far as they are concerned. */}
+        <span className="iki-metric-label first-letter:uppercase">
+          {w.activity ?? "Session"}
+        </span>
+        <span className="iki-metric-note shrink-0">{shortDay(w.date)}</span>
       </div>
-      {parts.length > 0 && (
-        <span className="text-micro text-muted">{parts.join(" · ")}</span>
-      )}
+      {parts.length > 0 && <span className="iki-metric-note">{parts.join(" · ")}</span>}
       {/* Only one vendor tells us this. Where it is absent we say nothing,
           because "they do not say" is not the same as "they started it". */}
       {w.autoDetected && (
-        <span className="text-micro text-muted">
+        <span className="iki-metric-note">
           Your device noticed this rather than you starting it.
         </span>
       )}
@@ -192,19 +207,19 @@ function DevicePanel({ device, days }: { device: Device; days: number }) {
       </button>
 
       {open && hasData && (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           {device.metrics.length > 0 && (
-            <div className="flex flex-col gap-3">
+            <ul className="flex flex-col gap-2">
               {device.metrics.map((m) => (
                 <MetricRow key={m.metric} m={m} />
               ))}
-            </div>
+            </ul>
           )}
 
           {device.workouts.length > 0 && (
-            <div className="flex flex-col gap-2 border-t border-line pt-3">
-              <p className="font-label text-eyebrow-sm uppercase text-muted">Sessions</p>
-              <ul className="flex flex-col gap-2">
+            <div className="iki-metric gap-2.5">
+              <p className="iki-eyebrow">Sessions</p>
+              <ul className="flex flex-col gap-2.5">
                 {device.workouts.map((w) => (
                   <WorkoutRow key={`${w.startedAt}-${w.activity ?? ""}`} w={w} />
                 ))}

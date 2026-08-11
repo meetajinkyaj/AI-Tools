@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { METRICS } from "@/lib/wearables/metrics";
 import { METRIC_GLYPHS } from "./metric-icon";
-import { display, movement, recencyLabel, rowNote } from "./wearable-trends";
+import { movement, recencyLabel, rowNote } from "./wearable-trends";
 
 /**
  * The device panel on Trends.
@@ -14,37 +14,6 @@ import { display, movement, recencyLabel, rowNote } from "./wearable-trends";
  * that fix which can be checked without a browser: how a number is written, how
  * old it is, and whether it moved.
  */
-
-describe("display", () => {
-  it("writes sleep as hours and minutes, with no trailing unit", () => {
-    expect(display("sleep_minutes", 408, "min")).toEqual({ value: "6h 48m", unit: "" });
-  });
-
-  it("pads the minutes, so 6h 5m does not read as 6h 50m", () => {
-    expect(display("sleep_minutes", 365, "min").value).toBe("6h 05m");
-  });
-
-  it("groups a step count", () => {
-    expect(display("steps", 11583, "count").value).toBe("11,583");
-  });
-
-  it("says nothing after a score or a count, which are not units", () => {
-    // "55 score" and "9,000 count" both read as a bug.
-    expect(display("sleep_score", 83, "score").unit).toBe("");
-    expect(display("steps", 11583, "count").unit).toBe("");
-  });
-
-  it("keeps a decimal where the metric has one", () => {
-    expect(display("spo2", 97.4, "%")).toEqual({ value: "97.4", unit: "%" });
-    expect(display("respiratory_rate", 14.6, "brpm")).toEqual({ value: "14.6", unit: "brpm" });
-  });
-
-  it("separates the unit from the figure", () => {
-    // They are styled differently: the number is the thing being read, the unit
-    // is there for the second glance.
-    expect(display("resting_heart_rate", 59, "bpm")).toEqual({ value: "59", unit: "bpm" });
-  });
-});
 
 describe("recencyLabel", () => {
   it("names today and yesterday", () => {
