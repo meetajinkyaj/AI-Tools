@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { display } from "./metric-format";
 import { MetricIcon } from "./metric-icon";
 
 /**
@@ -55,30 +56,6 @@ interface Series {
  * shape becomes visible rather than inferred.
  */
 const MIN_POINTS_FOR_LINE = 5;
-
-/** Minutes read as hours; everything else is already in its own unit. */
-export function display(
-  metric: string,
-  value: number,
-  unit: string,
-): { value: string; unit: string } {
-  if (metric === "sleep_minutes") {
-    const h = Math.floor(value / 60);
-    const m = Math.round(value % 60);
-    return { value: `${h}h ${String(m).padStart(2, "0")}m`, unit: "" };
-  }
-  const dp = unit === "%" || unit === "kg" || unit === "brpm" ? 1 : 0;
-  // Grouped: a step count is the one number here that routinely runs to five
-  // digits, and "12483" is harder to read at a glance than "12,483".
-  const n = value.toLocaleString("en-US", {
-    minimumFractionDigits: dp,
-    maximumFractionDigits: dp,
-  });
-  // "count" and "score" are descriptions of the number, not units you say out
-  // loud: "9,000 count" and "55 score" both read as a bug.
-  const bare = unit === "count" || unit === "score";
-  return { value: n, unit: bare ? "" : unit };
-}
 
 /**
  * Provider ids are lowercase because they travel in URLs and file paths. Nobody

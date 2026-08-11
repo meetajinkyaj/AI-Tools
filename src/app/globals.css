@@ -878,6 +878,62 @@ summary {
     opacity: 0.85;
   }
 
+  /*
+   * The per-device panel's half of the same vocabulary.
+   *
+   * "From your devices" shows the merged answer; "What your Whoop says" shows
+   * what one device sent, day by day, so it can be checked against the vendor's
+   * own app. Same tile, same icon, same label: the two screens are looking at
+   * the same readings from different distances, and dressing them differently
+   * made them look like unrelated features.
+   */
+
+  /* Day count, pushed right where the merged card puts its figure. */
+  .iki-metric-count {
+    flex-shrink: 0;
+    margin-left: auto;
+    font-size: var(--text-micro);
+    color: var(--muted);
+  }
+
+  /*
+   * A COLUMN OF NUMBERS, NOT A PARAGRAPH OF THEM. These readings used to flow
+   * inline and wrap, so dates and values ran together and no two figures lined
+   * up. The one job of this panel is reconciling our number against the
+   * vendor's, night by night, and that needs a list you can run a finger down.
+   */
+  .iki-metric-days {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1);
+  }
+  .iki-metric-day {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: calc(var(--spacing) * 3);
+    font-size: var(--text-micro);
+    color: var(--muted);
+  }
+  /* Tabular figures so the column is a column: proportional digits put the
+     decimal points of 97.4 and 100.0 in different places. */
+  .iki-metric-day-value {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .iki-metric-day-unused {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    text-decoration: line-through;
+  }
+
+  /* A session inside the sessions tile. */
+  .iki-metric-session {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 0.5);
+  }
+
   /* --- List row, handoff §2 ---------------------------------------------- */
 
   /*
