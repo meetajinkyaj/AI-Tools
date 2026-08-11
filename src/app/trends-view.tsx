@@ -15,9 +15,27 @@ interface CheckinSeriesPoint {
 }
 interface OutcomeBonus {
   marker_key: string;
+  /** Resolved from the catalog by /api/trends. Null when it has no row. */
+  marker_name: string | null;
   delta_value: number | null;
   amount: number;
   verified_at: string | null;
+}
+
+/**
+ * What to call a marker in the reward line.
+ *
+ * The catalog name when there is one. Otherwise the key made readable rather
+ * than shouted: this line used to print VISCERAL_FAT, which is a column name
+ * wearing a hat, and it appeared at the exact moment the app is supposed to be
+ * congratulating somebody. The fallback keeps a marker that has fallen out of
+ * the catalog legible instead of hiding the reward entirely.
+ */
+export function markerLabel(bonus: Pick<OutcomeBonus, "marker_key" | "marker_name">): string {
+  if (bonus.marker_name) return bonus.marker_name;
+  const words = bonus.marker_key.replace(/_/g, " ").trim();
+  if (!words) return "A marker";
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 interface TrendsData {
   checkin: { trend: CheckinTrend; series: CheckinSeriesPoint[] };
@@ -242,7 +260,7 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
           <ul className="flex flex-col gap-1">
             {bonuses.map((b, i) => (
               <li key={i} className="text-body-sm leading-relaxed text-ink">
-                <span className="font-semibold">{b.marker_key.toUpperCase()}</span>{" "}
+                <span className="font-semibold">{markerLabel(b)}</span>{" "}
                 moved into range{b.delta_value != null ? ` (${b.delta_value})` : ""} -{" "}
                 <span className="font-semibold text-clay">+{b.amount} iki points</span>
               </li>

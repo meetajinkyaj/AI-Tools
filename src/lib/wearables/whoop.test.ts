@@ -309,6 +309,83 @@ describe("Whoop workouts", () => {
   });
 });
 
+describe("paging through a window", () => {
+  /**
+   * A page holds 25 records and the rest are behind `next_token`. The adapter
+   * read the first page only until the first-connect backfill was added, which
+   * was correct for a 7-day window and quietly lost most of a 60-day one: the
+   * member saw a fortnight of recovery and no explanation for the gap.
+   */
+  it("follows next_token to the end of the collection", async () => {
+    const pages = [
+      { records: [{ ...recoveryRecord, created_at: "2022-04-24T11:00:00.000Z" }], next_token: "p2" },
+      { records: [{ ...recoveryRecord, created_at: "2022-04-23T11:00:00.000Z" }], next_token: "p3" },
+      { records: [{ ...recoveryRecord, created_at: "2022-04-22T11:00:00.000Z" }] },
+    ];
+    let call = 0;
+    const spy = vi.fn(async (url: string) => {
+      // Sleep and workouts are empty here; only recovery pages.
+      if (!String(url).includes("/recovery")) {
+        return new Response(JSON.stringify({ records: [] }), { status: 200 });
+      }
+      const page = pages[Math.min(call, pages.length - 1)];
+      call += 1;
+      return new Response(JSON.stringify(page), { status: 200 });
+    });
+    vi.stubGlobal("fetch", spy);
+
+    const out = await whoop.fetchRange!(range);
+    const days = out.filter((m) => m.metric === "hrv").map((m) => m.date);
+    expect(days).toEqual(["2022-04-24", "2022-04-23", "2022-04-22"]);
+
+    // The token goes back as `nextToken`, which is spelled differently from the
+    // `next_token` it arrives as. Sending the wrong one is ignored silently and
+    // re-fetches page one forever.
+    const urls = spy.mock.calls.map((c) => String(c[0])).filter((u) => u.includes("/recovery"));
+    expect(urls[1]).toContain("nextToken=p2");
+    expect(urls[2]).toContain("nextToken=p3");
+  });
+
+  it("stops when a vendor hands back the same token twice", async () => {
+    // Otherwise the loop spends the whole request budget on one page and takes
+    // the Worker down with it.
+    const spy = vi.fn(async (url: string) =>
+      String(url).includes("/recovery")
+        ? new Response(JSON.stringify({ records: [recoveryRecord], next_token: "same" }), {
+            status: 200,
+          })
+        : new Response(JSON.stringify({ records: [] }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", spy);
+
+    await whoop.fetchRange!(range);
+    const recoveryCalls = spy.mock.calls.filter((c) => String(c[0]).includes("/recovery"));
+    expect(recoveryCalls).toHaveLength(2);
+  });
+
+  it("caps how far it will walk even when the tokens keep changing", async () => {
+    let n = 0;
+    const spy = vi.fn(async (url: string) => {
+      if (!String(url).includes("/recovery")) {
+        return new Response(JSON.stringify({ records: [] }), { status: 200 });
+      }
+      n += 1;
+      return new Response(JSON.stringify({ records: [], next_token: `t${n}` }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", spy);
+
+    await whoop.fetchRange!(range);
+    expect(n).toBeLessThanOrEqual(12);
+  });
+
+  it("asks for a wider window on a first connect than on a nightly sync", () => {
+    // The whole point of the backfill: a member's own history is on the screen
+    // they land on, rather than arriving a day at a time over two weeks.
+    expect(whoop.backfillWindowDays).toBeGreaterThan(whoop.syncWindowDays);
+    expect(whoop.backfillWindowDays).toBeGreaterThanOrEqual(30);
+  });
+});
+
 describe("awkward responses", () => {
   it("returns nothing for empty collections rather than throwing", async () => {
     mock([], []);

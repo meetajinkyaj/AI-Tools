@@ -144,6 +144,28 @@ export interface WearableProvider {
   syncWindowDays: number;
 
   /**
+   * How far back to ask for on the FIRST sync of a connection.
+   *
+   * WHY A SECOND NUMBER. `syncWindowDays` is tuned for the nightly sweep, where
+   * a week is generous: it catches every late-arriving or corrected night at a
+   * cost of one small request per member per day. Applied to a brand new
+   * connection it is the wrong number for the opposite reason. The member has
+   * months of history sitting at the vendor, and a week of it is not a trend;
+   * the app looks empty on the one screen they open straight after connecting,
+   * and the rest arrives a day at a time as the sweep inches forward.
+   *
+   * ONLY SET IT WHERE PAGINATION IS HANDLED. Every one of these vendors caps a
+   * page and returns a continuation token, and most of these adapters read the
+   * first page only, which is correct for a 7-day window and silently lossy for
+   * a 60-day one. An adapter that has not been taught to follow its token must
+   * leave this undefined, which falls back to `syncWindowDays` and changes
+   * nothing.
+   *
+   * Absent means "same as a routine sync".
+   */
+  backfillWindowDays?: number;
+
+  /**
    * Pull workout SESSIONS for a date window.
    *
    * Separate from `fetchRange` because the two have different shapes and

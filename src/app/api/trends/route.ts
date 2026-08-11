@@ -137,13 +137,45 @@ export async function GET(request: Request) {
       .order("created_at", { ascending: false })
       .limit(10);
 
+    /*
+     * A NAME, NOT A COLUMN KEY.
+     *
+     * `points_transactions` stores `marker_key`, the canonical id: 'visceral_fat',
+     * 'ldl_c', 'hs_crp'. The screen was printing it upper-cased, so the moment
+     * somebody's marker actually improved, the reward that is supposed to be the
+     * payoff of the whole loop read VISCERAL_FAT. Resolved here rather than in the
+     * client because the client has no catalog, and inventing a name from the key
+     * gets LDL_C wrong in a way nobody would accept from a health app.
+     *
+     * The catalog is the display name the report already uses, so the two screens
+     * agree. `marker_key` is unique per (key, sex), so the same key can return two
+     * rows with the same display name; last one wins and they match.
+     */
+    const bonusKeys = [...new Set((bonuses ?? []).map((b) => b.marker_key as string))];
+    const markerNames: Record<string, string> = {};
+    if (bonusKeys.length > 0) {
+      const { data: names } = await supabase
+        .from("biomarker_catalog")
+        .select("marker_key, display_name")
+        .in("marker_key", bonusKeys);
+      for (const n of names ?? []) {
+        markerNames[n.marker_key as string] = n.display_name as string;
+      }
+    }
+
     return NextResponse.json({
       checkin: {
         trend,
         series: checkinPoints.slice(0, 14).reverse(), // oldest→newest for sparkline
       },
       biomarker,
-      bonuses: bonuses ?? [],
+      bonuses: (bonuses ?? []).map((b) => ({
+        ...b,
+        // Null rather than the key when the catalog has no row for it: the
+        // client can then fall back deliberately, instead of the server
+        // guessing a name and the client being unable to tell.
+        marker_name: markerNames[b.marker_key as string] ?? null,
+      })),
     });
   } catch (err) {
     console.error("GET /api/trends failed:", err);

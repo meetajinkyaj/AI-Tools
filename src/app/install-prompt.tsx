@@ -87,7 +87,7 @@ export function InstallPrompt() {
           type="button"
           onClick={dismiss}
           aria-label="Dismiss"
-          className="shrink-0 rounded-full px-2 py-1 text-micro text-muted hover:text-ink"
+          className="iki-tap shrink-0 rounded-full px-2 py-1 text-micro text-muted hover:text-ink"
         >
           Not now
         </button>

@@ -884,6 +884,78 @@ interface WhoopWorkout {
   };
 }
 
+/**
+ * Whoop's page size, and their documented maximum.
+ *
+ * Asking for fewer would only mean more round trips for the same records.
+ */
+const WHOOP_PAGE_SIZE = 25;
+
+/**
+ * How many pages one collection may walk before we stop asking.
+ *
+ * A BOUND, NOT A BUDGET. The windows below are chosen so this is never
+ * reached: 60 days of nights is about three pages, and even a member training
+ * twice a day fills six. It exists because a paginating loop against somebody
+ * else's service is the classic way to hang a Worker, and "the vendor kept
+ * handing us a token" is not a scenario we can rule out from here. Twelve
+ * pages is 300 records, comfortably more than any window we ask for, and a
+ * ceiling that costs nothing when it is not hit.
+ */
+const WHOOP_MAX_PAGES = 12;
+
+/**
+ * Walk a Whoop collection to the end of the window.
+ *
+ * WHY THIS EXISTS. Every one of these endpoints caps a page at 25 records and
+ * returns `next_token` when there are more. The first version of this adapter
+ * asked for one page and stopped, which was correct for the 7-day sync window
+ * it was written against and quietly wrong the moment we asked for more: a
+ * member connecting Whoop for the first time got a week of history, and the
+ * two months of recovery already sitting in Whoop's account appeared only as
+ * the nightly sweep inched forward a day at a time. The backfill is the reason
+ * this function was written; see `backfillWindowDays` in types.ts.
+ *
+ * The request parameter is `nextToken` and the response field is `next_token`.
+ * They are genuinely spelled differently, and mixing them up fails silently:
+ * an unrecognised query parameter is ignored, so the loop would re-fetch page
+ * one forever, which is what the repeat guard below catches.
+ */
+async function whoopPages<T>(
+  url: string,
+  accessToken: string,
+): Promise<T[]> {
+  const out: T[] = [];
+  const seen = new Set<string>();
+  let nextToken: string | undefined;
+
+  for (let page = 0; page < WHOOP_MAX_PAGES; page += 1) {
+    const paged = nextToken
+      ? `${url}&nextToken=${encodeURIComponent(nextToken)}`
+      : url;
+    const res = await providerFetch<{ records?: T[]; next_token?: string }>(
+      "whoop",
+      paged,
+      { accessToken },
+    );
+    for (const r of res.records ?? []) out.push(r);
+
+    const token = typeof res.next_token === "string" ? res.next_token : "";
+    // No token means the collection is exhausted, which is the normal exit.
+    if (!token) break;
+    // A repeated token means we are not advancing. Stopping loses the tail of
+    // a window; not stopping spends the request budget on the same 25 records
+    // until the Worker is killed, and takes the sync with it.
+    if (seen.has(token)) {
+      console.warn("whoop returned a repeated next_token, stopping pagination");
+      break;
+    }
+    seen.add(token);
+    nextToken = token;
+  }
+  return out;
+}
+
 /** Whoop's v2 recovery record. Field names verified against their docs. */
 interface WhoopRecovery {
   cycle_id?: number;
@@ -928,6 +1000,20 @@ const whoop: WearableProvider = {
   tokenAuth: "body",
   refreshRotates: true,
   syncWindowDays: 7,
+  /*
+   * SIXTY DAYS ON THE FIRST SYNC. Recovery, HRV and resting heart rate are
+   * only legible against their own history: one week of dots is not a trend,
+   * and a member who has worn the strap for months should not have to wait for
+   * the nightly sweep to walk their own data forward a day at a time. Whoop
+   * holds the history and hands it over on request, so the only reason we were
+   * not showing it was that we never asked.
+   *
+   * Sixty rather than everything: it covers the 30-day window every screen
+   * charts with room to spare, and it is four pages per collection rather than
+   * an unbounded crawl through somebody's entire membership on a request they
+   * are watching a spinner on.
+   */
+  backfillWindowDays: 60,
   async fetchRange({ accessToken, start, end }) {
     const out: DailyMetric[] = [];
     // v2. Their v1 to v2 guide maps every path we use one for one, v1 webhooks
@@ -935,15 +1021,11 @@ const whoop: WearableProvider = {
     const api = "https://api.prod.whoop.com/developer/v2";
     const range = `start=${start}T00:00:00.000Z&end=${end}T23:59:59.999Z`;
 
-    // 25 is the documented maximum for these collections. A 7-day window is
-    // well inside it, so `next_token` is not followed; widen `syncWindowDays`
-    // and this needs pagination first.
-    const sleep = await providerFetch<{ records?: WhoopSleep[] }>(
-      "whoop",
-      `${api}/activity/sleep?${range}&limit=25`,
-      { accessToken },
+    const sleepRecords = await whoopPages<WhoopSleep>(
+      `${api}/activity/sleep?${range}&limit=${WHOOP_PAGE_SIZE}`,
+      accessToken,
     );
-    for (const s of sleep.records ?? []) {
+    for (const s of sleepRecords) {
       // A null or non-object element must not take down the whole sync, and
       // "the vendor sent something odd" is a normal day.
       if (!s || typeof s !== "object") continue;
@@ -975,12 +1057,11 @@ const whoop: WearableProvider = {
       push(out, "respiratory_rate", day, num(s.score?.respiratory_rate), "whoop");
     }
 
-    const recovery = await providerFetch<{ records?: WhoopRecovery[] }>(
-      "whoop",
-      `${api}/recovery?${range}&limit=25`,
-      { accessToken },
+    const recoveryRecords = await whoopPages<WhoopRecovery>(
+      `${api}/recovery?${range}&limit=${WHOOP_PAGE_SIZE}`,
+      accessToken,
     );
-    for (const r of recovery.records ?? []) {
+    for (const r of recoveryRecords) {
       if (!r || typeof r !== "object") continue;
       if (r.score_state && r.score_state !== "SCORED") continue;
       // Recovery is computed on waking, so `created_at` is the morning it
@@ -1021,14 +1102,13 @@ const whoop: WearableProvider = {
    * also how anybody describes their own training.
    */
   async fetchWorkouts({ accessToken, start, end }) {
-    const res = await providerFetch<{ records?: WhoopWorkout[] }>(
-      "whoop",
+    const records = await whoopPages<WhoopWorkout>(
       `https://api.prod.whoop.com/developer/v2/activity/workout` +
-        `?start=${start}T00:00:00.000Z&end=${end}T23:59:59.999Z&limit=25`,
-      { accessToken },
+        `?start=${start}T00:00:00.000Z&end=${end}T23:59:59.999Z&limit=${WHOOP_PAGE_SIZE}`,
+      accessToken,
     );
     const out: WorkoutSession[] = [];
-    for (const w of res.records ?? []) {
+    for (const w of records) {
       if (!w || typeof w !== "object") continue;
       if (!w.id || !w.start || !w.end) continue;
       // PENDING_SCORE and UNSCORABLE both occur normally. The session is real

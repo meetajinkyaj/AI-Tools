@@ -239,7 +239,7 @@ export function AppShell({
           <button
             type="button"
             onClick={() => onNavigate("home")}
-            className="iki-press text-2xl text-ink"
+            className="iki-tap iki-press text-2xl text-ink"
             aria-label="Ikigaro home"
           >
             <Wordmark />
@@ -247,7 +247,7 @@ export function AppShell({
           <button
             type="button"
             onClick={() => onNavigate("profile")}
-            className="iki-avatar"
+            className="iki-tap iki-avatar"
             aria-label="Your profile"
           >
             {initialsOf(displayName ?? "")}

@@ -37,6 +37,8 @@ interface PanelRow {
   id: string;
   test_date: string | null;
   lab_name: string | null;
+  /** 'manual' | 'pdf_upload' | 'lab_api', per the biomarker_panels CHECK. */
+  source: string | null;
   created_at: string;
 }
 
@@ -893,8 +895,8 @@ export function BiomarkerReport({
       <header className="flex flex-col gap-1.5">
         <p className="iki-eyebrow">Report</p>
         <h1 className="iki-title">Your baseline</h1>
-        {panelSubtitle(latestPanel?.panel) && (
-          <p className="iki-lede">{panelSubtitle(latestPanel?.panel)}</p>
+        {panelSubtitle(latestPanel?.panel, readings.length) && (
+          <p className="iki-lede">{panelSubtitle(latestPanel?.panel, readings.length)}</p>
         )}
       </header>
 
@@ -1098,11 +1100,97 @@ export function BiomarkerReport({
   );
 }
 
-function panelSubtitle(panel: PanelRow | undefined): string {
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/**
+ * "2026-05-12" as "12 May 2026".
+ *
+ * PARSED BY HAND, NOT BY `new Date`. `test_date` is a calendar date with no
+ * time and no zone; `new Date("2026-05-12")` reads it as midnight UTC and then
+ * prints it in the reader's zone, which shows 11 May to anybody west of
+ * Greenwich. A lab date that is off by one is the kind of small wrongness that
+ * costs a health app its credibility, and it would only be visible to half the
+ * people using it.
+ *
+ * Returns "" for anything unparseable, so the caller drops the segment rather
+ * than printing "Invalid Date".
+ */
+export function formatPanelDate(value: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!m) return "";
+  const [, year, month, day] = m;
+  const name = MONTHS[Number(month) - 1];
+  if (!name) return "";
+  return `${Number(day)} ${name} ${year}`;
+}
+
+/**
+ * Where the readings came from, in the member's own terms.
+ *
+ * `source` is the panel's own column, so this says what actually happened
+ * rather than assuming an upload: the design's copy reads "read from your PDF",
+ * which is true of a PDF and a lie about the twenty markers somebody typed in
+ * by hand.
+ */
+function sourcePhrase(source: string | null | undefined): string {
+  if (source === "pdf_upload") return "read from your PDF";
+  if (source === "lab_api") return "from your lab";
+  return "entered by hand";
+}
+
+/**
+ * The line under "Your baseline": when the panel is from, and what is in it.
+ *
+ * WHAT CHANGED AND WHY. This used to print the raw ISO date and the lab name,
+ * "2026-05-12 · FITTR", which is a database row read aloud. The design asks for
+ * a written date and a count of what was read, because the two questions
+ * somebody actually has on opening this screen are "how old is this" and "did
+ * it get all of it".
+ *
+ * "Tested" rather than the design's "Uploaded" whenever we hold a test date:
+ * the sample date and the upload date are different days, often weeks apart,
+ * and labelling one as the other would misdate somebody's blood work. When
+ * there is no test date, the upload date is genuinely what we know, and it says
+ * so.
+ *
+ * The lab name is kept, which the mockup drops. It is provenance a doctor asks
+ * for first, and losing it to a redesign would be a real loss.
+ */
+export function panelSubtitle(
+  panel: PanelRow | undefined,
+  readingCount: number,
+): string {
   if (!panel) return "";
   const parts: string[] = [];
-  if (panel.test_date) parts.push(panel.test_date);
+
+  const tested = panel.test_date ? formatPanelDate(panel.test_date) : "";
+  if (tested) parts.push(`Tested ${tested}`);
+  else {
+    const uploaded = formatPanelDate(panel.created_at);
+    if (uploaded) parts.push(`Uploaded ${uploaded}`);
+  }
+
   if (panel.lab_name) parts.push(panel.lab_name);
+
+  if (readingCount > 0) {
+    parts.push(
+      `${readingCount} marker${readingCount === 1 ? "" : "s"} ${sourcePhrase(panel.source)}`,
+    );
+  }
+
   return parts.length > 0 ? parts.join(" · ") : "Your latest panel";
 }
 
