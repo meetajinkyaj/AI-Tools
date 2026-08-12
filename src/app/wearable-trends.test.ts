@@ -79,8 +79,9 @@ describe("rowNote", () => {
 
   it("names the devices when there is more than one", () => {
     // Then it answers a real question: which of mine is this number from.
+    // WHOOP in caps is their brand guideline, not a typo: see PROVIDER_NAMES.
     expect(rowNote({ sources: ["whoop", "oura"], points }, "2026-08-11", true)).toBe(
-      "Whoop + Oura · Yesterday · 2 days",
+      "WHOOP + Oura · Yesterday · 2 days",
     );
   });
 

@@ -147,7 +147,7 @@ export const METRIC_NOTES: Partial<Record<MetricKey, string>> = {
     "Your device's own sleep score. Each vendor computes it differently, so it is " +
     "comparable to your own past nights and to nothing else.",
   readiness_score:
-    "Your device's own readiness score. Whoop calls it recovery and Oura calls it " +
+    "Your device's own readiness score. WHOOP calls it recovery and Oura calls it " +
     "readiness; they answer the same question with different maths.",
   hrv:
     "Heart rate variability overnight. Devices sample it at different points in " +

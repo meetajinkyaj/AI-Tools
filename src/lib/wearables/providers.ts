@@ -977,7 +977,7 @@ interface WhoopRecovery {
 const whoop: WearableProvider = {
   id: "whoop",
   name: PROVIDER_NAMES.whoop,
-  blurb: "Recovery, strain and sleep performance from Whoop.",
+  blurb: "Recovery, strain and sleep performance from WHOOP.",
   clientIdEnv: "WHOOP_CLIENT_ID",
   clientSecretEnv: "WHOOP_CLIENT_SECRET",
   authorizeUrl: "https://api.prod.whoop.com/oauth/oauth2/auth",

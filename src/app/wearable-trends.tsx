@@ -64,7 +64,8 @@ const MIN_POINTS_FOR_LINE = 5;
 const BRAND: Record<string, string> = {
   oura: "Oura",
   fitbit: "Fitbit",
-  whoop: "Whoop",
+  // Caps, per their brand guidelines. See PROVIDER_NAMES in wearables/types.
+  whoop: "WHOOP",
   withings: "Withings",
   garmin: "Garmin",
   ultrahuman: "Ultrahuman",

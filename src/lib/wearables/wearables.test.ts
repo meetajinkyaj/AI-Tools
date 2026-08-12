@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clampScore, dayOf, isMetricKey, METRIC_KEYS, secondsToMinutes } from "./metrics";
 import { PROVIDERS, PROVIDER_IDS, isProviderId, providerConfigured } from "./providers";
+import { PROVIDER_NAMES } from "./types";
 import { safeEqual } from "../reminders";
 
 /**
@@ -67,6 +68,21 @@ describe("the provider registry", () => {
       ["fitbit", "garmin", "oura", "ultrahuman", "whoop", "withings"].sort(),
     );
     for (const id of PROVIDER_IDS) expect(PROVIDERS[id].id).toBe(id);
+  });
+
+  it("sets the WHOOP wordmark in caps, as their brand guidelines require", () => {
+    /*
+     * NOT A TYPO AND NOT A STYLE CHOICE. WHOOP's brand guidelines set the
+     * wordmark in caps and their API terms make following those guidelines a
+     * condition of using the API, which is also a thing an app-approval
+     * reviewer can check in one glance at a screenshot. A well-meaning pass
+     * over the copy to make product names sentence case would quietly undo a
+     * commitment we made to a vendor, so it is pinned here.
+     *
+     * The other five are spelled the way their own brands spell them.
+     */
+    expect(PROVIDER_NAMES.whoop).toBe("WHOOP");
+    expect(PROVIDER_NAMES.oura).toBe("Oura");
   });
 
   it("rejects unknown provider ids", () => {
