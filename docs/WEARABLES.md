@@ -221,9 +221,14 @@ Cycle endpoints in the V2 API", and a 403 there would cost a re-consent from
 every connected member. `offline` is the load-bearing one: without it Whoop
 issues no refresh token and every connection dies within the hour.
 
-**Pagination is not followed.** 25 is the documented maximum for these
-collections and a 7 day window is well inside it. Widen `syncWindowDays` and
-`next_token` has to be handled first.
+**Pagination is followed, for Whoop only.** 25 is the documented maximum for
+these collections. The request parameter is `nextToken` and the response field
+is `next_token`, spelled differently on purpose; sending the wrong one is
+ignored silently, so the walk in `whoopPages` stops if a token repeats and caps
+at 12 pages either way. Every other adapter still reads the first page only,
+which is correct for their 7 day window and is why none of them declares a
+`backfillWindowDays`: asking for 60 days without following the token would keep
+25 records and look complete.
 
 ### Whoop: blocked on an active WHOOP membership, and capped at 10
 
@@ -976,7 +981,13 @@ control once anything is connected, with an information icon that names the
 broken" were the same question with no answer in the app.
 
 The sweep re-pulls a **fixed recent window** (7 days, 14 for Withings) rather
-than tracking a high-water mark. Every one of these vendors revises data after
+than tracking a high-water mark. Two windows, not one: a connection that has
+never completed a sync takes `backfillWindowDays` instead (60, Whoop only), so
+a member's own history is on the screen they land on after connecting rather
+than arriving a day at a time. The manual "Sync now" button forces that wider
+window too, which is the only route by which a member who was already connected
+when the backfill shipped can ever reach it: they have a `last_sync_at`, and
+reconnecting deliberately does not clear it. Every one of these vendors revises data after
 the fact, a sleep score finalises hours later, a watch that was offline
 backfills days at once, so a window plus an idempotent upsert is both simpler
 and more accurate than a cursor that would silently miss every late arrival.
@@ -1288,5 +1299,7 @@ for a blocked one is an answer we can give the member today.
 - **Wearable data earns no points.** Steps are trivially spoofable and paying
   for them invites exactly that. If this changes, pay for *connecting* once, not
   for the numbers.
-- **No backfill beyond the sync window.** Most vendors offer months of history
-  on first connect. Worth adding once we know which metrics matter.
+- **Backfill on first connect is Whoop only.** 60 days, and it needed
+  pagination to be true rather than merely requested. Oura, Fitbit, Google
+  Health and Withings all cap a page and return a continuation token their
+  adapters do not follow, so each is its own piece of work.

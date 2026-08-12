@@ -72,9 +72,9 @@ function SyncInfoDialog({ onClose }: { onClose: () => void }) {
             goes straight into Trends.
           </p>
           <p className="text-body-sm text-muted">
-            Syncing now asks your device maker for that data straight away. It is
-            useful right after a workout, when you would rather not wait until
-            tomorrow to see it.
+            Syncing now asks your device maker for that data straight away, and
+            reaches further back than the morning sync does, so it is also the way
+            to pull in history from before you connected.
           </p>
           <p className="text-body-sm text-muted">
             Some readings take time to appear at their end. A night&apos;s sleep is
