@@ -31,6 +31,19 @@ describe("syncWindowFor", () => {
     expect(syncWindowFor(PROVIDERS.whoop, {})).toBe(PROVIDERS.whoop.backfillWindowDays);
   });
 
+  it("can be forced back to the wide window on a connection that has synced", () => {
+    /*
+     * WITHOUT THIS THE BACKFILL IS UNREACHABLE for anybody already connected.
+     * They have a `last_sync_at`, reconnecting deliberately does not clear it,
+     * and the nightly sweep asks for seven days forever, so the two months
+     * sitting at the vendor can never arrive. The manual "Sync now" button
+     * passes the flag.
+     */
+    expect(
+      syncWindowFor(PROVIDERS.whoop, { last_sync_at: "2026-08-10T02:00:00Z" }, true),
+    ).toBe(PROVIDERS.whoop.backfillWindowDays);
+  });
+
   it("changes nothing for a provider that has not declared a backfill", () => {
     // Every one of these adapters caps a page and returns a continuation token,
     // and most read the first page only. Widening their window without teaching

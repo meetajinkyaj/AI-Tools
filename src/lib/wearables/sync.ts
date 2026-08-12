@@ -74,12 +74,21 @@ export interface ConnectionRow {
  * expiry keeps their history and takes the cheap window. That is deliberate:
  * their data is already stored, and re-pulling two months to re-write rows we
  * already hold is a request budget spent on nothing.
+ *
+ * `force` IS THE WAY BACK FOR EVERYBODY ELSE. Without it the backfill can only
+ * ever reach members who connect after it ships: anybody already connected has
+ * a `last_sync_at`, and reconnecting deliberately does not clear it, so there
+ * is no path at all to the history sitting at the vendor. The manual "Sync
+ * now" button passes it, which is the honest reading of that button anyway:
+ * somebody standing in front of the app asking for their data wants all of it,
+ * not the last seven days of it.
  */
 export function syncWindowFor(
   provider: WearableProvider,
   conn: Pick<ConnectionRow, "last_sync_at">,
+  force = false,
 ): number {
-  const firstSync = !conn.last_sync_at;
+  const firstSync = force || !conn.last_sync_at;
   return firstSync ? (provider.backfillWindowDays ?? provider.syncWindowDays) : provider.syncWindowDays;
 }
 
@@ -476,7 +485,20 @@ export interface SyncResult {
  * Never throws: the caller is usually sweeping every connection in the system,
  * and one user's dead Whoop grant must not stop the other users' rings syncing.
  */
-export async function syncConnection(conn: ConnectionRow): Promise<SyncResult> {
+export interface SyncOptions {
+  /**
+   * Ask for the provider's backfill window even though this connection has
+   * synced before. Set by the manual "Sync now" path only: it is one member
+   * pressing a button, not the nightly sweep, and it is the only route by which
+   * an existing connection can pick up history it never asked for.
+   */
+  backfill?: boolean;
+}
+
+export async function syncConnection(
+  conn: ConnectionRow,
+  options: SyncOptions = {},
+): Promise<SyncResult> {
   const provider = PROVIDERS[conn.provider];
   const supabase = createSupabaseAdmin();
 
@@ -489,7 +511,9 @@ export async function syncConnection(conn: ConnectionRow): Promise<SyncResult> {
   try {
     const token = await accessTokenFor(conn);
     const end = new Date();
-    const start = new Date(end.getTime() - syncWindowFor(provider, conn) * 86_400_000);
+    const start = new Date(
+      end.getTime() - syncWindowFor(provider, conn, options.backfill) * 86_400_000,
+    );
 
     const metrics = await provider.fetchRange({
       accessToken: token,
@@ -560,8 +584,19 @@ export async function syncConnection(conn: ConnectionRow): Promise<SyncResult> {
   }
 }
 
-/** Every active connection for one user. Used by the manual "sync now". */
-export async function syncUser(userId: string): Promise<SyncResult[]> {
+/**
+ * Every active connection for one user. Used by the manual "sync now".
+ *
+ * Defaults to the backfill window rather than the nightly one. A member presses
+ * this button rarely and for one of two reasons: they have just connected, or
+ * they think something is missing. Both are answered by asking for everything
+ * the provider will give, and neither is answered by the seven days the sweep
+ * would have fetched tonight anyway.
+ */
+export async function syncUser(
+  userId: string,
+  options: SyncOptions = { backfill: true },
+): Promise<SyncResult[]> {
   const supabase = createSupabaseAdmin();
   const { data } = await supabase
     .from("wearable_connections")
@@ -571,7 +606,7 @@ export async function syncUser(userId: string): Promise<SyncResult[]> {
 
   const results: SyncResult[] = [];
   for (const conn of (data ?? []) as ConnectionRow[]) {
-    results.push(await syncConnection(conn));
+    results.push(await syncConnection(conn, options));
   }
   return results;
 }
