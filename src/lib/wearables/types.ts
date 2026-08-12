@@ -30,7 +30,11 @@ export type ProviderId =
 export const PROVIDER_NAMES: Record<ProviderId, string> = {
   oura: "Oura",
   fitbit: "Fitbit",
-  whoop: "Whoop",
+  // WHOOP, not Whoop. Their brand guidelines set the wordmark in caps and
+  // every surface they publish follows it; this string is what the app calls
+  // the device out loud, so it follows it too. The other five vendors are
+  // spelled the way their own brands spell them.
+  whoop: "WHOOP",
   withings: "Withings",
   garmin: "Garmin",
   ultrahuman: "Ultrahuman",

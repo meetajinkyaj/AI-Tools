@@ -67,7 +67,7 @@ const DEVICES: DeviceEntry[] = [
   },
   {
     key: "whoop",
-    label: "Whoop",
+    label: "WHOOP",
     supported: true,
     aliases: ["whoop", "woop", "whoop strap", "whoop 4", "whoop 4.0", "whoop 5", "whoop mg"],
   },

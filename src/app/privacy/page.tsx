@@ -49,6 +49,53 @@ export default function PrivacyPage() {
           marketing-communication preferences.
         </li>
       </ul>
+      <h3>Information from wearables you choose to connect</h3>
+      <p>
+        You can connect a wearable device or health account (for example WHOOP,
+        Oura, Fitbit, Withings, Garmin, or Ultrahuman). This is entirely
+        optional, the Service works without it, and nothing is read until you
+        complete that provider&rsquo;s own consent screen.
+      </p>
+      <ul>
+        <li>
+          <strong>What we read.</strong> Daily summary measurements only: sleep
+          duration and sleep score, readiness or recovery score, heart rate
+          variability, resting heart rate, respiratory rate, blood oxygen, skin
+          temperature deviation, steps, active calories, stressed and restored
+          time, VO<sub>2</sub> max, a provider&rsquo;s own cardiovascular-age
+          estimate, weight and body composition, glucose summaries from a
+          connected monitor, and exercise sessions with their duration, heart
+          rate, distance and energy.
+        </li>
+        <li>
+          <strong>What we do not read.</strong> Your name or email address at
+          the provider, and raw second-by-second sensor data. One provider
+          (Ultrahuman) issues a basic profile permission alongside its health
+          permissions because their platform pairs the two; we read nothing
+          through it today, and this Policy would say so before we did.
+        </li>
+        <li>
+          <strong>How much we ask for.</strong> Only the permissions the
+          features you use actually need. You can see the exact list on the
+          provider&rsquo;s consent screen before you agree to anything.
+        </li>
+        <li>
+          <strong>What we use it for.</strong> Showing your own readings back to
+          you in Trends, and placing them next to your lab results and check-ins.
+          Device data is never used for advertising, is never sold, and earns no
+          rewards points.
+        </li>
+        <li>
+          <strong>Disconnecting.</strong> You can disconnect a device at any
+          time in the app. We ask the provider to revoke our access where they
+          offer a way to do so, we delete our copy of your access credentials
+          immediately, and we stop reading anything further. Readings already
+          synced stay in your account so your past trends do not change
+          retroactively; to have those erased as well, email us as described
+          below and we will delete them.
+        </li>
+      </ul>
+
       <h3>Information collected automatically</h3>
       <ul>
         <li>
@@ -110,6 +157,13 @@ export default function PrivacyPage() {
           issue a discount code), never your health data.
         </li>
         <li>
+          <strong>Wearable providers.</strong> Data flows one way, from them to
+          us, and only for the account you connected. We do not send your
+          biomarker results, check-ins, or anything else you enter in Ikigaro
+          back to a device maker, and we do not share your device readings with
+          any other member, partner, or advertiser.
+        </li>
+        <li>
           <strong>Legal &amp; safety.</strong> Where required by law, or to
           protect the rights, safety, and security of users, the public, or
           Ikigaro.
@@ -128,6 +182,11 @@ export default function PrivacyPage() {
         by the browser or the public. We apply reasonable technical and
         organizational safeguards; however, no method of transmission or storage
         is completely secure.
+      </p>
+      <p>
+        Credentials for a connected wearable are encrypted before they are
+        written, are never returned to the browser by any part of the Service,
+        and are deleted outright when you disconnect that device.
       </p>
       <p>
         We retain your information for as long as your account is active or as
