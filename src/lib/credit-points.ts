@@ -122,7 +122,7 @@ export async function creditPoints(
     .maybeSingle();
   const priorBalance = balanceRow?.points_balance ?? 0;
 
-  const { data: updatedBalance } = await supabase
+  const { data: updatedBalance, error: balanceError } = await supabase
     .from("reward_points")
     .upsert(
       { user_id: userId, profile_id: profileId, points_balance: priorBalance + awarded },
@@ -131,9 +131,41 @@ export async function creditPoints(
     .select("points_balance")
     .single();
 
+  /*
+   * A LOST BALANCE WRITE USED TO BE INVISIBLE, TWICE OVER.
+   *
+   * The error was not read, so a failed upsert logged nothing; and the return
+   * fell back to `priorBalance + awarded`, a number that had never been stored.
+   * The screen therefore showed the balance the member should have had, the
+   * next page load showed the one they actually had, and the only trace was a
+   * ledger row and a lifetime score that no longer agreed with the balance.
+   * The two ledgers are meant to diverge (a gift raises one, a redemption
+   * lowers the other), which is exactly why a silent loss inside one of them is
+   * so hard to spot later: the gap looks like the design working.
+   *
+   * So: say so in the log, and return what is actually stored.
+   */
   const nextScore = priorScore + scoreAdded;
+  if (balanceError) {
+    console.error(
+      `points balance write failed for user ${userId}: ${balanceError.message}. ` +
+        `${awarded} spendable points not credited (${accelerated
+          .map((a) => a.reason)
+          .join(", ")}). Lifetime score is unaffected and the ledger still records the earn.`,
+    );
+  }
+
   if (scoreAdded > 0) {
-    await supabase.from("users").update({ iki_score: nextScore }).eq("id", userId);
+    const { error: scoreError } = await supabase
+      .from("users")
+      .update({ iki_score: nextScore })
+      .eq("id", userId);
+    if (scoreError) {
+      console.error(
+        `iki_score write failed for user ${userId}: ${scoreError.message}. ` +
+          `${scoreAdded} lifetime points not credited, so rank will lag the balance.`,
+      );
+    }
   }
 
   await writeLedger(userId, profileId, accelerated, opts);
@@ -141,7 +173,8 @@ export async function creditPoints(
   return {
     awarded,
     scoreAdded,
-    balance: updatedBalance?.points_balance ?? priorBalance + awarded,
+    // What the database holds, not what it should hold.
+    balance: updatedBalance?.points_balance ?? priorBalance,
     ikiScore: nextScore,
     multiplier,
     rankUp: rankUpCrossed(priorScore, nextScore),

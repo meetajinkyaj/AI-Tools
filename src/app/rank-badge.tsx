@@ -107,8 +107,16 @@ export function RankBadge({
           <p className="font-display text-display-md font-medium leading-none text-ink">
             {rank.name}
           </p>
+          {/*
+            "EARNED", BECAUSE THIS IS NOT THE NUMBER IN THE TILE BELOW IT.
+            Rank runs on lifetime points, which never fall; the tile shows the
+            spendable balance, which falls when you redeem something and rises
+            faster on a partner multiplier. Both were labelled "iki" and sat a
+            hundred pixels apart, so a member seeing 400 here and 390 there
+            reasonably concluded one of them was broken. Neither was.
+          */}
           <p className="font-label text-eyebrow-sm uppercase text-primary">
-            {rank.scene} · {score.toLocaleString()} iki
+            {rank.scene} · {score.toLocaleString()} iki earned
           </p>
           <p className="mt-1 text-caption text-muted">{rank.blurb}</p>
         </div>
