@@ -130,7 +130,10 @@ export function Dashboard({
         </section>
 
         <section className="iki-card iki-card-tight flex flex-col gap-1">
-          <p className="iki-eyebrow">iki points</p>
+          {/* "To spend", against the rank card's "earned" directly above it.
+              Two different quantities, and until they were named they looked
+              like one quantity reported twice with different answers. */}
+          <p className="iki-eyebrow">iki to spend</p>
           {summary ? (
             <p className="font-display text-display-md font-medium leading-none text-ink">
               {summary.pointsBalance}
