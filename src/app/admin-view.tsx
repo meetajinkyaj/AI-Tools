@@ -231,6 +231,101 @@ function BackupNotice({ risk }: { risk: AnalyticsData["backupRisk"] }) {
   );
 }
 
+interface PointsAudit {
+  panels: number;
+  expected: number;
+  matched: number;
+  missing: {
+    panelId: string;
+    userId: string;
+    email: string | null;
+    createdAt: string;
+    testDate: string | null;
+    expectedReason: string;
+    expectedAmount: number;
+  }[];
+  orphanEarns: number;
+  unexpected: number;
+  missingPoints: number;
+}
+
+/**
+ * Panels that should have paid points, and did not.
+ *
+ * WHY IT IS IN THE ADMIN CONSOLE and not a test. The panel-upload award, the
+ * largest earn in the economy, had never once written a row in production, and
+ * nothing in the app could tell: every balance reconciled, because it
+ * reconciled against a ledger that was itself missing the earn. There is no
+ * failure to catch in the code path; there is only a row that should exist and
+ * does not, which is a question for the database.
+ *
+ * SILENT WHEN THERE IS NOTHING TO SAY. A permanent green tick trains people to
+ * stop reading; a panel that appears only when somebody is owed points is worth
+ * looking at every time it does.
+ */
+function PointsAuditNotice({ getToken }: { getToken: () => Promise<string | null> }) {
+  const [audit, setAudit] = useState<PointsAudit | null>(null);
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    void (async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch("/api/admin/points-audit", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        setAudit((await res.json()) as PointsAudit);
+      } catch {
+        /* A diagnostic that breaks the page it diagnoses is worse than none. */
+      }
+    })();
+  }, [getToken]);
+
+  if (!audit || (audit.missing.length === 0 && audit.unexpected === 0)) return null;
+
+  return (
+    <section className="flex flex-col gap-2 rounded-card border-2 border-primary bg-primary/10 p-4">
+      <p className="font-label text-[0.65rem] uppercase tracking-[0.28em] text-primary">
+        {audit.missing.length} panel{audit.missing.length === 1 ? "" : "s"} earned no points
+      </p>
+      <p className="text-body-sm text-ink">
+        {audit.matched} of {audit.expected} panel uploads paid what the economy
+        says they are worth. The rest are {audit.missingPoints} points nobody
+        received, listed newest first: anything dated in the last few days is a
+        live fault, anything older predates the award.
+      </p>
+      <ul className="flex flex-col gap-1">
+        {audit.missing.slice(0, 10).map((m) => (
+          <li key={m.panelId} className="text-micro text-muted">
+            {m.createdAt.slice(0, 10)} · {m.email ?? m.userId} · owed{" "}
+            {m.expectedAmount} ({m.expectedReason})
+          </li>
+        ))}
+      </ul>
+      {audit.missing.length > 10 && (
+        <p className="text-micro text-muted">
+          and {audit.missing.length - 10} more.
+        </p>
+      )}
+      {audit.unexpected > 0 && (
+        <p className="text-micro text-muted">
+          {audit.unexpected} panel{audit.unexpected === 1 ? " earned" : "s earned"} points
+          the rule did not expect, so the audit and the app disagree about the
+          economy. Nobody is short-changed; one of the two is wrong.
+        </p>
+      )}
+      <p className="text-micro text-muted">
+        A panel whose readings exactly repeat an earlier one is owed nothing and
+        would be listed here anyway. That is the one false positive; the save
+        path normally collapses those before a row is written.
+      </p>
+    </section>
+  );
+}
+
 function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -279,6 +374,7 @@ function AnalyticsPanel({ getToken }: { getToken: () => Promise<string | null> }
   return (
     <div className="flex flex-col gap-6">
       <BackupNotice risk={data.backupRisk} />
+      <PointsAuditNotice getToken={getToken} />
 
       {/* Funnel, the checklist's core conversion metrics */}
       <section className="flex flex-col gap-3">
