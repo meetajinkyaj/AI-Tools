@@ -160,10 +160,11 @@ and a reviewer who cannot open the link is worse than no link.
 > requests a day, plus about ten for each new connection.
 >
 > On the minute limit: our sweep runs once nightly at 02:00 UTC and processes
-> connections serially, bounded per run. At present that is nowhere near 100
-> requests a minute. Before it could be, we will pace the sweep and read the
-> `X-RateLimit-Remaining` and `X-RateLimit-Reset` headers you publish, and we
-> would ask for an increase ahead of need rather than after being throttled.
+> connections serially, bounded per run. We read the `X-RateLimit-Remaining` and
+> `X-RateLimit-Reset` headers on every response, slow down as the budget runs
+> low, and stop a run cleanly when it is spent rather than collecting 429s.
+> Members not reached are first in line on the next run. We would ask for an
+> increase ahead of need rather than after being throttled.
 
 ### Screenshots, if the form or a reviewer asks for more
 
@@ -196,3 +197,17 @@ and do not let the ten-member cap arrive as a surprise.
 
 - Submitted on: _(fill in)_
 - Reply received: _(fill in)_
+
+---
+
+## Shipped after submitting
+
+Question 4's answer promised pacing against your published rate-limit headers.
+It was built the same day rather than left as an intention: see `WEARABLES.md`,
+"Request budgets are per app, not per member". The wording above has been
+updated to describe what the code does, so if WHOOP ask about volume, that
+section is the honest answer and this doc does not overstate it.
+
+**The answer as originally submitted said "we will pace"**, in the future tense.
+That was true when it was sent. If a reviewer quotes it back, the change is in
+our favour and worth saying plainly.
