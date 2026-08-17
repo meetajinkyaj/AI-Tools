@@ -259,3 +259,26 @@ export class ReauthRequired extends Error {
     this.name = "ReauthRequired";
   }
 }
+
+/**
+ * Thrown when the app has spent its request budget with a vendor.
+ *
+ * DISTINCT FROM EVERY OTHER FAILURE, because it is not about this connection.
+ * The budget is per app, shared across every member, so a member whose sync is
+ * cut short by it has done nothing wrong and their grant is perfectly healthy.
+ * Treating it as an ordinary error incremented their failure counter, and five
+ * such nights marked their connection expired and asked them to reconnect a
+ * device that had never failed.
+ *
+ * `retryAfterMs` is what the vendor said, when they said anything.
+ */
+export class RateLimited extends Error {
+  constructor(
+    public readonly provider: ProviderId,
+    message: string,
+    public readonly retryAfterMs: number | null = null,
+  ) {
+    super(message);
+    this.name = "RateLimited";
+  }
+}

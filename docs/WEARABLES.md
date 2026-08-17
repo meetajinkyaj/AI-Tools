@@ -995,6 +995,36 @@ and more accurate than a cursor that would silently miss every late arrival.
 It is bounded per run and ordered by `last_sync_at` ascending, so it cannot
 outgrow the Worker's CPU budget and nobody can be starved.
 
+### Request budgets are per app, not per member
+
+WHOOP allow **100 requests a minute and 10,000 a day across every member we
+have, together**. The sweep walks connections one after another, so at ten
+members it is nowhere near that and at a hundred and fifty it would be roughly
+two hundred a minute. Nothing warns you on the way: the run simply starts taking
+429s partway down the list, and the members at the end of the list are the ones
+who stop having data.
+
+`rate-limit.ts` holds both halves of the answer. **Pacing**: every response
+carries the remaining budget, and when it drops below ten we space out what is
+left over the time until it resets, capped at two seconds so a member watching a
+"Sync now" spinner never waits on it. **Stopping**: when the budget is gone,
+`providerFetch` raises `RateLimited` before sending anything, and `syncDue`
+pauses that vendor for the rest of the run rather than collecting a 429 per
+remaining member.
+
+**A rate limit costs the connection nothing.** This is the part that matters.
+Before it, a 429 was an ordinary error, so it incremented `failure_count`, and
+five nightly sweeps that ran out of budget before reaching the same member
+marked their connection `expired` and asked them to reconnect a device that had
+never failed. `classifyFailure` in `sync.ts` now separates "whose fault is this"
+from the writing of it: a rate limit writes nothing at all, and leaves
+`last_sync_at` alone so the member is at the FRONT of the next run.
+
+The store is per Worker isolate, so two concurrent invocations do not see each
+other's counters. Acceptable while the sweep is one scheduled run and the manual
+path is one member pressing a button; coordinating properly needs a Durable
+Object or KV, and is worth building when a second concurrent sweep exists.
+
 ### Two devices, one number: the member decides (migration 0022)
 
 `mergeMetrics` picks one source per metric per day by a ranked preference,
