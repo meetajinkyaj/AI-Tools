@@ -86,6 +86,18 @@ export default function PrivacyPage() {
           rewards points.
         </li>
         <li>
+          <strong>Google APIs.</strong> Where a device connects through Google
+          (Fitbit now authenticates with a Google account), Ikigaro&rsquo;s use
+          and transfer of information received from Google APIs adheres to the{" "}
+          <a href="https://developers.google.com/terms/api-services-user-data-policy">
+            Google API Services User Data Policy
+          </a>
+          , including the Limited Use requirements. In plain terms: that data is
+          used only to provide the features described above, is not transferred
+          to anyone except as needed to run the Service or where the law
+          requires it, is never used for advertising, and is never sold.
+        </li>
+        <li>
           <strong>Disconnecting.</strong> You can disconnect a device at any
           time in the app. We ask the provider to revoke our access where they
           offer a way to do so, we delete our copy of your access credentials

@@ -1263,7 +1263,7 @@ first, because it decides the sequence far more than engineering effort does.
 |---|---|---|---|
 | **Withings** | Registered, credentials in hand | **Adapter written, NEVER AUDITED** | Weight and body composition, plus sleep |
 | **Polar** | **Self-serve, no approval period** | No adapter | Sleep with stages and a sleep score, HRV and breathing rate (Nightly Recharge), training load, VO2 max, steps |
-| **Coros** | **Partner application, their approval** | No adapter | Endurance training data, HR, VO2 max, SpO2, sleep |
+| **Coros** | **Standard onboarding, no fee** (was recorded as a partner review; corrected 2026-08-17) | No adapter, and see `COROS_ACCESS.md` for why that order is right | Endurance training data, HR, VO2 max, SpO2, sleep |
 
 ### Withings first, because it is the only one already paid for
 
@@ -1297,18 +1297,29 @@ codebase keeps meeting, an authorised connection returning nothing, and it is
 documented rather than discoverable. Verify it against Polar's own docs before
 building; this note comes from a third-party write-up.
 
-### Coros is gated, like Garmin and Ultrahuman
+### Coros is less gated than we recorded
 
-Their own support page says developers wishing to partner submit an API
-application. So it is an application and a wait, not a form and a client id.
-Worth submitting early for the same reason as Whoop, since the queue only
-lengthens, but **no plan should depend on it.**
+**Corrected 2026-08-17.** This section used to file Coros with Garmin and
+Ultrahuman, as an application and somebody's judgement. Their own page now
+describes a "standardized, objective developer onboarding process" granting
+access "to any platform that satisfies our standard security and operational
+requirements", attributed to GDPR and the EU Data Act. No fee is mentioned. A
+vendor granting access because regulation obliges them is a vendor whose answer
+does not turn on how interesting they find us, so the failure mode we planned
+around, being quietly declined for being small, is not the one described.
+
+**The documentation is still private**, which is why applying comes before
+writing anything: credentials are issued after verification and their API
+reference arrives with them. See `COROS_ACCESS.md` for the application itself
+and for what to ask them while they have their hands on the keyboard.
 
 There is a widely-shared Node project that drives Coros' Training Hub through a
-non-public endpoint, and its own README warns it "could break anytime".
-**That is not an option here.** An undocumented endpoint underneath a health
-record is a data-integrity risk and an unstated dependency on a vendor's
-goodwill.
+non-public endpoint, and its own README warns it "could break anytime". **That
+is not an option here**, and the reason is stronger than fragility: those
+projects authenticate with the member's own Coros email and password. An
+undocumented endpoint underneath a health record is a data-integrity risk; a
+stored vendor password is a category of credential this app has deliberately
+never held.
 
 ### What "pending" means in the device request list
 

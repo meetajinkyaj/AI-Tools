@@ -501,6 +501,31 @@ const fitbit: WearableProvider = {
   clientIdEnv: "FITBIT_CLIENT_ID",
   clientSecretEnv: "FITBIT_CLIENT_SECRET",
 
+  /*
+   * HIDDEN UNTIL THE GOOGLE CLIENT IS VERIFIED, and the reason is a date on a
+   * calendar rather than a missing feature.
+   *
+   * Fitbit now authenticates through Google, and our Google OAuth client is in
+   * Testing. Google expire refresh tokens issued by a client in that state
+   * after SEVEN DAYS: a member who connects on Monday is disconnected by the
+   * following Monday, and the only thing the app can do about it is ask them to
+   * reconnect, weekly, forever. Google's own guidance is to publish before the
+   * client serves a production environment, and app.ikigaro.com is one.
+   *
+   * Publishing is not a toggle. Most Google Health API scopes are restricted,
+   * which puts it behind a Trust and Safety review AND an annual third-party
+   * security assessment, because we store that data on our own servers. See
+   * `docs/GOOGLE_VERIFICATION.md` for what that costs and what it needs.
+   *
+   * The credentials stay set and the adapter stays whole, because neither is
+   * wrong: it was audited against Google's published API and it will work the
+   * day the client is published. Deleting this line is the whole of the change
+   * when that happens.
+   */
+  unavailable:
+    "Fitbit signs in through Google, and our Google client is awaiting " +
+    "verification. Connections made before that would expire every seven days.",
+
   // Google's own OAuth, not Fitbit's. The member signs in with a Google
   // account; a Fitbit login will not appear anywhere in this flow.
   authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",

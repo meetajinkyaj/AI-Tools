@@ -444,6 +444,30 @@ export function WearableSettings({
             "Wearable device syncing is coming soon."}
       </p>
 
+      {/*
+        THE DISCLOSURE, IN THE APP, WHERE THE CONNECTING HAPPENS.
+        Google's Health API verification requires this and is specific about
+        the form: it has to be inside the app rather than only on a website or
+        in a policy, has to appear in normal use rather than behind a menu, has
+        to name the data and say what it is used for, and must not be mixed in
+        with disclosures about anything else. Hence its own paragraph, on the
+        screen somebody is looking at when they decide to connect, rather than
+        a line appended to the copy above.
+
+        It is written for every provider, not just Google, because it is
+        equally true of all of them and a member reading it does not care whose
+        rulebook produced it.
+      */}
+      {data.available.length > 0 && (
+        <p className="text-body-sm text-muted">
+          Ikigaro collects health and fitness data from the device you connect,
+          such as sleep, recovery, heart rate and activity, to show your own
+          readings in Trends, to work out your training load, and to project
+          your Future You. It is never sold, never used for advertising, and
+          never shown to anyone but you.
+        </p>
+      )}
+
       {message && (
         <p role="status" className="text-body-sm text-ink">
           {message}
