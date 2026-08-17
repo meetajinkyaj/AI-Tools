@@ -49,18 +49,19 @@ tier applies when they get to your submission.
 
 **Fitbit is not worth $500 to $4,500 a year and a six-week security assessment
 at single-digit members, and it is not safe to leave connectable in the
-meantime.** Those two facts point the same way, so pick one of these
-deliberately rather than drifting:
+meantime.** Those two facts point the same way.
 
-- **Recommended, until there is demand.** Hide the provider by giving the
-  `fitbit` adapter an `unavailable` reason in `src/lib/wearables/providers.ts`.
-  One line; `providerConfigured()` already returns false for any provider that
-  carries one, so it vanishes from the connect list. Nobody connects a device
-  that will drop them in a week. Reverse it the day verification lands.
-- **Leave it visible** only if the people testing it know their connection dies
-  every seven days and are re-connecting on purpose.
-- **Start verification now** if Fitbit turns out to be the device testers
-  actually own. Everything below is what you will be asked for.
+**Decided 2026-08-17: hidden until verification.** The credentials were set, so
+Fitbit was showing a Connect button on production to members who would have been
+disconnected seven days later, and no current tester owns a Fitbit. The `fitbit`
+adapter now carries an `unavailable` reason, which `providerConfigured()` already
+treats as decisive regardless of credentials, so it is gone from the connect
+list. Deleting that one field is the whole of the change when verification
+lands; the adapter and its credentials are untouched and correct.
+
+**Start verification** when Fitbit turns out to be a device testers actually own,
+or when launch is close enough that the annual cost is worth carrying.
+Everything below is what you will be asked for.
 
 Withings, Polar and Coros are all self-serve with no equivalent gate, which is
 why they are the cheaper way to widen device coverage. WHOOP has a review but no
@@ -111,8 +112,11 @@ from approval, and letting it lapse takes the app back to unverified.
 
 ## What to check before starting
 
-- [ ] Is `FITBIT_CLIENT_ID` / `FITBIT_CLIENT_SECRET` set in production? If yes,
-      the provider is live in the connect list today and the 7-day expiry is
-      already reaching real members.
-- [ ] Does any current tester actually own a Fitbit? If not, this whole page can
-      wait, and the `unavailable` line is the right answer for now.
+- [x] Is `FITBIT_CLIENT_ID` / `FITBIT_CLIENT_SECRET` set in production? **Yes**,
+      confirmed 2026-08-17 from a screenshot of the live connect list. That is
+      why hiding it was worth doing rather than noting.
+- [x] Does any current tester actually own a Fitbit? **No.** So this page waits,
+      and it costs nothing to let it.
+- [ ] When you do start: budget the assessment annually, not once. The Letter of
+      Validation expires a year after approval and lapsing takes the app back to
+      unverified.
