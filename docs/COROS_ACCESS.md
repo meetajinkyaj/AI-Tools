@@ -90,16 +90,90 @@ special case in `urls.ts` or a second application.
 > advertising, and never shown to anyone else. We are in closed beta ahead of a
 > Q4 2026 launch.
 
-### Two things to ask them, since the answers shape the adapter
+### The email, ready to send
 
-1. **Is there a webhook, or is it polling?** Terra's integration describes COROS
-   notifying them when new data is ready, which suggests a push model exists.
-   Garmin's push-only design already forced a shape on our sync code, so knowing
-   this before writing anything saves a rewrite.
-2. **What are the rate limits, and are they per app or per member?** WHOOP's are
-   per app, which is the difference between a comfortable budget and a hard
-   ceiling at scale, and we now have pacing built for exactly that
-   (`rate-limit.ts`).
+Three placeholders in square brackets need filling before this goes out: the
+company registration details, the sender's name and title, and the website if
+`ikigaro.com` differs from the app. Everything else is checked against the code.
+
+> **Subject:** API access application: Ikigaro (Avisa Innovation LLP)
+>
+> Hello,
+>
+> I am writing to apply for COROS API access on behalf of Ikigaro, a consumer
+> wellness application operated by Avisa Innovation LLP.
+>
+> **About us.** Ikigaro helps people understand their own blood work and see
+> what moves it. A member uploads a lab panel, logs a short daily check-in, and
+> optionally connects a wearable; we show the three side by side, so what
+> somebody did shows up next to what their body recorded and what their next
+> panel says. We are in closed beta with single-digit members, ahead of a public
+> launch in Q4 2026. Several of our members train seriously enough to own a
+> COROS watch, and today we have nothing to offer them.
+>
+> **What we would read.** Daily summaries only, and only for members who
+> explicitly connect their account: sleep and its stages, resting heart rate,
+> heart rate variability, blood oxygen, VO2 max, daily steps and energy, and
+> workout sessions with their duration, heart rate, distance and energy. We have
+> no use for second-by-second streams or GPS tracks and would not request them.
+>
+> **What happens to it.** It is shown back to the member alongside their own lab
+> results, and nowhere else. It is never sold, never used for advertising, never
+> shared with another member or a partner, and it earns nothing in our rewards
+> programme. Our privacy policy covers connected devices specifically, including
+> what disconnecting does: https://app.ikigaro.com/privacy
+>
+> **Technical details for registration.**
+>
+> - Company: Avisa Innovation LLP, Pune, Maharashtra, India. [Registration
+>   number and registered address.]
+> - Technical contact: hello@ikigaro.com
+> - Application: https://app.ikigaro.com
+> - OAuth 2.0 redirect URI: https://app.ikigaro.com/api/wearables/callback/coros
+> - Authorisation flow: OAuth 2.0 authorization code, server side. Client
+>   secrets and member tokens are held only on our servers, encrypted at rest,
+>   and are never exposed to a browser or a mobile client.
+> - Hosting: Cloudflare Workers, with Postgres on Supabase. Every table has
+>   row-level security enabled and application data is reachable only through
+>   our server.
+> - On disconnect we call the provider's revocation endpoint where one exists,
+>   delete our copy of the credentials immediately, and stop all reading. Members
+>   can have their stored data erased on request.
+>
+> We already run the same integration pattern against WHOOP, Oura and Withings,
+> so the work on our side is small once we have credentials and your API
+> reference.
+>
+> **Three questions**, so we build against your intent rather than around it:
+>
+> 1. Does the API deliver data by webhook when a watch syncs, or is it polled?
+>    We support both patterns today and would rather match yours from the start.
+> 2. Are the rate limits per application or per member? We pace our requests
+>    against published rate-limit headers where a vendor provides them, and the
+>    per-application case is the one worth designing for early.
+> 3. Where can we read the API reference, and is there anything else you need
+>    from us to complete the security and operational review?
+>
+> I am happy to provide anything further, including a walkthrough of how device
+> data appears in the product.
+>
+> Best regards,
+>
+> [Name]
+> [Title], Avisa Innovation LLP
+> [email] | https://app.ikigaro.com
+
+### Why those three questions and not others
+
+1. **Webhook or polling?** Terra's COROS integration describes COROS notifying
+   them when new data is ready, so a push model probably exists. Garmin's
+   push-only design already forced a shape on our sync code, and knowing which
+   we are building for saves a rewrite rather than a preference.
+2. **Rate limits per app or per member?** WHOOP's are per app, which is the
+   difference between a comfortable budget and a hard ceiling at scale. We have
+   pacing built for exactly that now (`rate-limit.ts`), so the answer decides
+   whether it applies here.
+3. **Where is the API reference?** The blocking one. Everything else waits on it.
 
 ---
 
