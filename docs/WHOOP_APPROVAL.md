@@ -96,73 +96,85 @@ apps, and Ikigaro has its own type system. Nothing to change.
 
 ## Step 5. The submission form
 
-`https://whoopinc.typeform.com/to/XmzituEp`. WHOOP ask for "designs and other
-helpful context". Draft answers below. Paste and edit; do not send anything here
+`https://whoopinc.typeform.com/to/XmzituEp`. Four required questions, answered
+below in the order the form asks them. Paste and edit; do not send anything here
 that has stopped being true.
 
-### What the app does
+### 1. "Please outline your intended use of the WHOOP API."
 
-> Ikigaro is a consumer wellness app that helps people read their own blood work
-> and see what actually moves it. Members upload a lab panel, log a 30-second
-> daily check-in, and connect a wearable. We put the three side by side: what
-> your last panel said, what you have done since, and what your body has been
-> doing while you did it.
+> Ikigaro helps people read their own blood work and see what actually moves it.
+> A member uploads a lab panel, logs a 30-second daily check-in, and connects a
+> wearable; we put the three side by side, so what they did shows up next to
+> what their body did and what their next panel says.
 >
-> WHOOP is what makes the third of those honest. Sleep, recovery, HRV and
-> resting heart rate are the measurements that connect a habit to a lab result,
-> and asking somebody to self-report them produces a number nobody should build
-> on.
-
-### How WHOOP data is used
-
-> We read daily summaries through the v2 API: sleep (`/activity/sleep`),
-> recovery (`/recovery`) and workouts (`/activity/workout`).
+> WHOOP is what makes that honest. Sleep, recovery, HRV and resting heart rate
+> are the measurements that connect a habit to a lab result, and asking somebody
+> to self-report them produces a number nobody should build on.
 >
-> Members see their own readings in Trends, both merged across every device they
-> have connected and, in a separate panel, exactly as WHOOP sent them, day by
-> day. That second panel exists so that a member who sees a different number in
-> the WHOOP app can find out why rather than concluding one of us is broken. Our
-> sleep figure is light plus deep plus REM, and we say so on the screen, because
-> that is the commonest reason the two disagree.
+> We read daily summaries from three v2 collections: `/activity/sleep`,
+> `/recovery` and `/activity/workout`. Members see their own readings in Trends,
+> both merged across every device they have connected and, in a separate panel,
+> exactly as WHOOP sent them, day by day. That second panel exists so somebody
+> who sees a different number in the WHOOP app can find out why rather than
+> concluding one of us is broken: our sleep figure is light plus deep plus REM,
+> and the screen says so.
 >
-> Device data is never used for advertising, is never sold, earns no rewards
-> points, and is never shown to anyone but the member it belongs to.
+> Device data is never sold, never used in advertising, never shown to anyone
+> but its owner, and earns no rewards points. Ikigaro is a consumer wellness
+> product, not a diagnostic one, and every screen says "Educational, not a
+> diagnosis. Please consult a doctor."
 
-### Data handling and privacy
+### 2. "Please share a link to UX and/or designs for your integration."
 
-> Privacy policy: https://app.ikigaro.com/privacy (section 1 covers connected
-> wearables specifically: what we read, what we do not, and what disconnecting
-> does).
+> https://claude.ai/code/artifact/f26b17d5-67c6-45a1-9086-e447f5c892fb
+
+A page showing both WHOOP screens, the five scopes with the reason for each, the
+sync sequence, what we never do with the data, and how the WHOOP name is used.
+**It has to be shared before it is submitted**: the page is private until it is,
+and a reviewer who cannot open the link is worse than no link.
+
+### 3. "What is your preferred timeline for releasing the integration to your users?"
+
+> Q4 2026. The integration is built and running in production today; what is
+> ahead of it is our own public launch rather than any WHOOP work. We are in
+> closed beta now, and WHOOP is live for the members who have one, which is how
+> we would like it to stay through launch.
 >
-> Access and refresh tokens are encrypted before they are written and are never
-> returned to the browser by any endpoint. On disconnect we call WHOOP's
-> `revokeUserOAuthAccess` and then delete our copy of the credentials outright.
-> Members can have all their data erased on request, which the policy states.
+> We are submitting well ahead of that date deliberately. The ten-member cap is
+> not a constraint at our size yet, and we would rather be reviewed on a small
+> honest integration now than a rushed one the week we launch.
+
+### 4. "Please share the expected number of users and the number of API calls per minute / per day."
+
+> Today: one connected WHOOP member, in a closed beta with single-digit members
+> in total, using roughly four requests a day.
 >
-> We request five scopes and no more: `read:sleep`, `read:recovery`,
-> `read:cycles`, `read:workout` and `offline`. We do not request `read:profile`,
-> because we call no profile endpoint and do not want a member's name or email.
+> Per connected member, per day, in steady state: one token refresh plus three
+> collection requests (sleep, recovery, workout), each a single 25-record page
+> for a seven-day window. About four requests. A first connection, or a manual
+> "sync now", pulls a 60-day backfill and follows `next_token`, which is about
+> ten requests once.
+>
+> At our Q4 2026 launch we expect on the order of 500 members within six months,
+> of whom we would estimate 100 to 150 are WHOOP members: roughly 400 to 600
+> requests a day, plus about ten for each new connection.
+>
+> On the minute limit: our sweep runs once nightly at 02:00 UTC and processes
+> connections serially, bounded per run. At present that is nowhere near 100
+> requests a minute. Before it could be, we will pace the sweep and read the
+> `X-RateLimit-Remaining` and `X-RateLimit-Reset` headers you publish, and we
+> would ask for an increase ahead of need rather than after being throttled.
 
-### Scale and status
+### Screenshots, if the form or a reviewer asks for more
 
-> Live at https://app.ikigaro.com, in closed beta, single-digit members today.
-> Operated by Avisa Innovation LLP, Pune, India. We are submitting now rather
-> than at the cap because approval is reported to take a while, and because we
-> would rather be reviewed on a small honest integration than a rushed large
-> one.
+The design link above carries rendered screens. Real device screenshots are
+better still, and these are the five worth taking on a phone with live data:
 
-### Designs to attach
-
-Take these on a phone, with the WHOOP data live, in whichever theme looks best:
-
-1. **Trends, "From your devices"** with the WHOOP attribution visible in the
-   card header.
+1. **Trends, "From your devices"** with the WHOOP attribution in the card header.
 2. **Trends, "What your WHOOP says"** expanded, showing the day-by-day readings.
 3. **Home**, showing the "Sync with WHOOP" control and its information popup.
-4. **Profile, connected devices**, showing WHOOP connected with a Disconnect
-   control.
-5. **The WHOOP consent screen itself**, as a member sees it, which shows the
-   five scopes we ask for.
+4. **Profile, connected devices**, showing WHOOP connected with a Disconnect control.
+5. **The WHOOP consent screen itself**, which shows the five scopes we ask for.
 
 ---
 
