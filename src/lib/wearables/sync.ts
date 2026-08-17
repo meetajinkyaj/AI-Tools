@@ -5,6 +5,7 @@ import { decryptToken, encryptToken } from "./crypto";
 import { isMetricKey, type DailyMetric } from "./metrics";
 import { PROVIDERS } from "./providers";
 import {
+  RateLimited,
   ReauthRequired,
   type OAuthTokens,
   type ProviderId,
@@ -475,7 +476,11 @@ function isoDay(d: Date): string {
 export interface SyncResult {
   provider: ProviderId;
   stored: number;
-  status: "ok" | "reauth" | "error" | "skipped";
+  /**
+   * `rate-limited` is not a failure of this connection and never counts as one.
+   * See the RateLimited branch below.
+   */
+  status: "ok" | "reauth" | "error" | "skipped" | "rate-limited";
   error?: string;
 }
 
@@ -485,6 +490,41 @@ export interface SyncResult {
  * Never throws: the caller is usually sweeping every connection in the system,
  * and one user's dead Whoop grant must not stop the other users' rings syncing.
  */
+/**
+ * What a failed sync means for the connection it happened on.
+ *
+ * SEPARATED FROM THE WRITING OF IT because this is the part with a rule in it,
+ * and the rule is the thing worth being sure about. The database call is
+ * mechanical; the judgement about whose fault a failure is, and whether it
+ * should eventually cost a member their connection, is not.
+ *
+ * Three answers, and the first is the one this exists for:
+ *
+ *   - RATE LIMITED: nothing is recorded. The request budget is per app, shared
+ *     across every member, so a member cut short by it has a healthy grant, a
+ *     working device, and the bad luck of being late in tonight's queue.
+ *     Counting it against them incremented `failure_count`, and five such
+ *     nights marked their connection expired and asked them to reconnect a
+ *     device that had never once failed. Their `last_sync_at` is left alone
+ *     too, which puts them at the FRONT of the next run rather than the back.
+ *
+ *   - REAUTH: only the member can fix it, so stop trying and say so.
+ *
+ *   - ERROR: a vendor having a bad night. Counted, and only after enough
+ *     consecutive nights does "transient" stop being a fair description.
+ */
+export type FailureOutcome =
+  | { kind: "rate-limited" }
+  | { kind: "reauth" }
+  | { kind: "error"; failures: number; expire: boolean };
+
+export function classifyFailure(err: unknown, priorFailures: number): FailureOutcome {
+  if (err instanceof RateLimited) return { kind: "rate-limited" };
+  if (err instanceof ReauthRequired) return { kind: "reauth" };
+  const failures = priorFailures + 1;
+  return { kind: "error", failures, expire: failures >= MAX_FAILURES };
+}
+
 export interface SyncOptions {
   /**
    * Ask for the provider's backfill window even though this connection has
@@ -556,8 +596,14 @@ export async function syncConnection(
     return { provider: conn.provider, stored, status: "ok" };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    const outcome = classifyFailure(err, conn.failure_count);
 
-    if (err instanceof ReauthRequired) {
+    if (outcome.kind === "rate-limited") {
+      // Nothing is written at all. See classifyFailure for why.
+      return { provider: conn.provider, stored: 0, status: "rate-limited", error: message };
+    }
+
+    if (outcome.kind === "reauth") {
       // The user has to act. Mark it and stop trying, repeated calls with a
       // dead grant are how you get rate limited by a vendor for nothing.
       await supabase
@@ -567,15 +613,12 @@ export async function syncConnection(
       return { provider: conn.provider, stored: 0, status: "reauth", error: message };
     }
 
-    const failures = conn.failure_count + 1;
     await supabase
       .from("wearable_connections")
       .update({
-        failure_count: failures,
+        failure_count: outcome.failures,
         last_error: message,
-        // Enough consecutive transient failures and it is not transient. Ask
-        // the user to reconnect rather than retrying nightly forever.
-        ...(failures >= MAX_FAILURES ? { status: "expired" } : {}),
+        ...(outcome.expire ? { status: "expired" } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("id", conn.id);
@@ -618,6 +661,13 @@ export async function syncUser(
  * Worker's CPU budget as the user count grows. Ordering by `last_sync_at`
  * ascending with nulls first means new connections sync immediately and nobody
  * can be starved, the longest-waiting is always next.
+ *
+ * A RATE LIMIT ENDS THE RUN FOR THAT VENDOR, rather than being met once per
+ * remaining member. Their budget is per app, so the next request to that vendor
+ * is already known to fail; sending fifty of them earns fifty 429s, which is
+ * how an app stops being served at all. The members not reached keep their
+ * `last_sync_at`, which is the oldest in the table, so they are at the front of
+ * the next run. The queue slows down; nobody drops out of it.
  */
 export async function syncDue(limit = 50): Promise<SyncResult[]> {
   const supabase = createSupabaseAdmin();
@@ -629,8 +679,17 @@ export async function syncDue(limit = 50): Promise<SyncResult[]> {
     .limit(limit);
 
   const results: SyncResult[] = [];
+  const paused = new Set<ProviderId>();
+
   for (const conn of (data ?? []) as ConnectionRow[]) {
-    results.push(await syncConnection(conn));
+    // Other vendors are unaffected: one exhausted budget is one vendor's.
+    if (paused.has(conn.provider)) {
+      results.push({ provider: conn.provider, stored: 0, status: "rate-limited" });
+      continue;
+    }
+    const result = await syncConnection(conn);
+    if (result.status === "rate-limited") paused.add(conn.provider);
+    results.push(result);
   }
   return results;
 }
