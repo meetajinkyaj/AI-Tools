@@ -195,16 +195,21 @@ of it.
 
 ### The email, ready to send
 
-Three placeholders in square brackets need filling before this goes out: the
-company registration details, the sender's name and title, and the website if
-`ikigaro.com` differs from the app. Everything else is checked against the code.
+**Send it after `/support` is deployed**, not before. The form's introduction
+requires a support page, this email links to it, and a reviewer clicking a 404
+is a worse first impression than waiting a day.
+
+Three placeholders in square brackets: the company registration details, the
+sender's name and title, and a secondary contact. Everything else is checked
+against the code or against their own reference guide.
 
 > **Subject:** API access application: Ikigaro (Avisa Innovation LLP)
 >
 > Hello,
 >
 > I am writing to apply for COROS API access on behalf of Ikigaro, a consumer
-> wellness application operated by Avisa Innovation LLP.
+> wellness application operated by Avisa Innovation LLP. I have submitted the
+> application form and am following up here as your onboarding process asks.
 >
 > **About us.** Ikigaro helps people understand their own blood work and see
 > what moves it. A member uploads a lab panel, logs a short daily check-in, and
@@ -214,11 +219,12 @@ company registration details, the sender's name and title, and the website if
 > launch in Q4 2026. Several of our members train seriously enough to own a
 > COROS watch, and today we have nothing to offer them.
 >
-> **What we would read.** Daily summaries only, and only for members who
-> explicitly connect their account: sleep and its stages, resting heart rate,
-> heart rate variability, blood oxygen, VO2 max, daily steps and energy, and
-> workout sessions with their duration, heart rate, distance and energy. We have
-> no use for second-by-second streams or GPS tracks and would not request them.
+> **What we would read**, and only for members who explicitly connect their
+> account: daily data (section 4.3) and workout records (section 4.2). In our
+> terms that is sleep and its stages, resting heart rate, heart rate
+> variability, blood oxygen, VO2 max, daily steps and energy, and workout
+> sessions with their duration, heart rate, distance and energy. We have no use
+> for second-by-second streams or GPS tracks and would not request them.
 >
 > **What happens to it.** It is shown back to the member alongside their own lab
 > results, and nowhere else. It is never sold, never used for advertising, never
@@ -226,11 +232,16 @@ company registration details, the sender's name and title, and the website if
 > programme. Our privacy policy covers connected devices specifically, including
 > what disconnecting does: https://app.ikigaro.com/privacy
 >
+> **Your two partner requirements are in place.** Login portal:
+> https://app.ikigaro.com. Support page: https://app.ikigaro.com/support, which
+> covers connecting and disconnecting a device, what to do when a reading looks
+> wrong or nothing has arrived, and how to reach us.
+>
 > **Technical details for registration.**
 >
 > - Company: Avisa Innovation LLP, Pune, Maharashtra, India. [Registration
 >   number and registered address.]
-> - Technical contact: hello@ikigaro.com
+> - Technical contact: hello@ikigaro.com. [Secondary contact.]
 > - Application: https://app.ikigaro.com
 > - OAuth 2.0 redirect URI: https://app.ikigaro.com/api/wearables/callback/coros
 > - Authorisation flow: OAuth 2.0 authorization code, server side. Client
@@ -243,39 +254,46 @@ company registration details, the sender's name and title, and the website if
 >   delete our copy of the credentials immediately, and stop all reading. Members
 >   can have their stored data erased on request.
 >
-> We already run the same integration pattern against WHOOP, Oura and Withings,
-> so the work on our side is small once we have credentials and your API
-> reference.
+> **On the workout data push service**, we answered N/A to both endpoint
+> questions on the form deliberately, having read section 5. We will poll
+> sections 4.2 and 4.3 on a daily schedule, which is how our five existing
+> integrations work, and a daily summary does not benefit from arriving sooner.
+> If you would rather partners receive pushes, say so and we will build the
+> receiving and status endpoints before we go live.
 >
-> **Two questions**, having read the V2.0.6 reference guide:
+> We already run this integration pattern against WHOOP, Oura and Withings, so
+> the work on our side is short now that we have your V2.0.6 reference guide.
+>
+> **Two questions.**
 >
 > 1. Is the documented cap of 1,000 calls a minute per application or per
->    member? We pace our requests against published rate-limit headers where a
+>    member? We pace requests against published rate-limit headers where a
 >    vendor sends them, and the per-application case is the one worth designing
 >    for early.
 > 2. Is there anything further you need from us to complete the security and
 >    operational review?
 >
-> I am happy to provide anything further, including a walkthrough of how device
-> data appears in the product.
->
 > Best regards,
 >
 > [Name]
 > [Title], Avisa Innovation LLP
-> [email] | https://app.ikigaro.com
+> hello@ikigaro.com | https://app.ikigaro.com
 
-### Why those three questions and not others
+### Why the questions shrank
 
-1. **Webhook or polling?** Terra's COROS integration describes COROS notifying
-   them when new data is ready, so a push model probably exists. Garmin's
-   push-only design already forced a shape on our sync code, and knowing which
-   we are building for saves a rewrite rather than a preference.
-2. **Rate limits per app or per member?** WHOOP's are per app, which is the
-   difference between a comfortable budget and a hard ceiling at scale. We have
-   pacing built for exactly that now (`rate-limit.ts`), so the answer decides
-   whether it applies here.
-3. **Where is the API reference?** The blocking one. Everything else waits on it.
+An earlier draft asked three. Reading V2.0.6 answered two of them, and asking a
+vendor something their own documentation states is a way of telling them you did
+not read it.
+
+- **Webhook or polling?** Answered. Section 4.2 and 4.3 poll; section 5's push is
+  explicitly optional. The email now states which we chose and why, rather than
+  asking.
+- **Where is the API reference?** Answered: it is linked from the application
+  form itself.
+- **Rate limits per app or per member?** Still open. The guide gives the number,
+  1,000 calls a minute, but not whose. That distinction is the difference
+  between a comfortable budget and a ceiling, and our pacing already handles the
+  per-application case (`rate-limit.ts`).
 
 ---
 
