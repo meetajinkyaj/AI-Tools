@@ -37,6 +37,9 @@ create table if not exists wearable_connections (
   id                uuid primary key default gen_random_uuid(),
   user_id           uuid not null references users(id) on delete cascade,
   -- 'oura' | 'fitbit' | 'whoop' | 'withings' | 'garmin' | 'ultrahuman'
+  -- 'coros' was added later, by 0023. The constraint below is the list as it
+  -- stood when this file ran; read 0023 for the current one rather than
+  -- trusting this line, which is history and not state.
   provider          text not null,
   -- The vendor's own id for this user. Needed to route Garmin's push
   -- callbacks, which arrive keyed by their id and not ours.

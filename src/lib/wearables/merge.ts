@@ -42,6 +42,12 @@ const SLEEP_FIRST: ProviderId[] = [
   "ultrahuman",
   "whoop",
   "garmin",
+  // COROS sits beside Garmin because it is the same kind of object: a large GPS
+  // endurance watch, as likely to be on a charger overnight as on a wrist. It
+  // publishes no sleep at all here (see providers.ts), so in this family it can
+  // only ever win HRV and resting heart rate, and only on a night the devices
+  // above it missed.
+  "coros",
   "fitbit",
   "withings",
 ];
@@ -49,6 +55,11 @@ const SLEEP_FIRST: ProviderId[] = [
 const MOVEMENT_FIRST: ProviderId[] = [
   "garmin",
   "fitbit",
+  // Behind both, not beside them. COROS count steps from the wrist like the two
+  // above, but step counting is the thing Fitbit was built to do and COROS is a
+  // training watch that also does it. Third is not a demotion: it wins any day
+  // the other two did not report.
+  "coros",
   "whoop",
   "oura",
   "ultrahuman",
@@ -62,6 +73,11 @@ const SCALE_FIRST: ProviderId[] = [
   "oura",
   "ultrahuman",
   "whoop",
+  // Reports no body composition whatsoever, so this position is a formality:
+  // a provider that never emits a metric never competes for it. Listed because
+  // every provider has to appear in every ranking, and an absent id would be
+  // indistinguishable from one somebody forgot.
+  "coros",
 ];
 
 /**
@@ -76,6 +92,7 @@ const CGM_FIRST: ProviderId[] = [
   "garmin",
   "fitbit",
   "withings",
+  "coros",
 ];
 
 /**

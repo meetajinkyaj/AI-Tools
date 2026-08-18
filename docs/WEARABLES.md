@@ -954,7 +954,7 @@ indefinitely, until somebody notices and revokes it.
 Postgres encrypts at rest at the disk level, which defends against someone
 stealing a disk, not the realistic threat here, which is a leaked service-role
 key or a stray `pg_dump`. A key that lives only in Worker secrets means the
-database on its own is not enough to impersonate our users against six vendors.
+database on its own is not enough to impersonate our users against seven vendors.
 
 ---
 
@@ -1141,7 +1141,7 @@ Tuesday". Consequences:
 
 ---
 
-## Adding a seventh provider
+## Adding an eighth provider
 
 1. Add the id to `ProviderId` and to the `provider` CHECK in a new migration.
 2. Add an adapter to `src/lib/wearables/providers.ts`. OAuth endpoints, scopes,
@@ -1254,7 +1254,7 @@ regardless.
 
 ---
 
-## Pending integrations: Withings, Polar, Coros
+## Pending integrations: Withings, Polar, COROS
 
 Three named on the roadmap, in the order they are worth doing. Access model
 first, because it decides the sequence far more than engineering effort does.
@@ -1263,7 +1263,7 @@ first, because it decides the sequence far more than engineering effort does.
 |---|---|---|---|
 | **Withings** | Registered, credentials in hand | **Adapter written, NEVER AUDITED** | Weight and body composition, plus sleep |
 | **Polar** | **Self-serve, no approval period** | No adapter | Sleep with stages and a sleep score, HRV and breathing rate (Nightly Recharge), training load, VO2 max, steps |
-| **Coros** | **Standard onboarding, no fee** (was recorded as a partner review; corrected 2026-08-17) | No adapter, and see `COROS_ACCESS.md` for why that order is right | Endurance training data, HR, VO2 max, SpO2, sleep |
+| **COROS** | **Applied 2026-08-18**, form submitted and email sent, awaiting their review | **Adapter written from their V2.0.6 reference guide, never run against a live account.** Hidden by `unavailable` until credentials exist | Steps, resting heart rate, overnight HRV, workouts |
 
 ### Withings first, because it is the only one already paid for
 
@@ -1297,7 +1297,94 @@ codebase keeps meeting, an authorised connection returning nothing, and it is
 documented rather than discoverable. Verify it against Polar's own docs before
 building; this note comes from a third-party write-up.
 
-### Coros is less gated than we recorded
+### COROS: the adapter is written, and four things in it are unlike everything else
+
+**Written 2026-08-18 against their API Reference V2.0.6 (February 2026),** which
+arrived with the application rather than from a public site. The application
+went in the same day: the Feishu form and an email to their developer contact.
+Nothing here has spoken to a COROS server. The provider carries an
+`unavailable` reason so that setting `COROS_CLIENT_ID` and `COROS_CLIENT_SECRET`
+does **not** switch it on, and the tests in `coros.test.ts` pin what their
+documentation says, which is a weaker claim than what their servers do.
+
+Four differences, each of which would have been a silent failure if guessed:
+
+1. **The token is a query parameter, not a bearer header,** and every data call
+   also needs `openId`, their user identifier. It arrives in the token response
+   and lives in `external_user_id`. A connection without one cannot be read at
+   all, so `fetchRange` returns empty rather than spending a request to earn an
+   error.
+2. **A refresh extends the existing token and issues nothing.**
+   `POST /oauth2/refresh-token` answers `{"result":"0000","message":"OK"}` and
+   adds one month to the token you already hold. `RefreshToken never expires`,
+   in their words. Generic refresh code throws "returned no access_token" on
+   that response, which is a *complete success*, and kills a working grant. This
+   is what `refreshExtendsToken` and `extendToken()` in `sync.ts` exist for.
+3. **Success is in the body, not the status code.** Every endpoint returns HTTP
+   200 with a `result` field, and only `"0000"` means it worked. An adapter
+   reading the status alone would treat a refusal as an empty day, which looks
+   exactly like a member who did not wear their watch.
+4. **Thirty days per query, three months of history.** "The maximum date range
+   for one query is 30 days, and the query date is not earlier than three months
+   before the day." So `corosWindows()` chunks a range, a 90-day backfill is
+   four requests, and no backfill can reach further back than a quarter however
+   it is asked. Their documented limit is 1,000 calls per minute, which this is
+   nowhere near.
+
+**Their `result` codes have no documented vocabulary.** `"0000"` is the only
+value the guide defines, so a member who revoked us at COROS and a COROS having
+a bad afternoon arrive as the same opaque string. Section 3.5 is the one
+question that separates them: `bindState` is 1 while the token exists and the
+member has not unbound it, "regardless of whether the token has expired". So a
+failed data call asks `bindState` once, and **only a clear zero** becomes
+`ReauthRequired`. Anything else, including a second failure, leaves the original
+error alone, because "we could not tell" must not read as "the grant is dead".
+
+Their token response is documented in **two spellings at once**: the parameter
+table names `accessToken` / `refreshToken` / `expiresIn`, and the worked example
+three lines below returns `access_token` / `refresh_token` / `expires_in`.
+`requestTokens` reads both. Their OAuth also defines **no scopes at all**, which
+is why `connect/route.ts` omits the parameter entirely rather than sending
+`scope=`.
+
+#### Two things COROS report that we deliberately do not store
+
+**Sleep is not mapped, and this is the most consequential decision in the
+adapter.** They give a window, `sleepStartTime` to `sleepEndTime`, with no
+stages. Our `sleep_minutes` is defined on the member's own screen as time
+actually asleep, light plus deep plus REM, which reads lower than time in bed. A
+window is time in bed. Publishing it under that key would make the definition we
+show people false for COROS members, and would put two different quantities on
+one chart for anybody wearing two devices. Their own example makes the case: it
+contains a night running from 2020-06-15 22:00 to 2020-06-18 08:00, which is
+either a typo or fifty-eight hours of sleep, and nothing in the payload
+distinguishes them.
+
+The honest fix is **a separate metric for time in bed**, which is a vocabulary
+change worth making deliberately rather than smuggling in with an adapter. It
+is not done. Until it is, COROS members get steps, resting heart rate and HRV,
+and the provider blurb says exactly that and does not mention sleep.
+
+**Calories are not mapped either,** for a simpler reason: the unit cannot be
+determined. Their table says "Unit: calorie", and their example pairs 9,553 of
+them with 52 steps, which is impossible as kilocalories and absurd as calories.
+**Verify against a real member's day before publishing a number nobody can
+check.** This is the first question to settle once credentials arrive.
+
+Only the **parent** workout type is mapped to a name. Their table pairs a parent
+with a child for every variant (outdoor run, indoor run, pool swim, open water),
+and carrying all of it would distinguish things our vocabulary does not: a
+workout activity is free text, shown as the vendor's own label. An unmapped code
+yields **no** label rather than a wrong one, because the member reads a label as
+what their watch recorded. Codes 98 and 99 are "custom sport" and the name the
+member gave it is not in the payload, so they stay unmapped on purpose.
+
+`startTimezone` counts **15-minute steps**, so 32 means UTC+08:00. Sessions are
+filed to the day they started **in the member's own timezone**; a 06:00 session
+in India filed by UTC lands on the previous day, which is how a training week
+quietly loses a Monday.
+
+### COROS is less gated than we recorded
 
 **Corrected 2026-08-17.** This section used to file Coros with Garmin and
 Ultrahuman, as an application and somebody's judgement. Their own page now
@@ -1308,10 +1395,12 @@ vendor granting access because regulation obliges them is a vendor whose answer
 does not turn on how interesting they find us, so the failure mode we planned
 around, being quietly declined for being small, is not the one described.
 
-**The documentation is still private**, which is why applying comes before
-writing anything: credentials are issued after verification and their API
-reference arrives with them. See `COROS_ACCESS.md` for the application itself
-and for what to ask them while they have their hands on the keyboard.
+**The documentation is private**, which is why applying came before writing
+anything: credentials are issued after verification. The reference guide
+arrived with the application form rather than after approval, which is what
+made the adapter above possible ahead of credentials. See `COROS_ACCESS.md` for
+the application itself and for what to ask them while they have their hands on
+the keyboard.
 
 There is a widely-shared Node project that drives Coros' Training Hub through a
 non-public endpoint, and its own README warns it "could break anytime". **That

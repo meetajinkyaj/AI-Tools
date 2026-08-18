@@ -3,12 +3,12 @@ import type { DailyMetric } from "./metrics";
 /**
  * The adapter contract every wearable vendor is squeezed into.
  *
- * Six vendors, six dialects, one shape. What varies between them is genuinely
+ * Seven vendors, seven dialects, one shape. What varies between them is genuinely
  * only: where the OAuth endpoints are, what scopes to ask for, how to call the
  * data endpoints, and how to turn the answer into `DailyMetric[]`. Everything
  * else, refresh, retry, backoff, persistence, idempotent upsert, is written
  * once in `sync.ts` and shared, because that is where the subtle bugs live and
- * six copies of subtle would be six times the bugs.
+ * seven copies of subtle would be seven times the bugs.
  */
 
 export type ProviderId =
@@ -17,7 +17,8 @@ export type ProviderId =
   | "whoop"
   | "withings"
   | "garmin"
-  | "ultrahuman";
+  | "ultrahuman"
+  | "coros";
 
 /**
  * Display names, in one place because two places drift.
@@ -38,6 +39,9 @@ export const PROVIDER_NAMES: Record<ProviderId, string> = {
   withings: "Withings",
   garmin: "Garmin",
   ultrahuman: "Ultrahuman",
+  // COROS, not Coros. Their own materials set it in caps throughout, the same
+  // reason WHOOP is spelled the way it is above.
+  coros: "COROS",
 };
 
 export interface OAuthTokens {
@@ -113,6 +117,32 @@ export interface WearableProvider {
    * than form fields, and reject the other form outright.
    */
   tokenAuth: "basic" | "body";
+
+  /**
+   * Where a refresh is sent, when it is not `tokenUrl`.
+   *
+   * Most vendors refresh at the same endpoint that issued the token, with a
+   * different grant type. COROS use a separate path (`/oauth2/refresh-token`),
+   * so the two have to be allowed to differ.
+   */
+  refreshUrl?: string;
+
+  /**
+   * TRUE when a refresh EXTENDS the existing access token rather than issuing a
+   * new one.
+   *
+   * COROS are the only vendor here that work this way, and the difference is
+   * not cosmetic. Their refresh endpoint answers `{"result":"0000","message":
+   * "OK"}` and nothing else: no token, no expiry. What it does is add thirty
+   * days to the life of the token you already hold. Code that assumes a refresh
+   * returns credentials throws "returned no access_token" on a response that
+   * was, in fact, a complete success, and the connection dies on a working
+   * grant.
+   *
+   * `refreshToken` never expires for these vendors either, so the credential to
+   * protect is the one already stored.
+   */
+  refreshExtendsToken?: boolean;
   /**
    * TRUE when a refresh returns a NEW refresh token and invalidates the old
    * one. This is the single nastiest failure mode in the whole integration: if

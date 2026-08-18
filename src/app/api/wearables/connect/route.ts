@@ -57,7 +57,12 @@ export async function GET(request: Request) {
   url.searchParams.set("response_type", "code");
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("redirect_uri", callbackUrl(providerId));
-  url.searchParams.set("scope", provider.scopes.join(" "));
+  // Omitted entirely when a vendor has no scopes rather than sent empty. COROS
+  // define none at all, and `scope=` is a parameter with no meaning to them:
+  // at best ignored, at worst a reason to reject an authorize request.
+  if (provider.scopes.length > 0) {
+    url.searchParams.set("scope", provider.scopes.join(" "));
+  }
   url.searchParams.set("state", state);
   // Vendor-specific extras, set last so a provider cannot quietly override
   // `state` or `redirect_uri` and weaken the flow.
