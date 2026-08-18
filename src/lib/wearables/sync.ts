@@ -16,7 +16,7 @@ import {
 /**
  * Refresh, fetch, normalize, store. The shared half of every integration.
  *
- * The adapters describe six vendors; everything that is easy to get subtly
+ * The adapters describe seven vendors; everything that is easy to get subtly
  * wrong lives here, once:
  *
  *   - REFRESH TOKEN ROTATION. Most of these vendors return a new refresh token
@@ -144,23 +144,123 @@ export async function requestTokens(
   // Withings wraps everything one level deeper, under `body`.
   const d = (json.body && typeof json.body === "object" ? json.body : json) as Record<string, unknown>;
 
-  const accessToken = typeof d.access_token === "string" ? d.access_token : "";
-  if (!accessToken) throw new Error(`${provider} returned no access_token`);
+  /*
+   * SNAKE CASE OR CAMEL CASE, because COROS document both for the same
+   * response. Their parameter table names `accessToken`, `refreshToken` and
+   * `expiresIn`; the worked example three lines below it returns
+   * `access_token`, `refresh_token` and `expires_in`. Reading only one spelling
+   * means a token exchange that succeeded looks like one that returned nothing,
+   * and the difference is invisible until a real member connects.
+   */
+  const str = (...keys: string[]): string | undefined => {
+    for (const k of keys) {
+      const v = d[k];
+      if (typeof v === "string" && v !== "") return v;
+      if (typeof v === "number") return String(v);
+    }
+    return undefined;
+  };
+  const numeric = (...keys: string[]): number | undefined => {
+    for (const k of keys) {
+      const v = d[k];
+      if (typeof v === "number" && Number.isFinite(v)) return v;
+      if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) {
+        return Number(v);
+      }
+    }
+    return undefined;
+  };
+
+  const accessToken = str("access_token", "accessToken") ?? "";
+  if (!accessToken) {
+    /*
+     * SAY WHAT THE VENDOR SAID, when the vendor said anything. COROS answer a
+     * refused code exchange with HTTP 200 and a `result` code in the body, so
+     * this branch is where their failures land: bare, the message reads as our
+     * parser losing a field, and the next person debugging a connect that will
+     * not connect starts in the wrong file. Only COROS carry `result`, so
+     * everyone else's message is unchanged.
+     */
+    const vendor = [d.result, d.message]
+      .filter((v): v is string => typeof v === "string" && v !== "")
+      .join(" ");
+    throw new Error(
+      `${provider} returned no access_token${vendor ? ` (vendor said: ${vendor})` : ""}`,
+    );
+  }
 
   return {
     accessToken,
-    refreshToken: typeof d.refresh_token === "string" ? d.refresh_token : undefined,
-    expiresIn: typeof d.expires_in === "number" ? d.expires_in : undefined,
+    refreshToken: str("refresh_token", "refreshToken"),
+    expiresIn: numeric("expires_in", "expiresIn"),
     scope: typeof d.scope === "string" ? d.scope : undefined,
-    externalUserId:
-      typeof d.user_id === "string"
-        ? d.user_id
-        : typeof d.userid === "string"
-          ? d.userid
-          : typeof d.user_id === "number"
-            ? String(d.user_id)
-            : undefined,
+    // `openId` is COROS's user identifier and the only thing that identifies a
+    // member on every subsequent call, since their endpoints take it as a query
+    // parameter rather than deriving it from the token.
+    externalUserId: str("user_id", "userid", "openId", "open_id"),
   };
+}
+
+/**
+ * Extend an access token that the vendor refreshes in place.
+ *
+ * COROS's refresh answers `{"result":"0000","message":"OK"}`: no token, no
+ * expiry, just an acknowledgement that the token you already hold now lives
+ * another thirty days. `requestTokens` cannot express that, because its whole
+ * contract is "returns credentials", and calling it here would throw on a
+ * response that means success.
+ *
+ * Returns the new expiry, or throws. A refresh rejected 4xx means the grant is
+ * gone the same way it does everywhere else.
+ */
+const EXTEND_DAYS = 30;
+
+export async function extendToken(
+  provider: ProviderId,
+  refreshToken: string,
+): Promise<{ expiresAt: string }> {
+  const p = PROVIDERS[provider];
+  const { id, secret } = clientCreds(p);
+
+  const res = await fetch(p.refreshUrl ?? p.tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: new URLSearchParams({
+      client_id: id,
+      client_secret: secret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    if (res.status >= 400 && res.status < 500) {
+      throw new ReauthRequired(provider, `${provider} refresh failed: ${text.slice(0, 200)}`);
+    }
+    throw new Error(`${provider} refresh endpoint ${res.status}: ${text.slice(0, 200)}`);
+  }
+
+  /*
+   * THE BODY IS THE ANSWER, NOT THE STATUS CODE. COROS return HTTP 200 with a
+   * `result` field, and only "0000" means it worked. Trusting the status alone
+   * would bank thirty days of validity on a refresh that was refused, and the
+   * connection would then fail silently a month later with nothing to point at.
+   */
+  let result: string | undefined;
+  try {
+    result = (JSON.parse(text) as { result?: string }).result;
+  } catch {
+    throw new Error(`${provider} refresh returned unparseable body: ${text.slice(0, 200)}`);
+  }
+  if (result !== "0000") {
+    throw new Error(`${provider} refresh returned result ${result ?? "(none)"}`);
+  }
+
+  return { expiresAt: new Date(Date.now() + EXTEND_DAYS * 86_400_000).toISOString() };
 }
 
 /**
@@ -229,6 +329,33 @@ async function accessTokenFor(conn: ConnectionRow): Promise<string> {
   const refresh = await decryptToken(conn.refresh_token_enc);
   if (!refresh) {
     throw new ReauthRequired(conn.provider, "no usable refresh token stored");
+  }
+
+  /*
+   * VENDORS THAT EXTEND RATHER THAN REISSUE. COROS's refresh returns an
+   * acknowledgement and no credentials: the token already stored is the token
+   * to keep using, now good for another thirty days. So the access token is
+   * decrypted rather than received, and only the expiry is written.
+   *
+   * A token we cannot decrypt is unrecoverable on this path, because there is
+   * no new one coming to replace it. That is a re-consent, and saying so beats
+   * extending the life of a credential we cannot read.
+   */
+  if (PROVIDERS[conn.provider].refreshExtendsToken) {
+    const existing = await decryptToken(conn.access_token_enc);
+    if (!existing) {
+      throw new ReauthRequired(
+        conn.provider,
+        "stored access token is unreadable and this vendor issues no replacement on refresh",
+      );
+    }
+    const { expiresAt } = await extendToken(conn.provider, refresh);
+    const supabase = createSupabaseAdmin();
+    await supabase
+      .from("wearable_connections")
+      .update({ expires_at: expiresAt, updated_at: new Date().toISOString() })
+      .eq("id", conn.id);
+    return existing;
   }
 
   const tokens = await requestTokens(conn.provider, {
@@ -385,7 +512,7 @@ export async function storeMetrics(
    * because a session was revised.
    *
    * Deduped here rather than in each adapter, because it is a property of the
-   * TABLE and six adapters would each have to remember it. Last wins, matching
+   * TABLE and seven adapters would each have to remember it. Last wins, matching
    * what the upsert itself would have done had the rows arrived separately.
    */
   const byKey = new Map<string, DailyMetric>();

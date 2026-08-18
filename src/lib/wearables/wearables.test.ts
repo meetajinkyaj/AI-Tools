@@ -7,7 +7,7 @@ import { safeEqual } from "../reminders";
 
 /**
  * These tests cover the parts that are wrong-by-default rather than the parts
- * that are merely code: unit normalization across six vendors, the credential
+ * that are merely code: unit normalization across seven vendors, the credential
  * gate, and the rotating-refresh-token hazard.
  *
  * The adapters' HTTP calls are deliberately NOT mocked. A mock of Oura's API is
@@ -63,9 +63,9 @@ describe("unit normalization", () => {
 });
 
 describe("the provider registry", () => {
-  it("has all six, and only those", () => {
+  it("has all seven, and only those", () => {
     expect(PROVIDER_IDS.sort()).toEqual(
-      ["fitbit", "garmin", "oura", "ultrahuman", "whoop", "withings"].sort(),
+      ["coros", "fitbit", "garmin", "oura", "ultrahuman", "whoop", "withings"].sort(),
     );
     for (const id of PROVIDER_IDS) expect(PROVIDERS[id].id).toBe(id);
   });
@@ -79,9 +79,12 @@ describe("the provider registry", () => {
      * over the copy to make product names sentence case would quietly undo a
      * commitment we made to a vendor, so it is pinned here.
      *
-     * The other five are spelled the way their own brands spell them.
+     * COROS is caps for the same reason: their own materials set it that way
+     * throughout. The other five are spelled the way their own brands spell
+     * them, which for those five means sentence case.
      */
     expect(PROVIDER_NAMES.whoop).toBe("WHOOP");
+    expect(PROVIDER_NAMES.coros).toBe("COROS");
     expect(PROVIDER_NAMES.oura).toBe("Oura");
   });
 
@@ -96,12 +99,27 @@ describe("the provider registry", () => {
     // writes back unconditionally, so this is documentation with teeth: a
     // provider claiming otherwise gets reviewed rather than assumed.
     //
-    // Google is the one exception and it is safe: they reuse the same refresh
+    // Google is one exception and it is safe: they reuse the same refresh
     // token and omit the field on refresh, and `tokenColumns` only overwrites
     // when a vendor actually sends one, so the stored token survives either
     // way. The flag records what is true, not what is convenient.
+    //
+    // COROS is the other, and for a stronger reason: their guide says plainly
+    // "RefreshToken never expires", and their refresh returns no credentials at
+    // all. There is nothing to rotate. See `refreshExtendsToken`.
     const nonRotating = PROVIDER_IDS.filter((id) => !PROVIDERS[id].refreshRotates);
-    expect(nonRotating).toEqual(["fitbit"]);
+    expect(nonRotating.sort()).toEqual(["coros", "fitbit"]);
+  });
+
+  it("lets a refresh extend rather than reissue for COROS alone", () => {
+    /*
+     * The flag switches a real branch in `accessTokenFor`: it decrypts and
+     * reuses the stored access token instead of expecting a new one. Setting it
+     * on a vendor that does reissue would pin that member to a token their
+     * vendor has already retired, and the sync would fail a month later with
+     * nothing pointing back here.
+     */
+    expect(PROVIDER_IDS.filter((id) => PROVIDERS[id].refreshExtendsToken)).toEqual(["coros"]);
   });
 
   it("marks Garmin push-only and everyone else pollable", () => {
@@ -120,14 +138,30 @@ describe("the provider registry", () => {
     expect(gated.sort()).toEqual(["garmin", "ultrahuman"]);
   });
 
-  it("gives every provider a redirect-safe id and non-empty scopes", () => {
+  it("gives every provider a redirect-safe id, and scopes wherever the vendor has any", () => {
+    /*
+     * COROS IS THE ONE EXCEPTION, and it is a fact about their OAuth rather
+     * than an unfinished adapter: their authorize request takes client_id,
+     * redirect_uri, state and response_type, and their reference guide defines
+     * no scope vocabulary at all. `connect/route.ts` therefore omits the
+     * parameter entirely instead of sending `scope=`, which would be a
+     * parameter with no meaning to them. Every other vendor asking for nothing
+     * would be a bug, so the assertion stays for the other six.
+     */
     for (const id of PROVIDER_IDS) {
       const p = PROVIDERS[id];
       expect(id, "ids go in URLs and file paths").toMatch(/^[a-z]+$/);
-      expect(p.scopes.length, id).toBeGreaterThan(0);
+      if (id !== "coros") expect(p.scopes.length, id).toBeGreaterThan(0);
       expect(p.authorizeUrl.startsWith("https://"), id).toBe(true);
       expect(p.tokenUrl.startsWith("https://"), id).toBe(true);
     }
+  });
+
+  it("only lets COROS have no scopes", () => {
+    // Guards the exception above from spreading. A second vendor arriving here
+    // means somebody skipped reading their docs, which is the failure this
+    // whole file exists to catch.
+    expect(PROVIDER_IDS.filter((id) => PROVIDERS[id].scopes.length === 0)).toEqual(["coros"]);
   });
 });
 
@@ -188,7 +222,7 @@ describe("the daily-metric upsert", () => {
    * accidental pair would store nothing, count as a failure, and after five of
    * those mark a healthy connection expired.
    *
-   * The dedupe lives in `storeMetrics` rather than in six adapters, because it
+   * The dedupe lives in `storeMetrics` rather than in seven adapters, because it
    * is a property of the table. This pins the shape of the rule; the database
    * call itself is exercised against the real schema at integration time.
    */
@@ -243,7 +277,11 @@ describe("vendor-side revocation", () => {
    */
   it("is implemented only where the endpoint is confirmed from the vendor's docs", () => {
     const withRevoke = PROVIDER_IDS.filter((id) => typeof PROVIDERS[id].revoke === "function");
-    expect(withRevoke.sort()).toEqual(["fitbit", "oura", "whoop"]);
+    // COROS document `POST /oauth2/deauthorize` in section 3.4 of their
+    // reference guide, along with what it does: "both the refresh token and the
+    // token will be set as invalid". Confirmed from the vendor, which is the
+    // bar this list holds.
+    expect(withRevoke.sort()).toEqual(["coros", "fitbit", "oura", "whoop"]);
   });
 
   it("sends Google the refresh token, which kills the whole grant", async () => {

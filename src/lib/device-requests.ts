@@ -137,11 +137,20 @@ const DEVICES: DeviceEntry[] = [
   },
   {
     key: "coros",
-    label: "Coros",
+    // COROS, not Coros, matching PROVIDER_NAMES and their own materials.
+    label: "COROS",
+    /*
+     * STILL FALSE, EVEN THOUGH THE ADAPTER IS WRITTEN. `supported` answers "can
+     * this member connect their watch today", and the answer is no: we applied
+     * on 2026-08-18 and no credentials have been issued, so the provider is
+     * hidden. Flipping this on the strength of code that exists would tell a
+     * member their device works and leave them looking for a button that is not
+     * there. Flip it when a connection succeeds, not when the adapter compiles.
+     */
     supported: false,
     reason:
-      "Queued. Coros have an API but it is partner-only: access needs an " +
-      "application and their approval, like Garmin and Ultrahuman.",
+      "Queued. Applied for COROS API access on 2026-08-18 and awaiting their " +
+      "review. The adapter is written against their reference guide.",
     aliases: ["coros", "coros pace", "coros apex", "coros vertix"],
   },
 

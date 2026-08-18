@@ -17,7 +17,7 @@ import {
 } from "./types";
 
 /**
- * The six cloud wearable adapters.
+ * The seven cloud wearable adapters.
  *
  * Each is roughly: where OAuth lives, what to ask for, and how to turn one
  * vendor's JSON into `DailyMetric[]`. All the machinery around them, refresh,
@@ -1444,6 +1444,446 @@ const ultrahuman: WearableProvider = {
   },
 };
 
+
+/* -------------------------------------------------------------------------- */
+/* COROS                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * COROS, written against their API Reference V2.0.6 (February 2026).
+ *
+ * FOUR THINGS HERE ARE UNLIKE EVERY OTHER ADAPTER, and each one would have been
+ * a silent failure if guessed:
+ *
+ *   1. THE TOKEN TRAVELS AS A QUERY PARAMETER, not a bearer header, and every
+ *      call also needs `openId`, their user identifier, which arrives in the
+ *      token response and lives in `external_user_id`.
+ *   2. A REFRESH EXTENDS THE EXISTING TOKEN. Their endpoint answers
+ *      `{"result":"0000","message":"OK"}` and issues nothing. See
+ *      `refreshExtendsToken` in types.ts.
+ *   3. SUCCESS IS IN THE BODY. Every response is HTTP 200 with a `result`
+ *      field, and only "0000" means it worked.
+ *   4. THIRTY DAYS PER QUERY, THREE MONTHS OF HISTORY. Their words: "The
+ *      maximum date range for one query is 30 days, and the query date is not
+ *      earlier than three months before the day." So a window wider than a
+ *      month is several requests, and no backfill can reach further back than a
+ *      quarter however it is asked.
+ */
+
+/** Their envelope. `result` is the status; the HTTP code is not. */
+interface CorosEnvelope<T> {
+  result?: string;
+  message?: string;
+  data?: T;
+}
+
+/** A day of summary data, section 4.3.4. */
+interface CorosDaily {
+  /** yyyyMMdd as an integer, e.g. 20200615. */
+  happenDay?: number;
+  sleepStartTime?: string;
+  sleepEndTime?: string;
+  calorie?: number;
+  step?: number;
+  rhr?: number;
+  /** Intraday samples. Not stored: we keep daily summaries, not traces. */
+  hrvList?: { hrv?: number; hr?: number; timestamp?: number }[];
+  /** Overnight HRV, which is the one that matches our `hrv`. */
+  ppgHrv?: number;
+  sleepAvgHr?: number;
+}
+
+/** A workout record, section 4.2.4. */
+interface CorosWorkout {
+  labelId?: string;
+  mode?: number;
+  subMode?: number;
+  deviceName?: string;
+  distance?: number;
+  calorie?: number;
+  avgSpeed?: number;
+  avgFrequency?: number;
+  step?: number;
+  duration?: number;
+  /** Epoch seconds. */
+  startTime?: number;
+  endTime?: number;
+  /** Counts of 15 minutes, where 32 means UTC+08:00. */
+  startTimezone?: number;
+  endTimezone?: number;
+  fitUrl?: string;
+}
+
+const COROS_API = "https://open.coros.com";
+
+/** Their words: "The maximum date range for one query is 30 days." */
+const COROS_MAX_QUERY_DAYS = 30;
+
+/**
+ * The activity names behind `mode` and `subMode`, from their workout type table.
+ *
+ * Only the parent type is mapped. Their table pairs a parent with a child for
+ * every variant (outdoor run, indoor run, pool swim, open water), and carrying
+ * all of it would be a hundred lines to distinguish things our vocabulary does
+ * not: a workout is free text here, shown as the vendor's own label. An
+ * unmapped code yields no label rather than a wrong one.
+ */
+const COROS_SPORTS: Record<number, string> = {
+  8: "Run",
+  9: "Bike",
+  10: "Swim",
+  13: "Multisport",
+  14: "Mountain climb",
+  15: "Trail run",
+  16: "Hike",
+  18: "Cardio",
+  19: "XC ski",
+  20: "Track run",
+  21: "Ski",
+  22: "Pilot",
+  23: "Strength",
+  24: "Rowing",
+  25: "Whitewater",
+  26: "Flatwater",
+  27: "Windsurfing",
+  28: "Speedsurfing",
+  29: "Ski touring",
+  31: "Walk",
+  32: "Fishing",
+  33: "Climbing",
+  34: "Jump rope",
+  36: "Badminton",
+  37: "Table tennis",
+  38: "Basketball",
+  39: "Soccer",
+  40: "Pickleball",
+  41: "Elliptical",
+  42: "Yoga",
+  43: "Pilates",
+  44: "Boxing",
+  45: "Frisbee",
+  46: "Skateboard",
+  47: "Tennis",
+  // 98 and 99 are "custom sport, outdoor" and "custom sport, indoor". The name
+  // the member gave it is not in the payload, so there is nothing to show but
+  // the word custom, and "Custom sport" on a chart is noise where a blank is
+  // honest. Left unmapped on purpose.
+};
+
+/** "20200615" or 20200615 to "2020-06-15". Returns undefined for anything else. */
+function corosDay(raw: number | string | undefined): string | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const s = String(raw);
+  if (!/^\d{8}$/.test(s)) return undefined;
+  return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+}
+
+/** "2026-08-01" to "20260801", which is what their query parameters want. */
+function corosCompact(day: string): string {
+  return day.replace(/-/g, "");
+}
+
+/**
+ * Split a range into chunks their API will accept.
+ *
+ * A 90-day backfill is four requests, not one refusal.
+ */
+export function corosWindows(
+  start: string,
+  end: string,
+  maxDays = COROS_MAX_QUERY_DAYS,
+): { start: string; end: string }[] {
+  const from = Date.parse(`${start}T00:00:00Z`);
+  const to = Date.parse(`${end}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return [];
+
+  const out: { start: string; end: string }[] = [];
+  const step = maxDays * 86_400_000;
+  for (let cursor = from; cursor <= to; cursor += step) {
+    const chunkEnd = Math.min(cursor + step - 86_400_000, to);
+    out.push({
+      start: new Date(cursor).toISOString().slice(0, 10),
+      end: new Date(chunkEnd).toISOString().slice(0, 10),
+    });
+    // A mistaken range must not become an unbounded loop.
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
+/**
+ * Unwrap their envelope, treating anything but "0000" as a failure.
+ *
+ * WHY NOT TRUST THE STATUS CODE. Their transport is 200 for both a result and a
+ * refusal; the `result` field is what distinguishes them. An adapter that read
+ * only the HTTP code would treat a refused call as an empty day and store
+ * nothing, which looks exactly like a member who did not wear their watch.
+ */
+async function corosGet<T>(
+  url: string,
+  binding: { token: string; openId: string },
+): Promise<T | undefined> {
+  const body = await providerFetch<CorosEnvelope<T>>("coros", url);
+  if (body?.result === "0000") return body.data;
+
+  /*
+   * ASK WHETHER THE GRANT IS STILL THERE, because their `result` codes cannot
+   * tell us. The guide documents "0000" for success and no vocabulary at all
+   * for anything else, so a member who revoked us at COROS and a COROS having a
+   * bad afternoon arrive here as the same opaque string. Left undistinguished,
+   * the revoked member's connection would fail nightly until the generic
+   * failure counter gave up on it days later, and the message on their screen
+   * would be a vendor error code rather than "reconnect your watch".
+   *
+   * Section 3.5 answers exactly that question: `bindState` is 1 while the token
+   * exists and the member has not unbound it, "regardless of whether the token
+   * has expired". Zero is the one answer only re-consent fixes.
+   *
+   * One extra request, only on a path that has already failed. Anything other
+   * than a clear zero falls through to the original error rather than inventing
+   * a diagnosis, since a second failing call is evidence of nothing.
+   */
+  if (await corosUnbound(binding)) {
+    throw new ReauthRequired("coros", "COROS reports this watch is no longer linked");
+  }
+  throw new Error(`coros returned result ${body?.result ?? "(none)"}: ${body?.message ?? ""}`);
+}
+
+/**
+ * TRUE only when COROS say plainly that the member has unbound us.
+ *
+ * Anything else, an error, an unparseable answer, a rate limit, is false: "we
+ * could not tell" must not read as "the grant is fine" OR as "the grant is
+ * dead", and false is what leaves the caller's original error intact.
+ */
+async function corosUnbound({
+  token,
+  openId,
+}: {
+  token: string;
+  openId: string;
+}): Promise<boolean> {
+  try {
+    const body = await providerFetch<CorosEnvelope<{ bindState?: number }>>(
+      "coros",
+      `${COROS_API}/coros/bindState` +
+        `?token=${encodeURIComponent(token)}&openId=${encodeURIComponent(openId)}`,
+    );
+    return body?.result === "0000" && num(body.data?.bindState) === 0;
+  } catch {
+    return false;
+  }
+}
+
+const coros: WearableProvider = {
+  id: "coros",
+  name: PROVIDER_NAMES.coros,
+  /*
+   * NO SLEEP IN THIS SENTENCE, deliberately. `fetchRange` explains at length
+   * why COROS sleep is not mapped; a blurb that promised it would be a promise
+   * the adapter below does not keep, and the member would find out by looking
+   * at an empty chart rather than by reading this file.
+   */
+  blurb: "Steps, resting heart rate, HRV and workouts from your COROS watch.",
+  clientIdEnv: "COROS_CLIENT_ID",
+  clientSecretEnv: "COROS_CLIENT_SECRET",
+
+  authorizeUrl: `${COROS_API}/oauth2/authorize`,
+  tokenUrl: `${COROS_API}/oauth2/accesstoken`,
+  refreshUrl: `${COROS_API}/oauth2/refresh-token`,
+
+  /*
+   * NO SCOPES AT ALL. Their authorize request takes client_id, redirect_uri,
+   * state and response_type, and nothing else; the reference guide defines no
+   * scope vocabulary. The connect route omits the parameter when this is empty
+   * rather than sending `scope=`, which would be a parameter with no meaning to
+   * them.
+   */
+  scopes: [],
+  tokenAuth: "body",
+
+  /*
+   * Their refresh "adds one month from the current time" to the token already
+   * issued, and returns no credentials. `refreshRotates` is false because the
+   * refresh token is not replaced either: their guide says plainly
+   * "RefreshToken never expires."
+   */
+  refreshExtendsToken: true,
+  refreshRotates: false,
+
+  syncWindowDays: 7,
+  /*
+   * NINETY DAYS, WHICH IS EVERYTHING THEY HAVE. "The query date is not earlier
+   * than three months before the day", so this is not a choice about how much
+   * history is worth fetching, it is the whole of what exists. Four requests
+   * per collection, chunked by `corosWindows`.
+   */
+  backfillWindowDays: 90,
+
+  async fetchRange({ accessToken, externalUserId, start, end }) {
+    // Their endpoints identify the member by openId, not by the token, so a
+    // connection without one cannot be read at all.
+    if (!externalUserId) return [];
+
+    const out: DailyMetric[] = [];
+    for (const window of corosWindows(start, end)) {
+      const url =
+        `${COROS_API}/coros/daily/query` +
+        `?token=${encodeURIComponent(accessToken)}` +
+        `&openId=${encodeURIComponent(externalUserId)}` +
+        `&startDate=${corosCompact(window.start)}` +
+        `&endDate=${corosCompact(window.end)}`;
+
+      const data = await corosGet<{ dailyList?: CorosDaily[] }>(url, {
+        token: accessToken,
+        openId: externalUserId,
+      });
+      for (const day of data?.dailyList ?? []) {
+        if (!day || typeof day !== "object") continue;
+        const date = corosDay(day.happenDay);
+        if (!date) continue;
+
+        push(out, "steps", date, num(day.step), "coros");
+        push(out, "resting_heart_rate", date, num(day.rhr), "coros");
+
+        /*
+         * `ppgHrv` IS THE ONE THAT MATCHES. Their guide labels it "Overnight
+         * HRV", which is exactly what our `hrv` key means; `hrvList` is a set
+         * of intraday samples with their own timestamps, and averaging those
+         * would produce a different quantity under the same name.
+         */
+        push(out, "hrv", date, num(day.ppgHrv), "coros");
+
+        /*
+         * SLEEP IS DELIBERATELY NOT MAPPED, and this is the most consequential
+         * decision in this adapter.
+         *
+         * COROS give a window: `sleepStartTime` and `sleepEndTime`, with no
+         * stages. Our `sleep_minutes` is defined, on the member's own screen,
+         * as "time actually asleep: light, deep and REM added together. This
+         * reads lower than time in bed". A window is time in bed. Publishing it
+         * under that key would make the definition we show people false for
+         * COROS members, and would mix two different quantities on one chart
+         * for anybody wearing two devices.
+         *
+         * Their own example makes the case: it contains a night running from
+         * 2020-06-15 22:00 to 2020-06-18 08:00, which is either a typo or
+         * fifty-eight hours of sleep, and nothing in the payload would let us
+         * tell.
+         *
+         * The honest fix is a separate metric for time in bed, which is a
+         * vocabulary change worth making deliberately rather than smuggling in
+         * with an adapter. See docs/WEARABLES.md.
+         */
+
+        /*
+         * CALORIES ARE NOT MAPPED EITHER, for a simpler reason: the unit cannot
+         * be determined. Their table says "Unit: calorie", and their example
+         * pairs 9,553 of them with 52 steps, which is impossible as kilocalories
+         * and absurd as calories. Verify against a real member's day before
+         * publishing a number nobody can check.
+         */
+      }
+    }
+    return out;
+  },
+
+  async fetchWorkouts({ accessToken, externalUserId, start, end }) {
+    if (!externalUserId) return [];
+
+    const out: WorkoutSession[] = [];
+    for (const window of corosWindows(start, end)) {
+      const url =
+        `${COROS_API}/v2/coros/sport/list` +
+        `?token=${encodeURIComponent(accessToken)}` +
+        `&openId=${encodeURIComponent(externalUserId)}` +
+        `&startDate=${corosCompact(window.start)}` +
+        `&endDate=${corosCompact(window.end)}`;
+
+      const data = await corosGet<CorosWorkout[]>(url, {
+        token: accessToken,
+        openId: externalUserId,
+      });
+      for (const w of data ?? []) {
+        if (!w || typeof w !== "object") continue;
+        const startSec = num(w.startTime);
+        const endSec = num(w.endTime);
+        if (!w.labelId || startSec === undefined || endSec === undefined) continue;
+
+        const startedAt = new Date(startSec * 1000).toISOString();
+        out.push({
+          externalId: String(w.labelId),
+          startedAt,
+          endedAt: new Date(endSec * 1000).toISOString(),
+          /*
+           * Keyed to the day it started, in the member's own timezone rather
+           * than in UTC. `startTimezone` counts 15-minute steps, so 32 is
+           * UTC+08:00; a session at 06:00 in India would otherwise be filed to
+           * the previous day, which is how a training week quietly loses a
+           * Monday.
+           */
+          date: corosLocalDay(startSec, num(w.startTimezone)),
+          activity: w.mode !== undefined ? COROS_SPORTS[w.mode] : undefined,
+          distanceM: num(w.distance),
+          // Calories omitted, for the reason given in fetchRange.
+          source: "coros",
+        });
+      }
+    }
+    return out;
+  },
+
+  /**
+   * Their deauthorize endpoint, section 3.4: "After deauthorize, both the
+   * refresh token and the token will be set as invalid."
+   */
+  async revoke({ accessToken, signal }) {
+    const res = await fetch(
+      `${COROS_API}/oauth2/deauthorize?token=${encodeURIComponent(accessToken)}`,
+      { method: "POST", signal },
+    );
+    if (!res.ok) {
+      throw new Error(`coros deauthorize ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    }
+
+    /*
+     * THE BODY, NOT THE STATUS. Their deauthorize answers 200 with a `result`
+     * the same way every other COROS endpoint does, so a refusal and a success
+     * are the same HTTP code. Reading only the status here would let us record
+     * a revoke that never happened, which is the one failure this method exists
+     * to prevent: it is a privacy claim, and an unverified one is worse than an
+     * absent one.
+     */
+    const text = await res.text();
+    let result: string | undefined;
+    try {
+      result = (JSON.parse(text) as { result?: string }).result;
+    } catch {
+      throw new Error(`coros deauthorize returned unparseable body: ${text.slice(0, 200)}`);
+    }
+    if (result !== "0000") {
+      throw new Error(`coros deauthorize returned result ${result ?? "(none)"}`);
+    }
+  },
+
+  unavailable:
+    "COROS API access has been applied for and is awaiting their review. The " +
+    "adapter is written against their V2.0.6 reference guide and untested " +
+    "against a live account.",
+};
+
+/**
+ * The calendar day a timestamp falls on in the member's own timezone.
+ *
+ * `offsetQuarters` counts 15-minute steps, their convention: 32 is UTC+08:00.
+ * Undefined means they did not say, and UTC is the honest fallback rather than
+ * this server's timezone, which has nothing to do with the member.
+ */
+export function corosLocalDay(epochSeconds: number, offsetQuarters?: number): string {
+  const offsetMs = (offsetQuarters ?? 0) * 15 * 60_000;
+  return new Date(epochSeconds * 1000 + offsetMs).toISOString().slice(0, 10);
+}
+
 /* -------------------------------------------------------------------------- */
 
 export const PROVIDERS: Record<ProviderId, WearableProvider> = {
@@ -1453,6 +1893,7 @@ export const PROVIDERS: Record<ProviderId, WearableProvider> = {
   withings,
   garmin,
   ultrahuman,
+  coros,
 };
 
 export const PROVIDER_IDS = Object.keys(PROVIDERS) as ProviderId[];

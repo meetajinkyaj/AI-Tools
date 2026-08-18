@@ -1,8 +1,22 @@
 # Getting COROS API access
 
-Everything needed to apply, and an explanation of why there is no adapter yet.
+Everything needed to apply, the answers that were submitted, and what the
+adapter built from their reference guide does and deliberately does not do.
 
 Source: `support.coros.com`, "Submit an API Application", read 2026-08-17.
+
+## Status
+
+**Applied 2026-08-18.** The Feishu form was submitted and the email below was
+sent. Awaiting their review; no credentials issued.
+
+**The adapter is written**, against their API Reference V2.0.6 (February 2026),
+which arrived with the form rather than after approval. It has **never spoken to
+a COROS server**, so the provider carries an `unavailable` reason: setting
+`COROS_CLIENT_ID` and `COROS_CLIENT_SECRET` does not switch it on, and nothing
+below should be read as "this works". The four ways their API is unlike every
+other vendor here, and the two fields we deliberately do not store, are in
+[`WEARABLES.md`](./WEARABLES.md).
 
 ---
 
@@ -29,18 +43,22 @@ weeks is unknown, but "objective" and "non-discriminatory" are their words, and
 the failure mode we planned around (being quietly declined for being small) is
 not the one described.
 
-## Why there is no adapter yet, and why that is the right order
+## Why the adapter waited for the documentation
 
 **The API reference is not public.** Credentials are issued after identity and
-security verification, and the endpoint documentation comes with them. So a
-COROS adapter written today would be written from guesswork, which is the exact
-mistake this codebase has already paid for once: the Ultrahuman adapter was
-built from assumption rather than documentation and was wrong in almost every
-particular, silently.
+security verification. So a COROS adapter written before reading their
+documentation would have been written from guesswork, which is the exact mistake
+this codebase has already paid for once: the Ultrahuman adapter was built from
+assumption rather than documentation and was wrong in almost every particular,
+silently.
 
 The Google Health work went code-first because the scope list had to match the
-code. COROS is the opposite: apply first, read their documentation, then write
-an adapter against it.
+code. COROS was the opposite: apply first, read their documentation, then write
+an adapter against it. **The reference guide turned out to arrive with the
+application form rather than after approval**, which is why the adapter now
+exists while the application is still under review. That is the same order, not
+a shortcut around it: every line of it is written against their document, and
+none of it against a live account.
 
 ### The shortcut that is not one
 
@@ -299,13 +317,30 @@ not read it.
 
 ## When the credentials arrive
 
-1. Read their API reference and record the shapes here before writing code, the
-   way `WEARABLES.md` records WHOOP's and Oura's.
-2. Add `coros` to `ProviderId`, `PROVIDER_NAMES` and the adapter registry.
-3. Map their fields onto the existing metric vocabulary rather than inventing
-   keys. Sleep stages sum to `sleep_minutes` the way WHOOP's do; their recovery
-   or readiness equivalent goes to `readiness_score`; VO2 max, HRV, resting
-   heart rate and SpO2 already exist.
-4. `COROS_CLIENT_ID` / `COROS_CLIENT_SECRET` as Cloudflare secrets, never in a
-   file.
-5. Test against the documented payloads, not against invented ones.
+Steps 1 to 3 of the original plan are **done**: the reference guide is read, the
+shapes are recorded in `WEARABLES.md`, `coros` is in `ProviderId`,
+`PROVIDER_NAMES`, the registry and migration 0023, and the adapter maps onto the
+existing vocabulary rather than inventing keys. `coros.test.ts` tests against
+their documented payloads and nothing invented. What is left is everything that
+needs a real account:
+
+1. **Set `COROS_CLIENT_ID` and `COROS_CLIENT_SECRET` as Cloudflare secrets**,
+   never in a file, then **remove the `unavailable` reason** from the adapter.
+   Those are two separate acts on purpose: credentials alone must not make a
+   provider appear.
+2. **Settle the calorie unit before mapping it.** Their table says "Unit:
+   calorie" and their example pairs 9,553 of them with 52 steps, which is
+   impossible as kilocalories and absurd as calories. One real member-day
+   answers it. Until then no calorie value is stored from COROS at all.
+3. **Decide what to do about sleep.** They give a window and no stages, so it is
+   time in bed, not `sleep_minutes`. Either add a distinct metric for time in
+   bed or leave it unmapped; do not quietly fill `sleep_minutes` with it. See
+   `WEARABLES.md` for the full argument.
+4. **Confirm the failure path with a real revocation.** Their `result` codes
+   have no documented vocabulary, so the adapter asks `bindState` (section 3.5)
+   to tell a revoked grant from a bad afternoon. That logic has never seen a
+   real refusal.
+5. **Watch the first sync for an empty `openId`.** Every data call takes it as a
+   query parameter, and a connection without one silently fetches nothing.
+6. Flip `supported` in `src/lib/device-requests.ts` only once a member has
+   actually connected a watch, not when the adapter compiles.

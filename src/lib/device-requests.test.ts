@@ -205,7 +205,13 @@ describe("Polar and Coros are queued, not blocked", () => {
     }
   });
 
-  it("neither claims to be supported, because no adapter exists", () => {
+  it("neither claims to be supported, because neither can be connected today", () => {
+    /*
+     * COROS now HAS an adapter, and this still has to be false. `supported`
+     * answers "can this member connect their watch", not "does code exist":
+     * credentials have not been issued, the provider is hidden, and telling a
+     * member it works would send them looking for a button that is not there.
+     */
     for (const name of ["polar", "coros"]) {
       expect(matchDevice(name)?.supported, name).toBe(false);
     }
