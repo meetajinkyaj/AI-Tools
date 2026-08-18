@@ -1262,7 +1262,7 @@ first, because it decides the sequence far more than engineering effort does.
 | Vendor | Access | State | What it adds |
 |---|---|---|---|
 | **Withings** | Registered, credentials in hand | **Adapter written, NEVER AUDITED** | Weight and body composition, plus sleep |
-| **Polar** | **Self-serve, no approval period** | No adapter | Sleep with stages and a sleep score, HRV and breathing rate (Nightly Recharge), training load, VO2 max, steps |
+| **Polar** | **Self-serve, no approval period** | No adapter. Researched 2026-08-18, blocked on their `swagger.yaml`, see [`POLAR_ACCESS.md`](./POLAR_ACCESS.md) | Sleep with stages and a sleep score, HRV and breathing rate (Nightly Recharge), training load, VO2 max, steps |
 | **COROS** | **Applied 2026-08-18**, form submitted and email sent, awaiting their review | **Adapter written from their V2.0.6 reference guide, never run against a live account.** Hidden by `unavailable` until credentials exist | Steps, resting heart rate, overnight HRV, workouts |
 
 ### Withings first, because it is the only one already paid for
@@ -1289,13 +1289,37 @@ The data is a good fit rather than an adjacent one. Sleep with stages and a
 score, Nightly Recharge (autonomic state, HRV, breathing rate), daily activity,
 training load, and VO2 max all land on keys the vocabulary already has.
 
-**One trap to know before writing a line.** After the OAuth exchange, Polar
-require an explicit `POST` to their users endpoint to register the member with
-the application. **Skip it and every subsequent data request fails, with a
-perfectly valid access token.** That is precisely the shape of failure this
-codebase keeps meeting, an authorised connection returning nothing, and it is
-documented rather than discoverable. Verify it against Polar's own docs before
-building; this note comes from a third-party write-up.
+**Read [`POLAR_ACCESS.md`](./POLAR_ACCESS.md) before writing a line.** Research
+on 2026-08-18 turned up two things that change the job, and one of them
+contradicts what this section used to say.
+
+**There are two Polar APIs.** The v3 "Open AccessLink" everyone writes tutorials
+about works on a transaction model: open a transaction, list items, fetch each,
+commit. The current one is the **AccessLink Dynamic API v4**, which has range
+queries, a ten-scope vocabulary, and first-class sleep with stages. A new
+integration targets v4.
+
+**Their tokens expire, and we had recorded otherwise.** A widely-syndicated
+third-party write-up states that "Polar access tokens are long-lived and do not
+expire". Polar's own v4 reference: "The access token is valid for 12 hours. A
+refresh token must be used to get a new access token." Believing the blog would
+have produced an integration that works for half a day and then stops, which is
+this codebase's most expensive class of bug.
+
+**The registration trap is real, and now confirmed from Polar rather than
+inferred.** After the OAuth exchange, Polar require an explicit `POST /users` to
+register the member with the application. **Skip it and every subsequent data
+request fails, with a perfectly valid access token.** Their own example client
+says so in its docstring: "partner must register user before being able to
+access her data". 409 Conflict means already registered and is ignorable.
+Confirmed for v3; whether v4 still needs it is one of the open questions in
+`POLAR_ACCESS.md`.
+
+**And a trap nobody writes about.** On `/activity/list`, "without features the
+response contains only the dates where activity data is available", while using
+`features` caps a request at one day. So the obvious 90-day range call returns
+dates and no numbers, and an adapter built on it stores nothing while looking
+perfectly healthy.
 
 ### COROS: the adapter is written, and four things in it are unlike everything else
 

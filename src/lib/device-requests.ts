@@ -131,8 +131,8 @@ const DEVICES: DeviceEntry[] = [
     label: "Polar",
     supported: false,
     reason:
-      "Queued. Polar's AccessLink API is self-serve with no approval period, " +
-      "which makes it the least gated integration left.",
+      "Queued and started. Polar's AccessLink API is self-serve with no " +
+      "approval period, which makes it the least gated integration left.",
     aliases: ["polar", "polar flow", "polar vantage", "polar h10", "polar ignite"],
   },
   {
