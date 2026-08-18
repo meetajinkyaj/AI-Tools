@@ -64,7 +64,24 @@ repositories first, and they look like an answer.
 ## The application
 
 **Route.** Email `api@coros.com` from an authorised technical representative,
-and complete their application form (linked from the support article above).
+and complete their application form.
+
+**The form's URL is not recorded here, on purpose.** It sits behind the words
+"this link" in two of their support articles, and it could not be captured from
+this environment: the network policy denies `support.coros.com` outright, and
+the extraction service that can reach it strips URLs out of page content. A
+guessed vendor URL is worse than an absent one, so open either article and click
+the anchor:
+
+- "Submit an API Application", `support.coros.com/hc/en-us/articles/17085887816340-Submit-an-API-Application`,
+  in the sentence "apply to our API using **this link**".
+- "Supported 3rd Party Apps", `support.coros.com/hc/en-us/articles/360040256531-Supported-3rd-Party-Apps`,
+  in "submit their API Application by going to **this link**".
+
+Paste the real URL in here once it is known, so the next person does not repeat
+this.
+
+`api@coros.com` is certain: it appears as plain text in both articles.
 
 **What they ask for**, in their order:
 
