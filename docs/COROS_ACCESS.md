@@ -66,46 +66,82 @@ repositories first, and they look like an answer.
 **Route.** Email `api@coros.com` from an authorised technical representative,
 and complete their application form.
 
-**The form's URL is not recorded here, on purpose.** It sits behind the words
-"this link" in two of their support articles, and it could not be captured from
-this environment: the network policy denies `support.coros.com` outright, and
-the extraction service that can reach it strips URLs out of page content. A
-guessed vendor URL is worse than an absent one, so open either article and click
-the anchor:
+**The form:** https://coros-teams.feishu.cn/share/base/form/shrcnLqSduZsaNhbvDJTO2x0Vlf
+(a Feishu form, linked from their support articles behind the words "this
+link"). Email `api@coros.com` as well: their process names both.
 
-- "Submit an API Application", `support.coros.com/hc/en-us/articles/17085887816340-Submit-an-API-Application`,
-  in the sentence "apply to our API using **this link**".
-- "Supported 3rd Party Apps", `support.coros.com/hc/en-us/articles/360040256531-Supported-3rd-Party-Apps`,
-  in "submit their API Application by going to **this link**".
+**Two conditions stated in the form's own introduction**, before any question:
 
-Paste the real URL in here once it is known, so the next person does not repeat
-this.
+> "We require that all partners add a **Login Portal and Support Page** to their
+> website or support center to allow users to access the integration and request
+> technical support. **There is no fee** associated with integration when
+> partnering with COROS."
 
-`api@coros.com` is certain: it appears as plain text in both articles.
+The login portal is `app.ikigaro.com`. The support page did not exist and now
+does: `/support`, linked from the landing page, the legal pages and Profile.
 
-**What they ask for**, in their order:
+**The API Reference Guide is linked from the form's introduction**, which means
+the documentation arrives BEFORE credentials rather than with them. That
+reverses the order this page originally recommended: fetch that guide, and the
+adapter can be written properly while the application is still being reviewed.
 
-| They want | Ours |
-|---|---|
-| Company details | Ikigaro, operated by Avisa Innovation LLP, Pune, Maharashtra, India |
-| Technical contact | `hello@ikigaro.com` |
-| OAuth 2.0 redirect URI | `https://app.ikigaro.com/api/wearables/callback/coros` |
-| Acceptance of their standard API Terms of Use | Read them before agreeing, particularly the security requirements and the rate limits |
+## The 24 answers
 
-**The redirect URI is a commitment, so get it right first time.** Every other
-integration here follows `/api/wearables/callback/<provider id>`, and the
-provider id for this one is `coros`. Registering anything else means either a
-special case in `urls.ts` or a second application.
+| # | Question | Answer |
+|---|---|---|
+| 1 | Platform / Application Name | Ikigaro |
+| 2 | Company Name | Avisa Innovation LLP |
+| 3 | Primary Contact Email | hello@ikigaro.com |
+| 4 | Secondary Contact Email | [second address, or repeat the primary] |
+| 5 | Privacy Officer Email | hello@ikigaro.com (or a dedicated address if one exists) |
+| 6 | Company Owner Name and Title | [name and title] |
+| 7 | Platform / Application URL | https://app.ikigaro.com |
+| 8 | Description (100 characters) | `Your blood work, daily habits and watch data, read side by side.` (64) |
+| 9 | Total Active Users | 0-150 |
+| 10 | Primary Region | India |
+| 11 | API functions needed | **Activity / Workout Data Sync (one way, COROS to your platform)** and **Access Daily Health Data**. Nothing else. |
+| 12 | Authorized Callback Domain | https://app.ikigaro.com |
+| 13 | Workout data receiving endpoint | N/A for now, see below |
+| 14 | Service status check URL | N/A for now, see below |
+| 15 | Bluetooth / ANT+ profile | N/A |
+| 16 | Personal or public use | Public |
+| 17 | Commercial or non-commercial | Commercial |
+| 18 | Intended use of data | See the paragraph below |
+| 19 | Expected Integration Launch Date | Q4 2026 |
+| 20 | Agree to the API Application Terms | Yes, after reading them |
+| 21 | Agree to the COROS API Agreement | Yes, after reading it |
+| 22 | Your name | [name] |
+| 23 | Submit date | The day it is sent |
+| 24 | Logo PNGs (144x144 and 102x102 required) | Generated from `public/icon-512.png`; 120x120 and 300x300 too, which are required only for workout or training-plan sync |
 
-### What to say we want, if they ask
+**Question 18, intended use of data:**
 
-> Ikigaro is a consumer wellness app that puts a member's lab panels beside
-> their daily habits and what their device recorded. We read daily summaries
-> only: sleep and its stages, resting heart rate, heart rate variability, blood
-> oxygen, VO2 max, steps and workout sessions. The data is shown back to the
-> member alongside their own blood work, is never sold, never used for
-> advertising, and never shown to anyone else. We are in closed beta ahead of a
-> Q4 2026 launch.
+> Ikigaro helps people understand their own blood work and see what moves it. A
+> member uploads a lab panel, logs a short daily check-in, and optionally
+> connects a wearable; we show the three side by side. COROS data would be read
+> only for members who explicitly connect their account, and only as daily
+> summaries: sleep and its stages, resting heart rate, heart rate variability,
+> blood oxygen, VO2 max, daily steps and energy, and workout sessions with their
+> duration, heart rate, distance and energy. It is shown back to that member
+> alongside their own lab results and nowhere else. It is never sold, never used
+> for advertising, never shared with another member or partner, and it earns
+> nothing in our rewards programme. Tokens are encrypted at rest, held server
+> side only, and deleted when a member disconnects. Privacy policy:
+> https://app.ikigaro.com/privacy
+
+**Questions 13 and 14 deserve a decision rather than a default.** They ask for a
+webhook endpoint so COROS can push workout summaries, and section 5.3 of their
+reference guide describes it. We have no such endpoint for COROS today, and
+answering with a URL that 404s is worse than answering N/A. Two honest options:
+
+- **N/A now**, poll like every other provider, and add the endpoint later. Safe,
+  and it is what the answers above assume.
+- **Build it first** if their reference guide turns out to make push the only way
+  to get workouts. Garmin already forced that shape on our sync code, so the
+  pattern exists (`/api/wearables/garmin-push`) and the COROS equivalent would be
+  a short piece of work.
+
+Read section 5.3 before answering, since it decides which of those is true.
 
 ### The email, ready to send
 
