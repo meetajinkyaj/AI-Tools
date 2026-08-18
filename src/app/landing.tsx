@@ -47,6 +47,9 @@ export function Landing() {
           <Link href="/terms" className="transition-colors hover:text-linen">
             Terms
           </Link>
+          <Link href="/support" className="transition-colors hover:text-linen">
+            Support
+          </Link>
         </nav>
       </main>
     </div>

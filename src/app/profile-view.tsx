@@ -114,6 +114,9 @@ export function ProfileView({
         <a href="/terms" className="iki-tap underline underline-offset-2">
           Terms
         </a>
+        <a href="/support" className="iki-tap underline underline-offset-2">
+          Support
+        </a>
       </p>
     </div>
   );
