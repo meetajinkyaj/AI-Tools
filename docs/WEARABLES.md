@@ -871,7 +871,17 @@ WITHINGS_CLIENT_ID / WITHINGS_CLIENT_SECRET
 GARMIN_CLIENT_ID / GARMIN_CLIENT_SECRET
 GARMIN_PUSH_SECRET        # required before Garmin works, see below
 ULTRAHUMAN_CLIENT_ID / ULTRAHUMAN_CLIENT_SECRET
+POLAR_CLIENT_ID / POLAR_CLIENT_SECRET
+COROS_CLIENT_ID / COROS_CLIENT_SECRET     # set these and COROS still stays
+                                          # hidden: its `unavailable` reason
+                                          # wins over credentials, on purpose
 ```
+
+**Setting a pair is what makes a provider appear**, so it is a deploy-shaped
+act rather than a config change. `providerConfigured` returns true as soon as
+both are present, and the connect UI lists whatever it returns. The one
+exception is a provider carrying an `unavailable` reason, which stays hidden
+regardless; that is the difference between "we have keys" and "this works".
 
 ### `WEARABLE_TOKEN_KEY`
 
