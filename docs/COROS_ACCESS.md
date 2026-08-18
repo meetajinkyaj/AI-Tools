@@ -129,19 +129,69 @@ adapter can be written properly while the application is still being reviewed.
 > side only, and deleted when a member disconnects. Privacy policy:
 > https://app.ikigaro.com/privacy
 
-**Questions 13 and 14 deserve a decision rather than a default.** They ask for a
-webhook endpoint so COROS can push workout summaries, and section 5.3 of their
-reference guide describes it. We have no such endpoint for COROS today, and
-answering with a URL that 404s is worse than answering N/A. Two honest options:
+**Questions 13 and 14: N/A, and the reference guide settles it.**
 
-- **N/A now**, poll like every other provider, and add the endpoint later. Safe,
-  and it is what the answers above assume.
-- **Build it first** if their reference guide turns out to make push the only way
-  to get workouts. Garmin already forced that shape on our sync code, so the
-  pattern exists (`/api/wearables/garmin-push`) and the COROS equivalent would be
-  a short piece of work.
+The question was whether push is the only way to get workouts. It is not.
+Section 4.2 polls them:
 
-Read section 5.3 before answering, since it decides which of those is true.
+> `GET https://open.coros.com/v2/coros/sport/list?token=...&openId=...&startDate=20170101&endDate=20170110`
+>
+> "The maximum date range for one query is 30 days, and the query date is not
+> earlier than three months before the day."
+
+Section 4.3 polls daily data the same way. Section 5 opens with "**If you need**
+the Workout Summary Data Push Service", and the form repeats that condition, so
+push is an option rather than the route. Polling is what every other provider
+here does, our nightly sweep already runs it, and a daily summary does not
+benefit from arriving five minutes sooner.
+
+So both answers are **N/A**, and that costs nothing. What it does cost is
+history: polling reaches three months back and no further, where WHOOP gave us
+sixty days by choice rather than by limit. Worth knowing before somebody expects
+a year of a member's training on their first sync.
+
+**If push is wanted later**, section 5.2 and 5.3 describe a straightforward
+endpoint and nothing in it needs a re-application, only new URLs sent to COROS:
+
+- COROS POST workout summaries to an HTTPS endpoint of ours, with `client` and
+  `secret` in the **request header**, which we verify before accepting anything.
+  `safeEqual` in `src/lib/reminders.ts` is the constant-time comparison to use.
+- They check newly added and previously failed workouts **every 5 minutes**,
+  retry a failed push **twice**, and stop retrying after **24 hours**.
+- **Duplicates are expected**: "COROS may push the same workout data again if
+  push timeout occurs since COROS can't verify if partner has received the
+  data." Our workout upsert is keyed on (user, provider, external id), so this
+  is already handled.
+- The "Service Status Check API" in question 14 is simply a URL they GET and
+  expect **HTTP 200** from. We have no such endpoint today; it would be a few
+  lines.
+
+## What the API reference says, for when the adapter is written
+
+From `COROS_API_Reference_V2.0.6` (February 2026), read 2026-08-18. Recorded
+here so the adapter is written against the document rather than against memory
+of it.
+
+- **Base URL** `https://open.coros.com`. Regional URLs were consolidated into
+  this one in May 2026 per their changelog.
+- **OAuth**: `GET /oauth2/authorize?client_id=...&redirect_uri=...&state=...&response_type=code`.
+  The code is single use and expires in 30 minutes. The **access token is valid
+  for 30 days** and is refreshable, which is far longer than every other vendor
+  here and changes what "expired" means for a COROS connection.
+- **All calls use `application/x-www-form-urlencoded`.**
+- **Workouts**: `GET /v2/coros/sport/list`, 30 days per query, three months of
+  history maximum.
+- **Daily data**: section 4.3, same date-range shape.
+- **Identity**: `openId`, COROS's own user identifier, which maps onto
+  `wearable_connections.external_user_id`.
+- **Rate limit: 1,000 calls a minute**, raisable on request. Ten times WHOOP's,
+  and our pacing already reads whatever headers a vendor sends.
+- **Units to normalise carefully**: distance in metres, `avgSpeed` in
+  seconds per kilometre, `avgFrequency` in steps per minute, timestamps in epoch
+  seconds, and timezones as a count of 15-minute steps where 32 means UTC+08:00.
+  `calorie` is documented as "Unit: calorie", which for a workout almost
+  certainly means kilocalories; **verify against a real session before trusting
+  it**, because this is exactly the shape of the WHOOP kilojoule trap.
 
 ### The email, ready to send
 
@@ -197,15 +247,14 @@ company registration details, the sender's name and title, and the website if
 > so the work on our side is small once we have credentials and your API
 > reference.
 >
-> **Three questions**, so we build against your intent rather than around it:
+> **Two questions**, having read the V2.0.6 reference guide:
 >
-> 1. Does the API deliver data by webhook when a watch syncs, or is it polled?
->    We support both patterns today and would rather match yours from the start.
-> 2. Are the rate limits per application or per member? We pace our requests
->    against published rate-limit headers where a vendor provides them, and the
->    per-application case is the one worth designing for early.
-> 3. Where can we read the API reference, and is there anything else you need
->    from us to complete the security and operational review?
+> 1. Is the documented cap of 1,000 calls a minute per application or per
+>    member? We pace our requests against published rate-limit headers where a
+>    vendor sends them, and the per-application case is the one worth designing
+>    for early.
+> 2. Is there anything further you need from us to complete the security and
+>    operational review?
 >
 > I am happy to provide anything further, including a walkthrough of how device
 > data appears in the product.
