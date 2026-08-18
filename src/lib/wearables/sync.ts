@@ -16,7 +16,7 @@ import {
 /**
  * Refresh, fetch, normalize, store. The shared half of every integration.
  *
- * The adapters describe seven vendors; everything that is easy to get subtly
+ * The adapters describe eight vendors; everything that is easy to get subtly
  * wrong lives here, once:
  *
  *   - REFRESH TOKEN ROTATION. Most of these vendors return a new refresh token
@@ -197,7 +197,11 @@ export async function requestTokens(
     // `openId` is COROS's user identifier and the only thing that identifies a
     // member on every subsequent call, since their endpoints take it as a query
     // parameter rather than deriving it from the token.
-    externalUserId: str("user_id", "userid", "openId", "open_id"),
+    // `x_user_id` is Polar's. Their v4 endpoints do not take a user id at all,
+    // so unlike COROS's `openId` nothing depends on capturing it; it is stored
+    // because having the vendor's own id for a connection is what makes a
+    // support conversation about one member's data possible.
+    externalUserId: str("user_id", "userid", "openId", "open_id", "x_user_id"),
   };
 }
 
@@ -512,7 +516,7 @@ export async function storeMetrics(
    * because a session was revised.
    *
    * Deduped here rather than in each adapter, because it is a property of the
-   * TABLE and seven adapters would each have to remember it. Last wins, matching
+   * TABLE and eight adapters would each have to remember it. Last wins, matching
    * what the upsert itself would have done had the rows arrived separately.
    */
   const byKey = new Map<string, DailyMetric>();

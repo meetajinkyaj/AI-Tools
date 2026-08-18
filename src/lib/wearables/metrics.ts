@@ -1,7 +1,7 @@
 /**
  * The canonical metric vocabulary every provider normalizes into.
  *
- * WHY A VOCABULARY AND NOT "WHATEVER THE VENDOR SENT". Seven vendors describe
+ * WHY A VOCABULARY AND NOT "WHATEVER THE VENDOR SENT". Eight vendors describe
  * overlapping things in incompatible units and names: Oura reports sleep in
  * seconds, Fitbit in minutes; Whoop scores recovery 0-100, Oura scores
  * readiness 0-100, and they do not mean the same thing but they answer the same

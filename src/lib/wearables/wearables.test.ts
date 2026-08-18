@@ -7,7 +7,7 @@ import { safeEqual } from "../reminders";
 
 /**
  * These tests cover the parts that are wrong-by-default rather than the parts
- * that are merely code: unit normalization across seven vendors, the credential
+ * that are merely code: unit normalization across eight vendors, the credential
  * gate, and the rotating-refresh-token hazard.
  *
  * The adapters' HTTP calls are deliberately NOT mocked. A mock of Oura's API is
@@ -63,9 +63,9 @@ describe("unit normalization", () => {
 });
 
 describe("the provider registry", () => {
-  it("has all seven, and only those", () => {
+  it("has all eight, and only those", () => {
     expect(PROVIDER_IDS.sort()).toEqual(
-      ["coros", "fitbit", "garmin", "oura", "ultrahuman", "whoop", "withings"].sort(),
+      ["coros", "fitbit", "garmin", "oura", "polar", "ultrahuman", "whoop", "withings"].sort(),
     );
     for (const id of PROVIDER_IDS) expect(PROVIDERS[id].id).toBe(id);
   });
@@ -80,8 +80,8 @@ describe("the provider registry", () => {
      * commitment we made to a vendor, so it is pinned here.
      *
      * COROS is caps for the same reason: their own materials set it that way
-     * throughout. The other five are spelled the way their own brands spell
-     * them, which for those five means sentence case.
+     * throughout. The other six are spelled the way their own brands spell
+     * them, which for those six means sentence case.
      */
     expect(PROVIDER_NAMES.whoop).toBe("WHOOP");
     expect(PROVIDER_NAMES.coros).toBe("COROS");
@@ -146,7 +146,7 @@ describe("the provider registry", () => {
      * no scope vocabulary at all. `connect/route.ts` therefore omits the
      * parameter entirely instead of sending `scope=`, which would be a
      * parameter with no meaning to them. Every other vendor asking for nothing
-     * would be a bug, so the assertion stays for the other six.
+     * would be a bug, so the assertion stays for the other seven.
      */
     for (const id of PROVIDER_IDS) {
       const p = PROVIDERS[id];
@@ -222,7 +222,7 @@ describe("the daily-metric upsert", () => {
    * accidental pair would store nothing, count as a failure, and after five of
    * those mark a healthy connection expired.
    *
-   * The dedupe lives in `storeMetrics` rather than in seven adapters, because it
+   * The dedupe lives in `storeMetrics` rather than in eight adapters, because it
    * is a property of the table. This pins the shape of the rule; the database
    * call itself is exercised against the real schema at integration time.
    */

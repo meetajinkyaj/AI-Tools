@@ -89,6 +89,19 @@ const DEVICES: DeviceEntry[] = [
     supported: true,
     aliases: ["ultrahuman", "ultra human", "ultrahuman ring", "ultrahuman ring air", "uh ring"],
   },
+  {
+    key: "polar",
+    label: "Polar",
+    /*
+     * LIVE, AND NEVER YET RUN AGAINST A REAL POLAR ACCOUNT. Credentials are
+     * set and the adapter is written from their v4 swagger, so a member can
+     * press Connect today. That is the point: the first connect is the test.
+     * If it turns out broken, this flag comes back off rather than the member
+     * being left with a button that does nothing.
+     */
+    supported: true,
+    aliases: ["polar", "polar flow", "polar vantage", "polar h10", "polar ignite"],
+  },
 
   // ---- On the roadmap, blocked on a native app ----------------------------
   {
@@ -126,15 +139,6 @@ const DEVICES: DeviceEntry[] = [
   // distinction matters in the admin list: a request for one of these is a
   // roadmap item, while a request for something below is an answer we can give
   // the member today.
-  {
-    key: "polar",
-    label: "Polar",
-    supported: false,
-    reason:
-      "Queued and started. Polar's AccessLink API is self-serve with no " +
-      "approval period, which makes it the least gated integration left.",
-    aliases: ["polar", "polar flow", "polar vantage", "polar h10", "polar ignite"],
-  },
   {
     key: "coros",
     // COROS, not Coros, matching PROVIDER_NAMES and their own materials.

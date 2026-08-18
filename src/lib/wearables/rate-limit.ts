@@ -94,10 +94,34 @@ export function parseRateLimit(headers: Headers, now: number = Date.now()): Rate
     return Number.isFinite(n) ? n : null;
   };
 
+  const limit = int(headers.get("x-ratelimit-limit") ?? headers.get("ratelimit-limit"));
+  let remaining = int(
+    headers.get("x-ratelimit-remaining") ?? headers.get("ratelimit-remaining"),
+  );
+
+  /*
+   * POLAR COUNT UP, NOT DOWN, AND THE DIFFERENCE IS THE WHOLE POINT.
+   *
+   * They send `RateLimit-Usage`: requests SPENT, where every other vendor here
+   * sends requests LEFT. Dropping that number into `remaining` unconverted is
+   * not a small error, it is the exact inverse: a nearly exhausted budget reads
+   * as almost untouched, so `isExhausted` never fires and we sprint into a wall
+   * of 429s; a fresh budget reads as nearly gone, so every request gets a
+   * pacing delay it does not need. Both failures look like the vendor
+   * misbehaving rather than like us misreading a header.
+   *
+   * Converted only when a limit is present, because "spent 40" means nothing
+   * without "out of what", and a guess here is worse than not knowing.
+   */
+  if (remaining === null) {
+    const usage = int(headers.get("ratelimit-usage") ?? headers.get("x-ratelimit-usage"));
+    if (usage !== null && limit !== null) remaining = Math.max(0, limit - usage);
+  }
+
   return {
-    limit: int(headers.get("x-ratelimit-limit")),
-    remaining: int(headers.get("x-ratelimit-remaining")),
-    resetSeconds: int(headers.get("x-ratelimit-reset")),
+    limit,
+    remaining,
+    resetSeconds: int(headers.get("x-ratelimit-reset") ?? headers.get("ratelimit-reset")),
     at: now,
   };
 }

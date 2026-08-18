@@ -1,11 +1,17 @@
-# Polar AccessLink: what is confirmed, and what the adapter still needs
+# Polar AccessLink: the research, and the adapter built from it
 
-Written 2026-08-18, at the start of the Polar integration.
+Written 2026-08-18, over the course of the Polar integration. The first half is
+the research that preceded the spec; the second half is what the spec turned out
+to say and what the adapter does about it.
 
-**Read this before writing a line of adapter.** The record in `WEARABLES.md`
+**Read this before touching the Polar adapter.** The record in `WEARABLES.md`
 described the v3 API and was built partly on a third-party write-up. Some of
-what it said is now confirmed from Polar's own sources, and some of it turns out
-to describe an API that is no longer the current one.
+what it said is now confirmed from Polar's own sources, some turns out to
+describe an API that is no longer the current one, and one claim was simply
+false.
+
+**Status: registered, credentials live, adapter shipped, never run against a
+real account.** See "What the first real connection has to prove".
 
 ---
 
@@ -68,10 +74,13 @@ passed to authorization endpoint".
 | `routes:read` | Routes |
 | `skin_contact:read` | Skin contact |
 
-Ask for four: `activity:read`, `sleep:read`, `nightly_recharge:read` and
-`continuous_samples:read`. **Not `profile:read`**, which carries the member's
-email and buys us nothing we do not already have, and not the sample-level
-scopes, which are traces rather than daily summaries.
+The swagger turns up more than the reference page's table lists, notably
+`training_sessions:read` for workouts and `tests:read` for VO2 max.
+
+We ask for five: `activity:read`, `sleep:read`, `nightly_recharge:read`,
+`continuous_samples:read` and `training_sessions:read`. **Not `profile:read`**,
+which carries the member's email and buys us nothing we do not already have, and
+not the sample-level scopes, which are traces rather than daily summaries.
 
 **Endpoints seen**, on host `www.polaraccesslink.com`:
 
@@ -119,75 +128,177 @@ for the v3 flow. It confirms:
   being able to access her data." The body is `{"member-id": "<our own id>"}`.
   A fork of Polar's client documents the follow-on detail: **409 Conflict means
   already registered and can be ignored.**
-- **`DELETE /users/{user_id}` de-registers and revokes the token.** That is a
-  revoke endpoint confirmed from the vendor, which is the bar `WEARABLES.md`
-  sets before implementing `revoke`.
+- **`DELETE /users/{user_id}` de-registers and revokes the token.**
 
 The registration step was previously recorded here from a third-party write-up
-with a note to verify it. **It is verified**, at least for v3.
+with a note to verify it. **It is verified for v3.** It does not apply to v4:
+there is no `/users` path anywhere in the v4 spec, so the workaround everyone
+writes about would post to a URL that does not exist. The same goes for the
+revoke endpoint, which is why the adapter ships without one; see "Still open".
 
 ---
 
-## What is still missing, and why the adapter is not written yet
+## The adapter, built 2026-08-18 from `swagger.yaml`
 
-Polar's egress is blocked from the build environment: `www.polar.com` and
-`www.polaraccesslink.com` both return 403 at the proxy. The v4 reference can be
-read only through a search tool that returns the page in reranked fragments, so
-the facts above are the ones that survived that filter intact.
+The spec closed every gap this document previously listed. What follows is what
+the adapter does and, more importantly, the four places where the spec says
+something surprising.
 
-**The gaps are exactly the fields `fetchRange` has to map:**
+### The token URL in circulation is the wrong one
 
-1. **`sleepSleepResult` properties.** Stages are confirmed; total sleep time,
-   the start and end of the night, and whether `sleepScore` is 0-100 are not.
-   `sleep_minutes` and `sleep_score` cannot be filled without them.
-2. **`nightlyrechargeNightlyRechargeResult` properties.** The sample containers
-   are visible (`NightlyRechargeHrvSamples`, `NightlyRechargeBreathingRateSamples`)
-   but not the nightly averages, which are what maps to `hrv`,
-   `resting_heart_rate` and `respiratory_rate`.
-3. **The daily activity summary fields.** Step *samples* are visible;
-   whether a day carries a step total and a calorie total, and under what names,
-   is not.
-4. **The `features` enum.** The trap above is confirmed; the actual values to
-   send are not, and without them every range call returns dates only.
-5. **Rate limits.** The reference has a "Rate limiting" section that did not
-   survive extraction.
-6. **Whether v4 still requires `POST /users`.** Confirmed for v3, unknown for
-   v4, and it is the difference between a working connection and one that
-   authorises perfectly and then 403s on every read.
+The swagger's `securityDefinitions` is the only place that states v4's OAuth
+hosts, and it names **`https://auth.polar.com/oauth/token`**. Polar's own v3
+example application, every community client derived from it, and the integration
+brief we were working from all say `https://polarremote.com/v2/oauth2/token`.
+That is the v3 endpoint. Both authorize and token live on `auth.polar.com` for
+v4, and a token exchange sent to the wrong host fails at the one moment a member
+is watching a spinner.
 
-**Guessing any of these is how the Ultrahuman adapter happened**: written from
-assumption rather than documentation, wrong in almost every particular, and
-silent about it. That adapter is the reason this file exists.
+The data host is `https://www.polaraccesslink.com/v4/data`, from the swagger's
+own `servers` entry rather than assembled from parts.
 
-### What unblocks it
+### `features` decides whether you get data at all
 
-Polar publish **`swagger.yaml`** on the v4 reference page, under
-"Development resources", described there as "The Swagger specification can be
-used to generate client implementations". That single file answers all six
-questions above and removes every guess.
+Confirmed across `/sleeps`, `/activity/list`, `/nightly-recharge-results`,
+`/training-sessions/list`, `/tests/list` and `/ppi-samples`: **without
+`features` the response contains only the dates where data is available**, and
+**with `features` only one day can be requested**. The feature vocabularies:
 
-It is one download from any browser outside this proxy. That is the same route
-the COROS reference guide took, and it turned a guessed adapter into a checked
-one.
+| Endpoint | Features | Range without features |
+|---|---|---|
+| `/sleeps` | `sleep-result`, `original-sleep-result`, `sleep-evaluation`, `sleep-score` | 30 days |
+| `/activity/list` | `samples`, `activity-target`, `physical-information` | 90 days |
+| `/nightly-recharge-results` | `samples` | 28 days |
+| `/training-sessions/list` | `samples`, `test-results`, `training-load-report`, `laps`, `hill-splits`, `routes`, `statistics`, `zones`, `pause-times`, `strength-training-results`, `comments`, `physical-info` | 90 days |
+
+`collectionFormat: multi`, so the key repeats: `?features=a&features=b`, never a
+comma list. And `to` is **exclusive** on every endpoint, so one day means
+tomorrow's date.
+
+**This is why there is no backfill window.** Ninety days of history exists and
+reaching it costs 90 requests per data type per member. Four data types makes
+one member's first sync 360 calls against an app-wide budget of 3,000 per
+fifteen minutes, so eight people connecting in an afternoon would exhaust it.
+The seven-day sweep fills history in a week instead, for free.
+
+### There is no daily step total
+
+Nowhere in v4. `/activity/list` returns step **samples**, bucketed by interval,
+**per device**, and the total is ours to compute. `polarSteps()` does it and
+takes **the highest single device rather than the sum of all of them**: a member
+with a watch and a second Polar device has two things that counted the same
+walk, and adding them reports a bigger day than happened, which is the direction
+nobody questions. Their own note that a device "might not be kept on for a full
+day, so there can be gaps" means the maximum can undercount a day split across
+two devices. Undercounting a real day is the smaller lie, and it matches what
+Polar Flow shows the member.
+
+### Durations are strings
+
+`"80s"`, or `"3.000000001s"` at full precision, across the whole API.
+`Number("80s")` is `NaN`, and a `NaN` reaching `push` is dropped silently, so
+getting this wrong presents as sleep that never appears rather than as an error.
+`polarSeconds()` parses it.
+
+### What is mapped
+
+| Our key | From | Note |
+|---|---|---|
+| `sleep_minutes` | `sleepEvaluation.asleepDuration` | **Not `sleepSpan`.** Our screen defines this to the member as time actually asleep; `sleepSpan` is time in bed. Polar report both, so unlike COROS we can take the one we mean |
+| `sleep_score` | `sleepScore.sleepScore` | Documented 1-100, so already our scale |
+| `hrv` | `meanNightlyRecoveryRmssd` | RMSSD in ms, exactly what Oura and WHOOP report. A rename, not a conversion |
+| `respiratory_rate` | `60000 / meanNightlyRecoveryRespirationInterval` | See the gate below |
+| `steps` | summed step samples | See above |
+| workouts | `/training-sessions/list` | Distance, kcal, avg and max HR, and `autoDetected` from `startTrigger` |
+
+**The respiratory rate carries a sanity gate.** Their spec's own example value
+for that field is `800`, which converts to 75 breaths a minute: a placeholder
+copied across several fields rather than a reading. If the unit is not what the
+spec says, the arithmetic yields a confident wrong number rather than an obvious
+failure, so anything outside 4-40 breaths a minute is **dropped, not clamped**. A
+clamp would hide the mistake by squashing it to the nearest plausible value and
+we would publish it as measured; a gap is visible and prompts someone to look.
+
+### What is deliberately not mapped
+
+**Resting heart rate.** They give `meanNightlyRecoveryRri`, a mean beat-to-beat
+interval over a four-hour window, and converting it to bpm is arithmetic. But
+our own screen defines resting heart rate to the member as "your lowest
+sustained heart rate while asleep", and a four-hour mean is a different
+quantity. A member wearing a Polar and an Oura would watch the number step by
+several bpm whenever the merge changed source, with no way to tell a rule from a
+bug.
+
+**Readiness.** `recoveryIndicator` is 1-6 and `recoveryIndicatorSubLevel` places
+you inside that class, so a continuous value is recoverable. What is not is the
+top of the scale: whether class 6 runs to a notional 7 or terminates decides
+whether to divide by five or six, and Polar do not say. That is a formula we
+would invent and then show people as a score.
+
+**Workout activity names.** Their `sport` field is a reference carrying an id and
+no name. Resolving it needs the `sports:read` scope and a `/sports/list` fetch,
+which is worth doing and is not worth guessing: a wrong sport label reads to the
+member as what their watch recorded.
+
+**Physical information.** Weight, height and VO2 max are all reachable through
+the `physical-information` feature, and we do not ask for it. The vendor-side
+registration deliberately switched that data type off, and `profile:read` is not
+in our scope list.
+
+Both of the first two want one real account to settle them.
+
+### Polar count requests up, not down
+
+Their headers are `RateLimit-Limit`, **`RateLimit-Usage`** and `RateLimit-Reset`:
+requests **spent**, where every other vendor here reports requests **left**, and
+without the `x-` prefix. `parseRateLimit` now reads both conventions and
+converts usage into remaining, but only when a limit is present, because "spent
+40" means nothing without "out of what".
+
+Reading one as the other is the exact inverse: a nearly exhausted budget would
+read as almost untouched, so we would sprint into a wall of 429s; a fresh budget
+would read as nearly gone, so every request would take a pacing delay it does not
+need. Both look like the vendor misbehaving rather than like us misreading a
+header.
+
+Documented limits: **3,000 requests per 15 minutes and 100,000 per 24 hours, per
+client id.** No test-user cap and no security-review threshold.
 
 ---
 
-## When the spec is in hand
+## What the first real connection has to prove
 
-1. Register the application at Polar's developer portal. Self-serve, no approval
-   period. `POLAR_CLIENT_ID` / `POLAR_CLIENT_SECRET` as Cloudflare secrets,
-   never in a file.
-2. Confirm from the spec whether v4 needs the `POST /users` registration step.
-   If it does, it belongs in the OAuth callback, not the sync path: a
-   connection that skips it is authorised and unreadable.
-3. Decide the backfill shape against the `features` trap. One request per day is
-   the honest reading; check the rate limits before committing to a 90-day
-   backfill that costs 90 calls per member.
-4. Parse durations as Protobuf duration strings (`"80s"`), not numbers, and put
-   that in a helper with a test, because it appears across the whole API.
-5. Map onto the existing vocabulary: stages sum to `sleep_minutes` the way
-   WHOOP's do, Nightly Recharge's nightly averages to `hrv` and
-   `resting_heart_rate`, activity to `steps`, and physical info's VO2 max to
-   `vo2_max`. Rescale any score to 0-100 in the adapter, never at read time.
-6. `DELETE /users/{user_id}` as `revoke`, since it is confirmed from Polar's own
-   client.
+Nothing here has run against a live Polar account, so the first connect is the
+test rather than a formality. In order of how likely each is to be the thing
+that breaks:
+
+1. **The token exchange reaches `auth.polar.com`.** If the swagger is stale and
+   `polarremote.com` is still the live v4 token host, the connect fails visibly
+   at the callback. That is the first thing to read in the logs.
+2. **The authorize screen lists five permissions and no email.** If Polar reject
+   or silently drop a scope, the granted set comes back in the token response's
+   `scope` field and is stored.
+3. **A sync writes rows.** The specific risk is `features`: if the parameter
+   name or a feature value is wrong, the calls return 200 with dates and no
+   data, and store nothing while looking healthy. A connection with
+   `last_sync_at` set and zero metrics is that failure.
+4. **The step total is plausible.** Compare one day against Polar Flow. A number
+   roughly double the app's means `polarSteps` should not have taken a maximum;
+   a number well below means the maximum is losing a day split across devices.
+5. **The respiratory rate appears at all.** If it is systematically missing, the
+   unit is not milliseconds and the gate is doing its job.
+
+## Still open
+
+**No `revoke`.** v3 had `DELETE /users/{user_id}`, which de-registered the member
+and invalidated the token. v4 has no equivalent path anywhere in the spec, and
+this repo's rule is that a revoke endpoint is implemented only where the vendor's
+own documentation confirms it: a guessed URL 404s quietly and leaves us believing
+we revoked something we did not. So disconnecting deletes our credentials and
+leaves the grant standing at Polar, which is why reconnecting goes straight to
+consent. Worth asking their B2B helpdesk (`b2bhelpdesk@polar.com`) directly.
+
+**Sport names**, which need `sports:read` and a catalogue fetch.
+
+**Resting heart rate and readiness**, both above, both needing one real night of
+data to judge.

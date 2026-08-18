@@ -42,6 +42,11 @@ const SLEEP_FIRST: ProviderId[] = [
   "ultrahuman",
   "whoop",
   "garmin",
+  // Polar ahead of COROS because Polar actually report sleep, with stages and
+  // a score, which is what this family is mostly about. Behind the three above
+  // for the reason the header gives: a large GPS watch is likelier to spend the
+  // night on a charger than a ring or a strap.
+  "polar",
   // COROS sits beside Garmin because it is the same kind of object: a large GPS
   // endurance watch, as likely to be on a charger overnight as on a wrist. It
   // publishes no sleep at all here (see providers.ts), so in this family it can
@@ -60,6 +65,10 @@ const MOVEMENT_FIRST: ProviderId[] = [
   // training watch that also does it. Third is not a demotion: it wins any day
   // the other two did not report.
   "coros",
+  // Behind COROS deliberately. Polar v4 publishes no daily step total at all:
+  // the number is summed out of per-device sample buckets by `polarSteps`, and
+  // a figure we assembled ourselves should lose to one a vendor stated.
+  "polar",
   "whoop",
   "oura",
   "ultrahuman",
@@ -73,6 +82,7 @@ const SCALE_FIRST: ProviderId[] = [
   "oura",
   "ultrahuman",
   "whoop",
+  "polar",
   // Reports no body composition whatsoever, so this position is a formality:
   // a provider that never emits a metric never competes for it. Listed because
   // every provider has to appear in every ranking, and an absent id would be
@@ -93,6 +103,7 @@ const CGM_FIRST: ProviderId[] = [
   "fitbit",
   "withings",
   "coros",
+  "polar",
 ];
 
 /**

@@ -182,12 +182,12 @@ describe("the autocomplete hints", () => {
   });
 });
 
-describe("Polar and Coros are queued, not blocked", () => {
+describe("Polar shipped, and COROS is queued rather than blocked", () => {
   /**
    * Both sat under "No public API today" for weeks and both were wrong: Polar's
-   * AccessLink is self-serve with no approval period, and Coros publish an
-   * application form. A member asking for either should not be told we cannot,
-   * and the admin list should show why they are waiting.
+   * AccessLink is self-serve with no approval period, and COROS publish an
+   * application form. Polar has since shipped; COROS is still waiting on their
+   * review, and a member asking for either should get the truth about which.
    */
   it("neither is marked blocked", () => {
     for (const name of ["polar", "coros"]) {
@@ -197,24 +197,31 @@ describe("Polar and Coros are queued, not blocked", () => {
     }
   });
 
-  it("both explain what they are waiting on", () => {
-    // A queued device with no reason is indistinguishable from one nobody has
-    // looked at, which is the state this replaced.
-    for (const name of ["polar", "coros"]) {
-      expect(matchDevice(name)?.reason, name).toBeTruthy();
-    }
+  it("says Polar can be connected today", () => {
+    /*
+     * Credentials are live and the adapter is registered with no `unavailable`
+     * reason, so the Connect button is really there. This flag is what decides
+     * whether a member asking for Polar is told "already supported" or "on the
+     * roadmap", and the wrong answer sends them looking for a button that does
+     * not exist, or past one that does.
+     */
+    expect(matchDevice("polar")?.supported).toBe(true);
   });
 
-  it("neither claims to be supported, because neither can be connected today", () => {
+  it("does not claim COROS can be connected, because it cannot", () => {
     /*
-     * COROS now HAS an adapter, and this still has to be false. `supported`
-     * answers "can this member connect their watch", not "does code exist":
-     * credentials have not been issued, the provider is hidden, and telling a
-     * member it works would send them looking for a button that is not there.
+     * COROS HAS an adapter, and this still has to be false. `supported` answers
+     * "can this member connect their watch", not "does code exist": no
+     * credentials have been issued, the provider is hidden, and saying
+     * otherwise sends them hunting for a button that is not there.
      */
-    for (const name of ["polar", "coros"]) {
-      expect(matchDevice(name)?.supported, name).toBe(false);
-    }
+    expect(matchDevice("coros")?.supported).toBe(false);
+  });
+
+  it("tells a member waiting on COROS what it is waiting on", () => {
+    // A queued device with no reason is indistinguishable from one nobody has
+    // looked at, which is the state this replaced.
+    expect(matchDevice("coros")?.reason).toBeTruthy();
   });
 });
 
