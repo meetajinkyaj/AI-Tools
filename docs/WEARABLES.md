@@ -853,11 +853,13 @@ slash. Every one of these vendors rejects a mismatch with the same unhelpful
 `src/lib/wearables/urls.ts`, so what you register is what we send.
 
 For staging, register a second app per vendor against the staging host and set
-`APP_ORIGIN` there. **Nobody has**, and as of 2026-08-18 staging also has none
-of the wearable schema (it stopped at migration 0014), so staging cannot
-exercise a wearable flow at all. The first connection for a new provider
+`APP_ORIGIN` there. **Nobody has.** Staging now carries the full wearable
+schema (backfilled 2026-08-19, it had stalled at migration 0012), so it can
+rehearse a migration again, but it still cannot exercise an OAuth flow: vendor
+credentials are per-environment and are not set there, and the redirect URIs we
+registered name `app.ikigaro.com`. The first connection for a new provider
 therefore happens in production with your own account. See
-[`STAGING.md`](./STAGING.md), which now says so rather than implying otherwise.
+[`STAGING.md`](./STAGING.md).
 
 ---
 
