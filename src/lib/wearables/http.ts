@@ -18,7 +18,7 @@ function sleep(ms: number): Promise<void> {
  * The one HTTP call every adapter makes.
  *
  * Centralised so that the handling of the two answers that matter, "your token
- * is dead" and "you are going too fast", is identical across seven vendors
+ * is dead" and "you are going too fast", is identical across eight vendors
  * rather than six slightly different guesses.
  *
  * 401/403 becomes `ReauthRequired`, which the sync loop turns into a connection
@@ -28,7 +28,7 @@ function sleep(ms: number): Promise<void> {
  *
  * THE BUDGET IS WATCHED HERE because this is the only place that sees every
  * request and every response. Adapters ask for data; none of them should have
- * to know how much of a shared allowance is left, and seven copies of that
+ * to know how much of a shared allowance is left, and eight copies of that
  * bookkeeping would be six chances to get it wrong. See `rate-limit.ts`.
  */
 export async function providerFetch<T>(

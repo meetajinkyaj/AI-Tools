@@ -853,7 +853,11 @@ slash. Every one of these vendors rejects a mismatch with the same unhelpful
 `src/lib/wearables/urls.ts`, so what you register is what we send.
 
 For staging, register a second app per vendor against the staging host and set
-`APP_ORIGIN` there.
+`APP_ORIGIN` there. **Nobody has**, and as of 2026-08-18 staging also has none
+of the wearable schema (it stopped at migration 0014), so staging cannot
+exercise a wearable flow at all. The first connection for a new provider
+therefore happens in production with your own account. See
+[`STAGING.md`](./STAGING.md), which now says so rather than implying otherwise.
 
 ---
 
@@ -871,7 +875,17 @@ WITHINGS_CLIENT_ID / WITHINGS_CLIENT_SECRET
 GARMIN_CLIENT_ID / GARMIN_CLIENT_SECRET
 GARMIN_PUSH_SECRET        # required before Garmin works, see below
 ULTRAHUMAN_CLIENT_ID / ULTRAHUMAN_CLIENT_SECRET
+POLAR_CLIENT_ID / POLAR_CLIENT_SECRET
+COROS_CLIENT_ID / COROS_CLIENT_SECRET     # set these and COROS still stays
+                                          # hidden: its `unavailable` reason
+                                          # wins over credentials, on purpose
 ```
+
+**Setting a pair is what makes a provider appear**, so it is a deploy-shaped
+act rather than a config change. `providerConfigured` returns true as soon as
+both are present, and the connect UI lists whatever it returns. The one
+exception is a provider carrying an `unavailable` reason, which stays hidden
+regardless; that is the difference between "we have keys" and "this works".
 
 ### `WEARABLE_TOKEN_KEY`
 
@@ -954,7 +968,7 @@ indefinitely, until somebody notices and revokes it.
 Postgres encrypts at rest at the disk level, which defends against someone
 stealing a disk, not the realistic threat here, which is a leaked service-role
 key or a stray `pg_dump`. A key that lives only in Worker secrets means the
-database on its own is not enough to impersonate our users against seven vendors.
+database on its own is not enough to impersonate our users against eight vendors.
 
 ---
 
@@ -1141,7 +1155,7 @@ Tuesday". Consequences:
 
 ---
 
-## Adding an eighth provider
+## Adding a ninth provider
 
 1. Add the id to `ProviderId` and to the `provider` CHECK in a new migration.
 2. Add an adapter to `src/lib/wearables/providers.ts`. OAuth endpoints, scopes,
@@ -1254,7 +1268,10 @@ regardless.
 
 ---
 
-## Pending integrations: Withings, Polar, COROS
+## Pending integrations: Withings and COROS
+
+Polar has since shipped and moved out of this section; its record is below and
+in [`POLAR_ACCESS.md`](./POLAR_ACCESS.md).
 
 Three named on the roadmap, in the order they are worth doing. Access model
 first, because it decides the sequence far more than engineering effort does.
@@ -1262,7 +1279,7 @@ first, because it decides the sequence far more than engineering effort does.
 | Vendor | Access | State | What it adds |
 |---|---|---|---|
 | **Withings** | Registered, credentials in hand | **Adapter written, NEVER AUDITED** | Weight and body composition, plus sleep |
-| **Polar** | **Self-serve, no approval period** | No adapter. Researched 2026-08-18, blocked on their `swagger.yaml`, see [`POLAR_ACCESS.md`](./POLAR_ACCESS.md) | Sleep with stages and a sleep score, HRV and breathing rate (Nightly Recharge), training load, VO2 max, steps |
+| **Polar** | **Registered 2026-08-18, credentials live** | **Adapter shipped, never run against a real account.** Built from their v4 `swagger.yaml`; see [`POLAR_ACCESS.md`](./POLAR_ACCESS.md) | Sleep with stages and a sleep score, HRV, breathing rate, steps, workouts |
 | **COROS** | **Applied 2026-08-18**, form submitted and email sent, awaiting their review | **Adapter written from their V2.0.6 reference guide, never run against a live account.** Hidden by `unavailable` until credentials exist | Steps, resting heart rate, overnight HRV, workouts |
 
 ### Withings first, because it is the only one already paid for
@@ -1277,49 +1294,41 @@ useful work: it contributes weight and body fat and nothing to training or
 recovery. **Do not register anything further for it before reading the adapter
 against Withings' docs.**
 
-### Polar is the least gated integration left
+### Polar shipped 2026-08-18, and four things about it are unlike everything else
 
-Their **AccessLink** API is OAuth 2.0 authorization code, and registration at
-their developer portal is **self-serve with no approval period**. That makes it
-the only remaining vendor where the whole thing is inside our control: no
-ten-user cap, no queue, no partner review. Compare Whoop, where developers
-report months of silence.
+Built from their **AccessLink Dynamic API v4** `swagger.yaml`. Registration is
+self-serve with no approval period, so this is the only vendor here where the
+whole thing was inside our control. `POLAR_ACCESS.md` has the full record; the
+four things worth knowing before touching the adapter:
 
-The data is a good fit rather than an adjacent one. Sleep with stages and a
-score, Nightly Recharge (autonomic state, HRV, breathing rate), daily activity,
-training load, and VO2 max all land on keys the vocabulary already has.
+1. **There are two Polar APIs and this is the other one.** Every tutorial, every
+   community client, and Polar's own published example application target v3
+   "Open AccessLink": a transaction model, and a mandatory `POST /users` to
+   register each member before any read works. v4 has none of that. **The token
+   URL in circulation is v3's**: `polarremote.com/v2/oauth2/token` is what every
+   source says, and the v4 spec names `auth.polar.com/oauth/token`.
+2. **Their tokens expire in 12 hours**, and a widely-syndicated write-up says
+   they never do. We had recorded the write-up's version. That would have shipped
+   an integration that works until lunchtime.
+3. **`features` decides whether you get data at all.** Without it every endpoint
+   returns dates and no numbers; with it a request is capped at one day. So a
+   seven-day sweep is seven requests per data type, and there is deliberately no
+   backfill window: 90 days of history would be 360 calls for one member against
+   a 3,000-per-15-minutes budget.
+4. **There is no daily step total.** Activity returns step samples per device and
+   the total is ours to compute, taking the highest device rather than the sum,
+   because two devices counted the same walk.
 
-**Read [`POLAR_ACCESS.md`](./POLAR_ACCESS.md) before writing a line.** Research
-on 2026-08-18 turned up two things that change the job, and one of them
-contradicts what this section used to say.
+Also: durations are strings (`"80s"`), and Polar's rate-limit headers count
+**usage** where everyone else counts **remaining**, which `parseRateLimit` now
+converts. Reading one as the other is the exact inverse.
 
-**There are two Polar APIs.** The v3 "Open AccessLink" everyone writes tutorials
-about works on a transaction model: open a transaction, list items, fetch each,
-commit. The current one is the **AccessLink Dynamic API v4**, which has range
-queries, a ten-scope vocabulary, and first-class sleep with stages. A new
-integration targets v4.
-
-**Their tokens expire, and we had recorded otherwise.** A widely-syndicated
-third-party write-up states that "Polar access tokens are long-lived and do not
-expire". Polar's own v4 reference: "The access token is valid for 12 hours. A
-refresh token must be used to get a new access token." Believing the blog would
-have produced an integration that works for half a day and then stops, which is
-this codebase's most expensive class of bug.
-
-**The registration trap is real, and now confirmed from Polar rather than
-inferred.** After the OAuth exchange, Polar require an explicit `POST /users` to
-register the member with the application. **Skip it and every subsequent data
-request fails, with a perfectly valid access token.** Their own example client
-says so in its docstring: "partner must register user before being able to
-access her data". 409 Conflict means already registered and is ignorable.
-Confirmed for v3; whether v4 still needs it is one of the open questions in
-`POLAR_ACCESS.md`.
-
-**And a trap nobody writes about.** On `/activity/list`, "without features the
-response contains only the dates where activity data is available", while using
-`features` caps a request at one day. So the obvious 90-day range call returns
-dates and no numbers, and an adapter built on it stores nothing while looking
-perfectly healthy.
+Deliberately unmapped: resting heart rate (they give a four-hour mean, our screen
+promises the overnight low), readiness (their 1-6 scale has an ambiguous top and
+normalising it would be a formula we invented), and workout sport names (an id
+with no name, needing a scope and a catalogue fetch we can add later). **No
+`revoke`**: v3 had one, v4's spec has no equivalent path, and a guessed revoke
+URL is a privacy claim we cannot support.
 
 ### COROS: the adapter is written, and four things in it are unlike everything else
 

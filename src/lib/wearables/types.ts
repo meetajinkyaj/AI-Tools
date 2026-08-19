@@ -3,12 +3,12 @@ import type { DailyMetric } from "./metrics";
 /**
  * The adapter contract every wearable vendor is squeezed into.
  *
- * Seven vendors, seven dialects, one shape. What varies between them is genuinely
+ * Eight vendors, eight dialects, one shape. What varies between them is genuinely
  * only: where the OAuth endpoints are, what scopes to ask for, how to call the
  * data endpoints, and how to turn the answer into `DailyMetric[]`. Everything
  * else, refresh, retry, backoff, persistence, idempotent upsert, is written
  * once in `sync.ts` and shared, because that is where the subtle bugs live and
- * seven copies of subtle would be seven times the bugs.
+ * eight copies of subtle would be eight times the bugs.
  */
 
 export type ProviderId =
@@ -18,7 +18,8 @@ export type ProviderId =
   | "withings"
   | "garmin"
   | "ultrahuman"
-  | "coros";
+  | "coros"
+  | "polar";
 
 /**
  * Display names, in one place because two places drift.
@@ -33,7 +34,7 @@ export const PROVIDER_NAMES: Record<ProviderId, string> = {
   fitbit: "Fitbit",
   // WHOOP, not Whoop. Their brand guidelines set the wordmark in caps and
   // every surface they publish follows it; this string is what the app calls
-  // the device out loud, so it follows it too. The other five vendors are
+  // the device out loud, so it follows it too. The other six vendors are
   // spelled the way their own brands spell them.
   whoop: "WHOOP",
   withings: "Withings",
@@ -42,6 +43,9 @@ export const PROVIDER_NAMES: Record<ProviderId, string> = {
   // COROS, not Coros. Their own materials set it in caps throughout, the same
   // reason WHOOP is spelled the way it is above.
   coros: "COROS",
+  // Polar, sentence case. Their own wordmark is lowercase in the logo but their
+  // running text and legal name are "Polar", so this follows the text.
+  polar: "Polar",
 };
 
 export interface OAuthTokens {

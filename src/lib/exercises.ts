@@ -120,7 +120,7 @@ export function normalizeActivities(input: unknown): string[] {
 /**
  * Vendor activity names that mean one of our types, longest-specific first.
  *
- * WHY THIS IS NEEDED. Seven vendors disagree about the taxonomy, and the check-in
+ * WHY THIS IS NEEDED. Eight vendors disagree about the taxonomy, and the check-in
  * has a seventh. Oura says `weight_training`, Whoop says `Weightlifting`,
  * Fitbit says `Weights` and the user tapped "Gym / Weights". Those are one
  * activity, and the Training card showed them as separate chips until this

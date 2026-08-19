@@ -17,7 +17,7 @@ import {
 } from "./types";
 
 /**
- * The seven cloud wearable adapters.
+ * The eight cloud wearable adapters.
  *
  * Each is roughly: where OAuth lives, what to ask for, and how to turn one
  * vendor's JSON into `DailyMetric[]`. All the machinery around them, refresh,
@@ -1885,6 +1885,409 @@ export function corosLocalDay(epochSeconds: number, offsetQuarters?: number): st
 }
 
 /* -------------------------------------------------------------------------- */
+/* Polar                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Polar, written against their AccessLink Dynamic API v4 swagger.
+ *
+ * THERE ARE TWO POLAR APIS AND THIS IS THE OTHER ONE. Every tutorial, every
+ * community client, and Polar's own published example application target v3
+ * "Open AccessLink": a transaction model where you open a transaction, list
+ * items, fetch each one and commit, plus a mandatory `POST /users` to register
+ * each member before any read will work. v4 has none of that. Different hosts,
+ * different endpoints, granular scopes, and no registration step. Code copied
+ * from a v3 example against a v4 client fails in ways that look like our bug.
+ *
+ * THREE THINGS HERE WILL CATCH THE NEXT PERSON OUT:
+ *
+ *   1. WITHOUT `features` YOU GET DATES AND NO DATA. Their words, on nearly
+ *      every endpoint: "Without features the response contains only the dates
+ *      where data is available." And using features caps a request at ONE DAY.
+ *      So a week is seven requests per data type, not one. See `polarDays`.
+ *   2. DURATIONS ARE STRINGS. `"80s"`, or `"3.000000001s"` at full precision.
+ *      `Number("80s")` is `NaN`, and a NaN reaching `push` is dropped silently,
+ *      so this would present as sleep that never appears. See `polarSeconds`.
+ *   3. THERE IS NO DAILY STEP TOTAL. Activity returns step SAMPLES bucketed by
+ *      interval, per device, and the total is ours to compute. See `polarSteps`.
+ */
+
+/** Their duration format: seconds with an `s`, optionally fractional. */
+export function polarSeconds(raw: unknown): number | undefined {
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw !== "string") return undefined;
+  const m = /^(\d+(?:\.\d+)?)s$/.exec(raw.trim());
+  if (!m) return undefined;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+interface PolarStepSamples {
+  startTime?: string;
+  interval?: number;
+  steps?: number[];
+}
+
+interface PolarActivityDay {
+  date?: string;
+  activitiesPerDevice?: {
+    deviceReference?: { deviceId?: string };
+    activitySamples?: { stepSamples?: PolarStepSamples }[];
+  }[];
+}
+
+interface PolarNightSleep {
+  sleepDate?: string;
+  sleepScore?: { sleepScore?: number };
+  sleepEvaluation?: {
+    asleepDuration?: string;
+    sleepSpan?: string;
+    phaseDurations?: {
+      wake?: string;
+      rem?: string;
+      light?: string;
+      deep?: string;
+      unknown?: string;
+    };
+  };
+}
+
+interface PolarRecharge {
+  sleepResultDate?: string;
+  meanNightlyRecoveryRmssd?: number;
+  meanNightlyRecoveryRri?: number;
+  meanNightlyRecoveryRespirationInterval?: number;
+  recoveryIndicator?: number;
+  recoveryIndicatorSubLevel?: number;
+  ansStatus?: number;
+}
+
+interface PolarTrainingSession {
+  identifier?: string;
+  startTime?: string;
+  stopTime?: string;
+  durationMillis?: number;
+  name?: string;
+  distanceMeters?: number;
+  calories?: number;
+  hrAvg?: number;
+  hrMax?: number;
+  trainingLoad?: number;
+  startTrigger?: string;
+  timezoneOffsetMinutes?: number;
+}
+
+/** From the swagger's own `servers` entry, not assembled from parts. */
+const POLAR_API = "https://www.polaraccesslink.com/v4/data";
+
+/**
+ * A day at a time, because `features` leaves us no choice.
+ *
+ * Bounded at 31 so that a mistaken window cannot turn into hundreds of requests
+ * against a budget shared by every member.
+ */
+function polarDays(start: string, end: string, max = 31): string[] {
+  const out: string[] = [];
+  const from = Date.parse(`${start}T00:00:00Z`);
+  const to = Date.parse(`${end}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return out;
+  for (let t = from; t <= to && out.length < max; t += 86_400_000) {
+    out.push(new Date(t).toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+/** `to` is EXCLUSIVE on every v4 endpoint, so one day means tomorrow's date. */
+function polarNextDay(day: string): string {
+  return new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+}
+
+function polarUrl(path: string, day: string, features: string[]): string {
+  const u = new URL(`${POLAR_API}${path}`);
+  u.searchParams.set("from", day);
+  u.searchParams.set("to", polarNextDay(day));
+  // `collectionFormat: multi` in the swagger: repeated key, not a comma list.
+  for (const f of features) u.searchParams.append("features", f);
+  return u.toString();
+}
+
+/**
+ * A day's step count, summed out of sample buckets.
+ *
+ * THE HIGHEST DEVICE WINS, RATHER THAN THE SUM OF ALL OF THEM. Polar report
+ * activity per device, and a member wearing a watch and carrying a phone sensor
+ * has two devices that both counted the same walk. Adding those together
+ * reports a day this person did not have, and it reports it as a bigger number,
+ * which is the direction nobody questions. Their own note that "a certain
+ * device might not be kept on for a full day, so there can be gaps" means the
+ * maximum can undercount a day split across two devices; undercounting a real
+ * day is a smaller lie than inventing steps, and it is the one that matches
+ * what Polar Flow shows the member.
+ */
+export function polarSteps(day: PolarActivityDay): number | undefined {
+  let best: number | undefined;
+  for (const device of day.activitiesPerDevice ?? []) {
+    let total = 0;
+    let sawAny = false;
+    for (const sample of device.activitySamples ?? []) {
+      for (const n of sample.stepSamples?.steps ?? []) {
+        const v = num(n);
+        if (v === undefined) continue;
+        total += v;
+        sawAny = true;
+      }
+    }
+    if (sawAny && (best === undefined || total > best)) best = total;
+  }
+  return best;
+}
+
+const polar: WearableProvider = {
+  id: "polar",
+  name: PROVIDER_NAMES.polar,
+  blurb: "Sleep with stages, HRV and training from your Polar watch.",
+  clientIdEnv: "POLAR_CLIENT_ID",
+  clientSecretEnv: "POLAR_CLIENT_SECRET",
+
+  /*
+   * BOTH URLS COME FROM THE SWAGGER'S OWN `securityDefinitions`, which is the
+   * only place that states them for v4 rather than for v3.
+   *
+   * The token URL is worth a sentence because the obvious source is wrong.
+   * Polar's own v3 example application, and every write-up derived from it, use
+   * `https://polarremote.com/v2/oauth2/token`. That is the v3 endpoint. The v4
+   * spec names `auth.polar.com/oauth/token`, alongside the authorize URL on the
+   * same host, and a token exchange sent to the wrong one of these fails at the
+   * only moment a member is watching.
+   */
+  authorizeUrl: "https://auth.polar.com/oauth/authorize",
+  tokenUrl: "https://auth.polar.com/oauth/token",
+
+  /*
+   * FIVE SCOPES, AND THE OMISSIONS ARE THE INTERESTING PART.
+   *
+   * `profile:read` is deliberately absent: it grants the member's email address,
+   * which we already hold from sign-in, and asking a device vendor for a second
+   * copy is a permission the member has to read and approve for no benefit to
+   * them. `ppi_data:read`, `routes:read`, `skin_contact:read` and
+   * `calendar:read` are absent because they are traces and planning data we have
+   * no screen for; a scope we do not use is a scope we should not be trusted
+   * with.
+   */
+  scopes: [
+    "activity:read",
+    "sleep:read",
+    "nightly_recharge:read",
+    "continuous_samples:read",
+    "training_sessions:read",
+  ],
+
+  // Their words: "Basic auth with base64 encoded string client_id:client_secret".
+  tokenAuth: "basic",
+
+  /*
+   * Their token response carries a refresh token and a twelve-hour
+   * `expires_in`. Whether the refresh token itself is replaced on use is not
+   * stated in the spec, so this is the safe reading: `sync.ts` writes back
+   * whatever it receives either way, and claiming a vendor does not rotate when
+   * it does is the failure that kills a connection permanently.
+   */
+  refreshRotates: true,
+
+  syncWindowDays: 7,
+  /*
+   * NO BACKFILL WINDOW, AND THAT IS A COST DECISION RATHER THAN A LIMIT.
+   *
+   * Their history goes back 90 days, so a backfill is possible. It is also 90
+   * requests per data type per member, because `features` caps a request at one
+   * day, so four data types make a single member's first sync 360 calls against
+   * an app-wide budget of 3,000 per fifteen minutes. Eight members connecting in
+   * the same afternoon would exhaust it. Leaving this undefined falls back to
+   * the seven-day window and the sweep fills the rest in a week.
+   */
+
+  async fetchRange({ accessToken, start, end }) {
+    const out: DailyMetric[] = [];
+
+    for (const day of polarDays(start, end)) {
+      /*
+       * SLEEP. `sleep-evaluation` carries the durations and `sleep-score` the
+       * score; `sleep-result` is the hypnogram, which is a trace we do not
+       * store, and asking for it would move a lot of bytes for nothing.
+       */
+      const sleep = await providerFetch<{ nightSleeps?: PolarNightSleep[] }>(
+        "polar",
+        polarUrl("/sleeps", day, ["sleep-evaluation", "sleep-score"]),
+        { accessToken },
+      );
+
+      for (const night of sleep?.nightSleeps ?? []) {
+        const date = night?.sleepDate;
+        if (!date) continue;
+        const evaluation = night.sleepEvaluation;
+
+        /*
+         * `asleepDuration`, NOT `sleepSpan`. Polar report both, and the
+         * difference is exactly the distinction our own screen makes:
+         * `sleep_minutes` is defined to the member as time actually asleep,
+         * which reads lower than time in bed. `sleepSpan` is time in bed. This
+         * is the same choice the COROS adapter had to decline to make, and here
+         * we can make it correctly because Polar report the number we mean.
+         */
+        const asleep = polarSeconds(evaluation?.asleepDuration);
+        if (asleep !== undefined) {
+          push(out, "sleep_minutes", date, secondsToMinutes(asleep), "polar");
+        }
+
+        /*
+         * Their range is documented as 1 to 100, so this is already our scale
+         * and `clampScore` is a guard rather than a conversion. Rescaling
+         * happens in the adapter or not at all, never at read time.
+         */
+        const score = num(night.sleepScore?.sleepScore);
+        if (score !== undefined) {
+          push(out, "sleep_score", date, clampScore(score), "polar");
+        }
+      }
+
+      /*
+       * NIGHTLY RECHARGE, which is where the overnight physiology lives.
+       */
+      const recharge = await providerFetch<{ nightlyRechargeResults?: PolarRecharge[] }>(
+        "polar",
+        polarUrl("/nightly-recharge-results", day, ["samples"]),
+        { accessToken },
+      );
+
+      for (const night of recharge?.nightlyRechargeResults ?? []) {
+        const date = night?.sleepResultDate;
+        if (!date) continue;
+
+        /*
+         * RMSSD IS EXACTLY WHAT OUR `hrv` KEY MEANS, in the same unit, so this
+         * is a rename and not a conversion. Oura and WHOOP report RMSSD too,
+         * which is the whole reason these three can share an axis.
+         */
+        push(out, "hrv", date, num(night.meanNightlyRecoveryRmssd), "polar");
+
+        /*
+         * RESPIRATORY RATE, converted from an interval, with a sanity gate.
+         *
+         * They report a mean respiration INTERVAL in milliseconds, so breaths
+         * per minute is 60000 divided by it. The gate exists because their own
+         * example value for this field is 800, which would be 75 breaths a
+         * minute: plainly a placeholder copied across several fields in their
+         * spec rather than a real reading. If the unit is not what the spec
+         * says, the arithmetic produces a confident wrong number rather than an
+         * obvious failure, so anything outside a range a sleeping human can
+         * actually produce is DROPPED rather than clamped. A clamp would hide
+         * the mistake by squashing it to the nearest plausible value; dropping
+         * leaves a gap, which is visible and honest.
+         */
+        const interval = num(night.meanNightlyRecoveryRespirationInterval);
+        if (interval !== undefined && interval > 0) {
+          const brpm = 60_000 / interval;
+          if (brpm >= 4 && brpm <= 40) {
+            push(out, "respiratory_rate", date, Math.round(brpm * 10) / 10, "polar");
+          }
+        }
+
+        /*
+         * TWO THINGS FROM THIS PAYLOAD ARE DELIBERATELY NOT MAPPED.
+         *
+         * RESTING HEART RATE. They give `meanNightlyRecoveryRri`, the mean
+         * beat-to-beat interval over a four-hour window starting half an hour
+         * after sleep onset. Converting it to bpm is arithmetic, but the result
+         * is a four-hour MEAN, and our own screen defines resting heart rate to
+         * the member as "your lowest sustained heart rate while asleep". Those
+         * are different quantities, and a member wearing a Polar and an Oura
+         * would see the number step by several bpm on any night the merge
+         * switched source, with no way to tell a rule from a bug.
+         *
+         * READINESS. `recoveryIndicator` is 1 to 6 and
+         * `recoveryIndicatorSubLevel` is a 0-100 position inside that class, so
+         * a continuous value is recoverable, but the top of the range is
+         * ambiguous: whether class 6 spans to a notional 7 or terminates
+         * decides whether the scale divides by five or six, and Polar do not
+         * say. That is a formula we would be inventing and then showing people
+         * as a score. Both want one real account to settle them; see
+         * docs/POLAR_ACCESS.md.
+         */
+      }
+
+      /*
+       * DAILY ACTIVITY, for steps. `samples` is the feature that carries them;
+       * `activity-target` is a goal and `physical-information` is profile data
+       * we deliberately did not enable at registration.
+       */
+      const activity = await providerFetch<{
+        activities?: { activityDays?: PolarActivityDay[] };
+      }>("polar", polarUrl("/activity/list", day, ["samples"]), { accessToken });
+
+      for (const activityDay of activity?.activities?.activityDays ?? []) {
+        const date = activityDay?.date;
+        if (!date) continue;
+        push(out, "steps", date, polarSteps(activityDay), "polar");
+      }
+    }
+
+    return out;
+  },
+
+  async fetchWorkouts({ accessToken, start, end }) {
+    const out: WorkoutSession[] = [];
+
+    for (const day of polarDays(start, end)) {
+      const data = await providerFetch<{ trainingSessions?: PolarTrainingSession[] }>(
+        "polar",
+        polarUrl("/training-sessions/list", day, ["statistics"]),
+        { accessToken },
+      );
+
+      for (const s of data?.trainingSessions ?? []) {
+        if (!s || typeof s !== "object") continue;
+        if (!s.identifier || !s.startTime) continue;
+
+        /*
+         * `startTime` IS ALREADY IN THE MEMBER'S LOCAL TIME, per the spec, and
+         * carries no zone designator. So the day it belongs to is the date part
+         * as written, with no conversion: parsing it as UTC and re-formatting
+         * would be a no-op at best and would move an early-morning session to
+         * the previous day at worst.
+         */
+        out.push({
+          externalId: String(s.identifier),
+          startedAt: s.startTime,
+          endedAt: s.stopTime ?? s.startTime,
+          date: dayOf(s.startTime),
+          distanceM: num(s.distanceMeters),
+          // Their own field says kilocalories, which is our unit already.
+          calories: num(s.calories),
+          avgHeartRate: num(s.hrAvg),
+          maxHeartRate: num(s.hrMax),
+          /*
+           * NO ACTIVITY NAME, and not for want of trying. Their `sport` field
+           * is a reference carrying an id and no name; resolving it needs the
+           * `sports:read` scope and a separate catalogue fetch, which is worth
+           * doing and is not worth guessing. `name` is the member's own title
+           * for the session, which is a label but not a sport.
+           */
+          source: "polar",
+          /*
+           * Polar are the second vendor after Fitbit that says so out loud.
+           * Anything else, including a missing trigger, stays false: that is
+           * "they did not say", not "we know they did not".
+           */
+          autoDetected: s.startTrigger === "TRAINING_START_AUTOMATIC_TRAINING_DETECTION",
+        });
+      }
+    }
+
+    return out;
+  },
+};
+
+/* -------------------------------------------------------------------------- */
 
 export const PROVIDERS: Record<ProviderId, WearableProvider> = {
   oura,
@@ -1894,6 +2297,7 @@ export const PROVIDERS: Record<ProviderId, WearableProvider> = {
   garmin,
   ultrahuman,
   coros,
+  polar,
 };
 
 export const PROVIDER_IDS = Object.keys(PROVIDERS) as ProviderId[];
