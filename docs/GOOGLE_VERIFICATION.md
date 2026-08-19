@@ -110,6 +110,48 @@ from approval, and letting it lapse takes the app back to unverified.
 
 ---
 
+## The five-minute check nobody has done
+
+**Added 2026-08-19.** This page has always said "most scopes for the Google
+Health API are restricted", quoting Google. It has never established whether
+**ours** are, and that word "most" is carrying the entire cost estimate.
+
+The distinction is not academic:
+
+| | Sensitive scope | Restricted scope |
+|---|---|---|
+| Verification | **3 to 5 business days** | **4 to 6 weeks** |
+| Privacy policy review | Standard | Rigorous, against Limited Use |
+| Security assessment | **None** | **Annual CASA, paid, if you store the data on a server** |
+| Cash cost | **Nothing** | ~$500 to $4,500 a year |
+
+**Google Cloud Console tells you which, for free, without asking anybody.**
+From Google's OAuth App Verification Help Centre: *"When you add scopes to your
+project, scope categories (non-sensitive, sensitive, or restricted) are
+indicated automatically in the Google Cloud Console."* Open the project's OAuth
+consent screen, go to Scopes, press Add scope, and search for
+`googlehealth`. The console labels each one.
+
+**Do this before assuming the cost.** It is the only unknown standing between
+"Fitbit is a few thousand a year" and "Fitbit is a free five-day review", and
+it costs one login.
+
+Three outcomes, and each points somewhere different:
+
+- **All three restricted.** The decision below stands unchanged, with a real
+  number behind it instead of an inference.
+- **Some restricted, some sensitive.** A reduced-scope Fitbit becomes possible:
+  free verification, days rather than weeks, no annual fee. Whether it is worth
+  shipping depends on which survives. Activity alone gives steps and loses
+  sleep and HRV, which is most of what this product wants Fitbit for, so this
+  would be a coverage decision rather than an obvious win.
+- **None restricted.** Publish, and delete the `unavailable` line.
+
+**And confirm the CASA trigger while you are there.** Google are explicit that
+the assessment applies *"if you store or transmit restricted scope data on
+servers"*. We do, on Supabase, so restricted scopes mean CASA for us with no
+exemption to argue for. That is worth knowing is settled rather than hoped.
+
 ## What to check before starting
 
 - [x] Is `FITBIT_CLIENT_ID` / `FITBIT_CLIENT_SECRET` set in production? **Yes**,
