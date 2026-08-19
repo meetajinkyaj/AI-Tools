@@ -69,8 +69,15 @@ From **Project Settings → API**, copy:
 ### 1.2 Create the schema
 
 In the staging project's SQL editor, run every file in
-`supabase/migrations/` **in filename order**, `0001` through `0015`. They are
-idempotent, so a re-run is harmless.
+`supabase/migrations/` **in filename order**, `0001` through the highest
+numbered file. They are idempotent, so a re-run is harmless.
+
+> **This instruction used to say "`0001` through `0015`", and staging does not
+> match it.** Checked 2026-08-18: no table matching `wearable%` exists on the
+> staging project at all. `wearable_connections` is created by **0015**, so
+> whatever ran here stopped at 0014, and everything from 0015 onward is absent.
+> See "What staging cannot currently rehearse" below before trusting staging
+> for anything.
 
 Then confirm:
 
@@ -196,6 +203,49 @@ allow-list, not beta approval. So:
 
 **Testing a migration:** run it on the staging database *before* opening the PR
 that depends on it, same migration-first rule as production, rehearsed.
+
+### What staging cannot currently rehearse
+
+**Checked 2026-08-18, and this is a real gap rather than a caveat.** The staging
+project has none of the wearable schema: no `wearable_connections`, no
+`wearable_workouts`, no `wearable_source_preferences`. Since
+`wearable_connections` arrives in **0015**, staging stopped somewhere around
+0014, which means every migration from 0015 onward has only ever run in one
+place: production.
+
+Two consequences, and the second is the one that matters.
+
+**Wearable features cannot be exercised on staging at all.** Any screen that
+reads a connection 500s there. Nothing in CI catches this, because
+`deploy-staging` only deploys code and the smoke suite (`smoke.yml`) is
+read-only and points at *production*, not staging.
+
+**And the migration rehearsal above is not happening.** That rule is the thing
+that makes a production migration safe on a database with **no backups**. A
+staging project ten migrations behind cannot rehearse anything, so every
+production migration since 0015 has gone in unrehearsed. That is the actual
+risk here, not the missing tables.
+
+Fixing it is cheap: re-run `supabase/migrations/` from `0001` in filename order
+against staging. Every file is idempotent, so the ones already applied are
+no-ops. What it does **not** fix is OAuth testing, see below.
+
+### Staging cannot test a wearable OAuth flow either, schema or no schema
+
+Two independent reasons, both structural:
+
+1. **Worker secrets are per-environment** (§1.4). The vendor client ids and
+   secrets are set on the production Worker and are *not* inherited, so a
+   provider that is configured in production is simply invisible on staging.
+2. **The redirect URI is registered per host.** What we register with each
+   vendor is `https://app.ikigaro.com/api/wearables/callback/<provider>`, and a
+   vendor rejects any mismatch. Staging would need a second app registered per
+   vendor and `APP_ORIGIN` set, which `WEARABLES_APPLICATIONS.md` describes and
+   then says most people skip.
+
+So the first connection for any new provider happens **in production, with your
+own account**. That is the documented position and it is fine at this size; it
+is worth being explicit that it is a decision rather than an oversight.
 
 ---
 
