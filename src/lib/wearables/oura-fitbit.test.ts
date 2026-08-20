@@ -315,22 +315,32 @@ describe("Google Health OAuth", () => {
     }
   });
 
-  it("asks for activity alone, to stay out of Google's restricted tier", () => {
+  it("asks for all three, because there is no cheaper tier to reach for", () => {
     /*
-     * THE SCOPE CLASS IS THE PRICE. A sensitive Google scope is a free
-     * verification in three to five business days. A restricted one is four to
-     * six weeks plus an ANNUAL PAID security assessment, triggered because we
-     * store this data on our own servers. Google say most Google Health scopes
-     * are restricted without saying which, so we submit the smallest request
-     * that is still a product.
+     * THIS WAS BRIEFLY ONE SCOPE, AS A BET, AND THE BET LOST.
      *
-     * If this ever grows back to three, that should be because Google Cloud
-     * Console said those scopes are merely sensitive, or because somebody
-     * decided the annual fee is worth paying. Not by drift.
+     * Google price verification by scope CLASS: sensitive is free and takes
+     * days, restricted is weeks plus an ANNUAL PAID security assessment because
+     * we store the data on our own servers. Activity looked like the likeliest
+     * scope to be merely sensitive, so the request was cut to it alone.
+     *
+     * Google Cloud Console, checked 2026-08-19, files all three under "Your
+     * restricted scopes" with the sensitive section empty. Activity alone is
+     * restricted too. Since one restricted scope and three cost the same
+     * assessment, asking for one would mean paying full price for a third of
+     * the data.
+     *
+     * Do not reduce this again hoping for a free tier. That question is
+     * answered. The open one is whether the integration is worth the annual
+     * fee at all.
      */
-    expect(fitbit.scopes).toEqual([
-      "https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly",
-    ]);
+    expect(fitbit.scopes).toHaveLength(3);
+    expect(fitbit.scopes).toContain(
+      "https://www.googleapis.com/auth/googlehealth.sleep.readonly",
+    );
+    expect(fitbit.scopes).toContain(
+      "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly",
+    );
   });
 
   it("does not claim Google rotates refresh tokens, because it does not", () => {

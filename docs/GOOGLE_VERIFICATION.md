@@ -110,31 +110,81 @@ from approval, and letting it lapse takes the app back to unverified.
 
 ---
 
-## Decided 2026-08-19: submit for the reduced scope, and do the free half now
+## Answered 2026-08-19: all three scopes are restricted. There is no free path.
 
-**The adapter now requests one scope, `activity_and_fitness.readonly`, instead
-of three.** Steps, active energy, workouts and VO2 max. No sleep, no heart-rate
-family.
+**Checked in Google Cloud Console, which is where this should have been checked
+first.** The Data Access page files all three under **"Your restricted
+scopes"**, with the non-sensitive and sensitive sections both empty:
 
-**Why activity and not one of the others.** It is the scope most likely to sit
-on the sensitive side rather than the restricted one: step counts and workouts,
-the direct descendant of Google Fit's old `fitness.activity.read`, rather than
-the clinical-shaped data in the other two. That is a judgement and not a fact,
-which is what the console check above is for. If activity turns out to be
-restricted anyway, the reduction bought nothing and the decision reverts to
-whether Fitbit is worth an annual fee.
+| Scope | Class |
+|---|---|
+| `googlehealth.activity_and_fitness.readonly` | **Restricted** |
+| `googlehealth.health_metrics_and_measurements.readonly` | **Restricted** |
+| `googlehealth.sleep.readonly` | **Restricted** |
 
-**VO2 max survives the cut, which is not obvious.** Under the legacy Fitbit API
-it lived in `cardio_fitness`, and Google fold `activity` AND `cardio_fitness`
-into `activity_and_fitness.readonly`. Filed with the heart-rate family by eye,
-it would have been dropped silently. A test pins it.
+**So publishing this client requires the annual paid CASA assessment at any
+scope combination.** There is no subset that reaches the free, three-to-five-day
+sensitive tier. That question is now closed; do not reopen it by trying a
+different reduction.
 
-**The adapter no longer calls what it has no scope for.** It reads the granted
-set off the connection, so a member who declines a scope, or a reduced request
-like this one, stops the useless calls rather than absorbing a 403 per
-collection per member per night. `fetchWorkouts` returns empty rather than
-calling, because a 403 there is not tolerated further down and would mark a
-healthy connection expired.
+### The reduction was a bet, and it lost
+
+Earlier the same day the app was cut to `activity_and_fitness.readonly` alone,
+on the reasoning that activity was the likeliest scope to be merely sensitive:
+step counts and workouts, the descendant of Google Fit's old
+`fitness.activity.read`, rather than the clinical-shaped data in the other two.
+That reasoning was explicitly flagged as a judgement rather than a fact, and it
+was wrong.
+
+**It has been reverted to all three.** One restricted scope and three cost the
+same assessment, so keeping the reduction would have meant paying full price for
+a third of the data, losing sleep and the entire heart-rate family, which is
+most of what this product wants from a wearable.
+
+**What the episode left behind is worth keeping.** The adapter now derives what
+to fetch from the scopes actually granted, so a member who declines a scope at
+Google's consent screen no longer causes a guaranteed 403 per collection per
+night. That was always a bug; the reduction only made it visible.
+
+### The decision this forces
+
+**Google Health costs $500 to $4,500 a year, every year, or it stays hidden.**
+It is the only integration on the roadmap with a recurring cash cost: Withings,
+Polar and COROS are self-serve and free, and WHOOP has a review but no fee.
+
+At single-digit testers, none of whom owns a Fitbit or a Pixel Watch, that is
+clearly not worth paying. **Not before launch.** Revisit when a real member is
+blocked by its absence, or when the annual fee is small next to what the app
+earns. Until then the adapter sits complete and hidden, which costs nothing.
+
+### The free half, done and not done
+
+Completed 2026-08-19 and banked, since none of it expires:
+
+- **OAuth consent screen filled in**: app name, support and developer emails,
+  authorised domain `ikigaro.com`, home page `https://ikigaro.com`, privacy
+  policy `https://app.ikigaro.com/privacy`, terms `https://app.ikigaro.com/terms`.
+
+Still outstanding, and each is cheap when the time comes:
+
+- **The app logo** on the consent screen. Needs a file nobody has supplied.
+- **Domain verification for `ikigaro.com`** in Search Console. The property
+  exists under the right account but sits unverified, and finishing it needs a
+  **DNS TXT record**, which is a production DNS change. Held deliberately rather
+  than done unprompted. Never expires, so it is worth banking whenever somebody
+  is comfortable making that change.
+- **`ikigaro.com` does not link to a privacy policy anywhere.** Google's
+  reviewers expect the registered homepage to link one, so this is a real
+  blocker for any future submission. Note that the marketing site is a
+  **separate codebase**: this repo serves `app.ikigaro.com`, whose own landing
+  page does link both privacy and terms.
+- **The business name is inconsistent** across surfaces: the site says
+  "Ikigaro", "IKIGARO OS" and "Ikigaro Club", the Cloud project says "Ikigaro",
+  and the legal entity is Avisa Innovation LLP. Worth aligning before a
+  reviewer compares them.
+
+Not started, and correctly so: the scope justification and the demonstration
+video, both of which only matter at submission.
 
 ### What is still hidden, and what would unhide it
 
