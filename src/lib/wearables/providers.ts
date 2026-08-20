@@ -493,32 +493,41 @@ const GH_SCOPE_METRICS =
 const GH_SCOPE_SLEEP = "https://www.googleapis.com/auth/googlehealth.sleep.readonly";
 
 /**
- * WHAT WE ASK GOOGLE FOR, AND WHY IT IS CURRENTLY ONE SCOPE OUT OF THREE.
+ * WHAT WE ASK GOOGLE FOR: all three, and here is why the reduction was undone.
  *
- * THE COST IS PER SCOPE CLASS, NOT PER APP. A *sensitive* Google scope is a
- * free verification that takes three to five business days. A *restricted*
- * one is four to six weeks, a Limited Use privacy review, and an **annual
- * paid CASA security assessment**, triggered because we store this data on
- * our own servers. Google say "most scopes for the Google Health API are
- * restricted" without saying which, so the cheapest possible request is the
- * one worth submitting first.
+ * ON 2026-08-19 THIS WAS CUT TO `activity_and_fitness` ALONE, as a bet. The
+ * cost of this integration is set by scope CLASS: a *sensitive* scope is a free
+ * verification in three to five business days, while a *restricted* one is four
+ * to six weeks plus an ANNUAL PAID security assessment, triggered because we
+ * store the data on our own servers. Google say "most scopes for the Google
+ * Health API are restricted" without saying which, and activity looked like the
+ * likeliest exception: step counts and workouts, the descendant of Google Fit's
+ * old `fitness.activity.read`, rather than the clinical-shaped data in the other
+ * two.
  *
- * Activity is the scope most likely to sit on the sensitive side: it is step
- * counts and workouts, the direct descendant of Google Fit's old
- * `fitness.activity.read`, rather than the clinical-shaped data in the other
- * two. That is a judgement, not a fact.
+ * THE BET LOST. Google Cloud Console, checked the same day, files all three
+ * under "Your restricted scopes", with the non-sensitive and sensitive sections
+ * both empty. Activity alone is restricted. There is no free tier here at any
+ * scope combination.
  *
- * CONFIRM BEFORE SUBMITTING. Google Cloud Console labels every scope
- * non-sensitive, sensitive or restricted when you add it to the project. If
- * sleep or metrics also come back sensitive, add them to this array and the
- * fetches below switch themselves back on; if activity comes back restricted,
- * the reduction bought nothing and the decision goes back to whether Fitbit
- * is worth an annual fee. See docs/GOOGLE_VERIFICATION.md.
+ * SO THE REDUCTION IS REVERTED, because its only purpose was avoiding a fee it
+ * cannot avoid. Asking for one restricted scope and asking for three costs the
+ * same assessment; the difference is that one of those answers throws away
+ * sleep and the whole heart-rate family, which is most of what this product
+ * wants from a wearable. Paying full price for a third of the data is the worst
+ * of both.
  *
- * ADDING ONE BACK IS ONE LINE, because `fetchRange` derives what to request
- * from this array rather than repeating the list.
+ * WHAT THE EPISODE LEFT BEHIND IS WORTH KEEPING: `fetchRange` now derives what
+ * to request from this array rather than repeating it, so a member who declines
+ * a scope at Google's consent screen no longer causes a guaranteed 403 per
+ * collection per night. That was always a bug; the reduction only made it
+ * visible. See `ghScope`.
+ *
+ * NOTE FOR WHOEVER REVISITS THIS. The question is no longer which scopes to
+ * ask for. It is whether Fitbit and Google Health are worth $500 to $4,500 a
+ * year, which at present they are not. See docs/GOOGLE_VERIFICATION.md.
  */
-const GOOGLE_HEALTH_SCOPES = [GH_SCOPE_ACTIVITY];
+const GOOGLE_HEALTH_SCOPES = [GH_SCOPE_ACTIVITY, GH_SCOPE_METRICS, GH_SCOPE_SLEEP];
 
 /**
  * Whether a scope is actually usable on this connection.
@@ -538,13 +547,9 @@ const GH_BASE = "https://health.googleapis.com/v4/users/me/dataTypes";
 const fitbit: WearableProvider = {
   id: "fitbit",
   name: PROVIDER_NAMES.fitbit,
-  /*
-   * NO SLEEP AND NO HEART RATE IN THIS SENTENCE, because the reduced scope set
-   * does not fetch them. The blurb tracks `GOOGLE_HEALTH_SCOPES`: widen those
-   * and this widens with them. A blurb promising what the grant cannot deliver
-   * is discovered by the member as an empty chart.
-   */
-  blurb: "Steps, workouts and VO₂ max, through your Google account.",
+  // Tracks `GOOGLE_HEALTH_SCOPES`. A blurb promising what the grant cannot
+  // deliver is discovered by the member as an empty chart.
+  blurb: "Sleep, heart rate and steps from Fitbit, Pixel Watch or your phone.",
   clientIdEnv: "FITBIT_CLIENT_ID",
   clientSecretEnv: "FITBIT_CLIENT_SECRET",
 
@@ -570,8 +575,8 @@ const fitbit: WearableProvider = {
    * when that happens.
    */
   unavailable:
-    "Fitbit signs in through Google, and our Google client is awaiting " +
-    "verification. Connections made before that would expire every seven days.",
+    "Google Health sign-in is awaiting Google's verification of our app. " +
+    "Connections made before that would expire every seven days.",
 
   // Google's own OAuth, not Fitbit's. The member signs in with a Google
   // account; a Fitbit login will not appear anywhere in this flow.

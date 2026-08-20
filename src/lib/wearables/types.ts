@@ -31,7 +31,26 @@ export type ProviderId =
  */
 export const PROVIDER_NAMES: Record<ProviderId, string> = {
   oura: "Oura",
-  fitbit: "Fitbit",
+  /*
+   * GOOGLE HEALTH, NOT FITBIT, and the rename is a correctness fix rather than
+   * a preference.
+   *
+   * The provider id stays `fitbit` because it is in redirect URIs, stored rows
+   * and env var names, and renaming that is a migration for no benefit. What
+   * this string does is different: it is the button the member presses and the
+   * label on their chart, and it was lying twice over. A member clicked
+   * "Fitbit" and landed on a GOOGLE consent screen asking for `googlehealth.*`
+   * scopes, which reads as a bait and switch and which a Google reviewer could
+   * fairly call a mismatched disclosure. And it hid the reach of the thing:
+   * this reads a Google account's health data, which a Pixel Watch, a Wear OS
+   * device or an Android phone counting steps all write to, so every one of
+   * those members was being told we did not support them.
+   *
+   * NOT TO BE CONFUSED WITH GOOGLE HEALTH CONNECT, which is the on-device
+   * Android API and needs a native app we do not have. Different product, near
+   * identical name. `device-requests.ts` keeps them apart.
+   */
+  fitbit: "Google Health",
   // WHOOP, not Whoop. Their brand guidelines set the wordmark in caps and
   // every surface they publish follows it; this string is what the app calls
   // the device out loud, so it follows it too. The other six vendors are

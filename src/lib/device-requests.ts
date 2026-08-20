@@ -60,12 +60,6 @@ const DEVICES: DeviceEntry[] = [
     aliases: ["oura", "oura ring", "oura ring 3", "oura ring 4", "oura gen 3", "oura gen 4", "ourah", "aura ring"],
   },
   {
-    key: "fitbit",
-    label: "Fitbit",
-    supported: true,
-    aliases: ["fitbit", "fit bit", "google fitbit", "fitbit charge", "fitbit sense", "fitbit versa", "fitbit inspire"],
-  },
-  {
     key: "whoop",
     label: "WHOOP",
     supported: true,
@@ -117,8 +111,15 @@ const DEVICES: DeviceEntry[] = [
     label: "Google Health Connect",
     supported: false,
     blocked: true,
-    reason: "On-device API, needs our Android app.",
-    aliases: ["health connect", "google health connect", "google health", "google fit", "googlefit", "android health", "samsung health connect"],
+    /*
+     * A DIFFERENT GOOGLE PRODUCT FROM THE ONE ABOVE, with a near identical
+     * name. Health Connect is the ON-DEVICE Android API and needs a native app.
+     * The Google Health API is a cloud API we already have an adapter for. The
+     * bare alias "google health" now belongs to that one, or somebody asking
+     * for the thing we integrate would be told we cannot do it.
+     */
+    reason: "On-device Android API, needs our Android app. Not the same as the Google Health API.",
+    aliases: ["health connect", "google health connect", "google fit", "googlefit", "android health", "samsung health connect"],
   },
   // Deliberately its own entry, NOT folded into Apple Health. An Apple Watch
   // reaches us through HealthKit, but someone naming the watch is telling us
@@ -133,12 +134,43 @@ const DEVICES: DeviceEntry[] = [
     aliases: ["apple watch", "applewatch", "iwatch", "apple watch ultra", "apple watch series", "watch os", "watchos"],
   },
 
-  // ---- Public API, no adapter yet -----------------------------------------
+  // ---- Adapter written, not connectable yet -------------------------------
   //
-  // These have a real, documented API and are queued rather than blocked. The
+  // These have a real, documented API and an audited adapter, and are queued
+  // rather than blocked: what is missing is permission, not code. The
   // distinction matters in the admin list: a request for one of these is a
-  // roadmap item, while a request for something below is an answer we can give
-  // the member today.
+  // roadmap item with a date attached, while a request for something below is
+  // an answer we can give the member today.
+  {
+    key: "fitbit",
+    /*
+     * THE KEY IS STILL `fitbit` AND THE LABEL IS NOT. The key is stored on
+     * every historical request row and renaming it would orphan them; the
+     * label is what an admin reads. What we integrate is the Google Health
+     * API, which Fitbit, Pixel Watch and Wear OS all write into.
+     */
+    label: "Google Health",
+    /*
+     * FALSE WHILE IT IS HIDDEN. `supported` answers "can this member connect
+     * today", and the provider carries an `unavailable` reason pending
+     * Google's verification of our app, so the answer is no. This said true
+     * for weeks, which told anybody asking for a Fitbit that it already worked
+     * and left them hunting for a button that was not there.
+     */
+    supported: false,
+    reason:
+      "Queued. Fitbit now signs in through Google Health, and our Google app " +
+      "is awaiting verification. Connecting before that would disconnect the " +
+      "member every seven days.",
+    aliases: [
+      "fitbit", "fit bit", "google fitbit", "fitbit charge", "fitbit sense",
+      "fitbit versa", "fitbit inspire",
+      // The other devices that write to Google Health, which the old "Fitbit"
+      // label hid from members who own one.
+      "google health", "google health api", "pixel watch", "google pixel watch",
+      "wear os", "wearos",
+    ],
+  },
   {
     key: "coros",
     // COROS, not Coros, matching PROVIDER_NAMES and their own materials.
