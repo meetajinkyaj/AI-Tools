@@ -153,9 +153,14 @@ It is the only integration on the roadmap with a recurring cash cost: Withings,
 Polar and COROS are self-serve and free, and WHOOP has a review but no fee.
 
 At single-digit testers, none of whom owns a Fitbit or a Pixel Watch, that is
-clearly not worth paying. **Not before launch.** Revisit when a real member is
-blocked by its absence, or when the annual fee is small next to what the app
-earns. Until then the adapter sits complete and hidden, which costs nothing.
+clearly not worth paying.
+
+**DECIDED 2026-08-19: Google Health stays hidden. Not before launch.** This is
+the founder's call and not a pending question, so it does not need re-opening
+every time somebody notices the adapter sitting there. Revisit when a real
+member is blocked by its absence, or when the annual fee is small next to what
+the app earns. Until then the adapter is complete, audited, hidden, and costs
+nothing to keep.
 
 ### The free half, done and not done
 
@@ -164,15 +169,29 @@ Completed 2026-08-19 and banked, since none of it expires:
 - **OAuth consent screen filled in**: app name, support and developer emails,
   authorised domain `ikigaro.com`, home page `https://ikigaro.com`, privacy
   policy `https://app.ikigaro.com/privacy`, terms `https://app.ikigaro.com/terms`.
+- **Domain ownership verified.** `https://ikigaro.com/` now reads "Ownership
+  verified" in Search Console under the project's own Google account, by a
+  `google-site-verification=` TXT record at the apex. This never expires, and
+  it is a prerequisite under every future version of the decision above, which
+  is why it was worth doing while the answer is still "not yet".
+
+  The zone went from 16 records to 17 and the apex TXT count from one to two,
+  which is what proves a record was ADDED rather than an existing one
+  overwritten. The apex SPF is byte-identical to before. That check mattered:
+  the apex carries Hostinger's mail records, and a domain may hold only one SPF
+  record, so merging the two is the tidy-looking mistake that would have broken
+  outgoing member email with nothing in this app to report it.
+
+  **Worth doing eventually:** Search Console allows a second verification
+  method under Settings, so ownership survives somebody cleaning up that TXT
+  record years from now. Not urgent.
+
+  See `EMAIL.md` for the zone as it actually stands, including two things
+  spotted in it that nobody has verified.
 
 Still outstanding, and each is cheap when the time comes:
 
 - **The app logo** on the consent screen. Needs a file nobody has supplied.
-- **Domain verification for `ikigaro.com`** in Search Console. The property
-  exists under the right account but sits unverified, and finishing it needs a
-  **DNS TXT record**, which is a production DNS change. Held deliberately rather
-  than done unprompted. Never expires, so it is worth banking whenever somebody
-  is comfortable making that change.
 - **`ikigaro.com` does not link to a privacy policy anywhere.** Google's
   reviewers expect the registered homepage to link one, so this is a real
   blocker for any future submission. Note that the marketing site is a
