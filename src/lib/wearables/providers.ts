@@ -486,18 +486,65 @@ export function googleTemperatureDeviation(
 }
 
 /** Google Health's OAuth scopes. Four metrics now share one of them. */
-const GOOGLE_HEALTH_SCOPES = [
-  "https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly",
-  "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly",
-  "https://www.googleapis.com/auth/googlehealth.sleep.readonly",
-];
+const GH_SCOPE_ACTIVITY =
+  "https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly";
+const GH_SCOPE_METRICS =
+  "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly";
+const GH_SCOPE_SLEEP = "https://www.googleapis.com/auth/googlehealth.sleep.readonly";
+
+/**
+ * WHAT WE ASK GOOGLE FOR, AND WHY IT IS CURRENTLY ONE SCOPE OUT OF THREE.
+ *
+ * THE COST IS PER SCOPE CLASS, NOT PER APP. A *sensitive* Google scope is a
+ * free verification that takes three to five business days. A *restricted*
+ * one is four to six weeks, a Limited Use privacy review, and an **annual
+ * paid CASA security assessment**, triggered because we store this data on
+ * our own servers. Google say "most scopes for the Google Health API are
+ * restricted" without saying which, so the cheapest possible request is the
+ * one worth submitting first.
+ *
+ * Activity is the scope most likely to sit on the sensitive side: it is step
+ * counts and workouts, the direct descendant of Google Fit's old
+ * `fitness.activity.read`, rather than the clinical-shaped data in the other
+ * two. That is a judgement, not a fact.
+ *
+ * CONFIRM BEFORE SUBMITTING. Google Cloud Console labels every scope
+ * non-sensitive, sensitive or restricted when you add it to the project. If
+ * sleep or metrics also come back sensitive, add them to this array and the
+ * fetches below switch themselves back on; if activity comes back restricted,
+ * the reduction bought nothing and the decision goes back to whether Fitbit
+ * is worth an annual fee. See docs/GOOGLE_VERIFICATION.md.
+ *
+ * ADDING ONE BACK IS ONE LINE, because `fetchRange` derives what to request
+ * from this array rather than repeating the list.
+ */
+const GOOGLE_HEALTH_SCOPES = [GH_SCOPE_ACTIVITY];
+
+/**
+ * Whether a scope is actually usable on this connection.
+ *
+ * `granted` is what the member agreed to at the consent screen, which can be
+ * LESS than we asked for: Google let people untick individual scopes. Falling
+ * back to what we declare is right for a vendor that reports nothing, and for
+ * the very first sync of a connection stored before this field existed.
+ */
+function ghScope(scope: string, granted: string | null | undefined): boolean {
+  const set = granted?.trim() ? granted.trim().split(/\s+/) : GOOGLE_HEALTH_SCOPES;
+  return set.includes(scope);
+}
 
 const GH_BASE = "https://health.googleapis.com/v4/users/me/dataTypes";
 
 const fitbit: WearableProvider = {
   id: "fitbit",
   name: PROVIDER_NAMES.fitbit,
-  blurb: "Steps, sleep and resting heart rate from Fitbit.",
+  /*
+   * NO SLEEP AND NO HEART RATE IN THIS SENTENCE, because the reduced scope set
+   * does not fetch them. The blurb tracks `GOOGLE_HEALTH_SCOPES`: widen those
+   * and this widens with them. A blurb promising what the grant cannot deliver
+   * is discovered by the member as an empty chart.
+   */
+  blurb: "Steps, workouts and VO₂ max, through your Google account.",
   clientIdEnv: "FITBIT_CLIENT_ID",
   clientSecretEnv: "FITBIT_CLIENT_SECRET",
 
@@ -563,7 +610,7 @@ const fitbit: WearableProvider = {
   refreshRotates: false,
   syncWindowDays: 7,
 
-  async fetchRange({ accessToken, start, end }) {
+  async fetchRange({ accessToken, start, end, grantedScopes }) {
     const out: DailyMetric[] = [];
     // Every Google range is closed-open, so the last day needs the day after.
     const endExclusive = nextDay(end);
@@ -623,13 +670,33 @@ const fitbit: WearableProvider = {
           `${dataType.replace(/-/g, "_")}.date < "${endExclusive}"`,
       );
 
+    /*
+     * ASK ONLY FOR WHAT WE HOLD A SCOPE FOR.
+     *
+     * Without this, a reduced scope set still fires every call and collects a
+     * 403 for each one. The tolerance below would absorb them, so nothing
+     * would visibly break, which is the problem: six guaranteed failures per
+     * member per night, spending a shared request budget to earn errors and
+     * burying any real 403 in noise.
+     *
+     * WHICH SCOPE COVERS WHAT IS NOT OBVIOUS, and VO2 max is the trap. Under
+     * the legacy Fitbit API it lived in `cardio_fitness`, and Google fold
+     * `activity` AND `cardio_fitness` into `activity_and_fitness.readonly`.
+     * So VO2 max travels with steps, not with the heart-rate family, and an
+     * activity-only grant still gets it.
+     */
+    const none = Promise.resolve<GDataPoint[]>([]);
+    const wantMetrics = ghScope(GH_SCOPE_METRICS, grantedScopes);
+    const wantActivity = ghScope(GH_SCOPE_ACTIVITY, grantedScopes);
+
     const [rhr, hrv, spo2, breathing, vo2, temp] = await Promise.all([
-      daily("daily-resting-heart-rate"),
-      daily("daily-heart-rate-variability"),
-      daily("daily-oxygen-saturation"),
-      daily("daily-respiratory-rate"),
-      daily("daily-vo2-max"),
-      daily("daily-sleep-temperature-derivations"),
+      wantMetrics ? daily("daily-resting-heart-rate") : none,
+      wantMetrics ? daily("daily-heart-rate-variability") : none,
+      wantMetrics ? daily("daily-oxygen-saturation") : none,
+      wantMetrics ? daily("daily-respiratory-rate") : none,
+      // Cardio fitness, so activity rather than metrics. See above.
+      wantActivity ? daily("daily-vo2-max") : none,
+      wantMetrics ? daily("daily-sleep-temperature-derivations") : none,
     ]);
 
     for (const p of rhr) {
@@ -680,11 +747,13 @@ const fitbit: WearableProvider = {
      * also the right question: a night belongs to the morning you wake, which
      * is the rule Oura's adapter follows for the same reason.
      */
-    const sleeps = await list(
-      "sleep",
-      `sleep.interval.end_time >= "${start}T00:00:00Z" AND ` +
-        `sleep.interval.end_time < "${endExclusive}T00:00:00Z"`,
-    );
+    const sleeps = ghScope(GH_SCOPE_SLEEP, grantedScopes)
+      ? await list(
+          "sleep",
+          `sleep.interval.end_time >= "${start}T00:00:00Z" AND ` +
+            `sleep.interval.end_time < "${endExclusive}T00:00:00Z"`,
+        )
+      : [];
     for (const p of sleeps) {
       const s = p.sleep;
       if (!s) continue;
@@ -737,9 +806,10 @@ const fitbit: WearableProvider = {
       }
     };
 
+    const noRoll = Promise.resolve({ rollupDataPoints: [] });
     const [stepRoll, energyRoll] = await Promise.all([
-      rollUp("steps"),
-      rollUp("active-energy-burned"),
+      wantActivity ? rollUp("steps") : noRoll,
+      wantActivity ? rollUp("active-energy-burned") : noRoll,
     ]);
     for (const r of stepRoll.rollupDataPoints ?? []) {
       push(out, "steps", isoFromGDate(r.civilStartTime?.date), num(r.steps?.countSum), "fitbit");
@@ -779,7 +849,12 @@ const fitbit: WearableProvider = {
    * means "they do not say", not "we know it was deliberate", which is the same
    * rule every other provider follows.
    */
-  async fetchWorkouts({ accessToken, start, end }) {
+  async fetchWorkouts({ accessToken, start, end, grantedScopes }) {
+    // Exercise sits under the activity scope. Unlike `fetchRange`, a refusal
+    // here is not tolerated further down, so an unscoped call would surface a
+    // 403 as ReauthRequired and mark a healthy connection dead.
+    if (!ghScope(GH_SCOPE_ACTIVITY, grantedScopes)) return [];
+
     const endExclusive = nextDay(end);
     const res = await providerFetch<{ dataPoints?: GDataPoint[] }>(
       "fitbit",

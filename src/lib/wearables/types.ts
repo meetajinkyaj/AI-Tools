@@ -171,6 +171,21 @@ export interface WearableProvider {
         externalUserId: string | null;
         start: string;
         end: string;
+        /**
+         * What the member ACTUALLY granted, space-separated, as the vendor
+         * reported it at the token exchange. Null when the vendor said nothing.
+         *
+         * WHY AN ADAPTER WANTS THIS. Consent screens let people decline. An
+         * adapter that fetches every collection regardless spends a request per
+         * refused scope per member per night to collect a 403, and buries any
+         * real 403 among them. Only Google's adapter reads it so far, because
+         * Google is the only vendor here that both returns the granted set and
+         * bundles enough scopes for the difference to matter.
+         *
+         * Absent means "assume everything this provider asks for", which is the
+         * old behaviour and the right default for a vendor that does not say.
+         */
+        grantedScopes?: string | null;
       }) => Promise<DailyMetric[]>)
     | null;
 
@@ -216,6 +231,8 @@ export interface WearableProvider {
     externalUserId: string | null;
     start: string;
     end: string;
+    /** As on `fetchRange`. */
+    grantedScopes?: string | null;
   }) => Promise<WorkoutSession[]>;
 
   /**

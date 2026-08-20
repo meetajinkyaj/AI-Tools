@@ -13,6 +13,27 @@ import { googleLocalDay, googleTemperatureDeviation, PROVIDERS } from "./provide
 
 const range = { accessToken: "t", externalUserId: null, start: "2026-08-01", end: "2026-08-01" };
 
+/**
+ * The full Google Health scope set, passed explicitly by the Fitbit tests.
+ *
+ * WHY THE TESTS NAME THESE RATHER THAN INHERITING THEM. What the adapter asks
+ * for is currently reduced to activity alone, to keep the app out of Google's
+ * restricted-scope tier and its annual paid security assessment. The knowledge
+ * encoded below, the shape of every daily collection Google returns and the
+ * traps in each one, was expensive to acquire and stays true whatever we
+ * happen to request this month. So these tests pass the granted set directly
+ * and keep exercising all of it; when a scope is added back, its parsing is
+ * already proven rather than newly written. See GOOGLE_HEALTH_SCOPES.
+ */
+const ALL_GH_SCOPES = [
+  "https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly",
+  "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly",
+  "https://www.googleapis.com/auth/googlehealth.sleep.readonly",
+].join(" ");
+
+/** `range`, plus every scope, for the tests that check payload parsing. */
+const fullRange = { ...range, grantedScopes: ALL_GH_SCOPES };
+
 /** Routes a stubbed fetch by URL fragment, since one sync hits several paths. */
 function route(map: Record<string, unknown>) {
   vi.stubGlobal(
@@ -286,17 +307,30 @@ describe("Google Health OAuth", () => {
     });
   });
 
-  it("requests three scopes, all read-only", () => {
-    expect(fitbit.scopes).toHaveLength(3);
+  it("asks for read-only Google Health scopes and nothing else", () => {
+    expect(fitbit.scopes.length).toBeGreaterThan(0);
     for (const s of fitbit.scopes) {
       expect(s).toMatch(/^https:\/\/www\.googleapis\.com\/auth\/googlehealth\./);
       expect(s).toMatch(/\.readonly$/);
     }
-    // Four legacy scopes collapsed into this one bundle, so heart rate, SpO2,
-    // respiratory rate and temperature now arrive or refuse together.
-    expect(fitbit.scopes).toContain(
-      "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly",
-    );
+  });
+
+  it("asks for activity alone, to stay out of Google's restricted tier", () => {
+    /*
+     * THE SCOPE CLASS IS THE PRICE. A sensitive Google scope is a free
+     * verification in three to five business days. A restricted one is four to
+     * six weeks plus an ANNUAL PAID security assessment, triggered because we
+     * store this data on our own servers. Google say most Google Health scopes
+     * are restricted without saying which, so we submit the smallest request
+     * that is still a product.
+     *
+     * If this ever grows back to three, that should be because Google Cloud
+     * Console said those scopes are merely sensitive, or because somebody
+     * decided the annual fee is worth paying. Not by drift.
+     */
+    expect(fitbit.scopes).toEqual([
+      "https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly",
+    ]);
   });
 
   it("does not claim Google rotates refresh tokens, because it does not", () => {
@@ -312,7 +346,7 @@ describe("Google Health daily collections", () => {
     // Google's spec really does want both spellings of one data type in a
     // single request. Getting it uniform either way returns nothing.
     const calls = captureFetch();
-    return fitbit.fetchRange!(range).then(() => {
+    return fitbit.fetchRange!(fullRange).then(() => {
       const hrv = calls.find((c) => c.url.includes("daily-heart-rate-variability"));
       expect(hrv, "path should be kebab-case").toBeTruthy();
       expect(decodeURIComponent(hrv!.url)).toContain("daily_heart_rate_variability.date");
@@ -321,7 +355,7 @@ describe("Google Health daily collections", () => {
 
   it("asks for a closed-open range, so the last day is not dropped", async () => {
     const calls = captureFetch();
-    await fitbit.fetchRange!(range);
+    await fitbit.fetchRange!(fullRange);
     const hrv = calls.find((c) => c.url.includes("daily-heart-rate-variability"))!;
     const filter = decodeURIComponent(hrv.url);
     expect(filter).toContain('>= "2026-08-01"');
@@ -354,7 +388,7 @@ describe("Google Health daily collections", () => {
         dataPoints: [{ dailyVo2Max: { vo2Max: 46.1, date: gd("2026-08-01") } }],
       },
     });
-    const out = await fitbit.fetchRange!(range);
+    const out = await fitbit.fetchRange!(fullRange);
     const at = (m: string) => out.find((x) => x.metric === m)?.value;
     // beatsPerMinute is an int64, which JSON carries as a STRING.
     expect(at("resting_heart_rate")).toBe(54);
@@ -384,7 +418,7 @@ describe("Google Health daily collections", () => {
         return new Response(JSON.stringify({}), { status: 200 });
       }),
     );
-    const out = await fitbit.fetchRange!(range);
+    const out = await fitbit.fetchRange!(fullRange);
     expect(out.find((m) => m.metric === "resting_heart_rate")?.value).toBe(51);
     expect(out.some((m) => m.metric === "spo2")).toBe(false);
   });
@@ -418,7 +452,7 @@ describe("Google Health skin temperature, the Whoop trap in a new coat", () => {
         ],
       },
     });
-    const out = await fitbit.fetchRange!(range);
+    const out = await fitbit.fetchRange!(fullRange);
     expect(out.find((m) => m.metric === "temperature_deviation")?.value).toBe(0.4);
   });
 });
@@ -428,7 +462,7 @@ describe("Google Health sleep", () => {
     // Sleep is explicitly excluded from the civil-start-time filter every
     // other session type uses, and wants RFC-3339 on interval.end_time.
     const calls = captureFetch();
-    await fitbit.fetchRange!(range);
+    await fitbit.fetchRange!(fullRange);
     const sleep = calls.find((c) => c.url.includes("/sleep/dataPoints"))!;
     const filter = decodeURIComponent(sleep.url);
     expect(filter).toContain("sleep.interval.end_time");
@@ -453,7 +487,7 @@ describe("Google Health sleep", () => {
         ],
       },
     });
-    const out = await fitbit.fetchRange!(range);
+    const out = await fitbit.fetchRange!(fullRange);
     const sleep = out.find((m) => m.metric === "sleep_minutes");
     expect(sleep?.value).toBe(431);
     expect(sleep?.date).toBe("2026-08-01");
@@ -480,7 +514,7 @@ describe("Google Health sleep", () => {
         ],
       },
     });
-    const out = await fitbit.fetchRange!(range);
+    const out = await fitbit.fetchRange!(fullRange);
     expect(out.some((m) => m.metric === "sleep_minutes")).toBe(false);
   });
 
@@ -502,7 +536,7 @@ describe("Google Health sleep", () => {
         ],
       },
     });
-    const out = await fitbit.fetchRange!(range);
+    const out = await fitbit.fetchRange!(fullRange);
     // Efficiency is derivable and means something different from Oura's score.
     expect(out.some((m) => m.metric === "sleep_score")).toBe(false);
   });
@@ -511,7 +545,7 @@ describe("Google Health sleep", () => {
 describe("Google Health rollups", () => {
   it("POSTs dailyRollUp with a capital U, which their own guide gets wrong", async () => {
     const calls = captureFetch();
-    await fitbit.fetchRange!(range);
+    await fitbit.fetchRange!(fullRange);
     const steps = calls.find((c) => c.url.includes("/steps/dataPoints"))!;
     expect(steps.url).toContain(":dailyRollUp");
     expect(steps.url).not.toContain(":dailyRollup");
@@ -533,7 +567,7 @@ describe("Google Health rollups", () => {
         ],
       },
     });
-    const out = await fitbit.fetchRange!(range);
+    const out = await fitbit.fetchRange!(fullRange);
     expect(out.find((m) => m.metric === "steps")?.value).toBe(9412);
     expect(out.find((m) => m.metric === "active_calories")?.value).toBe(612.5);
   });
@@ -564,7 +598,7 @@ describe("Google Health exercise", () => {
     // Google report millimetres. Reading them as metres would turn a 5km run
     // into 5,000km and nothing would fail.
     captureFetch({ "/exercise/dataPoints": { dataPoints: [exercise()] } });
-    const out = await fitbit.fetchWorkouts!(range);
+    const out = await fitbit.fetchWorkouts!(fullRange);
     expect(out[0].distanceM).toBe(5000);
     expect(out[0].calories).toBe(340);
     expect(out[0].avgHeartRate).toBe(148);
@@ -580,7 +614,7 @@ describe("Google Health exercise", () => {
         ],
       },
     });
-    const out = await fitbit.fetchWorkouts!(range);
+    const out = await fitbit.fetchWorkouts!(fullRange);
     expect(out[0].autoDetected).toBe(true);
   });
 
@@ -591,7 +625,7 @@ describe("Google Health exercise", () => {
       captureFetch({
         "/exercise/dataPoints": { dataPoints: [exercise({}, { recordingMethod: method })] },
       });
-      const out = await fitbit.fetchWorkouts!(range);
+      const out = await fitbit.fetchWorkouts!(fullRange);
       expect(out[0].autoDetected, method).toBe(false);
     }
   });
@@ -600,7 +634,7 @@ describe("Google Health exercise", () => {
     const e = exercise();
     delete (e as Record<string, unknown>).name;
     captureFetch({ "/exercise/dataPoints": { dataPoints: [e] } });
-    const out = await fitbit.fetchWorkouts!(range);
+    const out = await fitbit.fetchWorkouts!(fullRange);
     // Start plus type: a member cannot begin two runs at the same instant.
     expect(out[0].externalId).toBe("2026-08-01T07:00:00Z:RUNNING");
   });
@@ -611,8 +645,113 @@ describe("Google Health exercise", () => {
         dataPoints: [null, { exercise: { displayName: "Broken" } }, exercise()],
       },
     });
-    const out = await fitbit.fetchWorkouts!(range);
+    const out = await fitbit.fetchWorkouts!(fullRange);
     expect(out).toHaveLength(1);
+  });
+});
+
+describe("Google Health asks only for what it was granted", () => {
+  /**
+   * A member can untick scopes at Google's consent screen, and the app itself
+   * now requests a reduced set. Either way the adapter must not call
+   * collections it has no scope for: each one is a guaranteed 403, spending a
+   * shared request budget per member per night to earn an error, and burying
+   * any real 403 in the noise.
+   */
+
+  const activityOnly = {
+    ...range,
+    grantedScopes:
+      "https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly",
+  };
+
+  /** Every URL the adapter asked for. */
+  function recordCalls(): string[] {
+    const seen: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        seen.push(String(url));
+        return new Response(JSON.stringify({ dataPoints: [], rollupDataPoints: [] }), {
+          status: 200,
+        });
+      }),
+    );
+    return seen;
+  }
+
+  it("skips the heart-rate family when only activity was granted", async () => {
+    const seen = recordCalls();
+    await fitbit.fetchRange!(activityOnly);
+    for (const dataType of [
+      "daily-resting-heart-rate",
+      "daily-heart-rate-variability",
+      "daily-oxygen-saturation",
+      "daily-respiratory-rate",
+      "daily-sleep-temperature-derivations",
+    ]) {
+      expect(seen.some((u) => u.includes(dataType)), dataType).toBe(false);
+    }
+  });
+
+  it("skips sleep when only activity was granted", async () => {
+    const seen = recordCalls();
+    await fitbit.fetchRange!(activityOnly);
+    expect(seen.some((u) => /\/sleep\/dataPoints/.test(u))).toBe(false);
+  });
+
+  it("still fetches VO2 max, because that is activity and not a health metric", async () => {
+    /*
+     * THE TRAP THIS PINS. Under the legacy Fitbit API, VO2 max lived in
+     * `cardio_fitness`, and Google fold `activity` AND `cardio_fitness` into
+     * `activity_and_fitness.readonly`. Filed with the heart-rate family by
+     * eye, it would be silently dropped from an activity-only grant, and the
+     * member would simply never see a number they are entitled to.
+     */
+    const seen = recordCalls();
+    await fitbit.fetchRange!(activityOnly);
+    expect(seen.some((u) => u.includes("daily-vo2-max"))).toBe(true);
+  });
+
+  it("still fetches steps and active energy", async () => {
+    const seen = recordCalls();
+    await fitbit.fetchRange!(activityOnly);
+    expect(seen.some((u) => u.includes("/steps/"))).toBe(true);
+    expect(seen.some((u) => u.includes("/active-energy-burned/"))).toBe(true);
+  });
+
+  it("returns no workouts at all without the activity scope", async () => {
+    /*
+     * Not merely skipped: `fetchWorkouts` has no per-collection tolerance, so
+     * an unscoped call would raise a 403, which `providerFetch` turns into
+     * ReauthRequired, which marks a perfectly healthy connection expired and
+     * asks the member to reconnect something that never failed.
+     */
+    const seen = recordCalls();
+    const out = await fitbit.fetchWorkouts!({
+      ...range,
+      grantedScopes:
+        "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly",
+    });
+    expect(out).toEqual([]);
+    expect(seen).toEqual([]);
+  });
+
+  it("falls back to the declared scopes when the vendor said nothing", async () => {
+    // An older connection row, stored before the granted set was recorded.
+    // Assuming everything we ask for is the old behaviour and the safe default.
+    const seen = recordCalls();
+    await fitbit.fetchRange!({ ...range, grantedScopes: null });
+    expect(seen.some((u) => u.includes("daily-vo2-max"))).toBe(true);
+  });
+
+  it("does not treat an all-skipped sync as a failure", async () => {
+    // Nothing was called, so nothing failed. A member who granted nothing
+    // useful gets an empty result, not a connection marked dead.
+    recordCalls();
+    await expect(
+      fitbit.fetchRange!({ ...range, grantedScopes: "https://example.invalid/nothing" }),
+    ).resolves.toEqual([]);
   });
 });
 
@@ -623,7 +762,7 @@ describe("Google Health failure handling", () => {
     // A member who declines the health scopes gets 403 on everything, and that
     // has to reach the sweep rather than presenting as a healthy empty week.
     vi.stubGlobal("fetch", vi.fn(async () => new Response("denied", { status: 403 })));
-    await expect(fitbit.fetchRange!(range)).rejects.toThrow();
+    await expect(fitbit.fetchRange!(fullRange)).rejects.toThrow();
   });
 
   it("tolerates a partial refusal, which is a member declining one scope", async () => {
@@ -643,7 +782,7 @@ describe("Google Health failure handling", () => {
         );
       }),
     );
-    const out = await fitbit.fetchRange!(range);
+    const out = await fitbit.fetchRange!(fullRange);
     expect(out.find((m) => m.metric === "resting_heart_rate")?.value).toBe(52);
   });
 
@@ -651,7 +790,7 @@ describe("Google Health failure handling", () => {
     // Nothing wrong, nothing recorded. This must not throw, or a member who
     // simply did not wear the device would see their connection degrade.
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })));
-    await expect(fitbit.fetchRange!(range)).resolves.toEqual([]);
+    await expect(fitbit.fetchRange!(fullRange)).resolves.toEqual([]);
   });
 });
 

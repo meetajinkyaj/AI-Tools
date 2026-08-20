@@ -110,6 +110,98 @@ from approval, and letting it lapse takes the app back to unverified.
 
 ---
 
+## Decided 2026-08-19: submit for the reduced scope, and do the free half now
+
+**The adapter now requests one scope, `activity_and_fitness.readonly`, instead
+of three.** Steps, active energy, workouts and VO2 max. No sleep, no heart-rate
+family.
+
+**Why activity and not one of the others.** It is the scope most likely to sit
+on the sensitive side rather than the restricted one: step counts and workouts,
+the direct descendant of Google Fit's old `fitness.activity.read`, rather than
+the clinical-shaped data in the other two. That is a judgement and not a fact,
+which is what the console check above is for. If activity turns out to be
+restricted anyway, the reduction bought nothing and the decision reverts to
+whether Fitbit is worth an annual fee.
+
+**VO2 max survives the cut, which is not obvious.** Under the legacy Fitbit API
+it lived in `cardio_fitness`, and Google fold `activity` AND `cardio_fitness`
+into `activity_and_fitness.readonly`. Filed with the heart-rate family by eye,
+it would have been dropped silently. A test pins it.
+
+**The adapter no longer calls what it has no scope for.** It reads the granted
+set off the connection, so a member who declines a scope, or a reduced request
+like this one, stops the useless calls rather than absorbing a 403 per
+collection per member per night. `fetchWorkouts` returns empty rather than
+calling, because a 403 there is not tolerated further down and would mark a
+healthy connection expired.
+
+### What is still hidden, and what would unhide it
+
+The `unavailable` flag stays on until the client is published, because the
+seven-day refresh token expiry in Testing mode has not changed. Publishing is
+what removes it, and verification is what allows publishing. Deleting that one
+field remains the whole of the change.
+
+### The free half, in order
+
+Everything here costs time and no money. None of it expires, so doing it now
+means that whenever Fitbit becomes worth having, the wait is Google's queue and
+not ours.
+
+1. **Confirm the scope classification** in Google Cloud Console, as above. This
+   is first because it can invalidate the rest.
+2. **Verify `ikigaro.com` in Google Search Console**, under the same account
+   that owns the Cloud project. Minutes, permanent, and a hard prerequisite.
+3. **Check the homepage** is reachable, explains what the app does, and matches
+   the client's registered details. Google reviewers do open it.
+4. **Fill in the OAuth consent screen** completely: app name, support email,
+   logo, the homepage, the privacy policy link, the authorised domain.
+5. **Paste the scope justification** below.
+6. **Record the demonstration video.** See the note about who can record it.
+7. **Submit.** Then wait, and expect Google to come back asking for something.
+
+### The scope justification, ready to paste
+
+Google warn that vague or duplicated justifications cause delays. One scope now,
+so one justification:
+
+> **`googlehealth.activity_and_fitness.readonly`** Ikigaro shows members their
+> own daily activity beside their own blood test results, which is the
+> comparison the product exists to make. This scope provides the step count,
+> active energy and workout sessions displayed on the member's Trends screen,
+> and the VO2 max shown alongside their cardiovascular markers. Activity is also
+> what distinguishes deliberate training from ambient movement in the training
+> and recovery card. The data is read only, shown only to the member it belongs
+> to, never sold, never used for advertising, and deleted when the member
+> disconnects the device or deletes their account.
+
+### The demonstration video: who can actually record it
+
+**This does not need a Fitbit**, which is the thing that has been quietly
+blocking it.
+
+The Google Health API reads a **Google account's** health data, which Fitbit
+writes into but so do Pixel Watch, Wear OS devices, and an Android phone
+counting steps on its own. Anyone with an Android phone that has been recording
+steps has activity data to demonstrate against. Our provider is called "Fitbit"
+for historical reasons; what it actually integrates is Google Health.
+
+To record it: add the Google account as a test user on the Audience page, take
+the `unavailable` flag off locally, connect, and record the consent screen, then
+Trends with the steps visible, then Disconnect. Seven-day tokens are irrelevant
+over a five-minute recording.
+
+### One thing to fix before submitting
+
+**The app says "Fitbit" while asking for Google scopes.** The member clicks a
+button labelled Fitbit, is sent to a Google consent screen, and grants
+`googlehealth.*`. That is accurate history and confusing presentation, and a
+reviewer checking that the in-app disclosure matches what the app does may read
+it as misleading. Worth renaming the surface to name Google Health, or at least
+saying "Fitbit, through your Google account" wherever the button appears. The
+provider id can stay `fitbit`; this is a copy change, not a migration.
+
 ## The five-minute check nobody has done
 
 **Added 2026-08-19.** This page has always said "most scopes for the Google
