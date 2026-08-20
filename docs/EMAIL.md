@@ -78,6 +78,61 @@ domain below is verified.
 Add them wherever `ikigaro.com` DNS lives (Cloudflare, if that is the
 registrar). Propagation is usually minutes, occasionally a few hours.
 
+**The zone as it actually stands, read 2026-08-19**, because the table above
+describes the setup and not the result, and the two differ in a way that
+matters when somebody is editing DNS in a hurry:
+
+| Name | Type | Purpose |
+|---|---|---|
+| `ikigaro.com` | MX | `mx1`/`mx2.hostinger.com`. **Apex mail is Hostinger, not Resend** |
+| `ikigaro.com` | TXT | SPF for **Hostinger**: `v=spf1 include:_spf.mail.hostinger.com ~all` |
+| `send.ikigaro.com` | MX + TXT | Resend's own subdomain, with SPF `include:amazonses.com` |
+| `resend._domainkey` | TXT | Resend's DKIM key |
+| `hostingermail-{a,b,c}._domainkey` | CNAME | Hostinger's DKIM keys |
+| `_dmarc` | TXT | `v=DMARC1; p=none` |
+
+**Resend lives on the `send.` subdomain**, which is Resend's own recommendation
+and is worth knowing before touching the apex. An earlier note in this repo
+assumed Resend's records sat at the apex; they do not, and somebody acting on
+that assumption would be editing Hostinger's mail records believing they were
+editing ours.
+
+### Two things in that zone worth checking, neither verified
+
+Both were spotted while reading the record list for an unrelated task, and
+**neither has been tested**: there is no DNS tooling in the build environment
+and DNS-over-HTTPS is blocked, so these are reasoned from how Cloudflare works
+rather than observed. Treat them as a checklist, not as findings.
+
+**The DKIM CNAMEs are marked Proxied, and email records should be DNS only.**
+`hostingermail-a/b/c._domainkey` are CNAMEs behind Cloudflare's orange cloud.
+A proxied record answers A and AAAA queries with Cloudflare's own addresses and
+does not expose its CNAME target, and DKIM verification is a **TXT** lookup at
+`selector._domainkey.<domain>` that has to follow that CNAME to Hostinger. If
+Cloudflare is honouring the proxy flag on those names, that lookup returns
+nothing and **DKIM fails for mail sent through Hostinger**, silently, with
+receivers deciding what to do about it. `autoconfig` and `autodiscover` are
+proxied too, which would break mail client auto-setup for the same reason.
+
+It is possible Cloudflare ignores the flag on underscore names. That is exactly
+what makes this worth one command rather than an argument:
+
+```bash
+dig +short TXT hostingermail-a._domainkey.ikigaro.com
+```
+
+A DKIM key comes back: fine, nothing to do. Nothing or a Cloudflare address
+comes back: switch those records to **DNS only** (grey cloud). Cloudflare's own
+guidance is that MX, SPF, DKIM and DMARC records are never proxied.
+
+**DMARC is `p=none`, which is monitoring and not enforcement.** Anyone can
+spoof `@ikigaro.com` and receivers are told to do nothing about it. `p=none` is
+the correct place to *start*, and the point of starting there is to read the
+reports and then move to `quarantine`. There is no `rua=` reporting address on
+the record, so no reports are being collected and nothing is driving that move.
+Worth revisiting before launch rather than now: tightening DMARC while DKIM may
+be broken (see above) would send our own mail to spam.
+
 **Start this early.** It is free, needs no code, and sending reputation warms
 over days, the same reasoning as filing the Garmin application before it is
 needed.

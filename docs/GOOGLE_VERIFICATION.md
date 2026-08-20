@@ -169,22 +169,29 @@ Completed 2026-08-19 and banked, since none of it expires:
 - **OAuth consent screen filled in**: app name, support and developer emails,
   authorised domain `ikigaro.com`, home page `https://ikigaro.com`, privacy
   policy `https://app.ikigaro.com/privacy`, terms `https://app.ikigaro.com/terms`.
+- **Domain ownership verified.** `https://ikigaro.com/` now reads "Ownership
+  verified" in Search Console under the project's own Google account, by a
+  `google-site-verification=` TXT record at the apex. This never expires, and
+  it is a prerequisite under every future version of the decision above, which
+  is why it was worth doing while the answer is still "not yet".
+
+  The zone went from 16 records to 17 and the apex TXT count from one to two,
+  which is what proves a record was ADDED rather than an existing one
+  overwritten. The apex SPF is byte-identical to before. That check mattered:
+  the apex carries Hostinger's mail records, and a domain may hold only one SPF
+  record, so merging the two is the tidy-looking mistake that would have broken
+  outgoing member email with nothing in this app to report it.
+
+  **Worth doing eventually:** Search Console allows a second verification
+  method under Settings, so ownership survives somebody cleaning up that TXT
+  record years from now. Not urgent.
+
+  See `EMAIL.md` for the zone as it actually stands, including two things
+  spotted in it that nobody has verified.
 
 Still outstanding, and each is cheap when the time comes:
 
 - **The app logo** on the consent screen. Needs a file nobody has supplied.
-- **Domain verification for `ikigaro.com`** in Search Console. The property
-  exists under the right account but sits unverified, and finishing it needs a
-  **DNS TXT record**. Approved 2026-08-19 and being done, because it never
-  expires and is a prerequisite under every future version of this decision.
-
-  **The hazard, if you are the one doing it:** `ikigaro.com` already carries
-  three TXT records for Resend (SPF, DKIM and DMARC) plus an MX, per
-  `EMAIL.md`. Google's verification record is a SEPARATE, ADDITIONAL TXT record
-  at the apex. It must never be merged into, or written over, the existing SPF
-  record: a domain may hold only one SPF record, so anybody "tidying" the apex
-  TXT entries into one breaks outgoing member email, and nothing in this app
-  will report that.
 - **`ikigaro.com` does not link to a privacy policy anywhere.** Google's
   reviewers expect the registered homepage to link one, so this is a real
   blocker for any future submission. Note that the marketing site is a
