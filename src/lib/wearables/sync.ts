@@ -59,6 +59,13 @@ export interface ConnectionRow {
    * would make those casts lie in the other direction.
    */
   last_sync_at?: string | null;
+  /**
+   * The scopes the vendor said were granted, space-separated, written at the
+   * token exchange. Optional on the type for the same reason `last_sync_at` is:
+   * several call sites build one of these from a `select("*")` where it is
+   * always present, and requiring it would make those casts lie.
+   */
+  scopes?: string | null;
 }
 
 /**
@@ -689,6 +696,9 @@ export async function syncConnection(
     const metrics = await provider.fetchRange({
       accessToken: token,
       externalUserId: conn.external_user_id,
+      // What this member actually agreed to, not what we asked for. See
+      // `grantedScopes` in types.ts.
+      grantedScopes: conn.scopes ?? null,
       start: isoDay(start),
       end: isoDay(end),
     });
@@ -704,6 +714,7 @@ export async function syncConnection(
         const sessions = await provider.fetchWorkouts({
           accessToken: token,
           externalUserId: conn.external_user_id,
+          grantedScopes: conn.scopes ?? null,
           start: isoDay(start),
           end: isoDay(end),
         });

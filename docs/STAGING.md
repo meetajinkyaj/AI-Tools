@@ -72,12 +72,12 @@ In the staging project's SQL editor, run every file in
 `supabase/migrations/` **in filename order**, `0001` through the highest
 numbered file. They are idempotent, so a re-run is harmless.
 
-> **This instruction used to say "`0001` through `0015`", and staging does not
-> match it.** Checked 2026-08-18: no table matching `wearable%` exists on the
-> staging project at all. `wearable_connections` is created by **0015**, so
-> whatever ran here stopped at 0014, and everything from 0015 onward is absent.
-> See "What staging cannot currently rehearse" below before trusting staging
-> for anything.
+> **This instruction used to name a fixed upper bound, "`0001` through
+> `0015`", and that is how staging fell nine migrations behind without anyone
+> noticing.** A hard-coded ceiling in a setup guide stops being true the day
+> the next migration lands, and nothing re-reads a line like this. Hence "the
+> highest numbered file". Fixed 2026-08-19, after staging was found stalled at
+> 0012; see "How staging fell behind" below, which is worth reading once.
 
 Then confirm:
 
@@ -204,35 +204,62 @@ allow-list, not beta approval. So:
 **Testing a migration:** run it on the staging database *before* opening the PR
 that depends on it, same migration-first rule as production, rehearsed.
 
-### What staging cannot currently rehearse
+### How staging fell behind, and what it cost
 
-**Checked 2026-08-18, and this is a real gap rather than a caveat.** The staging
-project has none of the wearable schema: no `wearable_connections`, no
-`wearable_workouts`, no `wearable_source_preferences`. Since
-`wearable_connections` arrives in **0015**, staging stopped somewhere around
-0014, which means every migration from 0015 onward has only ever run in one
-place: production.
+**Resolved 2026-08-19.** Staging is now fully migrated, 0001 through 0024, and
+matches production structurally. Recording what happened because the failure
+mode is more instructive than the fix.
 
-Two consequences, and the second is the one that matters.
+Staging had stalled at **0012**. It was missing `partners` and `invite_codes`
+(created by 0013), the RLS grants on them (0014), and the entire wearable
+schema (0015 onward). Nothing surfaced it: `deploy-staging` only deploys code,
+and the smoke suite is read-only and points at *production*. It came to light
+only because a Polar migration prompted somebody to look.
 
-**Wearable features cannot be exercised on staging at all.** Any screen that
-reads a connection 500s there. Nothing in CI catches this, because
-`deploy-staging` only deploys code and the smoke suite (`smoke.yml`) is
-read-only and points at *production*, not staging.
+**Two wrong diagnoses preceded the right one**, and both were reasoned rather
+than looked up. First "stopped around 0014", from seeing the wearable tables
+missing and assuming 0015 was the boundary. Then, on checking which migration
+creates `partners`, "stopped at 0012". Only the second was right, and it was
+right because somebody grepped instead of inferring.
 
-**And the migration rehearsal above is not happening.** That rule is the thing
-that makes a production migration safe on a database with **no backups**. A
-staging project ten migrations behind cannot rehearse anything, so every
-production migration since 0015 has gone in unrehearsed. That is the actual
-risk here, not the missing tables.
+**The fix that worked did not depend on the diagnosis being right.** Rather
+than applying the missing slice, the whole set from 0001 was concatenated into
+one file wrapped in a single `begin; ... commit;` and run once. Every migration
+here is idempotent (every create uses `IF NOT EXISTS`, every backfill is
+guarded by a `WHERE` that excludes rows it has already touched), so the set
+converges from *any* starting state. Already-applied files are no-ops, and that
+is the mechanism rather than waste. **Prefer this shape next time**: a slice
+needs a correct diagnosis and a pre-flight gate, and the full set needs
+neither.
 
-Fixing it is cheap: re-run `supabase/migrations/` from `0001` in filename order
-against staging. Every file is idempotent, so the ones already applied are
-no-ops. What it does **not** fix is OAuth testing, see below.
+**What it cost:** every migration from 0013 to 0024 went into production
+unrehearsed, because the environment meant to rehearse them could not. On a
+database with no backups that is the risk this whole section exists to prevent.
 
-### Staging cannot test a wearable OAuth flow either, schema or no schema
+#### Two dialogs Supabase will show you
 
-Two independent reasons, both structural:
+Both are expected. Neither means anything is wrong.
+
+- **"Run without RLS" / "Run and enable RLS"**, on 0007 and 0008, which create
+  tables without enabling RLS in the same statement. Choose **"Run without
+  RLS"**. 0009 enables it a few files later, and that ordering is what
+  production actually has. Running the file verbatim via `psql` is the same
+  thing with no dialog.
+- **"Potential issue detected: destructive operations"**, on 0023 and 0024.
+  Triggered by `drop constraint if exists`, which each file follows immediately
+  with an `add constraint`. It is a constraint swap, not data loss. Confirm it.
+
+#### Worth copying: verify the SQL before you run it
+
+Whoever ran the 2026-08-19 backfill checked the SHA-256 of the SQL loaded into
+the editor against the file they were given, before executing. On a 109KB paste
+into a browser editor that is the difference between "I ran the migrations" and
+"I ran what arrived", and it costs one command.
+
+### Staging still cannot test a wearable OAuth flow
+
+The schema is there now, and it still cannot. Two independent reasons, both
+structural rather than incidental:
 
 1. **Worker secrets are per-environment** (§1.4). The vendor client ids and
    secrets are set on the production Worker and are *not* inherited, so a
