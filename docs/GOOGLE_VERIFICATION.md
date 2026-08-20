@@ -153,9 +153,14 @@ It is the only integration on the roadmap with a recurring cash cost: Withings,
 Polar and COROS are self-serve and free, and WHOOP has a review but no fee.
 
 At single-digit testers, none of whom owns a Fitbit or a Pixel Watch, that is
-clearly not worth paying. **Not before launch.** Revisit when a real member is
-blocked by its absence, or when the annual fee is small next to what the app
-earns. Until then the adapter sits complete and hidden, which costs nothing.
+clearly not worth paying.
+
+**DECIDED 2026-08-19: Google Health stays hidden. Not before launch.** This is
+the founder's call and not a pending question, so it does not need re-opening
+every time somebody notices the adapter sitting there. Revisit when a real
+member is blocked by its absence, or when the annual fee is small next to what
+the app earns. Until then the adapter is complete, audited, hidden, and costs
+nothing to keep.
 
 ### The free half, done and not done
 
@@ -170,9 +175,16 @@ Still outstanding, and each is cheap when the time comes:
 - **The app logo** on the consent screen. Needs a file nobody has supplied.
 - **Domain verification for `ikigaro.com`** in Search Console. The property
   exists under the right account but sits unverified, and finishing it needs a
-  **DNS TXT record**, which is a production DNS change. Held deliberately rather
-  than done unprompted. Never expires, so it is worth banking whenever somebody
-  is comfortable making that change.
+  **DNS TXT record**. Approved 2026-08-19 and being done, because it never
+  expires and is a prerequisite under every future version of this decision.
+
+  **The hazard, if you are the one doing it:** `ikigaro.com` already carries
+  three TXT records for Resend (SPF, DKIM and DMARC) plus an MX, per
+  `EMAIL.md`. Google's verification record is a SEPARATE, ADDITIONAL TXT record
+  at the apex. It must never be merged into, or written over, the existing SPF
+  record: a domain may hold only one SPF record, so anybody "tidying" the apex
+  TXT entries into one breaks outgoing member email, and nothing in this app
+  will report that.
 - **`ikigaro.com` does not link to a privacy policy anywhere.** Google's
   reviewers expect the registered homepage to link one, so this is a real
   blocker for any future submission. Note that the marketing site is a
