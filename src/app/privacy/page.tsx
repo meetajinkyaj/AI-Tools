@@ -52,7 +52,8 @@ export default function PrivacyPage() {
       <h3>Information from wearables you choose to connect</h3>
       <p>
         You can connect a wearable device or health account (for example WHOOP,
-        Oura, Fitbit, Withings, Garmin, or Ultrahuman). This is entirely
+        Oura, Google Health, Polar, COROS, Withings, Garmin, or Ultrahuman).
+        This is entirely
         optional, the Service works without it, and nothing is read until you
         complete that provider&rsquo;s own consent screen.
       </p>
@@ -86,9 +87,10 @@ export default function PrivacyPage() {
           rewards points.
         </li>
         <li>
-          <strong>Google APIs.</strong> Where a device connects through Google
-          (Fitbit now authenticates with a Google account), Ikigaro&rsquo;s use
-          and transfer of information received from Google APIs adheres to the{" "}
+          <strong>Google APIs.</strong> Google Health connects with your
+          Google account and covers devices that write to it, including Fitbit,
+          Pixel Watch and Wear OS. Ikigaro&rsquo;s use and transfer of
+          information received from Google APIs adheres to the{" "}
           <a href="https://developers.google.com/terms/api-services-user-data-policy">
             Google API Services User Data Policy
           </a>

@@ -544,7 +544,7 @@ const fitbit: WearableProvider = {
    * and this widens with them. A blurb promising what the grant cannot deliver
    * is discovered by the member as an empty chart.
    */
-  blurb: "Steps, workouts and VO₂ max, through your Google account.",
+  blurb: "Steps, workouts and VO₂ max from Fitbit, Pixel Watch or your phone.",
   clientIdEnv: "FITBIT_CLIENT_ID",
   clientSecretEnv: "FITBIT_CLIENT_SECRET",
 
@@ -570,8 +570,8 @@ const fitbit: WearableProvider = {
    * when that happens.
    */
   unavailable:
-    "Fitbit signs in through Google, and our Google client is awaiting " +
-    "verification. Connections made before that would expire every seven days.",
+    "Google Health sign-in is awaiting Google's verification of our app. " +
+    "Connections made before that would expire every seven days.",
 
   // Google's own OAuth, not Fitbit's. The member signs in with a Google
   // account; a Fitbit login will not appear anywhere in this flow.

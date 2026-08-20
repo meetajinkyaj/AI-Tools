@@ -192,15 +192,29 @@ the `unavailable` flag off locally, connect, and record the consent screen, then
 Trends with the steps visible, then Disconnect. Seven-day tokens are irrelevant
 over a five-minute recording.
 
-### One thing to fix before submitting
+### The copy now says Google Health, done 2026-08-19
 
-**The app says "Fitbit" while asking for Google scopes.** The member clicks a
-button labelled Fitbit, is sent to a Google consent screen, and grants
-`googlehealth.*`. That is accurate history and confusing presentation, and a
-reviewer checking that the in-app disclosure matches what the app does may read
-it as misleading. Worth renaming the surface to name Google Health, or at least
-saying "Fitbit, through your Google account" wherever the button appears. The
-provider id can stay `fitbit`; this is a copy change, not a migration.
+The app used to say "Fitbit" while sending members to a Google consent screen
+asking for `googlehealth.*` scopes. That is accurate history and misleading
+presentation, and a reviewer checking that the in-app disclosure matches what
+the app does could fairly have called it out.
+
+Renamed on every surface a member or a reviewer sees: the connect button, the
+chart legend, the admin device list and the privacy policy. **The provider id
+stays `fitbit`**, because it is in redirect URIs, stored rows and env var
+names, and renaming that is a migration for no benefit.
+
+It also fixed something the old name was hiding. This reads a **Google
+account's** health data, which a Pixel Watch, a Wear OS watch or an Android
+phone counting steps all write to. Calling it Fitbit told every one of those
+members we did not support them. Their device names are now aliases on the
+request matcher.
+
+**Watch the two Googles.** Google Health (the cloud API we integrate) and
+Google Health Connect (the on-device Android API, which needs a native app we
+do not have) are different products with near identical names.
+`device-requests.ts` keeps them apart, and the bare phrase "google health" now
+routes to the one we can actually deliver.
 
 ## The five-minute check nobody has done
 

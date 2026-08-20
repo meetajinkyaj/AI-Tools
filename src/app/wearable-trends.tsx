@@ -63,12 +63,16 @@ const MIN_POINTS_FOR_LINE = 5;
  */
 const BRAND: Record<string, string> = {
   oura: "Oura",
-  fitbit: "Fitbit",
+  // Google Health rather than Fitbit: the grant is a Google one and the data
+  // can come from a Pixel Watch or a phone. See PROVIDER_NAMES.
+  fitbit: "Google Health",
   // Caps, per their brand guidelines. See PROVIDER_NAMES in wearables/types.
   whoop: "WHOOP",
   withings: "Withings",
   garmin: "Garmin",
   ultrahuman: "Ultrahuman",
+  coros: "COROS",
+  polar: "Polar",
 };
 
 function brandName(id: string): string {
