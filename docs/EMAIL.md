@@ -156,16 +156,52 @@ its DKIM signature and loses its SPF, so a member who forwards our mail, or
 whose address auto-forwards, hands the receiver a message that fails both. That
 is invisible until it happens and unattributable when it does.
 
-### The fix, not yet done
+### Blocked on Hostinger, and there is nothing for us to publish
 
-Publish the selector Hostinger is actually signing with. That means finding what
-Hostinger's own control panel says the DKIM record should be, since
-`hostingermail1` is not published at Hostinger's domain either, so a CNAME will
-not do it: the key has to come from their panel. Likely a TXT at
-`hostingermail1._domainkey`.
+**Checked 2026-08-20 and stopped there deliberately.** Hostinger's documented
+DKIM scheme uses exactly three selectors, published as CNAMEs:
 
-Do **not** delete `hostingermail-a/b/c` while doing it. They are harmless, and
-if Hostinger rotate selectors they may become live again.
+```
+hostingermail-{a,b,c}._domainkey  ->  hostingermail-{a,b,c}.dkim.mail.hostinger.com
+```
+
+All three are already correctly published on `ikigaro.com`, and `-a` resolves to
+a live key. **The selector their mail server actually signs with,
+`hostingermail1`, is not part of that scheme at all**:
+
+```
+hostingermail1._domainkey.ikigaro.com        ->  NXDOMAIN
+hostingermail1.dkim.mail.hostinger.com       ->  NXDOMAIN
+```
+
+So there is no CNAME target to point at and no public key to publish. This is a
+Hostinger-side inconsistency between what their server signs with and what their
+DNS scheme provides, and **no record added in Cloudflare can fix it correctly**.
+Adding a speculative one would be inventing a key, which cannot work.
+
+**Do not spend more time on our side.** The two routes that resolve it:
+
+1. **hPanel**, Emails, `ikigaro.com`, Email deliverability / DKIM. If it lists a
+   `hostingermail1` record, publish exactly that, DNS-only. If it offers
+   "regenerate DKIM records", that may re-sync the signer to the `-a/-b/-c` keys
+   that already work.
+2. **A support ticket**, which is the likelier real fix. Text ready to paste is
+   below.
+
+#### The support message
+
+> Outgoing mail from `ikigaro.com` is DKIM-signed with selector
+> `hostingermail1`, but `hostingermail1._domainkey.ikigaro.com` is not
+> provisioned and `hostingermail1.dkim.mail.hostinger.com` does not exist, so
+> receivers return `dkim=permerror (no key for signature)`. Confirmed in Gmail:
+>
+> `dkim=permerror (no key for signature) header.i=@ikigaro.com header.s=hostingermail1`
+>
+> The DKIM CNAMEs published on the domain are the documented
+> `hostingermail-a/b/c._domainkey`, all three resolving correctly, with `-a`
+> returning a live key. Please either align the signing selector with those
+> published keys, or provide the record for `hostingermail1` so it can be
+> published.
 
 ### The Resend path, still only half checked
 
@@ -192,8 +228,8 @@ is driving it forward.
 
 **The right order, and it is not the obvious one:**
 
-1. **Publish the `hostingermail1` selector** so the Hostinger path signs
-   verifiably, and confirm `dkim=pass` on a real message.
+1. **Get Hostinger to resolve the selector mismatch**, then confirm
+   `dkim=pass` on a real message. Blocked on them, not on us.
 2. Confirm the Resend path the same way.
 3. Add `rua=` so aggregate reports start arriving, and read them for a few
    weeks. Free, and changes nothing about delivery.
