@@ -97,56 +97,92 @@ assumed Resend's records sat at the apex; they do not, and somebody acting on
 that assumption would be editing Hostinger's mail records believing they were
 editing ours.
 
-### DKIM was broken by Cloudflare's proxy, found and fixed 2026-08-19
+### DKIM does not pass, and the Cloudflare fix was not the reason why
 
-**It was real.** Suspected while reading the zone for an unrelated task,
-confirmed by measurement, fixed the same day. Recording it because the failure
-mode is invisible by construction and will recur the moment somebody adds a
-mail record with the orange cloud on.
+**Two days, two findings, and the first one was not the cause.** Written out in
+order because the sequence is the lesson.
 
-**What was wrong.** `hostingermail-a/b/c._domainkey` were CNAMEs marked
-**Proxied**. A proxied Cloudflare record answers A and AAAA with Cloudflare's
-own anycast addresses and does not expose its CNAME target, and DKIM
-verification is a **TXT** lookup at `selector._domainkey.<domain>` that has to
-follow that CNAME through to Hostinger. So:
+**2026-08-19, the proxy problem, real but beside the point.**
+`hostingermail-a/b/c._domainkey` were CNAMEs marked **Proxied**. A proxied
+Cloudflare record answers A and AAAA with Cloudflare's own anycast addresses and
+does not expose its CNAME target, while DKIM verification is a **TXT** lookup
+that has to follow that CNAME to Hostinger. Measured before the fix:
 
 ```
 TXT hostingermail-a._domainkey.ikigaro.com  ->  (empty)
 A   hostingermail-a._domainkey.ikigaro.com  ->  104.21.74.251, 172.67.209.16
 ```
 
-Empty TXT where a key should be, and Cloudflare's IPs underneath. **Mail from
-the Hostinger mailbox was going out unsigned**, and receivers were deciding for
-themselves what to do about it. Nothing anywhere reports this: not the app, not
-Cloudflare, not Hostinger. `autoconfig` and `autodiscover` were proxied for the
-same reason, which breaks mail client auto-setup.
+The proxy was turned off on those three plus `autoconfig` and `autodiscover`,
+the zone stayed at 17 records, and the keys began resolving. **This was reported
+as "DKIM fixed". It was not.**
 
-**The fix** was turning the proxy off (grey cloud, "DNS only") on those five
-records and nothing else. The zone stayed at 17 records, which is what proves a
-toggle rather than a delete-and-recreate. **MX, SPF, DKIM and DMARC records are
-never proxied**, which is Cloudflare's own guidance and is now the rule here.
+**2026-08-20, the actual cause, found by sending a real message.** Gmail's
+verdict on mail from `team@ikigaro.com`:
 
-**Do not be fooled by selectors b and c.** After the fix, selector `a` returns
-a real 408-byte key while `b` and `c` return `v=DKIM1;p=` with an empty key.
-That is not a leftover of this bug: Hostinger provisions three selectors for
-rotation and only signs with one, and the empty placeholders live on
-Hostinger's side. Selector `a` is the live one. Somebody checking `b` in future
-will think it is broken; it is not.
+```
+dkim=permerror (no key for signature) header.i=@ikigaro.com header.s=hostingermail1
+spf=pass   (designates 23.83.217.12 as permitted sender)
+dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=ikigaro.com
+```
 
-**Member email was never affected**, and it is worth being exact about why.
-App mail goes through Resend, DKIM-signed via `resend._domainkey` (a TXT
-record, DNS-only, which returned a valid key throughout) with the envelope on
-`send.ikigaro.com`. The broken records were Hostinger's, which is the human
-mailbox. What was affected is a person replying from the company mailbox.
+**Hostinger signs with `s=hostingermail1`.** The records in DNS are
+`hostingermail-a`, `-b` and `-c`. Different names.
+`hostingermail1._domainkey.ikigaro.com` is **NXDOMAIN**, so a receiver looks up
+the key named in the signature, finds nothing, and returns `permerror`. Gmail
+displays that as DKIM FAIL.
 
-### The one check that has not been done
+So the records that were un-proxied are **not the selector Hostinger actually
+uses**. Fixing their proxy status was correct housekeeping (mail records should
+never be proxied, and `autoconfig` / `autodiscover` genuinely needed it) and it
+changed the DKIM outcome not at all.
 
-**DNS resolving is necessary, not sufficient.** The definitive test is a real
-message: send from the Hostinger mailbox to an address you control, open the
-raw headers, and look for `dkim=pass` in `Authentication-Results`. Anything
-else, including everything above, is inference about what receivers will do.
+**WHY THE FIRST ANSWER LOOKED SO CONVINCING.** A broken thing was found, it was
+genuinely broken, fixing it made the symptom under observation go away, and the
+symptom under observation was the wrong one. "The key now resolves" is not "the
+message now verifies", and only a real message tells you which you have. That
+gap is the whole reason the end-to-end test exists, and it is worth remembering
+the next time a DNS fix looks self-evidently complete.
 
-Worth five minutes, and it also settles the question below.
+### What this costs today, and what it risks
+
+**Mail is being delivered.** SPF passes and DMARC passes through SPF alignment,
+so the Hostinger mailbox reaches inboxes now: the test landed in Inbox, not
+Spam or Promotions.
+
+**It is riding on SPF alone.** DKIM contributes nothing, so there is no fallback
+in the one case SPF cannot survive: **forwarding**. A forwarded message keeps
+its DKIM signature and loses its SPF, so a member who forwards our mail, or
+whose address auto-forwards, hands the receiver a message that fails both. That
+is invisible until it happens and unattributable when it does.
+
+### The fix, not yet done
+
+Publish the selector Hostinger is actually signing with. That means finding what
+Hostinger's own control panel says the DKIM record should be, since
+`hostingermail1` is not published at Hostinger's domain either, so a CNAME will
+not do it: the key has to come from their panel. Likely a TXT at
+`hostingermail1._domainkey`.
+
+Do **not** delete `hostingermail-a/b/c` while doing it. They are harmless, and
+if Hostinger rotate selectors they may become live again.
+
+### The Resend path, still only half checked
+
+`resend._domainkey.ikigaro.com` publishes a valid key and did so throughout,
+from all four public resolvers, so the members' path was never affected by any
+of this. **It has still not been proven with a real message**, because no app
+mail exists in the test inbox yet (pre-launch) and the admin console sits behind
+Cloudflare Access.
+
+Closing it takes seconds when somebody is in the admin console: **Email, compose
+anything, "Send test to me"**, then Show original on the result. Expect
+`dkim=pass d=ikigaro.com` via the Resend selector, SPF evaluated against
+`send.ikigaro.com`, both aligning to `ikigaro.com` under relaxed mode.
+
+Note that `team@ikigaro.com` is deliberately both the app's `From` (through
+Resend) and a real Hostinger mailbox that receives replies, so **the same
+address sends down both paths** and needs DKIM working on each.
 
 ### DMARC is `p=none`, and the order of operations matters
 
@@ -156,14 +192,16 @@ is driving it forward.
 
 **The right order, and it is not the obvious one:**
 
-1. Confirm `dkim=pass` on a real message, per above.
-2. Add `rua=` so aggregate reports start arriving, and read them for a few
-   weeks. This is free and changes nothing about delivery.
-3. Only then consider `p=quarantine`.
+1. **Publish the `hostingermail1` selector** so the Hostinger path signs
+   verifiably, and confirm `dkim=pass` on a real message.
+2. Confirm the Resend path the same way.
+3. Add `rua=` so aggregate reports start arriving, and read them for a few
+   weeks. Free, and changes nothing about delivery.
+4. Only then consider `p=quarantine`.
 
-Tightening DMARC before step 1 is how a domain sends its own mail to spam. That
-was the reason to leave it alone while DKIM was suspect; DKIM is now fixed, so
-the blocker is gone and step 1 is the next move.
+**Do not skip to step 4.** The Hostinger path currently survives on SPF
+alignment alone, so tightening the policy while DKIM fails is how a domain
+sends its own mail to spam.
 
 ### One thing the apex SPF does not cover
 
