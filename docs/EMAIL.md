@@ -97,45 +97,86 @@ assumed Resend's records sat at the apex; they do not, and somebody acting on
 that assumption would be editing Hostinger's mail records believing they were
 editing ours.
 
-### Two things in that zone worth checking, neither verified
+### DKIM was broken by Cloudflare's proxy, found and fixed 2026-08-19
 
-Both were spotted while reading the record list for an unrelated task, and
-**neither has been tested**: there is no DNS tooling in the build environment
-and DNS-over-HTTPS is blocked, so these are reasoned from how Cloudflare works
-rather than observed. Treat them as a checklist, not as findings.
+**It was real.** Suspected while reading the zone for an unrelated task,
+confirmed by measurement, fixed the same day. Recording it because the failure
+mode is invisible by construction and will recur the moment somebody adds a
+mail record with the orange cloud on.
 
-**The DKIM CNAMEs are marked Proxied, and email records should be DNS only.**
-`hostingermail-a/b/c._domainkey` are CNAMEs behind Cloudflare's orange cloud.
-A proxied record answers A and AAAA queries with Cloudflare's own addresses and
-does not expose its CNAME target, and DKIM verification is a **TXT** lookup at
-`selector._domainkey.<domain>` that has to follow that CNAME to Hostinger. If
-Cloudflare is honouring the proxy flag on those names, that lookup returns
-nothing and **DKIM fails for mail sent through Hostinger**, silently, with
-receivers deciding what to do about it. `autoconfig` and `autodiscover` are
-proxied too, which would break mail client auto-setup for the same reason.
+**What was wrong.** `hostingermail-a/b/c._domainkey` were CNAMEs marked
+**Proxied**. A proxied Cloudflare record answers A and AAAA with Cloudflare's
+own anycast addresses and does not expose its CNAME target, and DKIM
+verification is a **TXT** lookup at `selector._domainkey.<domain>` that has to
+follow that CNAME through to Hostinger. So:
 
-It is possible Cloudflare ignores the flag on underscore names. That is exactly
-what makes this worth one command rather than an argument:
-
-```bash
-dig +short TXT hostingermail-a._domainkey.ikigaro.com
+```
+TXT hostingermail-a._domainkey.ikigaro.com  ->  (empty)
+A   hostingermail-a._domainkey.ikigaro.com  ->  104.21.74.251, 172.67.209.16
 ```
 
-A DKIM key comes back: fine, nothing to do. Nothing or a Cloudflare address
-comes back: switch those records to **DNS only** (grey cloud). Cloudflare's own
-guidance is that MX, SPF, DKIM and DMARC records are never proxied.
+Empty TXT where a key should be, and Cloudflare's IPs underneath. **Mail from
+the Hostinger mailbox was going out unsigned**, and receivers were deciding for
+themselves what to do about it. Nothing anywhere reports this: not the app, not
+Cloudflare, not Hostinger. `autoconfig` and `autodiscover` were proxied for the
+same reason, which breaks mail client auto-setup.
 
-**DMARC is `p=none`, which is monitoring and not enforcement.** Anyone can
-spoof `@ikigaro.com` and receivers are told to do nothing about it. `p=none` is
-the correct place to *start*, and the point of starting there is to read the
-reports and then move to `quarantine`. There is no `rua=` reporting address on
-the record, so no reports are being collected and nothing is driving that move.
-Worth revisiting before launch rather than now: tightening DMARC while DKIM may
-be broken (see above) would send our own mail to spam.
+**The fix** was turning the proxy off (grey cloud, "DNS only") on those five
+records and nothing else. The zone stayed at 17 records, which is what proves a
+toggle rather than a delete-and-recreate. **MX, SPF, DKIM and DMARC records are
+never proxied**, which is Cloudflare's own guidance and is now the rule here.
 
-**Start this early.** It is free, needs no code, and sending reputation warms
-over days, the same reasoning as filing the Garmin application before it is
-needed.
+**Do not be fooled by selectors b and c.** After the fix, selector `a` returns
+a real 408-byte key while `b` and `c` return `v=DKIM1;p=` with an empty key.
+That is not a leftover of this bug: Hostinger provisions three selectors for
+rotation and only signs with one, and the empty placeholders live on
+Hostinger's side. Selector `a` is the live one. Somebody checking `b` in future
+will think it is broken; it is not.
+
+**Member email was never affected**, and it is worth being exact about why.
+App mail goes through Resend, DKIM-signed via `resend._domainkey` (a TXT
+record, DNS-only, which returned a valid key throughout) with the envelope on
+`send.ikigaro.com`. The broken records were Hostinger's, which is the human
+mailbox. What was affected is a person replying from the company mailbox.
+
+### The one check that has not been done
+
+**DNS resolving is necessary, not sufficient.** The definitive test is a real
+message: send from the Hostinger mailbox to an address you control, open the
+raw headers, and look for `dkim=pass` in `Authentication-Results`. Anything
+else, including everything above, is inference about what receivers will do.
+
+Worth five minutes, and it also settles the question below.
+
+### DMARC is `p=none`, and the order of operations matters
+
+`_dmarc.ikigaro.com` reads `v=DMARC1; p=none`, with no `rua=`. So it is neither
+enforcing nor collecting the reports that would justify enforcing, and nothing
+is driving it forward.
+
+**The right order, and it is not the obvious one:**
+
+1. Confirm `dkim=pass` on a real message, per above.
+2. Add `rua=` so aggregate reports start arriving, and read them for a few
+   weeks. This is free and changes nothing about delivery.
+3. Only then consider `p=quarantine`.
+
+Tightening DMARC before step 1 is how a domain sends its own mail to spam. That
+was the reason to leave it alone while DKIM was suspect; DKIM is now fixed, so
+the blocker is gone and step 1 is the next move.
+
+### One thing the apex SPF does not cover
+
+`ikigaro.com`'s SPF is `v=spf1 include:_spf.mail.hostinger.com ~all`: Hostinger
+only, no Resend. The app sends **From: `team@ikigaro.com`** (see
+`DEFAULT_FROM` in `src/lib/email.ts`), which is the apex, while the envelope is
+`send.ikigaro.com`.
+
+Under DMARC's default **relaxed** alignment this is fine, because
+`send.ikigaro.com` and `ikigaro.com` share an organizational domain and the
+Resend DKIM signs as `ikigaro.com` anyway. It would stop being fine under
+**strict** alignment. Worth remembering at step 3 above, rather than
+discovering it when member email starts bouncing.
 
 ### 2. Set the secrets
 
