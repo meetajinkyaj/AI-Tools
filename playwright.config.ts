@@ -47,19 +47,26 @@ export default defineConfig({
   /*
    * TWO RETRIES AGAINST A DEPLOYED TARGET, ONE LOCALLY.
    *
-   * These runs cross the public internet from a GitHub runner to Cloudflare,
-   * and occasionally a connection is simply reset or aborted mid-navigation.
-   * On 2026-09-08 that produced a full red alert on the production smoke
-   * suite: 94 assertions passed, and the two that failed did so on one of the
-   * two parallel workers with `net::ERR_ABORTED; maybe frame was detached?`,
-   * against an app that was serving 200s and 404s correctly the whole time.
-   * Seven consecutive runs on the same commit had passed before it.
+   * On 2026-09-08 a full red alert fired on the production smoke suite: 94
+   * assertions passed and 2 failed, both on the mobile project. The first
+   * attempt got **HTTP 503** from the edge (`Expected: 404 Received: 503`, and
+   * a resource load failing with 503); the retry then aborted outright with
+   * `net::ERR_ABORTED; maybe frame was detached?` and timed out.
    *
-   * ONE RETRY WAS NOT ENOUGH because the flake outlives a single immediate
+   * So the app answered, briefly, with "unavailable", rather than answering
+   * wrongly. The runs immediately before AND after were green on the identical
+   * commit, and production served 200 and 404 correctly on demand minutes
+   * later.
+   *
+   * ONE RETRY WAS NOT ENOUGH because the blip outlives a single immediate
    * re-attempt: the first try and the retry land inside the same bad few
-   * seconds. A second retry costs nothing when everything is healthy, and the
-   * suite runs every thirty minutes, so a genuine outage is still caught on
-   * the next sweep even in the worst case.
+   * seconds. A second costs nothing when everything is healthy.
+   *
+   * WHAT THIS DELIBERATELY DOES NOT DO is make 5xx invisible. A 503 means real
+   * visitors in that window saw an error too, so repeated reds are a signal
+   * about the Worker (CPU or memory limits, an unhandled throw) and not about
+   * the network. Retries absorb one bad window; they must not be read as
+   * licence to ignore a cluster. See the triage in docs/TESTING.md.
    *
    * THIS DOES NOT HIDE A REAL FAILURE. A broken deploy fails all three
    * attempts, on both browser projects, every half hour. What it suppresses is
