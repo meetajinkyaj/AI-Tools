@@ -176,7 +176,46 @@ what nothing else watches.
 
 Its failure summary lists the likeliest causes in order, starting with the
 Privy allowed-domains list. GitHub emails the repo owner when a scheduled
-workflow fails; a red run means the **live app is broken right now**.
+workflow fails.
+
+### Triage a red run in two minutes, before believing it
+
+A red run usually means the live app is broken right now. **Usually.** It can
+also mean the runner could not reach Cloudflare for a few seconds. These look
+identical in the notification email and completely different in the log, so
+check in this order and stop at the first answer:
+
+1. **Was it every test, or a couple?** Scroll to the tail of the job log for
+   the `N passed` line. A broken deploy fails nearly everything. `94 passed, 2
+   failed` is not an outage.
+2. **Did it fail on both browser projects?** Failures tagged only `[mobile]` or
+   only `[desktop]`, where the same test passed on the other, are a worker
+   problem rather than an app problem. The app cannot be broken for one
+   emulated viewport and fine for the other.
+3. **Read the retry error, not the first one.** `net::ERR_ABORTED`,
+   `ERR_CONNECTION_RESET` or a bare `Test timeout` on `page.goto` are transport
+   failures: the request never got an answer. An assertion failure like
+   `Expected: 404 Received: 200` is the app misbehaving. Only the second kind
+   is an outage.
+4. **Ask production yourself**, which settles it:
+   ```bash
+   curl -sS -o /dev/null -w "%{http_code}\n" https://app.ikigaro.com/
+   curl -sS -o /dev/null -w "%{http_code}\n" https://app.ikigaro.com/nope
+   ```
+   `200` then `404` means the app is serving correctly.
+5. **Check the neighbours.** In the Actions tab, if the runs either side of the
+   red one are green on the same commit, it was a blip.
+
+**A worked example, 2026-09-08.** All-jobs-failed email, eight annotations,
+alarming. In fact: 94 passed and 2 failed, both `[mobile]` only, the retry
+error was `net::ERR_ABORTED; maybe frame was detached?`, production answered
+200 and 404 on demand, and the seven scheduled runs before it had all passed on
+the identical commit. A network blip, not an incident. Retries were raised from
+one to two afterwards, since the flake outlived a single immediate re-attempt.
+
+**Why this section exists.** The value of this monitor is entirely in being
+believed. If it cries wolf often enough to be ignored, it stops catching the
+Privy-shaped outage it was built for, and nothing else is watching.
 
 Two behavioural differences on the production target:
 - The admin UI tests skip, production serves `/admin` only on the Cloudflare

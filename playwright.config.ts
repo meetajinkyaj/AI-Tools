@@ -44,9 +44,30 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  // Deployed targets go over the public internet; one retry absorbs a flaky
-  // connection without hiding a real, reproducible failure.
-  retries: process.env.CI ? 1 : 0,
+  /*
+   * TWO RETRIES AGAINST A DEPLOYED TARGET, ONE LOCALLY.
+   *
+   * These runs cross the public internet from a GitHub runner to Cloudflare,
+   * and occasionally a connection is simply reset or aborted mid-navigation.
+   * On 2026-09-08 that produced a full red alert on the production smoke
+   * suite: 94 assertions passed, and the two that failed did so on one of the
+   * two parallel workers with `net::ERR_ABORTED; maybe frame was detached?`,
+   * against an app that was serving 200s and 404s correctly the whole time.
+   * Seven consecutive runs on the same commit had passed before it.
+   *
+   * ONE RETRY WAS NOT ENOUGH because the flake outlives a single immediate
+   * re-attempt: the first try and the retry land inside the same bad few
+   * seconds. A second retry costs nothing when everything is healthy, and the
+   * suite runs every thirty minutes, so a genuine outage is still caught on
+   * the next sweep even in the worst case.
+   *
+   * THIS DOES NOT HIDE A REAL FAILURE. A broken deploy fails all three
+   * attempts, on both browser projects, every half hour. What it suppresses is
+   * exactly one shape of noise, and that shape matters: a smoke alert nobody
+   * trusts is worse than no smoke alert, because this suite exists to catch a
+   * production outage that no other check would see.
+   */
+  retries: process.env.CI ? (isLocal ? 1 : 2) : 0,
   workers: process.env.CI ? 2 : undefined,
   // `github` annotates the failing line in the PR diff; `html` is what the
   // workflow uploads as an artifact (with traces) when something fails.
