@@ -176,7 +176,71 @@ what nothing else watches.
 
 Its failure summary lists the likeliest causes in order, starting with the
 Privy allowed-domains list. GitHub emails the repo owner when a scheduled
-workflow fails; a red run means the **live app is broken right now**.
+workflow fails.
+
+### Triage a red run in two minutes, before believing it
+
+A red run usually means the live app is broken right now. **Usually.** It can
+also mean the runner could not reach Cloudflare for a few seconds. These look
+identical in the notification email and completely different in the log, so
+check in this order and stop at the first answer:
+
+1. **Was it every test, or a couple?** Scroll to the tail of the job log for
+   the `N passed` line. A broken deploy fails nearly everything. `94 passed, 2
+   failed` is not an outage.
+2. **Did it fail on both browser projects?** Failures tagged only `[mobile]` or
+   only `[desktop]`, where the same test passed on the other, are a worker
+   problem rather than an app problem. The app cannot be broken for one
+   emulated viewport and fine for the other.
+3. **Read both errors, the first attempt AND the retry.** They often differ,
+   and the first is the informative one. Three shapes, and they mean different
+   things:
+   - **Transport.** `net::ERR_ABORTED`, `ERR_CONNECTION_RESET`, or a bare
+     `Test timeout` on `page.goto`. The request never got an answer. Network
+     weather between the runner and the edge.
+   - **Server error.** A **5xx** in the message, either directly
+     (`Expected: 404 Received: 503`) or as `Failed to load resource: the server
+     responded with a status of 503`. **The app answered, and answered
+     "unavailable".** This is the one not to wave away: real visitors in that
+     window saw an error too. Isolated, it is an edge or Worker hiccup;
+     repeated, it is the Worker hitting CPU or memory limits or throwing, and
+     that is worth chasing.
+   - **Assertion.** `Expected: 404 Received: 200`, a missing element, wrong
+     text. The app is up and behaving wrongly, which is a code or config bug.
+
+   Only the last two are about our app at all, and only the last is a
+   deployment defect.
+4. **Ask production yourself**, which settles it:
+   ```bash
+   curl -sS -o /dev/null -w "%{http_code}\n" https://app.ikigaro.com/
+   curl -sS -o /dev/null -w "%{http_code}\n" https://app.ikigaro.com/nope
+   ```
+   `200` then `404` means the app is serving correctly.
+5. **Check the neighbours.** In the Actions tab, if the runs either side of the
+   red one are green on the same commit, it was a blip.
+
+**A worked example, 2026-09-08.** All-jobs-failed email, eight annotations,
+alarming. In fact: **94 passed, 2 failed**, both `[mobile]` only, so the
+desktop copies of those same two tests passed in the same run. The **first
+attempt got HTTP 503** (`Expected: 404 Received: 503`), and the **retry**
+aborted with `net::ERR_ABORTED` and timed out. Production answered 200 and 404
+on demand minutes later and rendered fully past the splash. The runs
+immediately before (#763) and after (#765) were both green **on the identical
+commit**.
+
+Verdict: a brief 503 window at the edge, not an incident. Retries were raised
+from one to two afterwards, since it outlived a single immediate re-attempt.
+
+**The thing that was nearly got wrong here**, and the reason step 3 above lists
+three shapes rather than two: reading only the retry's `ERR_ABORTED` suggests
+pure network weather, and stops the investigation one step early. The first
+attempt's **503** is the real signal, and it says the app itself was briefly
+unavailable. Same verdict on one occurrence, different thing to watch for on
+the next.
+
+**Why this section exists.** The value of this monitor is entirely in being
+believed. If it cries wolf often enough to be ignored, it stops catching the
+Privy-shaped outage it was built for, and nothing else is watching.
 
 Two behavioural differences on the production target:
 - The admin UI tests skip, production serves `/admin` only on the Cloudflare

@@ -44,9 +44,37 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  // Deployed targets go over the public internet; one retry absorbs a flaky
-  // connection without hiding a real, reproducible failure.
-  retries: process.env.CI ? 1 : 0,
+  /*
+   * TWO RETRIES AGAINST A DEPLOYED TARGET, ONE LOCALLY.
+   *
+   * On 2026-09-08 a full red alert fired on the production smoke suite: 94
+   * assertions passed and 2 failed, both on the mobile project. The first
+   * attempt got **HTTP 503** from the edge (`Expected: 404 Received: 503`, and
+   * a resource load failing with 503); the retry then aborted outright with
+   * `net::ERR_ABORTED; maybe frame was detached?` and timed out.
+   *
+   * So the app answered, briefly, with "unavailable", rather than answering
+   * wrongly. The runs immediately before AND after were green on the identical
+   * commit, and production served 200 and 404 correctly on demand minutes
+   * later.
+   *
+   * ONE RETRY WAS NOT ENOUGH because the blip outlives a single immediate
+   * re-attempt: the first try and the retry land inside the same bad few
+   * seconds. A second costs nothing when everything is healthy.
+   *
+   * WHAT THIS DELIBERATELY DOES NOT DO is make 5xx invisible. A 503 means real
+   * visitors in that window saw an error too, so repeated reds are a signal
+   * about the Worker (CPU or memory limits, an unhandled throw) and not about
+   * the network. Retries absorb one bad window; they must not be read as
+   * licence to ignore a cluster. See the triage in docs/TESTING.md.
+   *
+   * THIS DOES NOT HIDE A REAL FAILURE. A broken deploy fails all three
+   * attempts, on both browser projects, every half hour. What it suppresses is
+   * exactly one shape of noise, and that shape matters: a smoke alert nobody
+   * trusts is worse than no smoke alert, because this suite exists to catch a
+   * production outage that no other check would see.
+   */
+  retries: process.env.CI ? (isLocal ? 1 : 2) : 0,
   workers: process.env.CI ? 2 : undefined,
   // `github` annotates the failing line in the PR diff; `html` is what the
   // workflow uploads as an artifact (with traces) when something fails.
