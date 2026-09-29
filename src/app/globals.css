@@ -277,7 +277,7 @@
   --spacing-gutter: 20px;      /* screen gutter */
   --spacing-card: 18px;        /* card padding */
   --spacing-card-tight: 16px;  /* compact rows */
-  --spacing-stack: 16px;       /* gap between cards */
+  --spacing-stack: 18px;       /* gap between cards */
   --spacing-shell-top: 70px;   /* clears the status bar */
   --spacing-shell-bottom: 130px; /* clears the floating nav */
 
@@ -304,20 +304,25 @@
   --spacing-safe-b: env(safe-area-inset-bottom);
   --spacing-safe-l: env(safe-area-inset-left);
 
-  /* --- Radii, handoff §1.5 --- */
-  --radius-ctl: 8px;       /* buttons, inputs */
-  --radius-inset: 10px;    /* segmented track, stat wells */
-  --radius-inset-pill: 7px;/* the sliding pill inside that track */
-  --radius-well: 11px;     /* icon wells */
-  --radius-card: 14px;
-  --radius-tile: 16px;     /* activity tiles */
-  --radius-tile-lg: 18px;  /* mosaic tiles */
-  --radius-sheet: 22px;
+  /* --- Radii, handoff §1.5 ---
+   * Softened one step (the "middle" setting): corners are rounder and calmer
+   * on a phone without going to full pills, so the editorial feel of the type
+   * is kept. Buttons stay short of a pill on purpose. Card 14->19 is the most
+   * visible change; the rest move proportionally so the family stays coherent.
+   */
+  --radius-ctl: 14px;      /* buttons, inputs */
+  --radius-inset: 12px;    /* segmented track, stat wells */
+  --radius-inset-pill: 9px;/* the sliding pill inside that track */
+  --radius-well: 13px;     /* icon wells */
+  --radius-card: 19px;
+  --radius-tile: 20px;     /* activity tiles */
+  --radius-tile-lg: 22px;  /* mosaic tiles */
+  --radius-sheet: 26px;
   --radius-pill: 999px;
   /* Deprecated alias of --radius-ctl. NOTE: `rounded-pill` above is new. It
      was used in twelve places and defined in none of them, so it emitted no
      CSS at all and those pills have been rendering square. */
-  --radius-control: 8px;
+  --radius-control: 14px;
 
   /*
    * --- Shadows, handoff §1.5 ---
