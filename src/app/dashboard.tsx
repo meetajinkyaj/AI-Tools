@@ -16,6 +16,14 @@ interface Summary {
   ikiScore: number;
 }
 
+/** A time-of-day greeting, from the viewer's local clock. */
+function greetingFor(date = new Date()): string {
+  const h = date.getHours();
+  if (h < 12) return "Morning";
+  if (h < 18) return "Afternoon";
+  return "Evening";
+}
+
 /** Shimmer stand-in for a stat value while the summary loads, never a fake 0. */
 function StatPlaceholder() {
   return <div className="h-8 w-16 animate-pulse rounded-ctl bg-surface-2" />;
@@ -41,6 +49,7 @@ export function Dashboard({
   refreshKey: number;
 }) {
   const firstName = profile.full_name.split(" ")[0] || profile.full_name;
+  const greeting = greetingFor();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -95,9 +104,9 @@ export function Dashboard({
     <div className="flex flex-col gap-stack">
       <header className="flex flex-col gap-1.5">
         <p className="iki-eyebrow">Home</p>
-        <h1 className="iki-title">Welcome, {firstName}</h1>
+        <h1 className="iki-title">{greeting}, {firstName}</h1>
         <p className="iki-lede">
-          Your baseline is set up. Check in daily to build your streak.
+          Your baseline is in. A quick check-in keeps your streak going.
         </p>
       </header>
 

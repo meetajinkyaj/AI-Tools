@@ -954,7 +954,7 @@ export function BiomarkerReport({
       */}
       {outOfRange.length > 0 && (
         <section className="iki-card flex flex-col gap-1.5">
-          <p className="iki-eyebrow">Needs attention</p>
+          <p className="iki-eyebrow">Worth a look</p>
           {outOfRange.map((r) => {
             const status = readingStatus(r, bandOf(r));
             return (
@@ -974,8 +974,8 @@ export function BiomarkerReport({
             );
           })}
           <p className="pt-1 text-micro text-muted">
-            General information, not a diagnosis, worth discussing with a
-            qualified professional.
+            This is information to explore, not a diagnosis. Worth a chat with
+            your doctor.
           </p>
         </section>
       )}

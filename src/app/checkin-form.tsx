@@ -134,7 +134,7 @@ export function CheckinForm({
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (energy === null) {
-      setError("Pick your energy level to check in.");
+      setError("Tap where your energy is today and you're set.");
       return;
     }
     setSubmitting(true);
@@ -289,7 +289,7 @@ export function CheckinForm({
       <header className="flex flex-col gap-1.5">
         <p className="iki-eyebrow">Daily check-in</p>
         <h1 className="iki-title">
-          {checkedInToday ? "Today's check-in" : "How are you today?"}
+          {checkedInToday ? "Today's check-in" : "How are you feeling today?"}
         </h1>
         <p className="iki-lede">
           A few seconds to log how you feel. Your first check-in each day earns iki
@@ -306,7 +306,7 @@ export function CheckinForm({
           : justSaved
             ? earned && earned > 0
               ? `Saved. You earned ${earned} iki points.`
-              : "Saved. Your check-in has been updated."
+              : "Saved. See you tomorrow."
             : ""}
       </p>
 
@@ -345,7 +345,7 @@ export function CheckinForm({
             <p className="text-body-sm font-semibold text-ink">
               {earned && earned > 0
                 ? `Done ✓ You're checked in for today and earned ${earned} iki points.`
-                : "Done ✓ Your check-in has been updated."}
+                : "Done ✓ See you tomorrow."}
             </p>
           )}
 
@@ -409,10 +409,10 @@ export function CheckinForm({
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-body-sm font-semibold text-ink">I trained today</span>
+            <span className="text-body-sm font-semibold text-ink">Did you train today?</span>
             <Switch
               checked={trainingLogged}
-              label="I trained today"
+              label="Did you train today?"
               onChange={(v) => {
                 setTrainingLogged(v);
                 markEdited();
@@ -492,7 +492,7 @@ export function CheckinForm({
               markEdited();
             }}
             maxLength={500}
-            placeholder="Anything worth noting about food today (optional)."
+            placeholder="Anything about food today? Totally optional."
           />
         </label>
 
