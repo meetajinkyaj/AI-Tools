@@ -315,6 +315,10 @@ in `src/app/switch.tsx`, since Profile uses one too)
   30-day streak heatmap: `g` checked in (solid), `p` partial (dashed: a
   check-in without sleep), `n` missed (faint). Today carries the ring.
 - `.iki-icon-well` a 36px inset circle holding an icon (device row).
+- `.iki-seal-lg` / `.iki-seal-inner` / `.iki-seal-sm` the rank sheet's 88px
+  double-ringed seal and its 38px ladder seals. `.iki-rank-sheet` the sheet's
+  padding and scroll. `.iki-btn-ceremonial-primary` the filled ceremonial pill
+  ("Share your rank").
 - `Rings` and `RankKanji` in `data-marks.tsx`: concentric progress rings and
   the rank kanji as outline SVG, coloured by token.
 

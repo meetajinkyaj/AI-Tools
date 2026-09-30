@@ -22,6 +22,7 @@ import type { RankCardInput } from "@/lib/rank-share-card";
 import { RankKanji, Rings } from "./data-marks";
 import { Icon } from "./icons";
 import { RankShareModal } from "./rank-share-modal";
+import { RankSheet } from "./rank-sheet";
 import { WearableHomeCard } from "./wearable-home-card";
 
 interface Summary {
@@ -98,6 +99,13 @@ export function Dashboard({
   const [panel, setPanel] = useState<PanelCounts | null | undefined>(undefined);
   const [rewards, setRewards] = useState<{ balance: number; unlock: NextUnlock } | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [rankOpen, setRankOpen] = useState(false);
+  const rankRowRef = useRef<HTMLButtonElement>(null);
+  const closeRank = useCallback(() => {
+    setRankOpen(false);
+    // Back to the row that opened it, not the top of the document.
+    rankRowRef.current?.focus();
+  }, []);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const loadedKey = useRef(-1);
 
@@ -161,7 +169,8 @@ export function Dashboard({
         <ScoreCard
           summary={summary}
           panel={panel ?? null}
-          onOpenRank={() => void openShare()}
+          rankRowRef={rankRowRef}
+          onOpenRank={() => setRankOpen(true)}
           onShare={() => void openShare()}
         />
       ) : (
@@ -211,6 +220,17 @@ export function Dashboard({
           device is connected. It renders itself away when neither applies. */}
       <WearableHomeCard getToken={getToken} onOpenSettings={onOpenSettings} />
 
+      {rankOpen && summary && (
+        <RankSheet
+          score={summary.ikiScore}
+          onShare={() => {
+            setRankOpen(false);
+            void openShare();
+          }}
+          onClose={closeRank}
+        />
+      )}
+
       {shareOpen && summary && (
         <RankShareModal
           input={
@@ -240,11 +260,13 @@ const PILLARS = [
 export function ScoreCard({
   summary,
   panel,
+  rankRowRef,
   onOpenRank,
   onShare,
 }: {
   summary: Summary;
   panel: PanelCounts | null;
+  rankRowRef?: React.Ref<HTMLButtonElement>;
   onOpenRank: () => void;
   onShare: () => void;
 }) {
@@ -273,8 +295,10 @@ export function ScoreCard({
           to the share card, which is why it is a separate button. */}
       <div className="flex items-center gap-3">
         <button
+          ref={rankRowRef}
           type="button"
           onClick={onOpenRank}
+          aria-haspopup="dialog"
           className="iki-press flex min-h-tap min-w-0 flex-1 items-center gap-3 text-left"
           aria-label={`Rank: ${progress.rank.name}, ${summary.ikiScore.toLocaleString("en-US")} iki. Open the rank ladder`}
         >

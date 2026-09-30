@@ -810,6 +810,18 @@ summary {
     border-color: var(--primary);
     color: var(--primary);
   }
+  /* The filled ceremonial pill, for the one brand moment on a sheet ("Share
+     your rank"). Still Marcellus caps; terracotta because it is the action. */
+  .iki-btn-ceremonial-primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--primary-fg);
+  }
+  .iki-btn-ceremonial-primary:hover:not(:disabled) {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+    color: var(--primary-fg);
+  }
 
   .iki-btn-link {
     background: none;
@@ -1448,6 +1460,13 @@ summary {
     box-shadow: var(--shadow-sheet);
     animation: iki-sheet-up 340ms var(--ease-spring);
   }
+  /* The rank ladder sheet: v2 §4.2 padding (8 top, 20 sides, 18 bottom). */
+  .iki-rank-sheet {
+    max-height: calc(100dvh - var(--spacing) * 8);
+    overflow-y: auto;
+    padding: calc(var(--spacing) * 2) var(--spacing-gutter) var(--spacing-card);
+  }
+
   /* The grab handle. Decorative: the sheet is not draggable, and the handle is
      there because a panel that rose from the bottom edge reads as one that can
      be pushed back down. */
@@ -1611,6 +1630,26 @@ summary {
     border: 1.5px solid var(--primary);
     border-radius: var(--radius-pill);
     color: var(--primary);
+  }
+
+  /* Seal sizes. The rank sheet's is a double ring: the terracotta rim, then a
+     hairline ring inside it (v2 §4.2). */
+  .iki-seal-lg {
+    width: calc(var(--spacing) * 22); /* 88 */
+    height: calc(var(--spacing) * 22);
+  }
+  .iki-seal-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--spacing) * 17); /* 68 */
+    height: calc(var(--spacing) * 17);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-pill);
+  }
+  .iki-seal-sm {
+    width: calc(var(--spacing) * 9.5); /* 38 */
+    height: calc(var(--spacing) * 9.5);
   }
 
   /* "+2 yesterday": a quiet inset pill beside a big numeral. */
