@@ -100,6 +100,65 @@
   --bad: #8f3f1d;                         /* out of range: LOW / HIGH */
   --bad-wash: rgba(143, 63, 29, 0.12);
 
+  /*
+   * --- v2 pillar hues (handoff v2 §3.1) ---
+   * CATEGORY LABELS ONLY: Performance (training), Recovery (sleep), Longevity
+   * (biomarkers). They colour a dot, a ring, an icon circle. Never a button,
+   * never a ground: `--primary` stays the only call-to-action colour and the
+   * colour of "something you earned".
+   */
+  --pillar-performance: #c98a45;
+  --pillar-recovery: #7a8a5c;
+  --pillar-longevity: #6a8a94;
+  --pillar-fg: #1b1815; /* glyph inside a pillar-filled circle, both grounds */
+
+  /* --- v2 data marks. Literal rgba, never color-mix() (see §10 of the doc). */
+  --track: rgba(27, 24, 21, 0.08);        /* empty dots, bar and ring tracks */
+  --track-strong: rgba(27, 24, 21, 0.12); /* empty dot in a dot grid */
+  --heat-on: #1b1815;                     /* streak heatmap: checked in */
+  --heat-partial: rgba(27, 24, 21, 0.35); /* dashed border of a partial day */
+  --heat-off: rgba(27, 24, 21, 0.05);     /* missed day */
+
+  /*
+   * --- v2 flag washes. Text colour is paired, not free:
+   * bad -> --primary, warn -> --tan, good -> --pillar-recovery.
+   */
+  --flag-bad-wash: rgba(181, 86, 45, 0.14);
+  --flag-warn-wash: rgba(201, 183, 156, 0.22);
+  --flag-good-wash: rgba(122, 138, 92, 0.16);
+  --tan: #c9b79c; /* BORDERLINE text, scoreboard eyebrow. Same in both grounds. */
+
+  /* --- v2 shell --- */
+  --nav-ground: rgba(251, 247, 240, 0.85);
+  --nav-shadow: 0 12px 32px rgba(27, 24, 21, 0.12);
+  --muted-dim: rgba(110, 100, 91, 0.55); /* --muted at 55%: a disabled nav slot */
+
+  /* --- v2 accents on data, one use each --- */
+  --thumb-glow: rgba(205, 113, 68, 0.45);  /* energy thumb halo */
+  --celebrate-edge: rgba(205, 113, 68, 0.35); /* the saved check-in card */
+
+  /*
+   * --- Fixed over-photo values (Future You scoreboard). The photo is a fixed
+   * brand asset, identical in both themes, so what sits on it is fixed too.
+   */
+  --photo-scrim: linear-gradient(
+    180deg,
+    rgba(27, 24, 21, 0.15),
+    rgba(27, 24, 21, 0.55) 45%,
+    rgba(27, 24, 21, 0.92)
+  );
+  --photo-text: rgba(241, 233, 220, 0.78);
+  --photo-edge: rgba(241, 233, 220, 0.4);
+
+  /*
+   * --- v2 gradients (§3.4). DATA ONLY: inside charts and the energy slider.
+   * Never on a card, a button or a ground.
+   */
+  --grad-energy: linear-gradient(90deg, rgba(212, 154, 90, 0.25), #d49a5a 55%, #cd7144);
+  --grad-bar-primary: linear-gradient(180deg, #cd7144, #8f3f1d);
+  --grad-bar-recovery: linear-gradient(180deg, #8a9a6b, #5b6a44);
+  --grad-thumb: linear-gradient(180deg, #d68a5c, #cd7144);
+
   /* --- Deprecated aliases. Kept so existing components inherit the handoff
          values without being edited. Use the names above in new code. ------ */
   --background: var(--canvas);
@@ -123,8 +182,9 @@
   color-scheme: dark;
 
   --canvas: #1b1815;
-  --surface: #242019;
-  --surface-2: #2d2822;
+  /* v2 §3.1: a touch warmer than v1 (#242019 / #2d2822). */
+  --surface: #23201b;
+  --surface-2: #2d2823;
   --ink: #f1e9dc;
   --muted: #a89c8f;
   --line: rgba(241, 233, 220, 0.13);
@@ -144,6 +204,22 @@
   --warn-wash: rgba(201, 183, 156, 0.16);
   --bad: #cd7144;
   --bad-wash: rgba(205, 113, 68, 0.14);
+
+  /* v2 (§3.1). Pillars lift a step so they hold against charcoal. */
+  --pillar-performance: #d49a5a;
+  --pillar-recovery: #8a9a6b;
+  --pillar-longevity: #7c9ba6;
+  --track: rgba(241, 233, 220, 0.08);
+  --track-strong: rgba(241, 233, 220, 0.1);
+  --heat-on: #f1e9dc;
+  --heat-partial: rgba(241, 233, 220, 0.35);
+  --heat-off: rgba(241, 233, 220, 0.06);
+  --flag-bad-wash: rgba(205, 113, 68, 0.16);
+  --flag-warn-wash: rgba(201, 183, 156, 0.14);
+  --flag-good-wash: rgba(138, 154, 107, 0.16);
+  --nav-ground: rgba(35, 32, 27, 0.82);
+  --nav-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  --muted-dim: rgba(168, 156, 143, 0.55);
 }
 
 /*
@@ -176,6 +252,25 @@
   --color-warn-wash: var(--warn-wash);
   --color-bad: var(--bad);
   --color-bad-wash: var(--bad-wash);
+
+  /* v2 (§3.1) */
+  --color-pillar-performance: var(--pillar-performance);
+  --color-pillar-recovery: var(--pillar-recovery);
+  --color-pillar-longevity: var(--pillar-longevity);
+  --color-pillar-fg: var(--pillar-fg);
+  --color-track: var(--track);
+  --color-track-strong: var(--track-strong);
+  --color-heat-on: var(--heat-on);
+  --color-heat-partial: var(--heat-partial);
+  --color-heat-off: var(--heat-off);
+  --color-flag-bad-wash: var(--flag-bad-wash);
+  --color-flag-warn-wash: var(--flag-warn-wash);
+  --color-flag-good-wash: var(--flag-good-wash);
+  --color-nav-ground: var(--nav-ground);
+  --color-muted-dim: var(--muted-dim);
+  --color-celebrate-edge: var(--celebrate-edge);
+  --color-photo-text: var(--photo-text);
+  --color-photo-edge: var(--photo-edge);
 
   /* Deprecated color aliases, see the note above. */
   --color-background: var(--canvas);
@@ -218,7 +313,49 @@
    * the comment so nobody has to go back to the PDF to find out what was
    * discarded.
    */
-  --text-display-xl: 1.9375rem; /* 31 */
+  /*
+   * v2 display steps (§3.3). Cormorant 500. The big numerals sit tight
+   * (0.85) because they are read as a figure, not as a line of text.
+   */
+  --text-display-2xl: 4.5rem; /* 72: iki score, momentum, points to spend */
+  --text-display-2xl--line-height: 0.85;
+  --text-display-2xl--letter-spacing: -0.03em;
+
+  --text-display-hero-lg: 4rem; /* 64: "31 of 34" report hero */
+  --text-display-hero-lg--line-height: 0.85;
+  --text-display-hero-lg--letter-spacing: -0.03em;
+
+  --text-display-hero: 3.5rem; /* 56: Trends numerals, +10 on save */
+  --text-display-hero--line-height: 0.85;
+  --text-display-hero--letter-spacing: -0.03em;
+
+  --text-display-sleep: 2.5rem; /* 40: hours of sleep on the check-in card */
+  --text-display-sleep--line-height: 0.9;
+  --text-display-sleep--letter-spacing: -0.02em;
+
+  --text-h1: 2.25rem; /* 36: screen title, replaces display-xl (31) */
+  --text-h1--line-height: 1;
+  --text-h1--letter-spacing: -0.02em;
+
+  --text-display-rank: 2.125rem; /* 34: rank name in the rank sheet */
+  --text-display-rank--line-height: 1;
+  --text-display-rank--letter-spacing: -0.02em;
+
+  --text-display-name: 1.875rem; /* 30: profile name, scoreboard headline */
+  --text-display-name--line-height: 1.05;
+  --text-display-name--letter-spacing: -0.02em;
+
+  --text-display-tile: 1.75rem; /* 28: numerals on the Home bento tiles */
+  --text-display-tile--line-height: 1;
+  --text-display-tile--letter-spacing: -0.02em;
+
+  /* Hanken Grotesk 600: the two-tone insight sentence (Trends, Future). */
+  --text-insight: 1.25rem; /* 20 */
+  --text-insight--line-height: 1.4;
+  --text-insight--letter-spacing: -0.01em;
+
+  --text-display-xl: 1.9375rem; /* 31, v1 screen title. Kept for anything
+                                   not yet moved to text-h1. */
   --text-display-xl--line-height: 1.05;
   --text-display-xl--letter-spacing: -0.02em;
 
@@ -234,7 +371,7 @@
 
   --text-eyebrow: 0.6875rem; /* 11 */
   --text-eyebrow--line-height: 1;
-  --text-eyebrow--letter-spacing: 0.2em; /* band 0.18-0.22em */
+  --text-eyebrow--letter-spacing: 0.3em; /* v2 §3.3, was 0.2em */
 
   --text-eyebrow-sm: 0.65625rem; /* 10.5 */
   --text-eyebrow-sm--line-height: 1;
@@ -294,7 +431,8 @@
   --spacing-switch-w: 50px;
   --spacing-switch-h: 30px;
   --spacing-switch-knob: 22px;
-  --spacing-tile: 104px;   /* activity tile minimum height */
+  --spacing-tile: 112px;   /* activity tile minimum height (v2, was 104) */
+  --spacing-bento: 164px;  /* Home bento tile minimum height (v2) */
   --spacing-bar-max: 150px;/* progress track cap, so it never spans the card */
 
   /* Notch and home-indicator insets. Zero on every device without them, and
@@ -329,13 +467,16 @@
    * Cards have NO shadow. Only these four surfaces lift, and each one lifts
    * because it floats over content rather than sitting in the flow.
    */
-  --shadow-nav: 0 10px 30px rgba(27, 24, 21, 0.12);
+  /* v2: ground-dependent, so it points at a variable the dark ground redefines. */
+  --shadow-nav: var(--nav-shadow);
   --shadow-fab: 0 8px 20px rgba(181, 86, 45, 0.35);
   --shadow-sheet: 0 -10px 40px rgba(27, 24, 21, 0.18);
   --shadow-tile: 0 2px 10px rgba(27, 24, 21, 0.15); /* dark mosaic only */
   /* Selection ring. A ring rather than a thicker border so the box does not
      grow by 1px when something is chosen, which reads as a jump. */
   --shadow-ring: 0 0 0 2px var(--primary);
+  /* Energy thumb: cut out of the card by a ring of surface, then a warm glow. */
+  --shadow-thumb: 0 0 0 4px var(--surface), 0 6px 22px var(--thumb-glow);
 
   /* --- Motion, handoff §1.6 --- */
   --ease-spring: cubic-bezier(0.32, 0.72, 0, 1); /* pills, switch, sheet */
@@ -684,12 +825,17 @@ summary {
 
   /* --- Screen header, handoff §2 ----------------------------------------- */
 
+  /*
+   * v2 §3.3: muted, not terracotta, and wider tracking (0.3em). Terracotta is
+   * now reserved for what the member earned and what they can do; a label that
+   * sits above every card spent it on nothing.
+   */
   .iki-eyebrow {
     font-family: var(--font-label), serif;
     font-size: var(--text-eyebrow);
-    letter-spacing: 0.22em;
+    letter-spacing: var(--text-eyebrow--letter-spacing);
     text-transform: uppercase;
-    color: var(--primary);
+    color: var(--muted);
   }
   /*
    * The SMALL eyebrow is muted, not terracotta, and that is the whole point of
@@ -705,10 +851,10 @@ summary {
   }
   .iki-title {
     font-family: var(--font-display), serif;
-    font-size: var(--text-display-xl);
+    font-size: var(--text-h1); /* v2: 36, was 31 */
     font-weight: 500; /* never bold: Cormorant loses its proportions above 500 */
-    line-height: 1.05;
-    letter-spacing: -0.02em;
+    line-height: var(--text-h1--line-height);
+    letter-spacing: var(--text-h1--letter-spacing);
     color: var(--ink);
   }
   .iki-lede {

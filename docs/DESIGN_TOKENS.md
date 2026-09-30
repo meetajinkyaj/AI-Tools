@@ -73,6 +73,41 @@ Utilities follow Tailwind's normal namespaces: `bg-canvas`, `text-ink`,
 These are deliberately not red and green. A value outside a reference range is
 information, not an alarm, and this app never diagnoses.
 
+### v2 additions (UI refresh, handoff v2 §3.1)
+
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `pillar-performance` | `#c98a45` | `#d49a5a` | Performance category (training) |
+| `pillar-recovery` | `#7a8a5c` | `#8a9a6b` | Recovery category (sleep) |
+| `pillar-longevity` | `#6a8a94` | `#7c9ba6` | Longevity category (biomarkers) |
+| `pillar-fg` | `#1b1815` | `#1b1815` | glyph inside a pillar-filled circle |
+| `tan` | `#c9b79c` | `#c9b79c` | BORDERLINE flag text, scoreboard eyebrow |
+| `track` | 8% ink | 8% linen | empty dots, bar and ring tracks |
+| `track-strong` | 12% ink | 10% linen | empty dot in a dot grid |
+| `heat-on` | `#1b1815` | `#f1e9dc` | streak heatmap: checked in |
+| `heat-partial` | 35% ink | 35% linen | dashed border of a partial day |
+| `heat-off` | 5% ink | 6% linen | missed day |
+| `flag-bad-wash` | 14% primary | 16% clay | LOW / HIGH pill fill, text `primary` |
+| `flag-warn-wash` | 22% tan | 14% tan | BORDERLINE pill fill, text `tan` |
+| `flag-good-wash` | 16% recovery | 16% recovery | Into range / Improved, text `pillar-recovery` |
+| `nav-ground` | 85% surface | 82% surface | the floating bar |
+| `muted-dim` | 55% muted | 55% muted | a disabled nav slot (Challenges) |
+| `celebrate-edge` | 35% clay | 35% clay | border of the saved check-in card |
+| `photo-text` / `photo-edge` | 78% / 40% linen | same | text and ghost-button border over the scoreboard photo |
+
+Dark surfaces are a touch warmer in v2: `surface` `#23201b`, `surface-2`
+`#2d2823` (were `#242019` / `#2d2822`).
+
+**Pillar hues label categories only.** They colour a dot, a ring or an icon
+circle, never a button or a ground. `primary` stays the only call-to-action
+colour, and the colour of something the member earned (points, deltas).
+
+**Gradients are data only** (`--grad-energy`, `--grad-bar-primary`,
+`--grad-bar-recovery`, `--grad-thumb`, and `--photo-scrim` over the scoreboard
+photo). They appear inside charts and the energy slider. Never on a card, a
+button or a ground. They are plain custom properties rather than Tailwind
+utilities, used from the component classes.
+
 **Fixed brand colors** that must NOT follow the ground, for the charcoal
 marketing hero: `obsidian`, `linen`, `terracotta`, `tan`.
 
@@ -93,11 +128,20 @@ step and not just a font size.
 
 | Utility | px | Face | Use |
 |---|---|---|---|
-| `text-display-xl` | 31 | CG 500 | screen title |
+| `text-display-2xl` | 72 | CG 500 | iki score, momentum, points to spend (v2) |
+| `text-display-hero-lg` | 64 | CG 500 | "31 of 34" report hero (v2) |
+| `text-display-hero` | 56 | CG 500 | Trends numerals, points on save (v2) |
+| `text-display-sleep` | 40 | CG 500 | hours of sleep on the check-in card (v2) |
+| `text-h1` | 36 | CG 500 | screen title, via `.iki-title` (v2) |
+| `text-display-rank` | 34 | CG 500 | rank name in the rank sheet (v2) |
+| `text-display-name` | 30 | CG 500 | profile name, scoreboard headline (v2) |
+| `text-display-tile` | 28 | CG 500 | Home bento tile numerals (v2) |
+| `text-insight` | 20 | HG 600 | the two-tone insight sentence (v2) |
+| `text-display-xl` | 31 | CG 500 | v1 screen title; kept until nothing uses it |
 | `text-display-lg` | 29 | CG 500 | hero numerals (points balance) |
 | `text-display-md` | 26 | CG 500 | stat numerals, rank name |
 | `text-display-sm` | 22 | CG 500 | card headlines |
-| `text-eyebrow` | 11 | Marcellus | section labels, uppercase, 0.2em |
+| `text-eyebrow` | 11 | Marcellus | section labels, uppercase, 0.3em, muted (v2; was 0.2em, terracotta) |
 | `text-eyebrow-sm` | 10.5 | Marcellus | partner names, 0.16em |
 | `text-body-lg` | 15 | HG 600 | sheet rows |
 | `text-body` | 14.5 | HG 600 | buttons, tile labels |
@@ -127,7 +171,7 @@ a spacing value: `p-`, `px-`, `gap-`, `h-`, `min-h-`, `mt-`.
 | `gutter` | 20px | screen gutter |
 | `card` | 18px | card padding |
 | `card-tight` | 16px | compact rows |
-| `stack` | 16px | gap between cards |
+| `stack` | 18px | gap between cards (the v2 handoff says 16; 18 was chosen in the radius PR and kept) |
 | `shell-top` | 70px | clears the status bar |
 | `shell-bottom` | 130px | clears the floating nav |
 | `tap` | 44px | accessibility floor, not a design value |
@@ -138,15 +182,18 @@ a spacing value: `p-`, `px-`, `gap-`, `h-`, `min-h-`, `mt-`.
 | `sheet-row` | 52px | More sheet rows |
 | `bar` | 7px | progress track height |
 | `bar-max` | 150px | progress track cap |
+| `tile` | 112px | activity tile minimum height (v2, was 104) |
+| `bento` | 164px | Home bento tile minimum height (v2) |
 | `safe-t` `safe-r` `safe-b` `safe-l` | `env(safe-area-inset-*)` | notch and home indicator |
 
 ---
 
 ## 5. Radii and shadows
 
-`rounded-ctl` 8 · `rounded-inset` 10 · `rounded-inset-pill` 7 (the pill inside a
-segmented track) · `rounded-well` 11 · `rounded-card` 14 · `rounded-tile` 16 ·
-`rounded-tile-lg` 18 · `rounded-sheet` 22 · `rounded-pill` 999.
+`rounded-ctl` 14 · `rounded-inset` 12 · `rounded-inset-pill` 9 (the pill inside a
+segmented track) · `rounded-well` 13 · `rounded-card` 19 · `rounded-tile` 20 ·
+`rounded-tile-lg` 22 · `rounded-sheet` 26 · `rounded-pill` 999. (Brand
+guidelines v1.1, the "middle" softness.)
 
 > **`rounded-pill` was already used in twelve places and defined in none of
 > them.** Tailwind emitted no CSS for it, so those pills have been rendering
@@ -156,6 +203,10 @@ segmented track) · `rounded-well` 11 · `rounded-card` 14 · `rounded-tile` 16 
 Cards have **no shadow**; they are border-defined. Only four things lift, and
 each lifts because it floats over content rather than sitting in the flow:
 `shadow-nav`, `shadow-fab`, `shadow-sheet`, `shadow-tile` (dark mosaic only).
+
+`shadow-nav` follows the ground in v2 (`--nav-shadow`: 12% ink in light, 35%
+black in dark). `shadow-thumb` is the energy slider's thumb: a 4px ring of
+surface, then a warm glow.
 
 `--shadow-ring` (`0 0 0 2px var(--primary)`) is the selection ring. A ring
 rather than a thicker border, so the box does not grow by 1px when something is
