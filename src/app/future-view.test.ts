@@ -30,6 +30,6 @@ describe("momentumSentence", () => {
 
   it("uses no em or en dashes (house style)", () => {
     const p = momentumSentence(72, { ...base, projectedIfCheckedIn: 76 }, "2026-11-20");
-    expect(join(p)).not.toMatch(/[–—]/);
+    expect(join(p)).not.toMatch(new RegExp("[\u2013\u2014]"));
   });
 });
