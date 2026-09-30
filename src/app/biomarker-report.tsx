@@ -14,7 +14,9 @@ import {
 } from "@/lib/biomarkers";
 import type { ExtractedReading, ExtractionResult } from "@/lib/extraction";
 import { bandForReading, readingStatus, summarizePanel } from "@/lib/panel-summary";
+import { Rings } from "./data-marks";
 import { DoctorSummary } from "./doctor-summary";
+import { Icon, type IconName } from "./icons";
 import { fieldClass, labelClass } from "./ui";
 
 interface ReadingRow {
@@ -123,12 +125,24 @@ function rangeText(low: number | null, high: number | null, unit: string | null)
  * taupe for borderline, clay for in range, all inside the brand.
  */
 const SEVERITY_VARIANT: Record<Severity, string> = {
-  low: "iki-badge-bad",
-  high: "iki-badge-bad",
-  borderline: "iki-badge-warn",
-  optimal: "iki-badge-good",
-  in_range: "iki-badge-good",
+  // v2 flag washes (handoff section 4.6): LOW / HIGH terracotta, BORDERLINE
+  // tan, in range the recovery hue. Still no red, still no green.
+  low: "iki-flag-bad",
+  high: "iki-flag-bad",
+  borderline: "iki-flag-warn",
+  optimal: "iki-flag-good",
+  in_range: "iki-flag-good",
   unknown: "iki-badge-neutral",
+};
+
+/** The glyph in a "Worth a look" row, by the marker's category. */
+const CATEGORY_ICON: Record<string, IconName> = {
+  nutrients: "sun",
+  inflammation: "activity",
+  lipids: "heart",
+  cardiac: "heart",
+  hormones: "sparkles",
+  thyroid: "sparkles",
 };
 
 function StatusPill({
@@ -181,7 +195,7 @@ function attentionValueLine(r: ReadingRow): string {
   return range === "-" ? value : `${value} · ${range} typical`;
 }
 
-const DISCLAIMER = "Educational, not a diagnosis. Please consult a doctor.";
+const DISCLAIMER = "Information to explore, not a diagnosis. Worth a chat with your doctor.";
 
 /**
  * The extract endpoint streams newline heartbeats then a final JSON line. Parse
@@ -871,12 +885,46 @@ export function BiomarkerReport({
           the token scale; that component still serves the upload, review and
           entry modes, which this mockup does not cover. */}
       <header className="flex flex-col gap-1.5">
-        <p className="iki-eyebrow">Report</p>
+        <p className="iki-eyebrow">
+          Report
+          {latestPanel?.panel &&
+            ` · ${formatPanelDate(latestPanel.panel.test_date ?? latestPanel.panel.created_at)}`}
+        </p>
         <h1 className="iki-title">Your baseline</h1>
-        {panelSubtitle(latestPanel?.panel, readings.length) && (
-          <p className="iki-lede">{panelSubtitle(latestPanel?.panel, readings.length)}</p>
-        )}
       </header>
+
+      {/*
+        COUNTED THE RIGHT WAY UP, and now the hero (v2 section 4.6). "31 of 34
+        in range" leads; what is off follows in the card below. Leading with
+        what is wrong when thirty-one things are right is a framing this app
+        does not use.
+      */}
+      {readings.length > 0 && (
+        <section className="iki-card flex items-center justify-between gap-4">
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="iki-eyebrow">In range</p>
+            <p className="font-display text-display-hero-lg text-ink">
+              {inRangeCount}
+              <span className="ml-1.5 font-sans text-body text-muted">of {readings.length}</span>
+            </p>
+            <p className="text-caption text-muted">
+              {readings.length} markers {sourcePhrase(latestPanel?.panel?.source ?? null)}
+              {outOfRange.length > 0 && ` · ${outOfRange.length} worth a look`}
+            </p>
+            {latestPanel?.panel?.lab_name && (
+              <p className="text-micro text-muted">{latestPanel.panel.lab_name}</p>
+            )}
+          </div>
+          <Rings
+            size={84}
+            stroke={7}
+            radii={[38.5]}
+            rings={[{ value: inRangeCount / readings.length, color: "var(--pillar-longevity)" }]}
+            centreDot={4}
+            label={`${inRangeCount} of ${readings.length} markers in range`}
+          />
+        </section>
+      )}
 
       {awardNote && (
         <section className="iki-card iki-card-accent flex flex-col gap-4">
@@ -925,22 +973,19 @@ export function BiomarkerReport({
         </section>
       )}
 
-      {/*
-        NEEDS ATTENTION LEADS THE SCREEN. The old order opened with a count and
-        made you scroll to find out which markers it meant. This is the reason
-        somebody opened the report, so it goes first and the tally follows it.
-      */}
       {outOfRange.length > 0 && (
-        <section className="iki-card flex flex-col gap-1.5">
-          <p className="iki-eyebrow">Worth a look</p>
+        <section className="iki-card flex flex-col">
+          <p className="iki-eyebrow pb-2">Worth a look</p>
           {outOfRange.map((r) => {
             const status = readingStatus(r, bandOf(r));
+            const icon = CATEGORY_ICON[categoryByKey.get(r.marker_key) ?? ""] ?? "heart-pulse";
             return (
-              <div key={r.id} className="iki-row">
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <span className="truncate text-body-sm font-semibold text-ink">
-                    {r.marker_name}
-                  </span>
+              <div key={r.id} className="flex items-center gap-3 border-t border-line py-2.5">
+                <span className="iki-icon-well iki-well-longevity" aria-hidden>
+                  <Icon name={icon} size={16} strokeWidth={1.8} />
+                </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate text-body font-semibold text-ink">{r.marker_name}</span>
                   {/* Never wrapped: "24 ng/mL · 30-100 typical" broken across
                       two lines reads as two separate numbers. */}
                   <span className="whitespace-nowrap text-micro text-muted">
@@ -951,41 +996,31 @@ export function BiomarkerReport({
               </div>
             );
           })}
-          <p className="pt-1 text-micro text-muted">
-            This is information to explore, not a diagnosis. Worth a chat with
-            your doctor.
-          </p>
         </section>
       )}
 
-      {/*
-        COUNTED THE OTHER WAY UP. This card used to say "3 of 34 markers to
-        review". Same two numbers, and leading with what is wrong when
-        thirty-one things are right is a framing this app should not use.
-      */}
-      {readings.length > 0 && (
-        <section className="iki-card iki-card-tight flex items-center justify-between gap-3">
-          <div className="flex flex-col gap-0.5">
-            <span className="font-display text-display-sm font-medium leading-none text-ink">
-              {inRangeCount} of {readings.length}
-            </span>
-            <span className="text-small text-muted">markers in range</span>
+      {/* By system (v2 section 4.6): the same count, per category. */}
+      {readingGroups.length > 1 && (
+        <section className="iki-card flex flex-col">
+          <div className="flex items-baseline justify-between pb-2">
+            <p className="iki-eyebrow">By system</p>
+            <p className="text-micro text-muted">{inRangeCount} in range</p>
           </div>
-          <div
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={readings.length}
-            aria-valuenow={inRangeCount}
-            aria-label="Markers in range"
-            className="iki-bar w-full max-w-bar-max flex-1"
-          >
-            {/* Data, so it is inline: a proportion of real readings rather than
-                a design value. Everything about how it looks is in .iki-bar. */}
-            <div
-              className="iki-bar-fill"
-              style={{ width: `${(inRangeCount / readings.length) * 100}%` }}
-            />
-          </div>
+          {readingGroups.map((group) => {
+            const counted = summarizePanel(group.readings, catalog);
+            return (
+              <div
+                key={group.category}
+                className="flex items-center justify-between gap-3 border-t border-line py-2.5"
+              >
+                <span className="text-body-sm text-ink">{categoryLabel(group.category)}</span>
+                <span className="text-body-sm font-semibold text-ink tabular-nums">
+                  {counted.inRange}
+                  <span className="font-normal text-muted"> / {counted.total}</span>
+                </span>
+              </div>
+            );
+          })}
         </section>
       )}
 

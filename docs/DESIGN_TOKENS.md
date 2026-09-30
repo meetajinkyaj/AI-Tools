@@ -348,6 +348,10 @@ in `src/app/switch.tsx`, since Profile uses one too)
   eyebrow, and clay (not terracotta) for the reward, which holds AA on the
   scrim.
 
+**v2 Report** (section 4.6)
+- `.iki-well-longevity` the 34px longevity-hued well holding a category glyph
+  in "Worth a look" rows. Flag pills on Report use `.iki-flag-*` (see Trends).
+
 **Header and sheet**
 - `.iki-profile-chip` / `-initials` the v2 header chip: "Profile" plus a 30px
   initials circle, 38px tall. It replaced v1's bare `.iki-avatar`, because with
