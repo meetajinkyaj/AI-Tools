@@ -6,6 +6,7 @@ import { todayUTC } from "@/lib/checkin";
 import {
   computeHabitSignals,
   computeMomentum,
+  momentumOutlook,
   markerOutlook,
   type MarkerPoint,
   MOMENTUM_WINDOW_DAYS,
@@ -78,6 +79,9 @@ export async function GET(request: Request) {
         measuredSleep,
       ),
     );
+    // v2 (handoff section 6): the change this month, today's projection and
+    // the month's check-in count, for the momentum card's sentence and dots.
+    const outlook = momentumOutlook((checkins ?? []) as CheckinPoint[], todayUTC(), measuredSleep);
 
     // --- Panels, collapsed to distinct test dates (latest save per date) ---
     const { data: panels } = await supabase
@@ -93,7 +97,7 @@ export async function GET(request: Request) {
     const distinct = [...byDate.entries()].sort(([a], [b]) => (a < b ? -1 : 1));
 
     if (distinct.length === 0) {
-      return NextResponse.json({ ...emptyFuture(), momentum });
+      return NextResponse.json({ ...emptyFuture(), momentum, outlook });
     }
 
     const [latestDate, latestPanel] = distinct[distinct.length - 1];
@@ -154,6 +158,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       momentum,
+      outlook,
       markers: outlooks,
       inRangeCount: latestRows.filter((r) => !FLAGGED.has(r.flag)).length,
       retest: retestMilestone(latestDate, todayUTC()),

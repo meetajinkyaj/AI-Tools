@@ -231,3 +231,73 @@ export function retestMilestone(
   const daysUntilDue = Math.round((dueMs - Date.parse(today)) / 86_400_000);
   return { lastPanelDate, dueDate, daysUntilDue };
 }
+
+// ---- v2 Future You card (UI v2, section 4.5) --------------------------------
+
+export interface MomentumOutlook {
+  checkedInToday: boolean;
+  /** Check-ins in the momentum window, for "26 / 30 check-ins this month". */
+  checkinsThisMonth: number;
+  /**
+   * Momentum now minus momentum a month ago, for "+4 this month". Null when
+   * there is no check-in older than the window to compare against.
+   *
+   * BOTH SIDES USE SELF-REPORTED SLEEP. Device sleep is only fetched for the
+   * current window, and mixing a measured "now" with a remembered "then" would
+   * report a device's arrival as progress.
+   */
+  changeThisMonth: number | null;
+  /**
+   * What momentum becomes if today's check-in is logged with training, for
+   * "check in and log training and momentum climbs to 76". Null once today is
+   * already in, since there is nothing left to project.
+   */
+  projectedIfCheckedIn: number | null;
+}
+
+export function momentumOutlook(
+  checkins: CheckinPoint[],
+  today: string,
+  measuredSleepHours: number | null = null,
+): MomentumOutlook {
+  const checkedInToday = checkins.some((c) => c.checkin_date === today);
+
+  const cutoff = new Date(Date.parse(`${today}T00:00:00Z`) - MOMENTUM_WINDOW_DAYS * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const older = checkins.filter((c) => c.checkin_date <= cutoff);
+  const changeThisMonth =
+    older.length === 0
+      ? null
+      : computeMomentum(computeHabitSignals(checkins)).score -
+        computeMomentum(computeHabitSignals(older)).score;
+
+  let projectedIfCheckedIn: number | null = null;
+  if (!checkedInToday) {
+    const newest = [...checkins].sort((a, b) => (a.checkin_date < b.checkin_date ? 1 : -1))[0];
+    const withToday: CheckinPoint[] = [
+      ...checkins,
+      {
+        checkin_date: today,
+        // Energy carries over from the last check-in so the projection does
+        // not flatter or punish the energy trend; sleep is left unknown.
+        energy_score: newest?.energy_score ?? null,
+        sleep_hours: null,
+        training_logged: true,
+      },
+    ];
+    projectedIfCheckedIn = computeMomentum(
+      computeHabitSignals(withToday, MOMENTUM_WINDOW_DAYS, measuredSleepHours),
+    ).score;
+  }
+
+  return {
+    checkedInToday,
+    // Counted directly over the 30 days ending today. checkinRate's window is
+    // anchored on the newest check-in, which is right for momentum but would
+    // let old check-ins into a caption that says "this month".
+    checkinsThisMonth: checkins.filter((c) => c.checkin_date > cutoff && c.checkin_date <= today).length,
+    changeThisMonth,
+    projectedIfCheckedIn,
+  };
+}
