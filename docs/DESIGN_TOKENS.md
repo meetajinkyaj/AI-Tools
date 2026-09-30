@@ -352,6 +352,11 @@ in `src/app/switch.tsx`, since Profile uses one too)
 - `.iki-well-longevity` the 34px longevity-hued well holding a category glyph
   in "Worth a look" rows. Flag pills on Report use `.iki-flag-*` (see Trends).
 
+**v2 Rewards** (section 4.7)
+- `.iki-voucher-well[data-pillar]` the 44px circle on a voucher row, in the
+  partner's pillar hue (`voucherPillar()` in `partners-view.tsx`).
+- `.iki-btn-sm` a 40px row action (Redeem). Always with `.iki-tap`.
+
 **Header and sheet**
 - `.iki-profile-chip` / `-initials` the v2 header chip: "Profile" plus a 30px
   initials circle, 38px tall. It replaced v1's bare `.iki-avatar`, because with
