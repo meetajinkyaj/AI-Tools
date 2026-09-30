@@ -41,6 +41,7 @@ const SAFE = [
   "iki-nav-item", //       54
   "iki-nav-fab", //        --spacing-fab
   "iki-tile", //           --spacing-tile
+  "iki-bento", //          --spacing-bento (164, Home tiles)
   "iki-segmented-option", // 44
   "iki-energy-cell", //    46
   "iki-code", //           44

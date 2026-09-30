@@ -1580,6 +1580,167 @@ summary {
     transform: scale(0.97);
   }
 
+  /* --- v2 score card and data marks (§4.1) ----------------------------- */
+
+  /*
+   * A 6px track with a terracotta fill. Terracotta because every bar of this
+   * kind in v2 is something the member is moving (rank, next voucher). The
+   * fill width is data and is set inline by the caller.
+   */
+  .iki-track {
+    height: calc(var(--spacing) * 1.5); /* 6 */
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: var(--track);
+  }
+  .iki-track-fill {
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--primary);
+    transition: width 300ms var(--ease-spring);
+  }
+
+  /* The kanji seal on the rank row: a 1.5px terracotta ring. */
+  .iki-seal {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--spacing) * 12); /* 48 */
+    height: calc(var(--spacing) * 12);
+    border: 1.5px solid var(--primary);
+    border-radius: var(--radius-pill);
+    color: var(--primary);
+  }
+
+  /* "+2 yesterday": a quiet inset pill beside a big numeral. */
+  .iki-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 1);
+    height: calc(var(--spacing) * 6.5); /* 26 */
+    padding-inline: calc(var(--spacing) * 2.5);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    font-size: var(--text-small);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* A small ceremonial pill (the rank row's "Share"). 34px box, 44px target. */
+  .iki-pill-sm {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 1.5);
+    height: calc(var(--spacing) * 8.5); /* 34 */
+    padding-inline: calc(var(--spacing) * 3.5);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-pill);
+    color: var(--ink);
+    font-family: var(--font-label), serif;
+    font-size: var(--text-eyebrow-sm);
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+    transition: border-color 140ms ease-out, color 140ms ease-out;
+  }
+  .iki-pill-sm:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+
+  /* Pillar label: Marcellus caps at 0.18em, beside a 10px hue dot. */
+  .iki-pillar-label {
+    font-family: var(--font-label), serif;
+    font-size: var(--text-small);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .iki-pillar-dot {
+    flex-shrink: 0;
+    width: calc(var(--spacing) * 2.5); /* 10 */
+    height: calc(var(--spacing) * 2.5);
+    border-radius: var(--radius-pill);
+  }
+
+  /* Home bento tile: a card-shaped button. min-width 0 so a long caption
+     wraps instead of pushing the grid wider than the screen. */
+  .iki-bento {
+    display: flex;
+    min-width: 0;
+    min-height: var(--spacing-bento);
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2.5);
+    padding: var(--spacing-card-tight);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-tile);
+    background: var(--surface);
+    text-align: left;
+  }
+
+  /* Rewards dot grid: 8 x 2, 4px gap. */
+  .iki-dots {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: var(--spacing);
+  }
+  .iki-dot {
+    aspect-ratio: 1;
+    border-radius: var(--radius-pill);
+    background: var(--track-strong);
+  }
+  .iki-dot[data-on="true"] {
+    background: var(--primary);
+  }
+
+  /*
+   * Streak heatmap: 10 x 3 pills. Checked in is solid ink, partial is a dashed
+   * outline, missed is a faint wash. Today carries the selection ring.
+   */
+  .iki-heat {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: calc(var(--spacing) * 1.5); /* 6 */
+  }
+  .iki-heat-day {
+    height: calc(var(--spacing) * 5.5); /* 22 */
+    border-radius: var(--radius-pill);
+    background: var(--heat-off);
+  }
+  .iki-heat-day[data-s="g"],
+  .iki-heat-key[data-s="g"] {
+    background: var(--heat-on);
+  }
+  .iki-heat-day[data-s="p"],
+  .iki-heat-key[data-s="p"] {
+    background: transparent;
+    border: 1.5px dashed var(--heat-partial);
+  }
+  .iki-heat-day[data-today="true"] {
+    box-shadow: var(--shadow-ring);
+  }
+  .iki-heat-key {
+    background: var(--heat-off);
+    display: inline-block;
+    width: calc(var(--spacing) * 3);
+    height: calc(var(--spacing) * 2);
+    border-radius: var(--radius-pill);
+    vertical-align: middle;
+  }
+
+  /* A 36px inset circle holding an icon (device row). */
+  .iki-icon-well {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--spacing) * 9); /* 36 */
+    height: calc(var(--spacing) * 9);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+
   /* The page padding that keeps content clear of the nav and the status bar. */
   .iki-shell {
     padding-inline: calc(var(--spacing-gutter) + var(--spacing-safe-l));

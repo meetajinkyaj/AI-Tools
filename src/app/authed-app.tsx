@@ -217,6 +217,8 @@ export function AuthedApp() {
             getToken={getAccessToken}
             onCheckIn={() => navigate("checkin")}
             onOpenSettings={() => navigate("profile")}
+            onOpenReport={() => navigate("report")}
+            onOpenRewards={() => navigate("partners")}
             refreshKey={summaryVersion}
           />
           <InterventionLog getToken={getAccessToken} />

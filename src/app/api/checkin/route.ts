@@ -12,6 +12,7 @@ import {
   validateCheckinInput,
 } from "@/lib/checkin";
 import { creditPoints } from "@/lib/credit-points";
+import { type CheckinDay, last30Statuses, shiftDate, weekInputs } from "@/lib/home-summary";
 import { getOrCreateSelfProfileId } from "@/lib/profiles";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -57,6 +58,10 @@ export async function GET(request: Request) {
         streak: 0,
         pointsBalance: 0,
         ikiScore: 0,
+        last30: Array(30).fill("n"),
+        pointsToday: 0,
+        week: { trainingDays: 0, avgSleep: null },
+        weekBefore: { trainingDays: 0, avgSleep: null },
       });
     }
     const profileId = await getOrCreateSelfProfileId(userId);
@@ -86,12 +91,41 @@ export async function GET(request: Request) {
       .eq("id", userId)
       .maybeSingle();
 
+    /*
+     * v2 Home (handoff section 6): the 30-day heatmap, what today earned, and
+     * the two 7-day windows behind the score card. "weekBefore" ends yesterday,
+     * so the card can say how the score moved since then without a second
+     * request. 37 days covers the heatmap and both windows.
+     */
+    const [{ data: days }, { data: earnedToday }] = await Promise.all([
+      supabase
+        .from("daily_checkins")
+        .select("checkin_date, sleep_hours, training_logged, exercises")
+        .eq("profile_id", profileId)
+        .gte("checkin_date", shiftDate(today, -36))
+        .order("checkin_date", { ascending: false }),
+      supabase
+        .from("points_transactions")
+        .select("amount")
+        .eq("profile_id", profileId)
+        .eq("type", "earn")
+        .gte("created_at", `${today}T00:00:00Z`),
+    ]);
+    const rows = (days ?? []) as CheckinDay[];
+
     return NextResponse.json({
       checkin: checkedInToday ? recent : null,
       checkedInToday,
       streak,
       pointsBalance,
       ikiScore: Number(scoreRow?.iki_score ?? 0),
+      last30: last30Statuses(rows, today),
+      pointsToday: (earnedToday ?? []).reduce(
+        (sum, r) => sum + Number((r as { amount: number }).amount ?? 0),
+        0,
+      ),
+      week: weekInputs(rows, today),
+      weekBefore: weekInputs(rows, shiftDate(today, -1)),
     });
   } catch (err) {
     console.error("GET /api/checkin failed:", err);

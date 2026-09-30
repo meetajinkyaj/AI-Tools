@@ -4,19 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   type Band,
-  bandFor,
   type CatalogEntry,
   type Flag,
   groupByCategory,
   isEnterableNumeric,
-  isNoteworthy,
   isQualitative,
   qualitativeOptions,
   type Severity,
-  SEVERITY_LABELS,
-  severityFromBand,
 } from "@/lib/biomarkers";
 import type { ExtractedReading, ExtractionResult } from "@/lib/extraction";
+import { bandForReading, readingStatus, summarizePanel } from "@/lib/panel-summary";
 import { DoctorSummary } from "./doctor-summary";
 import { fieldClass, labelClass } from "./ui";
 
@@ -155,20 +152,6 @@ function StatusPill({
       {label}
     </span>
   );
-}
-
-/** The severity + display label for a reading, the band wins over the raw flag. */
-function readingStatus(
-  r: ReadingRow,
-  band: Band | null,
-): { severity: Severity; label: string } {
-  if (r.result_kind === "qualitative") {
-    return r.flag === "in_range"
-      ? { severity: "in_range", label: "Normal" }
-      : { severity: "high", label: "Review" };
-  }
-  const severity = severityFromBand(r.flag, band);
-  return { severity, label: band ? band.label : SEVERITY_LABELS[severity] };
 }
 
 /**
@@ -873,14 +856,9 @@ export function BiomarkerReport({
   const readings = latestPanel?.readings ?? [];
   const categoryByKey = new Map(catalog.map((e) => [e.marker_key, e.category]));
   const readingGroups = groupReadings(readings, categoryByKey);
-  const bandOf = (r: ReadingRow): Band | null => {
-    const bands = catalogByKey.get(r.marker_key)?.bands ?? [];
-    return r.value != null && bands.length > 0 ? bandFor(r.value, bands) : null;
-  };
-  const outOfRange = readings.filter((r) =>
-    isNoteworthy(readingStatus(r, bandOf(r)).severity),
-  );
-  const inRangeCount = readings.length - outOfRange.length;
+  const bandOf = (r: ReadingRow): Band | null => bandForReading(r, catalogByKey);
+  // Shared with the Home tile (src/lib/panel-summary.ts), so both count alike.
+  const { worthALook: outOfRange, inRange: inRangeCount } = summarizePanel(readings, catalog);
 
   if (showSummary) {
     return <DoctorSummary getToken={getToken} onBack={() => setShowSummary(false)} />;
