@@ -38,7 +38,14 @@ export function Segmented<T extends string>({
   value,
   onChange,
   label,
+  quiet = false,
 }: {
+  /**
+   * v2 section 4.8: a settings choice (Appearance) marks the selection with a
+   * raised surface and a hairline rather than terracotta. Terracotta is the
+   * colour of an action, and picking a theme is a preference.
+   */
+  quiet?: boolean;
   options: readonly SegmentedOption<T>[];
   value: T | null;
   onChange: (v: T) => void;
@@ -51,7 +58,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="iki-segmented"
+      className={`iki-segmented ${quiet ? "iki-segmented-quiet" : ""}`}
       style={{ gridTemplateColumns: `repeat(${options.length}, 1fr)` }}
     >
       <span

@@ -357,6 +357,14 @@ in `src/app/switch.tsx`, since Profile uses one too)
   partner's pillar hue (`voucherPillar()` in `partners-view.tsx`).
 - `.iki-btn-sm` a 40px row action (Redeem). Always with `.iki-tap`.
 
+**v2 Profile** (section 4.8)
+- `.iki-identity-avatar` the 64px initials circle; `.iki-chip` a quiet
+  information chip (primary goal with its pillar dot, member since).
+- `.iki-btn-header` the 38px header button ("Edit profile"), the Profile
+  chip's height.
+- `Segmented quiet` / `.iki-segmented-quiet` a settings choice (Appearance):
+  the pill is a raised surface with a hairline rather than terracotta.
+
 **Header and sheet**
 - `.iki-profile-chip` / `-initials` the v2 header chip: "Profile" plus a 30px
   initials circle, 38px tall. It replaced v1's bare `.iki-avatar`, because with

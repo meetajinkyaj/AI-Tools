@@ -220,6 +220,16 @@ export function AuthedApp() {
           >
             {checkinMode === "saved" ? "Done" : "Cancel"}
           </button>
+        ) : tab === "profile" ? (
+          profileMode === "view" ? (
+            <button
+              type="button"
+              onClick={() => setProfileMode("edit")}
+              className="iki-tap iki-btn iki-btn-secondary iki-btn-header"
+            >
+              Edit profile
+            </button>
+          ) : null
         ) : undefined
       }
     >
@@ -249,7 +259,6 @@ export function AuthedApp() {
       {tab === "profile" && profileMode === "view" && (
         <ProfileView
           profile={profile as ProfileRow}
-          onEdit={() => setProfileMode("edit")}
           onLogout={() => void logout()}
           getToken={getAccessToken}
         />
