@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProfileRow } from "@/lib/profile";
 import { AppShell, NAV_ITEMS, type NavKey } from "./app-shell";
 import { BiomarkerReport } from "./biomarker-report";
-import { CheckinForm } from "./checkin-form";
+import { type CheckinMode, CheckinForm } from "./checkin-form";
 import { Dashboard } from "./dashboard";
 import { InstallPrompt } from "./install-prompt";
 import { InterventionLog } from "./intervention-log";
@@ -37,6 +37,7 @@ export function AuthedApp() {
   const [tab, setTab] = useState<NavKey>("home");
   const [summaryVersion, setSummaryVersion] = useState(0);
   const [profileMode, setProfileMode] = useState<"view" | "edit">("view");
+  const [checkinMode, setCheckinMode] = useState<CheckinMode>("form");
   const startedRef = useRef(false);
 
   /*
@@ -208,6 +209,19 @@ export function AuthedApp() {
       active={tab}
       onNavigate={navigate}
       displayName={profile?.full_name}
+      headerRight={
+        tab === "checkin" ? (
+          // v2 section 4.3: the check-in takes the header's right-hand slot.
+          // Cancel while filling it in, Done once it is saved; both go Home.
+          <button
+            type="button"
+            onClick={() => navigate("home")}
+            className="iki-tap iki-press text-micro font-semibold uppercase tracking-[0.1em] text-muted"
+          >
+            {checkinMode === "saved" ? "Done" : "Cancel"}
+          </button>
+        ) : undefined
+      }
     >
       {tab === "home" && (
         <div className="flex w-full max-w-xl flex-col gap-stack">
@@ -229,6 +243,7 @@ export function AuthedApp() {
           getToken={getAccessToken}
           activities={(profile as ProfileRow).activities ?? []}
           onChange={() => setSummaryVersion((v) => v + 1)}
+          onModeChange={setCheckinMode}
         />
       )}
       {tab === "profile" && profileMode === "view" && (

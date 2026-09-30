@@ -1,3 +1,4 @@
+import type { DayStatus } from "@/lib/home-summary";
 import type { RankId } from "@/lib/iki-rank";
 import { KANJI_UNITS_PER_EM, RANK_KANJI_PATH } from "@/lib/rank-kanji";
 
@@ -96,5 +97,37 @@ export function RankKanji({ id, size }: { id: RankId; size: number }) {
     >
       <path d={RANK_KANJI_PATH[id]} />
     </svg>
+  );
+}
+
+/**
+ * The 30-day streak heatmap (Home, and the saved check-in). Checked in is
+ * solid, partial (a check-in without sleep) is dashed, missed is a faint wash;
+ * today carries the selection ring. One image to assistive tech, with the
+ * count as its name, rather than thirty unlabelled cells.
+ */
+export function Heatmap({ days, legend = true }: { days: DayStatus[]; legend?: boolean }) {
+  const done = days.filter((d) => d !== "n").length;
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="iki-heat" role="img" aria-label={`Checked in on ${done} of the last ${days.length} days`}>
+        {days.map((s, i) => (
+          <span key={i} className="iki-heat-day" data-s={s} data-today={i === days.length - 1} />
+        ))}
+      </div>
+      {legend && (
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-micro text-muted" aria-hidden>
+          <span className="flex items-center gap-1.5">
+            <span className="iki-heat-key" data-s="g" /> Checked in
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="iki-heat-key" data-s="p" /> Partial
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="iki-heat-key" data-s="n" /> Missed
+          </span>
+        </p>
+      )}
+    </div>
   );
 }

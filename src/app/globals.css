@@ -1172,55 +1172,141 @@ summary {
     color: var(--primary);
   }
 
-  /* --- Energy scale, handoff §2 ------------------------------------------ */
+  /* --- Energy slider, v2 §4.3 ------------------------------------------ */
 
   /*
-   * FIVE CELLS THAT BEHAVE AS ONE SLIDER.
-   *
-   * The cells are not buttons. A slider containing five buttons is six things
-   * in the tab order and reads to a screen reader as a toolbar, when what it
-   * is, is one value between one and five. So the track carries
-   * `role="slider"` with its aria values and the single tab stop, and the
-   * cells are inert marks the track fills in.
+   * ONE SLIDER. The track carries `role="slider"`, the single tab stop and the
+   * aria values; the gradient bar and the thumb are decoration it positions.
    *
    * `touch-action: none` is what makes the drag work at all on a phone. Without
    * it the browser claims the gesture for scrolling the moment the finger moves
    * vertically, and the value stops following it halfway through.
+   *
+   * The track is inset by half a thumb on each side, so the thumb's centre can
+   * reach both ends without its body hanging off the card.
    */
   .iki-energy {
-    display: flex;
-    gap: calc(var(--spacing) * 2);
+    position: relative;
+    height: var(--spacing-tap);
+    margin-inline: calc(var(--spacing) * 7.25); /* half the 58px thumb */
     touch-action: none;
+    cursor: pointer;
   }
-  .iki-energy-cell {
-    flex: 1;
+  .iki-energy-track {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    height: calc(var(--spacing) * 2); /* 8 */
+    translate: 0 -50%;
+    border-radius: var(--radius-pill);
+    background: var(--grad-energy);
+  }
+  .iki-energy-thumb {
+    position: absolute;
+    top: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--spacing) * 1);
+    min-width: calc(var(--spacing) * 14.5); /* 58 */
+    height: calc(var(--spacing) * 9.5); /* 38 */
+    translate: -50% -50%;
+    border-radius: var(--radius-pill);
+    background: var(--grad-thumb);
+    box-shadow: var(--shadow-thumb);
+    color: var(--pillar-fg);
+    font-size: var(--text-body-lg);
+    font-weight: 700;
+    user-select: none;
+    transition: left 120ms var(--ease-press);
+  }
+  /* While dragging the thumb follows the finger exactly; easing would lag it. */
+  .iki-energy[data-dragging="true"] .iki-energy-thumb {
+    transition: none;
+  }
+
+  /* Sleep steppers: 36px inset buttons, 44px target via .iki-tap. */
+  .iki-stepper {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: var(--spacing-ctl);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-ctl);
-    background: var(--surface);
-    color: var(--muted);
-    font-size: var(--text-body);
-    font-weight: 600;
-    user-select: none;
-    transition:
-      background-color 140ms ease-out,
-      border-color 140ms ease-out,
-      color 140ms ease-out,
-      transform 140ms var(--ease-press);
+    height: calc(var(--spacing) * 9); /* 36 */
+    border-radius: var(--radius-inset);
+    background: var(--surface-2);
+    color: var(--ink);
   }
-  /* Filled up to the value, not just at it: the scale reads as a level rather
-     than as five radio buttons. */
-  .iki-energy-cell[data-filled="true"] {
+  .iki-stepper:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* A 26px pillar-filled circle holding a card's glyph (Sleep, Trained). */
+  .iki-glyph-well {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--spacing) * 6.5); /* 26 */
+    height: calc(var(--spacing) * 6.5);
+    border-radius: var(--radius-pill);
+    color: var(--pillar-fg);
+  }
+
+  /*
+   * Hold to check in. The arc fills over the hold (600ms linear) and the
+   * button fires when it completes; letting go resets it. Under reduced motion
+   * the global reset collapses the transition, and the component fires on a
+   * plain tap instead.
+   */
+  .iki-hold {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--spacing) * 3);
+    width: 100%;
+    min-height: calc(var(--spacing) * 14); /* 56 */
+    border-radius: var(--radius-pill);
     background: var(--primary);
-    border-color: var(--primary);
     color: var(--primary-fg);
+    font-size: var(--text-body-lg);
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    -webkit-touch-callout: none;
+    transition: background-color 140ms ease-out;
   }
-  /* The cell under the finger lifts, so a drag has something to follow. */
-  .iki-energy-cell[data-active="true"] {
-    transform: scale(1.08);
+  .iki-hold:hover:not(:disabled) {
+    background: var(--primary-hover);
+  }
+  .iki-hold:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .iki-hold-arc {
+    stroke-dasharray: 63;
+    stroke-dashoffset: 63;
+    transition: stroke-dashoffset 150ms ease-out;
+  }
+  .iki-hold[data-holding="true"] .iki-hold-arc {
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 600ms linear;
+  }
+
+  /* The saved state: a card edged in terracotta, and its 64px check. */
+  .iki-celebrate {
+    border-color: var(--celebrate-edge);
+    text-align: center;
+  }
+  .iki-celebrate-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--spacing) * 16); /* 64 */
+    height: calc(var(--spacing) * 16);
+    border-radius: var(--radius-pill);
+    background: var(--primary);
+    color: var(--primary-fg);
   }
 
   /* --- Switch, handoff §2 ------------------------------------------------ */
@@ -1273,21 +1359,22 @@ summary {
     background: var(--primary-fg);
   }
 
-  /* --- Activity tile, handoff §2 ----------------------------------------- */
+  /* --- Activity tile, v2 §4.3 ------------------------------------------ */
 
   .iki-tile {
     position: relative;
     display: flex;
+    min-width: 0;
     flex-direction: column;
+    gap: calc(var(--spacing) * 1);
     min-height: var(--spacing-tile);
-    padding: calc(var(--spacing) * 3) calc(var(--spacing) * 3) calc(var(--spacing) * 2.5);
+    padding: calc(var(--spacing) * 3.5); /* 14 */
     border: 1px solid var(--line);
     border-radius: var(--radius-tile);
     background: var(--surface);
     text-align: left;
     cursor: pointer;
     transition:
-      background-color 160ms ease-out,
       border-color 160ms ease-out,
       box-shadow 160ms ease-out,
       transform 100ms var(--ease-press);
@@ -1301,7 +1388,6 @@ summary {
    * is chosen, which reads as a jump on a screen full of them.
    */
   .iki-tile[aria-pressed="true"] {
-    background: var(--primary-wash);
     border-color: transparent;
     box-shadow: var(--shadow-ring);
   }
@@ -1312,26 +1398,34 @@ summary {
     font-weight: 600;
     color: var(--ink);
   }
-  .iki-tile-icon {
-    position: absolute;
-    right: calc(var(--spacing) * 3);
-    bottom: calc(var(--spacing) * 2.5);
-    color: var(--muted);
-    opacity: 0.55;
-    transition: color 160ms ease-out, opacity 160ms ease-out;
-  }
-  .iki-tile[aria-pressed="true"] .iki-tile-icon {
-    color: var(--primary);
-    opacity: 1;
-  }
-  .iki-tile-check {
-    position: absolute;
-    top: calc(var(--spacing) * 2.25);
-    right: calc(var(--spacing) * 2.25);
+  /* The 34px icon circle: inset when off, the activity's pillar hue when on. */
+  .iki-tile-well {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: calc(var(--spacing) * 5.5);
+    width: calc(var(--spacing) * 8.5); /* 34 */
+    height: calc(var(--spacing) * 8.5);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    color: var(--muted);
+    transition: background-color 160ms ease-out, color 160ms ease-out;
+  }
+  .iki-tile[aria-pressed="true"][data-pillar="performance"] .iki-tile-well {
+    background: var(--pillar-performance);
+    color: var(--pillar-fg);
+  }
+  .iki-tile[aria-pressed="true"][data-pillar="recovery"] .iki-tile-well {
+    background: var(--pillar-recovery);
+    color: var(--pillar-fg);
+  }
+  .iki-tile-check {
+    position: absolute;
+    top: calc(var(--spacing) * 3);
+    right: calc(var(--spacing) * 3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--spacing) * 5.5); /* 22 */
     height: calc(var(--spacing) * 5.5);
     border-radius: var(--radius-pill);
     background: var(--primary);

@@ -2,13 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { Rank } from "@/lib/iki-rank";
+import { rankProgress, type Rank } from "@/lib/iki-rank";
 import { RankUpToast } from "./rank-badge";
 import { ShareCheckinCard } from "./share-card";
 import { ShareModal } from "./share-modal";
 
-import type { CheckinRow } from "@/lib/checkin";
+import { ENERGY_LABELS, type CheckinRow } from "@/lib/checkin";
+import type { DayStatus } from "@/lib/home-summary";
+import { POINTS } from "@/lib/points";
 import {
+  DURATION_LABELS,
   type DurationBucket,
   EXERCISE_TYPE_LABELS,
   EXERCISE_TYPES,
@@ -17,7 +20,16 @@ import {
   isExerciseType,
   OTHER_TYPE,
 } from "@/lib/exercises";
-import { ActivityTile, DurationSegmented, EnergyScale } from "./checkin-controls";
+import {
+  ActivityTile,
+  DurationSegmented,
+  EnergyScale,
+  HoldToSubmit,
+  pillarForActivity,
+  SleepStepper,
+} from "./checkin-controls";
+import { Heatmap } from "./data-marks";
+import { Icon } from "./icons";
 import { Switch } from "./switch";
 import { fieldClass } from "./ui";
 
@@ -28,7 +40,13 @@ interface CheckinState {
   pointsBalance: number;
   /** Lifetime, unboosted, drives the rank badge. */
   ikiScore?: number;
+  /** v2: the 30-day heatmap and what today earned, from GET /api/checkin. */
+  last30?: DayStatus[];
+  pointsToday?: number;
 }
+
+/** Which of the two check-in views is showing, for the shell's header link. */
+export type CheckinMode = "form" | "saved";
 
 /**
  * The Daily Check-in tab: a 30-second flow (energy, sleep, training, a note)
@@ -39,15 +57,18 @@ export function CheckinForm({
   getToken,
   activities,
   onChange,
+  onModeChange,
 }: {
   getToken: () => Promise<string | null>;
   activities: string[];
   onChange?: () => void;
+  /** Lets the shell label its header link "Cancel" (form) or "Done" (saved). */
+  onModeChange?: (mode: CheckinMode) => void;
 }) {
   const [state, setState] = useState<CheckinState | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [energy, setEnergy] = useState<number | null>(null);
-  const [sleepHours, setSleepHours] = useState("");
+  const [sleepHours, setSleepHours] = useState<number | null>(null);
   const [trainingLogged, setTrainingLogged] = useState(false);
   const [exercises, setExercises] = useState<ExerciseEntry[]>([]);
   const [note, setNote] = useState("");
@@ -61,6 +82,9 @@ export function CheckinForm({
   const [shareModal, setShareModal] = useState(false);
   const [rankUp, setRankUp] = useState<Rank | null>(null);
   const [inviteCode, setInviteCode] = useState("");
+  /** Editing today's check-in after it was saved (v2: "Update check-in"). */
+  const [editing, setEditing] = useState(false);
+  const [showAllActivities, setShowAllActivities] = useState(false);
   const startedRef = useRef(false);
 
   // Any edit after a save clears the "Done" confirmation so the button invites
@@ -100,7 +124,7 @@ export function CheckinForm({
 
   const applyCheckin = useCallback((c: CheckinRow | null) => {
     setEnergy(c?.energy_score ?? null);
-    setSleepHours(c?.sleep_hours != null ? String(c.sleep_hours) : "");
+    setSleepHours(c?.sleep_hours ?? null);
     setTrainingLogged(c?.training_logged ?? false);
     setExercises(c?.exercises ?? []);
     setNote(c?.nutrition_note ?? "");
@@ -131,8 +155,8 @@ export function CheckinForm({
     void load();
   }, [load]);
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
+  async function submit() {
+    if (submitting) return;
     if (energy === null) {
       setError("Tap where your energy is today and you're set.");
       return;
@@ -154,7 +178,7 @@ export function CheckinForm({
         },
         body: JSON.stringify({
           energy_score: energy,
-          sleep_hours: sleepHours === "" ? null : Number(sleepHours),
+          sleep_hours: sleepHours,
           training_logged: trainingLogged,
           nutrition_note: note,
           exercises: trainingLogged ? exercises : [],
@@ -169,13 +193,21 @@ export function CheckinForm({
         setError(data.error ?? "Something went wrong. Please try again.");
         return;
       }
-      setState({
-        checkin: data.checkin,
-        checkedInToday: true,
-        streak: data.streak,
-        pointsBalance: data.pointsBalance,
-        ikiScore: data.ikiScore,
+      setState((prev) => {
+        // Today's heatmap cell reflects what was just saved, without a refetch.
+        const last30 = [...(prev?.last30 ?? Array<DayStatus>(30).fill("n"))];
+        last30[last30.length - 1] = sleepHours == null ? "p" : "g";
+        return {
+          checkin: data.checkin,
+          checkedInToday: true,
+          streak: data.streak,
+          pointsBalance: data.pointsBalance,
+          ikiScore: data.ikiScore ?? prev?.ikiScore,
+          last30,
+          pointsToday: (prev?.pointsToday ?? 0) + (data.pointsAwarded ?? 0),
+        };
       });
+      setEditing(false);
       // Only ever set when this check-in actually crossed a boundary, so the
       // celebration cannot fire twice for the same rank.
       if (data.rankUp) setRankUp(data.rankUp);
@@ -234,7 +266,7 @@ export function CheckinForm({
       // Type keys, for choosing the default backdrop. Never drawn.
       exerciseTypes: exercises.map((e) => e.type),
       energy,
-      sleepHours: sleepHours === "" ? null : Number(sleepHours),
+      sleepHours,
       inviteCode,
       date: new Date(),
     }),
@@ -269,117 +301,154 @@ export function CheckinForm({
   }
 
   const checkedInToday = state?.checkedInToday ?? false;
-  // Show the user's usual activities as quick options; fall back to the full
-  // list if they haven't set any. "Other" is always available.
-  const activityOptions: string[] =
-    activities.length > 0 ? activities.filter(isExerciseType) : [...EXERCISE_TYPES];
+  const mode: CheckinMode = checkedInToday && !editing ? "saved" : "form";
+
+  // Favourites first (the member's profile activities), then the rest behind
+  // "All N activities". Anything already selected always shows, so a logged
+  // activity can always be deselected. "Other" is always last.
+  const favourites: string[] = activities.filter(isExerciseType);
   const selectedTypes = exercises.map((e) => e.type);
-  // Always show a chip for anything already logged today, even if it's no longer
-  // one of the user's profile activities, otherwise a logged activity can't be
-  // deselected.
-  const chipTypes = [
-    ...activityOptions,
+  const showAll = showAllActivities || favourites.length === 0;
+  const tileTypes = [
+    ...(showAll ? [...EXERCISE_TYPES] : favourites),
     ...selectedTypes.filter(
-      (t) => t !== OTHER_TYPE && isExerciseType(t) && !activityOptions.includes(t),
+      (t) => t !== OTHER_TYPE && isExerciseType(t) && !showAll && !favourites.includes(t),
     ),
+    OTHER_TYPE,
   ];
+  const nameOf = (type: string, label?: string | null) =>
+    type === OTHER_TYPE ? label || "Other" : EXERCISE_TYPE_LABELS[type as ExerciseType] ?? type;
+  const needsDuration = exercises.filter(
+    (e) => e.duration == null || (e.type === OTHER_TYPE && !e.label),
+  );
+
+  const status_ = (
+    /* Announced rather than only shown. Saving a check-in swaps the whole view,
+       which a screen reader would not mention on its own. */
+    <p role="status" aria-live="polite" className="sr-only">
+      {submitting
+        ? "Saving your check-in."
+        : justSaved
+          ? earned && earned > 0
+            ? `Saved. You earned ${earned} iki points.`
+            : "Saved. See you tomorrow."
+          : ""}
+    </p>
+  );
+
+  /* ------------------------------ saved view ------------------------------ */
+
+  if (mode === "saved") {
+    const earnedToday = earned ?? state?.pointsToday ?? 0;
+    const progress = rankProgress(state?.ikiScore ?? 0);
+    const streak = state?.streak ?? 0;
+    return (
+      <div className="flex w-full max-w-md flex-col gap-stack">
+        <ModeReporter mode={mode} onModeChange={onModeChange} />
+        <header className="flex flex-col gap-1.5">
+          <p className="iki-eyebrow">Daily check-in</p>
+          <h1 className="iki-title">Checked in.</h1>
+        </header>
+        {status_}
+
+        {rankUp && <RankUpToast rank={rankUp} onClose={() => setRankUp(null)} />}
+
+        <section className="iki-card iki-celebrate flex flex-col items-center gap-4 py-6">
+          <span className="iki-celebrate-check" aria-hidden>
+            <Icon name="check" size={30} strokeWidth={2.5} />
+          </span>
+          {earnedToday > 0 && (
+            <p className="font-display text-display-hero text-primary">
+              +{earnedToday}
+              <span className="ml-1 font-sans text-unit">iki</span>
+            </p>
+          )}
+          <p className="text-caption text-muted">
+            Streak now{" "}
+            <strong className="font-semibold text-ink">
+              {streak} {streak === 1 ? "day" : "days"}
+            </strong>
+            {progress.next &&
+              ` · ${progress.remaining.toLocaleString("en-US")} iki to ${progress.next.name}`}
+          </p>
+          <div className="w-full">
+            <Heatmap days={state?.last30 ?? Array<DayStatus>(30).fill("n")} legend={false} />
+          </div>
+
+          {showShare ? (
+            <div className="w-full text-left">
+              <ShareCheckinCard input={shareInput} onClose={() => setShowShare(false)} />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setShowShare(true);
+                void loadInviteCode();
+              }}
+              className="iki-btn iki-btn-ceremonial"
+            >
+              Share your streak
+            </button>
+          )}
+        </section>
+
+        <section className="iki-card flex flex-col">
+          <p className="iki-eyebrow pb-2">Logged today</p>
+          <LoggedRow color="var(--pillar-performance)" label="Energy"
+            value={energy ? `${ENERGY_LABELS[energy]} · ${energy}` : "-"} />
+          <LoggedRow color="var(--pillar-recovery)" label="Sleep"
+            value={sleepHours != null ? `${sleepHours} h` : "Not logged"} />
+          {trainingLogged &&
+            exercises.map((e) => (
+              <LoggedRow
+                key={e.type}
+                color={`var(--pillar-${pillarForActivity(e.type)})`}
+                label={nameOf(e.type, e.label)}
+                value={e.duration ? DURATION_LABELS[e.duration] : "-"}
+              />
+            ))}
+        </section>
+
+        <button type="button" onClick={() => setEditing(true)} className="iki-btn iki-btn-secondary w-full">
+          Update check-in
+        </button>
+        <p className="text-center text-micro text-muted">
+          Come back tomorrow to keep the streak alive.
+        </p>
+
+        {shareModal && <ShareModal input={shareInput} onClose={() => setShareModal(false)} />}
+      </div>
+    );
+  }
+
+  /* ------------------------------- form view ------------------------------ */
 
   return (
     <div className="flex w-full max-w-md flex-col gap-stack">
+      <ModeReporter mode={mode} onModeChange={onModeChange} />
       <header className="flex flex-col gap-1.5">
         <p className="iki-eyebrow">Daily check-in</p>
         <h1 className="iki-title">
           {checkedInToday ? "Today's check-in" : "How are you feeling today?"}
         </h1>
-        <p className="iki-lede">
-          A few seconds to log how you feel. Your first check-in each day earns iki
-          points.
-        </p>
       </header>
+      {status_}
 
-      {/* Announced rather than only shown. Saving a check-in changes a button
-          label and adds a card, neither of which a screen reader would mention
-          on its own. */}
-      <p role="status" aria-live="polite" className="sr-only">
-        {submitting
-          ? "Saving your check-in."
-          : justSaved
-            ? earned && earned > 0
-              ? `Saved. You earned ${earned} iki points.`
-              : "Saved. See you tomorrow."
-            : ""}
-      </p>
-
-      <div className="grid grid-cols-2 gap-2.5">
-        <section className="iki-card iki-card-tight flex flex-col gap-1">
-          <p className="iki-eyebrow">Streak</p>
-          <p className="font-display text-display-md font-medium leading-none text-ink">
-            {state?.streak ?? 0}
-            <span className="ml-1 font-sans text-unit text-muted">
-              {state?.streak === 1 ? "day" : "days"}
-            </span>
-          </p>
-        </section>
-        <section className="iki-card iki-card-tight flex flex-col gap-1">
-          <p className="iki-eyebrow">iki points</p>
-          <p className="font-display text-display-md font-medium leading-none text-ink">
-            {state?.pointsBalance ?? 0}
-          </p>
-        </section>
-      </div>
-
-      {/*
-        Sharing is available for as long as today's check-in exists, not only
-        in the seconds after saving.
-
-        It used to hang entirely off `justSaved`, which is component state: it
-        vanished on reload, on navigating away and back, and the moment any
-        field was edited. Anyone who checked in and returned later had no way
-        into the share sheet at all, which is most people most of the time.
-      */}
-      {rankUp && <RankUpToast rank={rankUp} onClose={() => setRankUp(null)} />}
-
-      {(justSaved || checkedInToday) && (
-        <section className="iki-card iki-card-accent iki-card-tight flex flex-col gap-3">
-          {justSaved && (
-            <p className="text-body-sm font-semibold text-ink">
-              {earned && earned > 0
-                ? `Done ✓ You're checked in for today and earned ${earned} iki points.`
-                : "Done ✓ See you tomorrow."}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+        className="flex flex-col gap-stack"
+      >
+        <section className="iki-card flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <p className="iki-eyebrow">Energy</p>
+            <p className="font-display text-display-md text-pillar-performance">
+              {energy ? ENERGY_LABELS[energy] : "Not set"}
             </p>
-          )}
-
-          {showShare ? (
-            <ShareCheckinCard
-              input={shareInput}
-              onClose={() => setShowShare(false)}
-            />
-          ) : (
-            <div className="flex flex-col gap-1">
-              <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowShare(true);
-                    void loadInviteCode();
-                  }}
-                  className={`iki-btn ${justSaved ? "iki-btn-primary" : "iki-btn-secondary"}`}
-                >
-                  Share your streak
-                </button>
-              </div>
-              <p className="text-micro text-muted">
-                Make an image for Instagram or WhatsApp, add your own photo if
-                you like.
-              </p>
-            </div>
-          )}
-        </section>
-      )}
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <span className="text-body-sm font-semibold text-ink">Energy</span>
+          </div>
           <EnergyScale
             value={energy}
             onChange={(v) => {
@@ -387,104 +456,124 @@ export function CheckinForm({
               markEdited();
             }}
           />
-        </div>
+        </section>
 
-        <label className="flex flex-col gap-2 text-body-sm font-semibold text-ink">
-          Sleep last night (hours)
-          <input
-            className={fieldClass}
-            type="number"
-            inputMode="decimal"
-            min={0}
-            max={24}
-            step={0.5}
-            value={sleepHours}
-            onChange={(e) => {
-              setSleepHours(e.target.value);
-              markEdited();
-            }}
-            placeholder="e.g. 7.5"
-          />
-        </label>
-
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-body-sm font-semibold text-ink">Did you train today?</span>
-            <Switch
-              checked={trainingLogged}
-              label="Did you train today?"
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2.5">
+          <section className="iki-card flex min-w-0 flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <span className="iki-glyph-well bg-pillar-recovery" aria-hidden>
+                <Icon name="moon" size={13} strokeWidth={2} />
+              </span>
+              <p className="iki-eyebrow">Sleep</p>
+            </div>
+            <SleepStepper
+              value={sleepHours}
               onChange={(v) => {
-                setTrainingLogged(v);
+                setSleepHours(v);
                 markEdited();
               }}
             />
-          </div>
-
-          {trainingLogged && (
-            <div className="flex flex-col gap-3">
-              <span className="text-micro text-muted">
-                Tap what you did, then set how long.
+          </section>
+          <section className="iki-card flex min-w-0 flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <span className="iki-glyph-well bg-pillar-performance" aria-hidden>
+                <Icon name="flame" size={13} strokeWidth={2} />
               </span>
-              {/* Tiles rather than chips: a grid of nine reads at a glance and
-                  gives a thumb something to hit, where a wrapped row of pills
-                  is a paragraph of small targets. */}
-              <div className="grid grid-cols-2 gap-2.5">
-                {[...chipTypes, OTHER_TYPE].map((type) => (
+              <p className="iki-eyebrow">Trained</p>
+            </div>
+            <p className="font-display text-display-md text-ink">{trainingLogged ? "Yes" : "No"}</p>
+            <div className="mt-auto">
+              <Switch
+                checked={trainingLogged}
+                label="Did you train today?"
+                onChange={(v) => {
+                  setTrainingLogged(v);
+                  markEdited();
+                }}
+              />
+            </div>
+          </section>
+        </div>
+
+        {trainingLogged && (
+          <section className="flex flex-col gap-3" aria-label="What you did">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="iki-eyebrow">What you did</p>
+              {exercises.length > 0 && (
+                <p className="text-micro text-muted">
+                  {exercises.length} selected
+                  {needsDuration.length > 0 && ` · ${needsDuration.length} needs a duration`}
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2.5">
+              {tileTypes.map((type) => {
+                const entry = exercises.find((e) => e.type === type);
+                return (
                   <ActivityTile
                     key={type}
                     type={type}
-                    label={
-                      type === OTHER_TYPE
-                        ? "Other"
-                        : EXERCISE_TYPE_LABELS[type as ExerciseType]
-                    }
-                    selected={selectedTypes.includes(type)}
+                    label={nameOf(type)}
+                    selected={!!entry}
+                    duration={entry?.duration ?? null}
                     onToggle={() => toggleExercise(type)}
                   />
-                ))}
-              </div>
-
-              {exercises.map((e) => {
-                const name =
-                  e.type === OTHER_TYPE
-                    ? "Other"
-                    : EXERCISE_TYPE_LABELS[e.type as ExerciseType];
-                return (
-                  <div key={e.type} className="iki-card iki-card-tight flex flex-col gap-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-body-sm font-semibold text-ink">{name}</span>
-                      <button
-                        type="button"
-                        onClick={() => toggleExercise(e.type)}
-                        className="iki-btn-link iki-tap"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    {e.type === OTHER_TYPE && (
-                      <input
-                        className={fieldClass}
-                        value={e.label ?? ""}
-                        onChange={(ev) => setOtherLabel(ev.target.value)}
-                        maxLength={60}
-                        placeholder="What did you do?"
-                      />
-                    )}
-                    <DurationSegmented
-                      label={`How long: ${name}`}
-                      value={e.duration}
-                      onChange={(b) => setDuration(e.type, b)}
-                    />
-                  </div>
                 );
               })}
             </div>
-          )}
-        </div>
 
-        <label className="flex flex-col gap-2 text-body-sm font-semibold text-ink">
-          Nutrition note
+            {needsDuration.map((e) => {
+              const name = nameOf(e.type);
+              return (
+                <div key={e.type} className="iki-card iki-card-tight flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-body-sm font-semibold text-ink">{name} · how long?</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleExercise(e.type)}
+                      className="iki-btn-link iki-tap"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  {e.type === OTHER_TYPE && (
+                    <input
+                      className={fieldClass}
+                      value={e.label ?? ""}
+                      onChange={(ev) => setOtherLabel(ev.target.value)}
+                      maxLength={60}
+                      placeholder="What did you do?"
+                      aria-label="What did you do?"
+                    />
+                  )}
+                  <DurationSegmented
+                    label={`How long: ${name}`}
+                    value={e.duration}
+                    onChange={(b) => setDuration(e.type, b)}
+                  />
+                </div>
+              );
+            })}
+
+            {!showAll && (
+              <button
+                type="button"
+                onClick={() => setShowAllActivities(true)}
+                className="iki-btn iki-btn-secondary w-full"
+              >
+                All {EXERCISE_TYPES.length} activities
+                <Icon name="chevron-right" size={16} strokeWidth={2} />
+              </button>
+            )}
+          </section>
+        )}
+
+        <section className="iki-card flex flex-col gap-2">
+          <label htmlFor="nutrition-note" className="iki-eyebrow">
+            Nutrition note
+          </label>
           <textarea
+            id="nutrition-note"
             className={`${fieldClass} h-auto min-h-20 resize-y py-2`}
             value={note}
             onChange={(e) => {
@@ -494,33 +583,55 @@ export function CheckinForm({
             maxLength={500}
             placeholder="Anything about food today? Totally optional."
           />
-        </label>
+        </section>
 
-        {error && <p role="alert" className="text-body-sm text-primary-deep">{error}</p>}
+        {error && (
+          <p role="alert" className="text-body-sm text-primary-deep">
+            {error}
+          </p>
+        )}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          aria-busy={submitting}
-          className="iki-btn iki-btn-primary w-full"
-        >
-          {submitting
-            ? "Saving…"
-            : justSaved
-              ? "Done ✓"
-              : checkedInToday
-                ? "Update check-in"
-                : "Check in"}
-        </button>
-
-        <p className="text-center text-micro text-muted">
-          First check-in of the day earns iki points.
-        </p>
+        <div className="flex flex-col items-center gap-2.5">
+          <HoldToSubmit
+            label={checkedInToday ? "Hold to update" : "Hold to check in"}
+            busy={submitting}
+            onFire={() => void submit()}
+          />
+          {!checkedInToday && (
+            <p className="text-micro uppercase tracking-[0.1em] text-muted">
+              First check-in of the day ·{" "}
+              <span className="font-semibold text-primary">+{POINTS.checkin} iki</span>
+            </p>
+          )}
+        </div>
       </form>
 
-      {shareModal && (
-        <ShareModal input={shareInput} onClose={() => setShareModal(false)} />
-      )}
+      {shareModal && <ShareModal input={shareInput} onClose={() => setShareModal(false)} />}
     </div>
   );
+}
+
+/** One line of the "Logged today" card: a pillar dot, a label, a value. */
+function LoggedRow({ color, label, value }: { color: string; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-3 border-t border-line py-2.5">
+      <span className="iki-pillar-dot" style={{ background: color }} aria-hidden />
+      <span className="flex-1 text-body-sm text-ink">{label}</span>
+      <span className="text-body-sm font-semibold text-ink">{value}</span>
+    </div>
+  );
+}
+
+/** Tells the shell which view is up, so its header link reads right. */
+function ModeReporter({
+  mode,
+  onModeChange,
+}: {
+  mode: CheckinMode;
+  onModeChange?: (mode: CheckinMode) => void;
+}) {
+  useEffect(() => {
+    onModeChange?.(mode);
+  }, [mode, onModeChange]);
+  return null;
 }

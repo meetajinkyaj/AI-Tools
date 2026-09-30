@@ -284,15 +284,23 @@ finds every use. Compose them with utilities; they set structure, not layout.
 
 **Controls** (behaviour lives in `src/app/checkin-controls.tsx`, and the switch
 in `src/app/switch.tsx`, since Profile uses one too)
-- `.iki-energy` / `.iki-energy-cell` the five-cell energy scale. The track is
-  one `role="slider"`, not five buttons: five buttons is five tab stops and
-  reads as a toolbar, when what it is, is one value between one and five.
-  `touch-action: none` on the track is what stops the browser claiming the
-  gesture for scrolling halfway through a drag. Cells fill up TO the value, so
-  it reads as a level.
+- `.iki-energy` / `-track` / `-thumb` the v2 energy slider: one
+  `role="slider"` with one tab stop, a data-only gradient track, and a thumb
+  that snaps to five stops (nearest stop, `energyAtRatio`). `touch-action:
+  none` on the track is what stops the browser claiming the drag for
+  scrolling. The thumb glides 120ms between stops but follows the finger
+  exactly while dragging (`data-dragging`).
+- `.iki-stepper` the sleep steppers (36px, 44px target). A visually hidden
+  number input carries the value for assistive tech.
+- `.iki-glyph-well` the 26px pillar-filled circle beside Sleep and Trained.
+- `.iki-hold` / `.iki-hold-arc` "Hold to check in": a 600ms hold fills the
+  ring and fires. Enter/Space and reduced motion fire on a plain press.
+- `.iki-celebrate` / `-check` the saved check-in card and its 64px check.
 - `.iki-switch` / `.iki-switch-knob`. The knob's travel is computed from the
   track's own tokens, so resizing the switch cannot leave the knob short.
-- `.iki-tile` / `-label` / `-icon` / `-check`. Selected is a ring plus a
+- `.iki-tile` / `-label` / `-well` / `-check`. v2: a 34px icon circle that
+  takes the activity's pillar hue when selected (`data-pillar`), and a sub line
+  (category, chosen duration, or "Set duration"). Selected is a ring plus a
   transparent border, never a thicker border, so a grid does not shift by a
   pixel when one is chosen.
 - `.iki-segmented` / `-pill` / `-option` / `-sub`. One pill that travels, never

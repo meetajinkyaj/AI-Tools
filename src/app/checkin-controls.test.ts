@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { MAX_ENERGY, MIN_ENERGY } from "@/lib/checkin";
-import { energyAtRatio } from "./checkin-controls";
+import {
+  energyAtRatio,
+  HOLD_MS,
+  pillarForActivity,
+  SLEEP_MAX,
+  SLEEP_MIN,
+  SLEEP_START,
+  stepSleep,
+  thumbPercent,
+} from "./checkin-controls";
 
 /**
  * The drag maths, without a DOM.
@@ -10,23 +19,28 @@ import { energyAtRatio } from "./checkin-controls";
  * capture keeps the gesture, and the CSS fills the cells. This function is the
  * only part that can be quietly wrong, and wrong here means somebody's finger
  * is over the 4 while the app records a 3.
+ *
+ * v2 made the control a thumb that sits on five stops (0, 25, 50, 75, 100%),
+ * so the value is the NEAREST stop, where v1's five cells each owned a fifth.
  */
 describe("energyAtRatio", () => {
-  it("puts each fifth of the track on its own value", () => {
+  it("snaps to the nearest of the five stops", () => {
     expect(energyAtRatio(0.0)).toBe(1);
-    expect(energyAtRatio(0.19)).toBe(1);
-    expect(energyAtRatio(0.2)).toBe(2);
+    expect(energyAtRatio(0.12)).toBe(1);
+    expect(energyAtRatio(0.13)).toBe(2);
+    expect(energyAtRatio(0.25)).toBe(2);
     expect(energyAtRatio(0.5)).toBe(3);
-    expect(energyAtRatio(0.79)).toBe(4);
-    expect(energyAtRatio(0.8)).toBe(5);
-    expect(energyAtRatio(0.99)).toBe(5);
+    expect(energyAtRatio(0.74)).toBe(4);
+    expect(energyAtRatio(0.88)).toBe(5);
+    expect(energyAtRatio(1)).toBe(MAX_ENERGY);
   });
 
-  it("gives the last cell the same width as the others", () => {
-    // Exactly 1.0 is the right edge and would land on a sixth cell without the
-    // clamp. A slider whose top value is reachable only by one pixel less than
-    // the end is a slider you cannot set to its top value with a thumb.
-    expect(energyAtRatio(1)).toBe(MAX_ENERGY);
+  it("puts the thumb exactly on the stop it reports", () => {
+    for (let v = MIN_ENERGY; v <= MAX_ENERGY; v += 1) {
+      expect(energyAtRatio(thumbPercent(v) / 100)).toBe(v);
+    }
+    expect(thumbPercent(MIN_ENERGY)).toBe(0);
+    expect(thumbPercent(MAX_ENERGY)).toBe(100);
   });
 
   it("pins rather than wraps when the finger leaves either end", () => {
@@ -45,5 +59,37 @@ describe("energyAtRatio", () => {
       expect(v, String(r)).toBeLessThanOrEqual(MAX_ENERGY);
       expect(Number.isInteger(v), String(r)).toBe(true);
     }
+  });
+});
+
+describe("sleep stepper", () => {
+  it("starts at a sensible value on the first tap, either way", () => {
+    expect(stepSleep(null, 1)).toBe(SLEEP_START);
+    expect(stepSleep(null, -1)).toBe(SLEEP_START);
+  });
+
+  it("moves in half hours and stays inside the range", () => {
+    expect(stepSleep(7, 1)).toBe(7.5);
+    expect(stepSleep(7.5, -1)).toBe(7);
+    expect(stepSleep(SLEEP_MAX, 1)).toBe(SLEEP_MAX);
+    expect(stepSleep(SLEEP_MIN, -1)).toBe(SLEEP_MIN);
+  });
+
+  it("snaps a typed odd value onto the half-hour grid", () => {
+    expect(stepSleep(7.2, 1)).toBe(7.5);
+  });
+});
+
+describe("activity pillar", () => {
+  it("files mobility under Recovery and training under Performance", () => {
+    expect(pillarForActivity("yoga_mobility")).toBe("recovery");
+    expect(pillarForActivity("gym")).toBe("performance");
+    expect(pillarForActivity("other")).toBe("performance");
+  });
+});
+
+describe("hold to check in", () => {
+  it("holds for the handoff's 600ms", () => {
+    expect(HOLD_MS).toBe(600);
   });
 });
