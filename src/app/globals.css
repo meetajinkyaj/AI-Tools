@@ -399,6 +399,10 @@
   --text-micro: 0.71875rem; /* 11.5, band 11-11.5 */
   --text-micro--line-height: 1.4;
 
+  /* The "SOON" badge on a disabled nav slot (v2 §4.0). Marcellus caps. */
+  --text-soon: 0.4375rem; /* 7 */
+  --text-soon--letter-spacing: 0.12em;
+
   --text-tab: 0.625rem; /* 10 */
   --text-tab--line-height: 1;
   --text-tab--letter-spacing: 0.03em;
@@ -424,7 +428,6 @@
   --spacing-ctl-lg: 48px; /* primary submit */
   --spacing-nav: 66px;
   --spacing-fab: 54px;
-  --spacing-sheet-row: 52px;
   --spacing-bar: 7px;      /* progress track height */
   /* Switch geometry, handoff §2. Off the 4px grid on purpose: this is a
      hardware-like control whose proportions the spec fixes exactly. */
@@ -1113,19 +1116,6 @@ summary {
     color: var(--ink);
     text-align: right;
   }
-  /* Sheet rows are tappable, so they carry the full height rather than a hit
-     area overlay: there is room for it here and a real 52px target is better
-     than a 52px-looking one. */
-  .iki-row-sheet {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: var(--spacing-sheet-row);
-    font-size: var(--text-body-lg);
-    font-weight: 600;
-    color: var(--ink);
-    cursor: pointer;
-  }
 
   /* --- Code chip, handoff §3.7 ------------------------------------------- */
 
@@ -1391,35 +1381,45 @@ summary {
     opacity: 0.75;
   }
 
-  /* --- Avatar chip, handoff §2 ------------------------------------------- */
-
-  .iki-avatar {
-    display: flex;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-    width: calc(var(--spacing) * 9.5);
-    height: calc(var(--spacing) * 9.5);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-pill);
-    background: var(--surface-2);
-    color: var(--ink);
-    font-size: var(--text-unit);
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    transition: border-color 140ms ease-out, transform 100ms var(--ease-press);
-  }
-  .iki-avatar:active {
-    transform: scale(0.97);
-  }
-
-  /* --- More sheet, handoff §2 -------------------------------------------- */
+  /* --- Profile chip, v2 §4.0 ------------------------------------------ */
 
   /*
-   * A sheet, not a menu. It holds the three sections that did not fit in the
-   * bar, and it slides from the bottom because that is where the thumb that
-   * opened it already is.
+   * "Profile" plus initials, replacing v1's bare 38px avatar. A labelled chip
+   * because v2 removed the More sheet: this is now the only way to Profile, and
+   * a circle of two letters did not say where it went.
+   */
+  .iki-profile-chip {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    height: calc(var(--spacing) * 9.5); /* 38 */
+    padding-inline: calc(var(--spacing) * 3) calc(var(--spacing) * 1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: var(--text-small);
+    font-weight: 600;
+  }
+  .iki-profile-chip-initials {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--spacing) * 7.5); /* 30 */
+    height: calc(var(--spacing) * 7.5);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    font-size: var(--text-tab);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  /* --- Bottom sheet (the rank ladder, v2 §4.2) ------------------------- */
+
+  /*
+   * Slides from the bottom because that is where the thumb that opened it
+   * already is. Behaviour (focus trap, Escape, backdrop) is in sheet.tsx.
    *
    * The backdrop is a sibling rather than a parent, so a tap anywhere outside
    * the panel closes it without the panel having to stop the event on its way
@@ -1499,7 +1499,7 @@ summary {
     padding-inline: calc(var(--spacing) * 2);
     border: 1px solid var(--line);
     border-radius: calc(var(--spacing-nav) / 2);
-    background: var(--surface-translucent);
+    background: var(--nav-ground);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     box-shadow: var(--shadow-nav);
@@ -1524,7 +1524,35 @@ summary {
   /* Styled off aria-current rather than a class, so the accessible state and
      the visible state cannot disagree. */
   .iki-nav-item[aria-current="page"] {
-    color: var(--primary);
+    color: var(--ink); /* v2: ink, not terracotta. The FAB is the only primary thing in the bar. */
+  }
+
+  /*
+   * A slot that is visible but not yet a control (Challenges, v2 §4.0). It is a
+   * span, so there is no press or focus state to suppress; this only dims it.
+   */
+  .iki-nav-item-disabled {
+    color: var(--muted-dim);
+    cursor: default;
+  }
+
+  /* "SOON", pinned to the top-right of the Challenges trophy. Decorative. */
+  .iki-soon-badge {
+    position: absolute;
+    top: calc(var(--spacing) * -1.25);   /* -5 */
+    right: calc(var(--spacing) * -3.5);  /* -14 */
+    display: inline-flex;
+    align-items: center;
+    height: calc(var(--spacing) * 3.25); /* 13 */
+    padding-inline: calc(var(--spacing) * 1.25); /* 5 */
+    border-radius: var(--radius-pill);
+    background: var(--primary);
+    color: var(--primary-fg);
+    font-family: var(--font-label), serif;
+    font-size: var(--text-soon);
+    letter-spacing: var(--text-soon--letter-spacing);
+    line-height: 1;
+    text-transform: uppercase;
   }
 
   /*
