@@ -35,7 +35,6 @@ export function AuthedApp() {
   const [status, setStatus] = useState<Status>("loading");
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [tab, setTab] = useState<NavKey>("home");
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [summaryVersion, setSummaryVersion] = useState(0);
   const [profileMode, setProfileMode] = useState<"view" | "edit">("view");
   const startedRef = useRef(false);
@@ -60,7 +59,6 @@ export function AuthedApp() {
     // Navigating always lands on the Profile tab in view mode (edit is explicit).
     if (key === "profile") setProfileMode("view");
     setTab(key);
-    setSheetOpen(false);
     if (!push || typeof window === "undefined") return;
     const url = new URL(window.location.href);
     // Home is the bare URL. A canonical "/" is what people paste, and
@@ -90,10 +88,7 @@ export function AuthedApp() {
       setTab(tabFromUrl());
     })();
 
-    const onPop = () => {
-      setTab(tabFromUrl());
-      setSheetOpen(false);
-    };
+    const onPop = () => setTab(tabFromUrl());
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
@@ -212,9 +207,6 @@ export function AuthedApp() {
     <AppShell
       active={tab}
       onNavigate={navigate}
-      sheetOpen={sheetOpen}
-      onSheetOpen={() => setSheetOpen(true)}
-      onSheetClose={() => setSheetOpen(false)}
       displayName={profile?.full_name}
     >
       {tab === "home" && (

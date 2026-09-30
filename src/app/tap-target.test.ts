@@ -40,7 +40,6 @@ const SAFE = [
   "secondaryButtonClass", // h-11 in ui.tsx
   "iki-nav-item", //       54
   "iki-nav-fab", //        --spacing-fab
-  "iki-row-sheet", //      --spacing-sheet-row
   "iki-tile", //           --spacing-tile
   "iki-segmented-option", // 44
   "iki-energy-cell", //    46
@@ -64,6 +63,14 @@ const SAFE = [
  */
 const EXEMPT = /^admin-/;
 
+/*
+ * The third: the disabled Challenges nav slot (v2 section 4.0). It is a
+ * `<span aria-disabled>`, not a control, so it is never scanned and never needs
+ * a hit area. When CHALLENGES_ENABLED flips it becomes a button with
+ * `iki-nav-item` and is checked like every other. app-shell.test.tsx asserts
+ * the span stays a span while the flag is off.
+ */
+
 const APP_DIR = join(process.cwd(), "src", "app");
 
 function tsxFiles(dir: string): string[] {
@@ -71,7 +78,9 @@ function tsxFiles(dir: string): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) out.push(...tsxFiles(path));
-    else if (entry.name.endsWith(".tsx") && !EXEMPT.test(entry.name)) out.push(path);
+    // Test files render components; they are not the member app.
+    else if (entry.name.endsWith(".tsx") && !entry.name.includes(".test.") && !EXEMPT.test(entry.name))
+      out.push(path);
   }
   return out;
 }

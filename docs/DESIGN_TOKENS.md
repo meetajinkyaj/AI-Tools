@@ -179,7 +179,6 @@ a spacing value: `p-`, `px-`, `gap-`, `h-`, `min-h-`, `mt-`.
 | `ctl-lg` | 48px | primary submit |
 | `nav` | 66px | bottom nav height |
 | `fab` | 54px | check-in button |
-| `sheet-row` | 52px | More sheet rows |
 | `bar` | 7px | progress track height |
 | `bar-max` | 150px | progress track cap |
 | `tile` | 112px | activity tile minimum height (v2, was 104) |
@@ -282,7 +281,6 @@ finds every use. Compose them with utilities; they set structure, not layout.
 **List rows**
 - `.iki-row` with `.iki-row-label` and `.iki-row-value`. The divider is on the
   row, so the last one loses its rule with no special case at the call site.
-- `.iki-row-sheet` h52 tappable row for the More sheet.
 
 **Controls** (behaviour lives in `src/app/checkin-controls.tsx`, and the switch
 in `src/app/switch.tsx`, since Profile uses one too)
@@ -303,16 +301,24 @@ in `src/app/switch.tsx`, since Profile uses one too)
   offset are inline, being arithmetic on the track's width.
 
 **Header and sheet**
-- `.iki-avatar` the 38px initials chip in the header.
-- `.iki-sheet-backdrop`, `.iki-sheet`, `.iki-sheet-handle` the More sheet. The
-  handle is decorative: the sheet is not draggable, and it is there because a
-  panel that rose from the bottom edge reads as one that can be pushed back
-  down.
+- `.iki-profile-chip` / `-initials` the v2 header chip: "Profile" plus a 30px
+  initials circle, 38px tall. It replaced v1's bare `.iki-avatar`, because with
+  the More sheet gone it is the only way to Profile.
+- `.iki-sheet-backdrop`, `.iki-sheet`, `.iki-sheet-handle` the bottom sheet
+  (the rank ladder). Behaviour lives in `sheet.tsx`: focus trap, Escape,
+  backdrop tap. The handle is decorative: the sheet is not draggable, and it is
+  there because a panel that rose from the bottom edge reads as one that can
+  be pushed back down.
 
 **Navigation**
 - `.iki-nav` the floating pill, with the safe-area inset already in its offset.
 - `.iki-nav-item` 56x54, styled off `aria-current="page"` rather than a class,
-  so the accessible state and the visible state cannot disagree.
+  so the accessible state and the visible state cannot disagree. Current is
+  `ink` in v2 (was `primary`); the check-in button is the bar's only terracotta.
+- `.iki-nav-item-disabled` and `.iki-soon-badge` the Challenges placeholder
+  (`CHALLENGES_ENABLED` in `src/lib/flags.ts`, default false). A span with
+  `aria-disabled`, never a button, never focusable, so the tap-target test
+  does not see it.
 - `.iki-nav-fab` the 54px check-in button, ringed in canvas so it reads as cut
   out of the bar.
 - `.iki-shell` the page padding that clears the nav, the status bar and both
@@ -391,7 +397,7 @@ staying light under a dark app.
 
 ## 9. The shell owns the section, and the URL owns the shell
 
-`AppShell` renders the bottom bar and the More sheet; `authed-app.tsx` owns
+`AppShell` renders the header and the bottom bar; `authed-app.tsx` owns
 which section is showing and mirrors it into the URL as `?tab=`, with
 `pushState` on navigate and a `popstate` listener for back and forward. Home is
 the bare URL, so `/` stays the canonical address for it.
