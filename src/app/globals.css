@@ -149,6 +149,8 @@
   );
   --photo-text: rgba(241, 233, 220, 0.78);
   --photo-edge: rgba(241, 233, 220, 0.4);
+  /* Over a member's own photo while it saves (profile-photo.tsx). */
+  --photo-busy: rgba(27, 24, 21, 0.45);
 
   /*
    * --- v2 gradients (§3.4). DATA ONLY: inside charts and the energy slider.
@@ -2067,6 +2069,35 @@ summary {
     font-size: var(--text-body-lg);
     font-weight: 700;
     letter-spacing: 0.04em;
+  }
+
+  /*
+   * Over the identity photo while a new one saves or the old one is removed.
+   * A dimmed circle with a turning ring. Under reduced motion the ring stops
+   * (the global reset) and the dimming alone says "busy".
+   */
+  .iki-photo-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+    background: var(--photo-busy);
+  }
+  .iki-photo-busy::after {
+    content: "";
+    width: calc(var(--spacing) * 6); /* 24 */
+    height: calc(var(--spacing) * 6);
+    border: 2px solid var(--photo-edge);
+    border-top-color: var(--photo-text);
+    border-radius: var(--radius-pill);
+    animation: iki-spin 900ms linear infinite;
+  }
+  @keyframes iki-spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   /* A quiet information chip: goal, member since. Not a control. */

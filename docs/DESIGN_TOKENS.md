@@ -94,6 +94,7 @@ information, not an alarm, and this app never diagnoses.
 | `muted-dim` | 55% muted | 55% muted | a disabled nav slot (Challenges) |
 | `celebrate-edge` | 35% clay | 35% clay | border of the saved check-in card |
 | `photo-text` / `photo-edge` | 78% / 40% linen | same | text and ghost-button border over the scoreboard photo |
+| `photo-busy` | 45% ink | same | dims the member's own photo while it saves (`.iki-photo-busy`) |
 
 Dark surfaces are a touch warmer in v2: `surface` `#23201b`, `surface-2`
 `#2d2823` (were `#242019` / `#2d2822`).
@@ -358,7 +359,11 @@ in `src/app/switch.tsx`, since Profile uses one too)
 - `.iki-btn-sm` a 40px row action (Redeem). Always with `.iki-tap`.
 
 **v2 Profile** (section 4.8)
-- `.iki-identity-avatar` the 64px initials circle; `.iki-chip` a quiet
+- `.iki-identity-avatar` the 64px identity circle: the member's photo when
+  they have one, initials otherwise (`Avatar` in `profile-photo.tsx`, which
+  also fills the 30px `.iki-profile-chip-initials` in the header).
+  `.iki-photo-busy` dims it with a turning ring while a photo saves; under
+  reduced motion the ring stops and the dimming carries it. `.iki-chip` a quiet
   information chip (primary goal with its pillar dot, member since).
 - `.iki-btn-header` the 38px header button ("Edit profile"), the Profile
   chip's height.

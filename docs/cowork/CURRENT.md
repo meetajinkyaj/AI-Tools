@@ -6,16 +6,37 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-07. **Nothing is pending.** The Google Cloud
-registration for Fitbit is done and the connect flow is proven end to end.
+Last updated: 2026-10-01. **One task pending: migration `0025_profile_photos`.**
 
-**The Fitbit registration task is withdrawn**, and not because it was done.
-Cowork found that `dev.fitbit.com` has closed registration for new
-applications and that the legacy Fitbit Web API is deprecated in September
-2026: Fitbit now runs through the Google Health API. Nobody can complete that
-task as it was written. Registration has to follow a rewritten adapter, so it
-comes back as a task when there is code for it to match. Good catch, it would
-have cost an afternoon and produced credentials nothing could call.
+## Run migration 0025 (profile photos), staging then production
+
+Needed before the profile photo PR merges. Until it runs, the app works as
+before and "Add photo" answers "Profile photos aren't switched on yet", so
+running it early is safe and running it late breaks nothing.
+
+1. Supabase, project `ikigaro-staging`, SQL Editor: paste the whole of
+   `supabase/migrations/0025_profile_photos.sql` and run it.
+2. Verify on staging:
+   ```sql
+   select column_name, data_type, is_nullable
+     from information_schema.columns
+    where table_name = 'profiles' and column_name = 'avatar_path';
+   -- expect one row: avatar_path, text, YES
+
+   select id, public, file_size_limit, allowed_mime_types
+     from storage.buckets where id = 'avatars';
+   -- expect: avatars, false, 1048576, {image/jpeg,image/png,image/webp}
+
+   select count(*) from pg_policies
+    where schemaname = 'storage' and policyname ilike '%avatar%';
+   -- expect 0: the bucket is private and only the server reads it
+   ```
+3. Repeat 1 and 2 on production (`xaygldulkjjofxohescm`).
+4. Report back; this task then moves to the ledger below.
+
+**Account deletion now has one more place to clear.** Photos live in the
+`avatars` bucket under `{profile id}/`. When a deletion request comes in by
+email, remove that folder in Storage as well as the rows.
 
 ---
 
