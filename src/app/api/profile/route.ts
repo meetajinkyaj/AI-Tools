@@ -5,6 +5,7 @@ import { resolveApprovedUserId } from "@/lib/app-user";
 import { POINTS, POINTS_REASON } from "@/lib/points";
 import { awardReferralMilestone } from "@/lib/referral-award";
 import { validateProfileInput } from "@/lib/profile";
+import { AVATAR_BUCKET, AVATAR_URL_TTL_SECONDS } from "@/lib/avatar";
 import { getOrCreateSelfProfileId } from "@/lib/profiles";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -46,7 +47,9 @@ export async function GET(request: Request) {
     if (error) {
       throw new Error(`profiles select failed: ${error.message}`);
     }
-    return NextResponse.json({ profile: data ?? null });
+    return NextResponse.json({
+      profile: data ? { ...data, avatar_url: await signedAvatarUrl(supabase, data.avatar_path) } : null,
+    });
   } catch (err) {
     console.error("GET /api/profile failed:", err);
     return NextResponse.json({ error: "Failed to load profile" }, { status: 500 });
@@ -116,9 +119,30 @@ export async function POST(request: Request) {
       await awardReferralMilestone(userId, POINTS_REASON.referralOnboard, POINTS.referralOnboard);
     }
 
-    return NextResponse.json({ profile });
+    return NextResponse.json({
+      profile: { ...profile, avatar_url: await signedAvatarUrl(supabase, profile.avatar_path) },
+    });
   } catch (err) {
     console.error("POST /api/profile failed:", err);
     return NextResponse.json({ error: "Failed to save profile" }, { status: 500 });
+  }
+}
+
+/**
+ * A short-lived link to the member's photo, or null. Never throws: a missing
+ * bucket (migration 0025 not run yet) or a lapsed object just means initials.
+ */
+async function signedAvatarUrl(
+  supabase: ReturnType<typeof createSupabaseAdmin>,
+  path: string | null | undefined,
+): Promise<string | null> {
+  if (!path) return null;
+  try {
+    const { data } = await supabase.storage
+      .from(AVATAR_BUCKET)
+      .createSignedUrl(path, AVATAR_URL_TTL_SECONDS);
+    return data?.signedUrl ?? null;
+  } catch {
+    return null;
   }
 }

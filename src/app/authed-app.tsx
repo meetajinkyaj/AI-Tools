@@ -209,6 +209,7 @@ export function AuthedApp() {
       active={tab}
       onNavigate={navigate}
       displayName={profile?.full_name}
+      avatarUrl={profile?.avatar_url}
       headerRight={
         tab === "checkin" ? (
           // v2 section 4.3: the check-in takes the header's right-hand slot.
@@ -261,6 +262,7 @@ export function AuthedApp() {
           profile={profile as ProfileRow}
           onLogout={() => void logout()}
           getToken={getAccessToken}
+          onAvatarChange={(url) => setProfile((p) => (p ? { ...p, avatar_url: url } : p))}
         />
       )}
       {tab === "profile" && profileMode === "edit" && (

@@ -6,16 +6,11 @@ reads and a trap for whoever re-runs one by accident. The permanent record of
 what was applied lives in the "Already applied" ledger below, one line each,
 no instructions.
 
-Last updated: 2026-08-07. **Nothing is pending.** The Google Cloud
-registration for Fitbit is done and the connect flow is proven end to end.
+Last updated: 2026-10-01. **Nothing is pending.**
 
-**The Fitbit registration task is withdrawn**, and not because it was done.
-Cowork found that `dev.fitbit.com` has closed registration for new
-applications and that the legacy Fitbit Web API is deprecated in September
-2026: Fitbit now runs through the Google Health API. Nobody can complete that
-task as it was written. Registration has to follow a rewritten adapter, so it
-comes back as a task when there is code for it to match. Good catch, it would
-have cost an afternoon and produced credentials nothing could call.
+**Account deletion now has one more place to clear.** Photos live in the
+`avatars` bucket under `{profile id}/`. When a deletion request comes in by
+email, remove that folder in Storage as well as the rows.
 
 ---
 
@@ -31,6 +26,7 @@ have cost an afternoon and produced credentials nothing could call.
 | `0018_broadcasts` | Applied 2026-07-30, verified. Both tables live, RLS on with 0 policies, `broadcast_recipients_unique` present, 4/4/4 unique unsubscribe tokens, 0 opted out, access breakdown unchanged. |
 | `0021_workout_auto_detected` | Applied to production 2026-08-06 and verified twice. `wearable_workouts.auto_detected` present, `boolean`, not null, default `false`; 0 rows flagged. Records whether the member started a session or their device noticed it, which is what keeps an auto-logged walk out of the training-day count without discarding it. |
 | `0019_broadcast_app_button` | Applied 2026-07-30, verified. `broadcasts.include_app_button` boolean, not null, default false; 0 rows with it set; `users` and `broadcast_recipients` unchanged. The SQL Editor spinner hung during this run, so completion was confirmed from a second connection rather than from the UI. |
+| `0025_profile_photos` | Applied to staging then production 2026-10-01, verified on both. `profiles.avatar_path` text, nullable; bucket `avatars` private, 1MB limit, jpeg/png/webp only; 0 storage policies; 0 profiles with a photo. Staging had been paused on the free tier and was resumed to run it. |
 
 | Configuration | Status |
 |---|---|

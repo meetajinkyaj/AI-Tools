@@ -8,7 +8,7 @@ import {
 } from "@/lib/profile";
 import { EXERCISE_TYPE_LABELS, isExerciseType } from "@/lib/exercises";
 import type { PrimaryGoal } from "@/lib/profile";
-import { initialsOf } from "./app-shell";
+import { ProfilePhoto } from "./profile-photo";
 import { NotificationSettings } from "./notification-settings";
 import { ThemeControl } from "./theme-control";
 import { WearableSettings } from "./wearable-settings";
@@ -38,11 +38,14 @@ export function ProfileView({
   profile,
   onLogout,
   getToken,
+  onAvatarChange,
 }: {
   profile: ProfileRow;
   /** Moved here from the shell header when the bottom nav replaced it. */
   onLogout?: () => void;
   getToken: () => Promise<string | null>;
+  /** A new signed photo link, or null once removed; the shell's chip follows it. */
+  onAvatarChange: (url: string | null) => void;
 }) {
   /*
    * NO "FULL NAME" ROW. It is the heading immediately above this card, and a
@@ -76,9 +79,12 @@ export function ProfileView({
   return (
     <div className="flex w-full max-w-md flex-col gap-stack">
       <header className="flex items-center gap-4">
-        <span className="iki-identity-avatar" aria-hidden>
-          {initialsOf(profile.full_name)}
-        </span>
+        <ProfilePhoto
+          name={profile.full_name}
+          url={profile.avatar_url}
+          getToken={getToken}
+          onChange={onAvatarChange}
+        />
         <div className="flex min-w-0 flex-col gap-2">
           <p className="sr-only">Profile</p>
           <h1 className="font-display text-display-name text-ink">{profile.full_name}</h1>

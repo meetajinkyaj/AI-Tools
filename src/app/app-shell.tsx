@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { CHALLENGES_ENABLED } from "@/lib/flags";
 import { CheckIcon } from "./activity-icon";
 import { Icon, type IconName } from "./icons";
+import { Avatar } from "./profile-photo";
 import { Wordmark } from "./ui";
 
 /**
@@ -60,22 +61,16 @@ const BAR_RIGHT: { key: NavKey; label: string; icon: IconName }[] = [
  */
 const SUB_SCREENS = new Set<NavKey>(["partners", "profile"]);
 
-/** Two letters from a name, for the header chip. */
-export function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
 /* --------------------------------- pieces --------------------------------- */
 
 /** "Profile" plus initials, replacing v1's bare avatar. */
 export function ProfileChip({
   displayName,
+  avatarUrl,
   onOpen,
 }: {
   displayName?: string;
+  avatarUrl?: string | null;
   onOpen: () => void;
 }) {
   return (
@@ -86,9 +81,7 @@ export function ProfileChip({
       aria-label="Profile"
     >
       <span>Profile</span>
-      <span className="iki-profile-chip-initials" aria-hidden>
-        {initialsOf(displayName ?? "")}
-      </span>
+      <Avatar url={avatarUrl} name={displayName ?? ""} className="iki-profile-chip-initials" />
     </button>
   );
 }
@@ -160,6 +153,7 @@ export function AppShell({
   active,
   onNavigate,
   displayName,
+  avatarUrl,
   headerRight,
   onChallenges,
   children,
@@ -168,6 +162,8 @@ export function AppShell({
   onNavigate: (key: NavKey) => void;
   /** For the header chip. Empty is fine; the chip just goes without letters. */
   displayName?: string;
+  /** The member's photo for the chip, if they have one; initials otherwise. */
+  avatarUrl?: string | null;
   /**
    * Replaces the Profile chip on the right of the header, for a screen that
    * owns that spot (Profile's "Edit profile", Check-in's "Cancel"). Pass
@@ -212,7 +208,7 @@ export function AppShell({
           {headerRight !== undefined ? (
             headerRight
           ) : active === "profile" ? null : (
-            <ProfileChip displayName={displayName} onOpen={() => onNavigate("profile")} />
+            <ProfileChip displayName={displayName} avatarUrl={avatarUrl} onOpen={() => onNavigate("profile")} />
           )}
         </header>
 

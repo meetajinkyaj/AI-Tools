@@ -78,6 +78,10 @@ export interface ProfileRow extends ProfileInput {
   user_id: string;
   created_at: string;
   updated_at: string;
+  /** Storage path of the profile photo (migration 0025). Absent before it runs. */
+  avatar_path?: string | null;
+  /** A short-lived signed link to that photo, added by GET /api/profile. */
+  avatar_url?: string | null;
 }
 
 export type ValidationResult =
