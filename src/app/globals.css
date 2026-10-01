@@ -1874,6 +1874,14 @@ summary {
     color: var(--ink);
   }
 
+  /* A 34px longevity-hued well: the "Worth a look" rows on Report (§4.6). */
+  .iki-well-longevity {
+    width: calc(var(--spacing) * 8.5);
+    height: calc(var(--spacing) * 8.5);
+    background: var(--pillar-longevity);
+    color: var(--pillar-fg);
+  }
+
   /* --- v2 Trends (§4.4) -------------------------------------------------- */
 
   /* Seven rounded bars, filled from the bottom. Fill height is data (inline). */
