@@ -7,7 +7,7 @@ import {
   projectLinear,
   retestMilestone,
 } from "./future";
-import { momentumOutlook } from "./future";
+import { checkinDaysInWindow, momentumOutlook } from "./future";
 import type { CheckinPoint } from "./trends";
 
 /** N consecutive daily check-ins ending 2026-01-30, newest first. */
@@ -174,5 +174,41 @@ describe("momentumOutlook (v2 Future card)", () => {
     expect(o.changeThisMonth).not.toBeNull();
     expect(o.changeThisMonth!).toBeGreaterThan(0);
     expect(o.checkinsThisMonth).toBe(20);
+  });
+});
+
+describe("check-in consistency counts only the 30-day window", () => {
+  const point = (checkin_date: string) => ({ checkin_date, energy_score: 3, sleep_hours: 7 });
+  const daysBack = (n: number) =>
+    new Date(Date.parse("2026-09-30T00:00:00Z") - n * 86_400_000).toISOString().slice(0, 10);
+
+  it("does not count the previous window's check-ins (the bug)", () => {
+    // 20 check-ins in each of the last two 30-day windows: 40 rows, as the
+    // API passes them. The old rule read this as 40/30, capped to 100%.
+    const rows = [
+      ...Array.from({ length: 20 }, (_, i) => point(daysBack(i))),
+      ...Array.from({ length: 20 }, (_, i) => point(daysBack(30 + i))),
+    ];
+    expect(computeHabitSignals(rows, 30, null, "2026-09-30").checkinRate).toBeCloseTo(20 / 30);
+  });
+
+  it("anchors on today, so a member who stopped is not credited for old days", () => {
+    const rows = Array.from({ length: 30 }, (_, i) => point(daysBack(20 + i)));
+    expect(checkinDaysInWindow(rows, 30, "2026-09-30")).toBe(10);
+  });
+
+  it("counts a day once even if it has two rows", () => {
+    expect(checkinDaysInWindow([point("2026-09-30"), point("2026-09-30")], 30, "2026-09-30")).toBe(1);
+  });
+
+  it("falls back to the newest check-in when no date is given", () => {
+    expect(checkinDaysInWindow([point("2026-08-01"), point("2026-08-15")], 30)).toBe(2);
+  });
+
+  it("keeps the dots and the % in step", () => {
+    const rows = Array.from({ length: 26 }, (_, i) => point(daysBack(i)));
+    const o = momentumOutlook(rows, "2026-09-30");
+    const rate = computeHabitSignals(rows, 30, null, "2026-09-30").checkinRate;
+    expect(o.checkinsThisMonth).toBe(Math.round(rate * 30));
   });
 });
