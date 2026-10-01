@@ -77,6 +77,7 @@ export async function GET(request: Request) {
         (checkins ?? []) as CheckinPoint[],
         MOMENTUM_WINDOW_DAYS,
         measuredSleep,
+        todayUTC(),
       ),
     );
     // v2 (handoff section 6): the change this month, today's projection and

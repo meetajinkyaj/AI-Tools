@@ -49,21 +49,48 @@ export interface Momentum {
  * and a wearable simply knows. Passing null, which is what happens for every
  * user without a device, and for a user whose devices have not reported in this
  * window, leaves the existing self-reported path exactly as it was.
+ *
+ * CONSISTENCY COUNTS ONLY THE WINDOW. `checkinRate` is the number of distinct
+ * days checked in during the `windowDays` days ending on `today`, divided by
+ * `windowDays`. It used to divide every check-in passed in by the window, and
+ * the API passes two windows' worth (60 days, for the energy delta), so a
+ * member with 40 check-ins over two months read as 100% "last 30 days" and was
+ * paid the full 35 consistency points. `today` defaults to the newest
+ * check-in, for callers that only have the rows.
  */
 export function computeHabitSignals(
   checkins: CheckinPoint[],
   windowDays = MOMENTUM_WINDOW_DAYS,
   measuredSleepHours: number | null = null,
+  today?: string,
 ): HabitSignals {
   const trend = summarizeCheckins(checkins, windowDays);
   const weeks = windowDays / 7;
   return {
-    checkinRate: Math.min(1, trend.count / windowDays),
+    checkinRate: Math.min(1, checkinDaysInWindow(checkins, windowDays, today) / windowDays),
     avgSleep: measuredSleepHours ?? trend.avgSleep,
     sleepIsMeasured: measuredSleepHours != null,
     trainingDaysPerWeek: Math.round((trend.trainingDays / weeks) * 10) / 10,
     energyDelta: trend.energyDelta,
   };
+}
+
+/** Distinct check-in days in the `windowDays` days ending on `anchor` (inclusive). */
+export function checkinDaysInWindow(
+  checkins: CheckinPoint[],
+  windowDays: number,
+  anchor?: string,
+): number {
+  const end =
+    anchor ??
+    checkins.reduce<string | null>((max, c) => (max === null || c.checkin_date > max ? c.checkin_date : max), null);
+  if (!end) return 0;
+  const endMs = Date.parse(`${end}T00:00:00Z`);
+  if (!Number.isFinite(endMs)) return 0;
+  const start = new Date(endMs - (windowDays - 1) * 86_400_000).toISOString().slice(0, 10);
+  return new Set(
+    checkins.map((c) => c.checkin_date).filter((d) => d >= start && d <= end),
+  ).size;
 }
 
 /**
@@ -269,8 +296,8 @@ export function momentumOutlook(
   const changeThisMonth =
     older.length === 0
       ? null
-      : computeMomentum(computeHabitSignals(checkins)).score -
-        computeMomentum(computeHabitSignals(older)).score;
+      : computeMomentum(computeHabitSignals(checkins, MOMENTUM_WINDOW_DAYS, null, today)).score -
+        computeMomentum(computeHabitSignals(older, MOMENTUM_WINDOW_DAYS, null, cutoff)).score;
 
   let projectedIfCheckedIn: number | null = null;
   if (!checkedInToday) {
@@ -287,16 +314,14 @@ export function momentumOutlook(
       },
     ];
     projectedIfCheckedIn = computeMomentum(
-      computeHabitSignals(withToday, MOMENTUM_WINDOW_DAYS, measuredSleepHours),
+      computeHabitSignals(withToday, MOMENTUM_WINDOW_DAYS, measuredSleepHours, today),
     ).score;
   }
 
   return {
     checkedInToday,
-    // Counted directly over the 30 days ending today. checkinRate's window is
-    // anchored on the newest check-in, which is right for momentum but would
-    // let old check-ins into a caption that says "this month".
-    checkinsThisMonth: checkins.filter((c) => c.checkin_date > cutoff && c.checkin_date <= today).length,
+    // The same count checkinRate uses, so the dots and the % always agree.
+    checkinsThisMonth: checkinDaysInWindow(checkins, MOMENTUM_WINDOW_DAYS, today),
     changeThisMonth,
     projectedIfCheckedIn,
   };
