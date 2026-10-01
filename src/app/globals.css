@@ -1874,6 +1874,78 @@ summary {
     color: var(--ink);
   }
 
+  /* --- v2 Trends (§4.4) -------------------------------------------------- */
+
+  /* Seven rounded bars, filled from the bottom. Fill height is data (inline). */
+  .iki-vbars {
+    display: flex;
+    flex-shrink: 0;
+    align-items: flex-end;
+    gap: calc(var(--spacing) * 1.5);
+  }
+  .iki-vbar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(var(--spacing) * 1.5);
+  }
+  .iki-vbar-track {
+    position: relative;
+    width: calc(var(--spacing) * 3.5); /* 14 */
+    height: calc(var(--spacing) * 21); /* 84 */
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: var(--track);
+  }
+  .iki-vbar-fill {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: var(--radius-pill);
+  }
+  .iki-vbar-fill[data-kind="primary"] {
+    background: var(--grad-bar-primary);
+  }
+  .iki-vbar-fill[data-kind="recovery"] {
+    background: var(--grad-bar-recovery);
+  }
+  .iki-vbar-day {
+    font-size: var(--text-tab);
+    color: var(--muted);
+  }
+  .iki-vbar-day[data-today="true"] {
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  /*
+   * v2 flag pills. The text colour is paired with its wash, never chosen at
+   * the call site: bad is terracotta, warn is tan, good is the recovery hue.
+   * Still never red and green.
+   */
+  .iki-flag-bad {
+    background: var(--flag-bad-wash);
+    color: var(--primary);
+  }
+  .iki-flag-warn {
+    background: var(--flag-warn-wash);
+    color: var(--tan);
+  }
+  .iki-flag-good {
+    background: var(--flag-good-wash);
+    color: var(--pillar-recovery);
+  }
+
+  /* The two-tone insight sentence (Trends, Future): HG 600 at 20px. */
+  .iki-insight {
+    font-size: var(--text-insight);
+    line-height: var(--text-insight--line-height);
+    letter-spacing: var(--text-insight--letter-spacing);
+    font-weight: 600;
+    color: var(--ink);
+  }
+
   /* The page padding that keeps content clear of the nav and the status bar. */
   .iki-shell {
     padding-inline: calc(var(--spacing-gutter) + var(--spacing-safe-l));

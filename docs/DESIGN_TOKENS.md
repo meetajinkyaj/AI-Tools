@@ -330,6 +330,15 @@ in `src/app/switch.tsx`, since Profile uses one too)
 - `Rings` and `RankKanji` in `data-marks.tsx`: concentric progress rings and
   the rank kanji as outline SVG, coloured by token.
 
+**v2 Trends** (section 4.4)
+- `.iki-vbars` / `.iki-vbar` / `-track` / `-fill[data-kind]` / `-day[data-today]`
+  seven rounded bars filled from the bottom with a data-only gradient, a
+  calendar week ending today (`src/lib/week-bars.ts`), earlier days fading.
+- `.iki-flag-bad` / `-warn` / `-good` the v2 flag pills, each wash paired with
+  its text colour (terracotta, tan, recovery hue). Use with `.iki-badge`.
+- `.iki-insight` the two-tone sentence, HG 600 at 20px; the muted and
+  terracotta parts are spans inside it.
+
 **Header and sheet**
 - `.iki-profile-chip` / `-initials` the v2 header chip: "Profile" plus a 30px
   initials circle, 38px tall. It replaced v1's bare `.iki-avatar`, because with

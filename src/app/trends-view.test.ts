@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { markerLabel } from "./trends-view";
+import { insightParts, markerLabel } from "./trends-view";
 
 /**
  * The reward line on Trends.
@@ -30,5 +30,24 @@ describe("markerLabel", () => {
 
   it("has something to say about an empty key", () => {
     expect(markerLabel({ marker_key: "", marker_name: null })).toBe("A marker");
+  });
+});
+
+describe("insightParts (v2 two-tone sentence)", () => {
+  it("composes the handoff's line from the bonus and the baseline month", () => {
+    const p = insightParts(
+      { marker_key: "visceral_fat", marker_name: "Visceral fat", delta_value: -1.5, amount: 120 },
+      "2025-11-12",
+    );
+    expect(p).toEqual({
+      lead: "Visceral fat moved into range.",
+      middle: "Down 1.5 since November, worth",
+      reward: "+120 iki.",
+    });
+  });
+
+  it("still reads as a sentence without a delta or a baseline date", () => {
+    const p = insightParts({ marker_key: "hs_crp", marker_name: null, delta_value: null, amount: 50 }, null);
+    expect(`${p.lead} ${p.middle} ${p.reward}`).toBe("Hs crp moved into range. Worth +50 iki.");
   });
 });

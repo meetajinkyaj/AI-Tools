@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { todayUTC } from "@/lib/checkin";
 import { POINTS, REFERRAL_MAX_TOTAL } from "@/lib/points";
+import { barOpacity, signed, type WeekBar, weekBars } from "@/lib/week-bars";
+import { formatPanelDate } from "./biomarker-report";
+import { Icon, type IconName } from "./icons";
 import type { CheckinTrend, MarkerDelta } from "@/lib/trends";
 import { DeviceDetail } from "./device-detail";
 import { TrainingCard } from "./training-card";
@@ -48,7 +52,34 @@ interface TrendsData {
   bonuses: OutcomeBonus[];
 }
 
-const DISCLAIMER = "Educational, not a diagnosis. Please consult a doctor.";
+/** v2 copy (handoff section 4.4), the same line the Report now uses. */
+const DISCLAIMER = "Information to explore, not a diagnosis. Worth a chat with your doctor.";
+
+/**
+ * The reward line, as one sentence in two tones (v2 section 4.4):
+ * "Visceral fat moved into range. Down 1.5 since November, worth +120 iki."
+ * Composed from the outcome bonus and the baseline date, never hand-written.
+ */
+export function insightParts(
+  bonus: Pick<OutcomeBonus, "marker_key" | "marker_name" | "delta_value" | "amount">,
+  baselineDate: string | null,
+): { lead: string; middle: string; reward: string } {
+  const month = baselineDate
+    ? new Date(`${baselineDate.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-GB", {
+        month: "long",
+        timeZone: "UTC",
+      })
+    : null;
+  const moved =
+    bonus.delta_value != null && bonus.delta_value !== 0
+      ? `${bonus.delta_value < 0 ? "Down" : "Up"} ${Math.abs(bonus.delta_value)}${month ? ` since ${month}` : ""}, worth`
+      : "Worth";
+  return {
+    lead: `${markerLabel(bonus)} moved into range.`,
+    middle: moved,
+    reward: `+${bonus.amount} iki.`,
+  };
+}
 
 /** Kept in sync with docs/FAQ.md; values come from the POINTS table so this
  * copy can never drift from the live economy. */
@@ -98,41 +129,76 @@ function RewardsFaq() {
   );
 }
 
-/** A tiny inline sparkline, no chart library, keeps the Worker bundle lean. */
-function Sparkline({ values, className = "" }: { values: number[]; className?: string }) {
-  const pts = values.filter((v) => Number.isFinite(v));
-  if (pts.length < 2) return null;
-  const w = 120;
-  const h = 28;
-  const min = Math.min(...pts);
-  const max = Math.max(...pts);
-  const span = max - min || 1;
-  const step = w / (pts.length - 1);
-  const d = pts
-    .map((v, i) => `${i === 0 ? "M" : "L"}${(i * step).toFixed(1)},${(h - ((v - min) / span) * h).toFixed(1)}`)
-    .join(" ");
+/**
+ * One of the two week cards (energy, sleep): the average and its change on the
+ * left, seven bars on the right. Bars use the data-only gradients.
+ */
+function WeekCard({
+  icon,
+  glyphClass,
+  eyebrow,
+  value,
+  unit,
+  delta,
+  deltaClass,
+  bars,
+  max,
+  kind,
+  label,
+}: {
+  icon: IconName;
+  glyphClass: string;
+  eyebrow: string;
+  value: number | null;
+  unit?: string;
+  delta: number | null;
+  deltaClass: string;
+  bars: WeekBar[];
+  max: number;
+  kind: "primary" | "recovery";
+  label: string;
+}) {
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className={className} aria-hidden>
-      <path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <section className="iki-card flex items-end justify-between gap-4">
+      <div className="flex min-w-0 flex-col gap-2">
+        <span className={`iki-glyph-well ${glyphClass}`} aria-hidden>
+          <Icon name={icon} size={13} strokeWidth={2} />
+        </span>
+        <p className="iki-eyebrow">{eyebrow}</p>
+        <p className="font-display text-display-hero text-ink">
+          {value ?? "-"}
+          {unit && value != null && <span className="font-sans text-unit text-muted">{unit}</span>}
+        </p>
+        {delta != null && delta !== 0 && (
+          <span className="iki-delta self-start">
+            <span className={deltaClass}>{signed(delta, unit ?? "")}</span>
+            <span className="uppercase tracking-[0.1em] text-muted">vs last wk</span>
+          </span>
+        )}
+      </div>
+      <div className="iki-vbars" role="img" aria-label={label}>
+        {bars.map((b, i) => (
+          <div key={b.date} className="iki-vbar">
+            <span className="iki-vbar-track">
+              {b.value != null && (
+                <span
+                  className="iki-vbar-fill"
+                  data-kind={kind}
+                  style={{
+                    height: `${Math.min(100, (b.value / max) * 100)}%`,
+                    opacity: barOpacity(i, b.isToday),
+                  }}
+                />
+              )}
+            </span>
+            <span className="iki-vbar-day" data-today={b.isToday}>
+              {b.letter}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
-}
-
-function deltaLabel(delta: number | null, unit = "", betterWhenDown = false): {
-  text: string;
-  tone: "up" | "down" | "flat";
-} {
-  if (delta == null || delta === 0) return { text: "no change", tone: "flat" };
-  const arrow = delta > 0 ? "▲" : "▼";
-  const improved = betterWhenDown ? delta < 0 : delta > 0;
-  return {
-    text: `${arrow} ${Math.abs(delta)}${unit}`,
-    tone: improved ? "up" : "down",
-  };
-}
-
-function toneClass(tone: "up" | "down" | "flat"): string {
-  return tone === "up" ? "text-clay" : tone === "down" ? "text-primary" : "text-muted";
 }
 
 export function TrendsView({ getToken }: { getToken: () => Promise<string | null> }) {
@@ -180,8 +246,7 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
   }
 
   const { checkin, biomarker, bonuses } = data;
-  const energyDelta = deltaLabel(checkin.trend.energyDelta, "");
-  const sleepDelta = deltaLabel(checkin.trend.sleepDelta, "h");
+  const today = todayUTC();
 
   return (
     <div className="flex w-full max-w-xl flex-col gap-stack">
@@ -189,89 +254,78 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
           size predate the token scale. That component still serves the screens
           this restyle has not reached. */}
       <header className="flex flex-col gap-1.5">
-        <p className="iki-eyebrow">Trends</p>
-        <h1 className="iki-title">Your movement</h1>
-        <p className="iki-lede">
-          Day-to-day from your check-ins, and the bigger picture from your lab panels.
+        <p className="iki-eyebrow">
+          Trends · {checkin.trend.count} check-in{checkin.trend.count === 1 ? "" : "s"}
         </p>
+        <h1 className="iki-title">Your movement</h1>
       </header>
 
       {/*
         CHECK-IN TREND LEADS. Everybody has check-ins; the device cards below
-        render for the few people with a ring, and leading with a section that
-        is empty for most members put the page's first screenful in the hands
-        of the smallest group on it.
+        render for the few people with a ring. Training days are not counted
+        here: the Training card reconciles check-ins against any device, and two
+        counts of one week on one page disagree the moment a ring is connected.
       */}
-      <section className="iki-card flex flex-col gap-3.5">
-        <p className="iki-eyebrow">Check-in trend</p>
-        {checkin.trend.count === 0 ? (
+      {checkin.trend.count === 0 ? (
+        <section className="iki-card">
           <p className="text-body-sm text-muted">
             Check in daily and your energy &amp; sleep trend will build here.
           </p>
-        ) : (
-          <div className="flex flex-col gap-3.5">
-            <div className="grid grid-cols-2 gap-3.5">
-              <div className="flex flex-col gap-1">
-                <span className="text-micro text-muted">Avg energy (7d)</span>
-                <span className="font-display text-display-md font-medium leading-none text-ink">
-                  {checkin.trend.avgEnergy ?? "-"}
-                  {/* The delta drops into the sans face beside the numeral,
-                      the same treatment a unit gets: a serif arrow reads as an
-                      ornament rather than as a value. `text-micro` and not
-                      `text-eyebrow`, which carries 0.2em of tracking that
-                      would push the arrow away from its own number. */}
-                  <span className={`ml-2 font-sans text-micro ${toneClass(energyDelta.tone)}`}>
-                    {checkin.trend.energyDelta != null ? energyDelta.text : ""}
-                  </span>
-                </span>
-                <span className="text-clay">
-                  <Sparkline values={checkin.series.map((p) => p.energy_score ?? NaN)} />
-                </span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-micro text-muted">Avg sleep (7d)</span>
-                <span className="font-display text-display-md font-medium leading-none text-ink">
-                  {checkin.trend.avgSleep != null ? `${checkin.trend.avgSleep}h` : "-"}
-                  <span className={`ml-2 font-sans text-micro ${toneClass(sleepDelta.tone)}`}>
-                    {checkin.trend.sleepDelta != null ? sleepDelta.text : ""}
-                  </span>
-                </span>
-                <span className="text-clay">
-                  <Sparkline values={checkin.series.map((p) => p.sleep_hours ?? NaN)} />
-                </span>
-              </div>
-            </div>
-            {/* Training days used to be counted here too. It now lives in the
-                Training card, which reconciles the check-in against any
-                connected device; two counts of the same week on one page
-                differ the moment a ring is connected, and the user has no way
-                to tell which one to believe. */}
-            <p className="text-micro text-muted">
-              {checkin.trend.count} check-in{checkin.trend.count === 1 ? "" : "s"} logged
-            </p>
-          </div>
-        )}
-      </section>
+        </section>
+      ) : (
+        <>
+          <WeekCard
+            icon="flame"
+            glyphClass="bg-primary text-primary-fg"
+            eyebrow="Energy · 7d"
+            value={checkin.trend.avgEnergy}
+            delta={checkin.trend.energyDelta}
+            deltaClass={(checkin.trend.energyDelta ?? 0) < 0 ? "text-muted" : "font-semibold text-primary"}
+            bars={weekBars(checkin.series, (p) => p.energy_score, today)}
+            max={5}
+            kind="primary"
+            label="Energy for each of the last seven days"
+          />
+          <WeekCard
+            icon="moon"
+            glyphClass="bg-pillar-recovery"
+            eyebrow="Sleep · 7d"
+            value={checkin.trend.avgSleep}
+            unit="h"
+            delta={checkin.trend.sleepDelta}
+            deltaClass={(checkin.trend.sleepDelta ?? 0) < 0 ? "text-muted" : "font-semibold text-pillar-recovery"}
+            bars={weekBars(checkin.series, (p) => p.sleep_hours, today)}
+            max={9}
+            kind="recovery"
+            label="Sleep for each of the last seven days"
+          />
+        </>
+      )}
 
-      {/* Outcome-verified rewards, the payoff moment. */}
-      {bonuses.length > 0 && (
-        <section className="iki-card iki-card-tight flex flex-col gap-2">
-          <p className="iki-eyebrow">You improved</p>
+      {/* Since your baseline: the infrequent, high-value signal, led by the
+          reward when there is one. */}
+      <section className="iki-card flex flex-col gap-3">
+        <p className="iki-eyebrow">Since your baseline</p>
+        {bonuses.length > 0 &&
+          (() => {
+            const p = insightParts(bonuses[0], biomarker.baselineDate);
+            return (
+              <p className="iki-insight">
+                {p.lead} <span className="text-muted">{p.middle}</span>{" "}
+                <span className="text-primary">{p.reward}</span>
+              </p>
+            );
+          })()}
+        {bonuses.length > 1 && (
           <ul className="flex flex-col gap-1">
-            {bonuses.map((b, i) => (
-              <li key={i} className="text-body-sm leading-relaxed text-ink">
-                <span className="font-semibold">{markerLabel(b)}</span>{" "}
-                moved into range{b.delta_value != null ? ` (${b.delta_value})` : ""} -{" "}
-                <span className="font-semibold text-clay">+{b.amount} iki points</span>
+            {bonuses.slice(1).map((b, i) => (
+              <li key={i} className="text-body-sm text-ink">
+                <span className="font-semibold">{markerLabel(b)}</span> moved into range,{" "}
+                <span className="font-semibold text-primary">+{b.amount} iki</span>
               </li>
             ))}
           </ul>
-        </section>
-      )}
-
-      {/* Biomarker since-baseline, the infrequent, high-value signal. */}
-      <section className="iki-card flex flex-col gap-2.5">
-        <p className="iki-eyebrow">Since your baseline</p>
+        )}
         {biomarker.panelCount < 2 ? (
           <p className="text-body-sm text-muted">
             You have one lab panel so far. Lab work is usually months apart. When you
@@ -280,34 +334,36 @@ export function TrendsView({ getToken }: { getToken: () => Promise<string | null
           </p>
         ) : (
           <>
-            <p className="text-micro text-muted">
-              {biomarker.baselineDate} → {biomarker.latestDate}
-            </p>
             <ul className="flex flex-col">
-              {biomarker.deltas.slice(0, 12).map((d) => {
-                const dl = deltaLabel(d.delta, "");
-                return (
-                  <li key={d.marker_key} className="iki-row">
-                    <span className="min-w-0 text-body-sm text-ink">
-                      {d.marker_name ?? d.marker_key}
-                      {(d.moved_into_range || d.improved) && (
-                        <span className="iki-badge iki-badge-good ml-2">
-                          {d.moved_into_range ? "into range" : "improved"}
-                        </span>
-                      )}
+              {biomarker.deltas.slice(0, 12).map((d) => (
+                <li
+                  key={d.marker_key}
+                  className="flex items-center gap-3 border-t border-line py-2.5 first:border-t-0"
+                >
+                  <span className="h-2 w-2 shrink-0 rounded-pill bg-pillar-longevity" aria-hidden />
+                  <span className="min-w-0 flex-1 text-body font-semibold text-ink">
+                    {d.marker_name ?? d.marker_key}
+                  </span>
+                  {(d.moved_into_range || d.improved) && (
+                    <span className="iki-badge iki-flag-good shrink-0">
+                      {d.moved_into_range ? "Into range" : "Improved"}
                     </span>
-                    {/* Never wrapped: "24 → 31" split over two lines reads as
-                        two unrelated numbers rather than one movement. */}
-                    <span className="shrink-0 whitespace-nowrap text-caption text-muted">
-                      {d.baseline_value} → {d.latest_value}
-                      {/* Direction of "good" varies per marker, so keep the delta neutral;
-                          the into-range badge is the health signal. */}
-                      <span className="ml-2">{d.delta != null ? dl.text : ""}</span>
-                    </span>
-                  </li>
-                );
-              })}
+                  )}
+                  {/* Never wrapped: "24 → 31" split over two lines reads as
+                      two unrelated numbers rather than one movement. Direction
+                      of "good" varies per marker, so the numbers stay neutral;
+                      the pill is the health signal. */}
+                  <span className="shrink-0 whitespace-nowrap text-caption text-muted">
+                    {d.baseline_value} → <strong className="font-semibold text-ink">{d.latest_value}</strong>
+                  </span>
+                </li>
+              ))}
             </ul>
+            {biomarker.baselineDate && biomarker.latestDate && (
+              <p className="text-micro uppercase tracking-[0.1em] text-muted">
+                {formatPanelDate(biomarker.baselineDate)} → {formatPanelDate(biomarker.latestDate)}
+              </p>
+            )}
           </>
         )}
       </section>
