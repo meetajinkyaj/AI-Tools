@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-
+import { nextUnlock } from "@/lib/home-summary";
+import { Icon, type IconName } from "./icons";
 
 /**
  * Partners / Rewards, the redemption loop. Users spend iki points on brand
@@ -220,30 +221,15 @@ export function PartnersView({
     <div className="flex w-full max-w-xl flex-col gap-stack">
       <header className="flex flex-col gap-1.5">
         <p className="iki-eyebrow">Rewards</p>
-        <h1 className="iki-title">Spend your iki points</h1>
-        <p className="iki-lede">
-          Redeem points for partner vouchers, or shop products we&rsquo;d use ourselves.
-        </p>
+        <h1 className="iki-title">Spend your iki</h1>
       </header>
 
-      <section className="iki-card iki-card-tight flex items-center justify-between gap-3">
-        <div className="flex flex-col gap-0.5">
-          <p className="iki-eyebrow">Your iki points</p>
-          {/* The one hero numeral on this screen, so it takes the largest step
-              in the scale below the page title. */}
-          <p className="font-display text-display-lg font-medium leading-none text-ink">
-            {balance}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowFaq((v) => !v)}
-          aria-expanded={showFaq}
-          className="iki-btn-link iki-tap shrink-0"
-        >
-          How to redeem
-        </button>
-      </section>
+      <PointsHero
+        balance={balance}
+        items={items}
+        faqOpen={showFaq}
+        onToggleFaq={() => setShowFaq((v) => !v)}
+      />
 
       {showFaq && <HowToRedeem />}
 
@@ -260,7 +246,7 @@ export function PartnersView({
       {vouchers.length > 0 && (
         <section className="flex flex-col gap-2">
           <p className="iki-eyebrow">Vouchers</p>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
             {vouchers.map((item) => (
               <VoucherCard
                 key={item.id}
@@ -294,10 +280,10 @@ export function PartnersView({
       )}
 
       {history.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-3">
+        <section className="iki-card flex flex-col">
+          <div className="flex items-center justify-between gap-3 pb-2">
             <p className="iki-eyebrow">
-              Redemption history{showHistory ? "" : ` · ${history.length}`}
+              Redeemed{showHistory ? "" : ` · ${history.length}`}
             </p>
             {/* Tucking history away is remembered per device. Kept: a member
                 who has redeemed a lot should not have to scroll past all of it
@@ -311,34 +297,35 @@ export function PartnersView({
               {showHistory ? "Hide" : "Show"}
             </button>
           </div>
-          {showHistory && (
-            <div className="flex flex-col gap-2">
-              {history.map((row) => {
-                const it = itemOf(row);
-                return (
-                  <div
-                    key={row.id}
-                    className="iki-card iki-card-tight flex items-center justify-between gap-2.5"
-                  >
-                    <div className="flex min-w-0 flex-col">
-                      {/* The snapshot first, the join second. A deleted catalog
-                          item must not erase a code somebody paid points for. */}
-                      <span className="truncate text-caption font-semibold text-ink">
-                        {row.item_name ?? it?.name ?? "Reward"}
-                      </span>
-                      <span className="text-micro text-muted">
-                        {new Date(row.redeemed_at ?? row.created_at).toLocaleDateString()} ·{" "}
-                        {row.points_spent} points
-                      </span>
-                    </div>
-                    {row.discount_code && (
-                      <CopyableCode code={row.discount_code} className="shrink-0" />
-                    )}
+          {showHistory &&
+            history.map((row) => {
+              const it = itemOf(row);
+              return (
+                <div
+                  key={row.id}
+                  className="flex items-center justify-between gap-2.5 border-t border-line py-2.5"
+                >
+                  <div className="flex min-w-0 flex-col">
+                    {/* The snapshot first, the join second. A deleted catalog
+                        item must not erase a code somebody paid points for. */}
+                    <span className="truncate text-body-sm font-semibold text-ink">
+                      {row.item_name ?? it?.name ?? "Reward"}
+                    </span>
+                    <span className="text-micro text-muted">
+                      {new Date(row.redeemed_at ?? row.created_at).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}{" "}
+                      · {row.points_spent} iki
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  {row.discount_code && (
+                    <CopyableCode code={row.discount_code} className="shrink-0" />
+                  )}
+                </div>
+              );
+            })}
         </section>
       )}
 
@@ -367,6 +354,88 @@ export function PartnersView({
       {issued && <VoucherIssued issued={issued} onClose={() => setIssued(null)} />}
     </div>
   );
+}
+
+/**
+ * The points hero (v2 section 4.7): what there is to spend, and how far it is
+ * to the cheapest voucher still out of reach. Shares `nextUnlock()` with the
+ * Home tile, so the two always name the same voucher.
+ */
+function PointsHero({
+  balance,
+  items,
+  faqOpen,
+  onToggleFaq,
+}: {
+  balance: number;
+  items: CatalogItem[];
+  faqOpen: boolean;
+  onToggleFaq: () => void;
+}) {
+  const unlock = nextUnlock(items, balance);
+  return (
+    <section className="iki-card flex flex-col gap-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-2">
+          <p className="iki-eyebrow">To spend</p>
+          <p className="font-display text-display-2xl text-primary">
+            {balance.toLocaleString("en-US")}
+            <span className="ml-1.5 font-sans text-body text-primary">iki</span>
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onToggleFaq}
+          aria-expanded={faqOpen}
+          className="iki-btn-link iki-tap shrink-0 text-micro"
+        >
+          How it works
+        </button>
+      </div>
+      <div className="flex flex-col gap-2 border-t border-line pt-4">
+        {unlock.state === "locked" && (
+          <div
+            className="iki-track"
+            role="progressbar"
+            aria-label={`Progress to ${unlock.name}`}
+            aria-valuemin={0}
+            aria-valuemax={unlock.cost}
+            aria-valuenow={balance}
+          >
+            <div className="iki-track-fill" style={{ width: `${(balance / unlock.cost) * 100}%` }} />
+          </div>
+        )}
+        <div className="flex items-center justify-between gap-3 text-micro uppercase tracking-[0.1em] text-muted">
+          <span className="min-w-0">
+            {unlock.state === "locked"
+              ? `${unlock.remaining.toLocaleString("en-US")} to ${[unlock.partner, unlock.name].filter(Boolean).join(" · ")}`
+              : unlock.state === "all-affordable"
+                ? "Enough for any voucher"
+                : "Vouchers arriving soon"}
+          </span>
+          {unlock.state === "locked" && (
+            <span className="shrink-0 tabular-nums">{unlock.cost.toLocaleString("en-US")}</span>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Which pillar a partner belongs to, from its catalogue category: recovery
+ * (sauna, spa, massage, sleep), longevity (labs, diagnostics), or performance
+ * (training, gyms, gear). It only picks the circle's hue and glyph.
+ */
+export function voucherPillar(category: string | null): {
+  pillar: "recovery" | "longevity" | "performance";
+  icon: IconName;
+} {
+  const c = (category ?? "").toLowerCase();
+  if (/sauna|spa|massage|recover|sleep|onsen|bath/.test(c)) return { pillar: "recovery", icon: "moon" };
+  if (/lab|diagnos|blood|test|clinic|health/.test(c)) return { pillar: "longevity", icon: "heart-pulse" };
+  if (/train|gym|fitness|sport|run|gear|coach/.test(c)) return { pillar: "performance", icon: "flame" };
+  return { pillar: "longevity", icon: "gift" };
 }
 
 interface ReferralInfo {
@@ -435,57 +504,52 @@ function InviteCard({ getToken }: { getToken: () => Promise<string | null> }) {
   };
 
   return (
-    <section className="iki-card flex flex-col gap-2.5">
-      <div className="flex items-baseline justify-between gap-3">
+    <section className="iki-card flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
         <p className="iki-eyebrow">Invite friends</p>
-        {info.completed > 0 && (
-          <span className="text-micro text-muted">
-            {info.completed} joined &amp; onboarded
-          </span>
-        )}
+        <span className="iki-badge iki-badge-primary iki-badge-flag">
+          Up to +{info.maxTotal} each
+        </span>
       </div>
-      <p className="text-caption leading-relaxed text-ink">
-        Share your link, earn up to{" "}
-        <span className="font-bold">+{info.maxTotal} iki points</span> per friend:
-      </p>
-      {/* Amounts in ink and bold, the condition in muted. The number is what
-          somebody scans for; the sentence is what they read once. */}
-      <ul className="flex flex-col gap-1 text-small text-muted">
-        <li>
-          <span className="font-bold text-ink">+{info.tiers.onboard}</span> when they
-          join and complete onboarding
-        </li>
-        <li>
-          <span className="font-bold text-ink">+{info.tiers.streak}</span> when they
-          build a daily habit (their first 7-day check-in streak)
-        </li>
-        <li>
-          <span className="font-bold text-ink">+{info.tiers.panel}</span> when they
-          upload their first blood report within {info.tiers.panelWindowDays} days
-          of joining
-        </li>
+      {/* The amount is what somebody scans for, so it gets its own column in
+          the display face; the condition is what they read once. */}
+      <ul className="flex flex-col gap-2">
+        {[
+          { amount: info.tiers.onboard, text: "They join and finish onboarding" },
+          { amount: info.tiers.streak, text: "Their first 7-day check-in streak" },
+          {
+            amount: info.tiers.panel,
+            text: `Their first blood report, within ${info.tiers.panelWindowDays} days of joining`,
+          },
+        ].map((t) => (
+          <li key={t.text} className="flex items-baseline gap-3">
+            <span className="w-11 shrink-0 font-display text-insight text-primary">+{t.amount}</span>
+            <span className="text-caption text-muted">{t.text}</span>
+          </li>
+        ))}
       </ul>
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <button
-          type="button"
-          onClick={() => void share()}
-          className="iki-btn iki-btn-primary shrink-0"
-        >
+      {info.completed > 0 && (
+        <p className="text-micro text-muted">{info.completed} joined &amp; onboarded so far</p>
+      )}
+      <div className="flex flex-col gap-2">
+        <button type="button" onClick={() => void share()} className="iki-btn iki-btn-ceremonial w-full">
           {copied ? "Link copied" : "Share your link"}
         </button>
         {/* KEPT, THOUGH THE MOCKUP HAS ONLY THE SHARE BUTTON. The share sheet is
             awkward or absent on desktop, and the visible link is the fallback
             when the clipboard is blocked. */}
-        <button
-          type="button"
-          onClick={() => void copyLink()}
-          className="iki-btn iki-btn-secondary shrink-0"
-        >
-          {linkCopied ? "Copied" : "Copy link"}
-        </button>
-        <code className="min-w-0 truncate rounded-ctl bg-surface-2 px-3 py-2 font-mono text-micro text-muted">
-          {info.link}
-        </code>
+        <div className="flex items-center gap-2">
+          <code className="min-w-0 flex-1 truncate rounded-ctl bg-surface-2 px-3 py-2 font-mono text-micro text-muted">
+            {info.link}
+          </code>
+          <button
+            type="button"
+            onClick={() => void copyLink()}
+            className="iki-btn-link iki-tap shrink-0"
+          >
+            {linkCopied ? "Copied" : "Copy link"}
+          </button>
+        </div>
       </div>
     </section>
   );
@@ -526,40 +590,43 @@ function VoucherCard({
   const comingSoon = item.inventory_status === "coming_soon";
   const soldOut = !comingSoon && (item.available_codes ?? 0) <= 0;
   const tooPoor = !comingSoon && !soldOut && balance < item.points_cost;
-  const label = comingSoon
-    ? "Coming soon"
-    : soldOut
-      ? "Sold out"
-      : `Redeem · ${item.points_cost}`;
+  const { pillar, icon } = voucherPillar(item.category);
 
   return (
-    <section className="iki-card iki-card-tight flex flex-col gap-2.5">
-      <div className="flex flex-col gap-0.5">
+    <section className={`iki-card iki-card-tight flex items-center gap-3 ${tooPoor ? "opacity-80" : ""}`}>
+      <span className={`iki-voucher-well`} data-pillar={pillar} aria-hidden>
+        <Icon name={icon} size={18} strokeWidth={1.8} />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {/* Muted, not terracotta: a brand name should not out-shout the offer
             it introduces. */}
         {item.partner && <p className="iki-eyebrow-sm">{item.partner}</p>}
         <p className="text-body font-semibold text-ink">{item.name}</p>
-        {item.discount_value && (
-          <p className="text-small text-muted">{item.discount_value}</p>
-        )}
-        {item.description && (
-          <p className="text-small text-muted">{item.description}</p>
+        {/* The gap is stated rather than the button just going dead. "Redeem"
+            greyed out with no reason reads as broken. */}
+        {tooPoor ? (
+          <p className="text-micro font-semibold text-primary">
+            {item.points_cost - balance} more iki to unlock
+          </p>
+        ) : (
+          (item.discount_value || item.description) && (
+            <p className="text-micro text-muted">{item.discount_value ?? item.description}</p>
+          )
         )}
       </div>
-      <button
-        type="button"
-        onClick={onRedeem}
-        disabled={comingSoon || soldOut || tooPoor}
-        className="iki-btn iki-btn-primary mt-auto w-full"
-      >
-        {label}
-      </button>
-      {/* The gap is stated rather than the button just going dead. "Redeem"
-          greyed out with no reason reads as broken. */}
-      {tooPoor && (
-        <p className="text-micro text-muted">
-          {item.points_cost - balance} more points to unlock.
-        </p>
+      {comingSoon || soldOut ? (
+        <span className="shrink-0 text-micro font-semibold text-muted">
+          {comingSoon ? "Coming soon" : "Sold out"}
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={onRedeem}
+          disabled={tooPoor}
+          className={`iki-tap iki-btn iki-btn-sm shrink-0 ${tooPoor ? "iki-btn-secondary" : "iki-btn-primary"}`}
+        >
+          {tooPoor ? item.points_cost.toLocaleString("en-US") : `Redeem · ${item.points_cost.toLocaleString("en-US")}`}
+        </button>
       )}
     </section>
   );
