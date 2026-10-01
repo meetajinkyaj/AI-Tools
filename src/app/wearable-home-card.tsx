@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { Icon } from "./icons";
 import { Card, Eyebrow, secondaryButtonClass } from "./ui";
 
 /**
@@ -19,6 +20,10 @@ import { Card, Eyebrow, secondaryButtonClass } from "./ui";
  * finished a session has no way to tell "not synced yet" apart from "broken".
  * One button and one line of status answers both. It is NOT dismissable, since
  * it is a control rather than an advertisement.
+ *
+ * v2 (section 4.1) gives both states one shape: a row with a 36px watch well,
+ * a line of text, and an action on the right, so Home ends on a quiet row
+ * rather than a second pitch card.
  *
  * The full provider list is not duplicated in either state. Managing
  * connections (which are on, disconnecting one) stays in Settings, and two
@@ -170,15 +175,18 @@ export function WearableHomeCard({
 
     return (
       <>
-        <Card className="flex items-center justify-between gap-3 p-5">
-          <div className="flex flex-col gap-1">
+        <section className="iki-card iki-card-tight flex items-center gap-3">
+          <span className="iki-icon-well" aria-hidden>
+            <Icon name="watch" size={18} />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <div className="flex items-center gap-1.5">
-              <Eyebrow>Your devices</Eyebrow>
+              <p className="text-body font-semibold text-ink">Your devices</p>
               <button
                 type="button"
                 onClick={() => setInfo(true)}
                 aria-label="How syncing works"
-                className="iki-tap flex h-4 w-4 items-center justify-center rounded-full border border-line text-[0.6rem] leading-none text-muted transition-colors hover:border-primary hover:text-primary"
+                className="iki-tap flex h-4 w-4 items-center justify-center rounded-full border border-line text-tab leading-none text-muted transition-colors hover:border-primary hover:text-primary"
               >
                 i
               </button>
@@ -194,7 +202,7 @@ export function WearableHomeCard({
           >
             {syncing ? "Syncing…" : brand ? `Sync with ${brand}` : "Sync your devices"}
           </button>
-        </Card>
+        </section>
 
         {info && <SyncInfoDialog onClose={() => setInfo(false)} />}
       </>
@@ -206,44 +214,43 @@ export function WearableHomeCard({
   if (dismissed) return null;
 
   const live = data.available.length;
+  // Nothing to connect yet: say nothing, rather than advertise a feature that
+  // is not there. (v1 showed "coming soon" here; the Profile screen still does.)
+  if (live === 0) return null;
+
+  // The brands come from what is actually live, so the line never promises a
+  // device the app cannot connect.
+  const brands = data.available.map((p) => p.name).join(", ");
 
   return (
-    <Card className="flex flex-col gap-3 p-5">
-      <div className="flex items-start justify-between gap-3">
-        <Eyebrow>Your devices</Eyebrow>
-        <button
-          type="button"
-          onClick={() => {
-            window.localStorage.setItem(DISMISS_KEY, "1");
-            setDismissed(true);
-          }}
-          aria-label="Hide this"
-          className="iki-tap px-1 text-body-sm leading-none text-muted"
-        >
-          ✕
-        </button>
-      </div>
-
-      <p className="text-body-sm text-ink">
-        {live > 0
-          ? "Sync your ring or watch and see sleep and recovery next to your lab results."
-          : "Wearable device syncing is coming soon."}
-      </p>
-      <p className="text-micro text-muted">
-        Apple Health and Google Health Connect coming soon.
-      </p>
-
-      {live > 0 && (
-        <div>
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="iki-tap rounded-pill border border-line px-4 py-2 font-label text-[0.65rem] uppercase tracking-[0.2em] text-ink transition-colors hover:border-primary hover:text-primary"
-          >
-            Connect a device
-          </button>
-        </div>
-      )}
-    </Card>
+    <section className="iki-card iki-card-tight flex items-center gap-3">
+      <button
+        type="button"
+        onClick={onOpenSettings}
+        className="iki-press flex min-h-tap min-w-0 flex-1 items-center gap-3 text-left"
+      >
+        <span className="iki-icon-well" aria-hidden>
+          <Icon name="watch" size={18} />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-body font-semibold text-ink">Connect a device</span>
+          <span className="text-micro text-muted">
+            {brands} · sleep and recovery, automatically
+          </span>
+        </span>
+        <Icon name="chevron-right" size={18} className="shrink-0 text-muted" />
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          window.localStorage.setItem(DISMISS_KEY, "1");
+          setDismissed(true);
+        }}
+        aria-label="Hide this"
+        className="iki-tap shrink-0 px-1 text-body-sm leading-none text-muted"
+      >
+        ✕
+      </button>
+    </section>
   );
 }

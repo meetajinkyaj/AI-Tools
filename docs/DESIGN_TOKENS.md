@@ -300,6 +300,24 @@ in `src/app/switch.tsx`, since Profile uses one too)
   movement is most of what tells you something changed. The pill's width and
   offset are inline, being arithmetic on the track's width.
 
+**v2 score card and data marks** (Home, section 4.1)
+- `.iki-track` / `.iki-track-fill` the 6px bar with a terracotta fill (rank
+  progress, next voucher). Width is data, set inline.
+- `.iki-seal` the 48px kanji seal on the rank row. `.iki-delta` the "+2
+  yesterday" pill. `.iki-pill-sm` the 34px ceremonial "Share" (44px target via
+  `.iki-tap`).
+- `.iki-pillar-label` / `.iki-pillar-dot` a pillar row: Marcellus caps beside a
+  10px hue dot. The hue is inline `var(--pillar-...)`.
+- `.iki-bento` a Home tile: card-shaped button, `--spacing-bento` tall,
+  `min-width: 0` so captions wrap instead of widening the grid.
+- `.iki-dots` / `.iki-dot[data-on]` the Rewards 8 x 2 dot grid.
+- `.iki-heat` / `.iki-heat-day[data-s][data-today]` / `.iki-heat-key` the
+  30-day streak heatmap: `g` checked in (solid), `p` partial (dashed: a
+  check-in without sleep), `n` missed (faint). Today carries the ring.
+- `.iki-icon-well` a 36px inset circle holding an icon (device row).
+- `Rings` and `RankKanji` in `data-marks.tsx`: concentric progress rings and
+  the rank kanji as outline SVG, coloured by token.
+
 **Header and sheet**
 - `.iki-profile-chip` / `-initials` the v2 header chip: "Profile" plus a 30px
   initials circle, 38px tall. It replaced v1's bare `.iki-avatar`, because with
