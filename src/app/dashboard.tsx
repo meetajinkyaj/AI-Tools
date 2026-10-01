@@ -19,7 +19,7 @@ import { summarizePanel, type JudgedReading } from "@/lib/panel-summary";
 import { POINTS } from "@/lib/points";
 import type { ProfileRow } from "@/lib/profile";
 import type { RankCardInput } from "@/lib/rank-share-card";
-import { RankKanji, Rings } from "./data-marks";
+import { Heatmap, RankKanji, Rings } from "./data-marks";
 import { Icon } from "./icons";
 import { RankShareModal } from "./rank-share-modal";
 import { RankSheet } from "./rank-sheet";
@@ -491,7 +491,6 @@ export function RewardsTile({
 
 export function StreakCard({ streak, last30 }: { streak: number; last30?: DayStatus[] }) {
   const days = last30 ?? Array<DayStatus>(30).fill("n");
-  const done = days.filter((d) => d !== "n").length;
   return (
     <section className="iki-card flex flex-col gap-4">
       <div className="flex items-baseline justify-between">
@@ -501,26 +500,7 @@ export function StreakCard({ streak, last30 }: { streak: number; last30?: DaySta
           <span className="ml-1 font-sans text-unit text-muted">{streak === 1 ? "day" : "days"}</span>
         </p>
       </div>
-      <div
-        className="iki-heat"
-        role="img"
-        aria-label={`Checked in on ${done} of the last 30 days`}
-      >
-        {days.map((s, i) => (
-          <span key={i} className="iki-heat-day" data-s={s} data-today={i === days.length - 1} />
-        ))}
-      </div>
-      <p className="flex flex-wrap gap-x-4 gap-y-1 text-micro text-muted" aria-hidden>
-        <span className="flex items-center gap-1.5">
-          <span className="iki-heat-key" data-s="g" /> Checked in
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="iki-heat-key" data-s="p" /> Partial
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="iki-heat-key" data-s="n" /> Missed
-        </span>
-      </p>
+      <Heatmap days={days} />
     </section>
   );
 }

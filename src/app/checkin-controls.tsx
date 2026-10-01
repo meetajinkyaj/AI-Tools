@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { ENERGY_LABELS, MAX_ENERGY, MIN_ENERGY } from "@/lib/checkin";
 import {
@@ -8,8 +8,10 @@ import {
   DURATION_HINTS,
   DURATION_LABELS,
   type DurationBucket,
+  categoryForType,
 } from "@/lib/exercises";
 import { ActivityIcon, CheckIcon } from "./activity-icon";
+import { Icon } from "./icons";
 import { Segmented } from "./segmented";
 
 /**
@@ -26,47 +28,43 @@ import { Segmented } from "./segmented";
  * form remains the single place a check-in exists.
  */
 
-const ENERGY_VALUES = Array.from(
-  { length: MAX_ENERGY - MIN_ENERGY + 1 },
-  (_, i) => MIN_ENERGY + i,
-);
-
 /**
- * The value a fraction across the track maps to.
+ * The value a fraction across the track maps to: the NEAREST of the five stops.
  *
  * EXPORTED SO IT CAN BE TESTED WITHOUT A DOM. This is the one piece of
- * arithmetic in the drag that can be subtly wrong: the boundaries between
- * cells, and what happens when a finger travels past either end. Everything
- * else in the gesture is the browser's pointer capture doing its job.
+ * arithmetic in the drag that can be subtly wrong: where one value hands over
+ * to the next, and what happens when a finger travels past either end.
  *
- * Floor rather than round, because the cells are equal slices: the first fifth
- * of the track is cell one, all of it, not the half either side of its centre.
+ * v2 changed the rule. The v1 control was five cells, so each value owned an
+ * equal fifth of the track (floor). The v2 control is a thumb that sits ON a
+ * stop at 0, 25, 50, 75 and 100 percent, so the value is whichever stop the
+ * finger is closest to (round). Keeping the old rule would put the thumb under
+ * the finger's left neighbour for half of every slice.
  */
 export function energyAtRatio(ratio: number): number {
-  const span = MAX_ENERGY - MIN_ENERGY + 1;
-  const index = Math.floor(ratio * span);
-  return Math.min(MAX_ENERGY, Math.max(MIN_ENERGY, MIN_ENERGY + index));
+  const steps = MAX_ENERGY - MIN_ENERGY;
+  const clamped = Math.min(1, Math.max(0, Number.isFinite(ratio) ? ratio : 0));
+  return MIN_ENERGY + Math.round(clamped * steps);
+}
+
+/** Where the thumb sits for a value, as a percentage across the track. */
+export function thumbPercent(value: number): number {
+  return ((value - MIN_ENERGY) / (MAX_ENERGY - MIN_ENERGY)) * 100;
 }
 
 /**
- * Energy, as one slider you can drag across.
+ * Energy, as one slider you can drag across (v2 section 4.3).
  *
- * WHY NOT FIVE BUTTONS, which is what it was. Five buttons is five tab stops
- * and, to a screen reader, a toolbar; what this actually is, is one value
- * between one and five. So the track is a single `role="slider"` with one tab
- * stop, its aria values, and an `aria-valuetext` carrying the word rather than
- * the number, because "Good" is the thing being chosen and "4" is how we store
- * it.
+ * ONE SLIDER, NOT FIVE BUTTONS. One tab stop, `role="slider"`, and an
+ * `aria-valuetext` carrying the word rather than the number, because "Good" is
+ * the thing being chosen and "4" is how we store it.
  *
- * THE DRAG IS THE POINT. Pointer capture on the track means the gesture keeps
- * following the finger after it leaves the element, which is what makes a slide
- * feel like a slide rather than like five taps that sometimes miss. The value
- * comes from the x position rather than from which cell was hit, so dragging
- * past the end pins to 5 instead of stopping wherever the last cell happened to
- * be.
+ * THE DRAG IS THE POINT. Pointer capture on the track keeps following the
+ * finger after it leaves the element, and the value comes from the x position,
+ * so dragging past the end pins to 5. While dragging the thumb follows with no
+ * transition; on release or a key press it glides 120ms to its stop.
  *
- * Keyboard: arrows move by one, Home and End jump to the ends. A slider that
- * only works with a pointer is not a slider.
+ * Keyboard: arrows move by one, Home and End jump to the ends.
  */
 export function EnergyScale({
   value,
@@ -77,8 +75,8 @@ export function EnergyScale({
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
 
-  /** The value under a given client x, clamped to the scale. */
   const valueAt = useCallback((clientX: number): number => {
     const el = trackRef.current;
     if (!el) return MIN_ENERGY;
@@ -95,8 +93,13 @@ export function EnergyScale({
     [valueAt, value, onChange],
   );
 
+  const stop = () => {
+    draggingRef.current = false;
+    setDragging(false);
+  };
+
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <div
         ref={trackRef}
         role="slider"
@@ -107,8 +110,10 @@ export function EnergyScale({
         aria-valuenow={value ?? undefined}
         aria-valuetext={value ? ENERGY_LABELS[value] : "Not set"}
         className="iki-energy"
+        data-dragging={dragging}
         onPointerDown={(e) => {
           draggingRef.current = true;
+          setDragging(true);
           // Capture on the TRACK, so a finger that slides off the row still
           // drives the value instead of the gesture being lost to the page.
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -118,12 +123,10 @@ export function EnergyScale({
           if (draggingRef.current) commit(e.clientX);
         }}
         onPointerUp={(e) => {
-          draggingRef.current = false;
+          stop();
           e.currentTarget.releasePointerCapture(e.pointerId);
         }}
-        onPointerCancel={() => {
-          draggingRef.current = false;
-        }}
+        onPointerCancel={stop}
         onKeyDown={(e) => {
           const current = value ?? MIN_ENERGY - 1;
           if (e.key === "ArrowRight" || e.key === "ArrowUp") {
@@ -141,59 +144,245 @@ export function EnergyScale({
           }
         }}
       >
-        {ENERGY_VALUES.map((v) => (
-          <div
-            key={v}
-            // Filled UP TO the value, not only at it, so the row reads as a
-            // level rather than as five radio buttons.
-            data-filled={value !== null && v <= value}
-            data-active={value === v}
-            className="iki-energy-cell"
-            aria-hidden
-          >
-            {v}
-          </div>
-        ))}
+        <span className="iki-energy-track" aria-hidden />
+        {value != null && (
+          <span className="iki-energy-thumb" style={{ left: `${thumbPercent(value)}%` }} aria-hidden>
+            <Icon name="flame" size={13} filled strokeWidth={1.5} />
+            {value}
+          </span>
+        )}
       </div>
-      <span className="text-small text-muted">
-        {value ? `${ENERGY_LABELS[value]}, press and slide` : "Press and slide"}
-      </span>
+      <div className="flex justify-between text-micro uppercase tracking-[0.1em] text-muted" aria-hidden>
+        <span>{ENERGY_LABELS[MIN_ENERGY]}</span>
+        <span>{ENERGY_LABELS[MAX_ENERGY]}</span>
+      </div>
     </div>
   );
 }
 
+/* --------------------------------- sleep ---------------------------------- */
+
+export const SLEEP_STEP = 0.5;
+export const SLEEP_MIN = 0;
+export const SLEEP_MAX = 14;
+/** Where the first tap on either stepper lands when nothing is logged yet. */
+export const SLEEP_START = 7;
+
+/** One stepper tap. Null (not logged) starts at SLEEP_START. */
+export function stepSleep(current: number | null, dir: 1 | -1): number {
+  if (current == null) return SLEEP_START;
+  const next = Math.round((current + dir * SLEEP_STEP) * 2) / 2;
+  return Math.min(SLEEP_MAX, Math.max(SLEEP_MIN, next));
+}
+
 /**
- * One activity, as a tile.
+ * Hours of sleep as two steppers (v2 section 4.3), with a real number input
+ * underneath for assistive tech and for typing an exact value.
  *
- * `aria-pressed` rather than a checkbox: this is a toggle button, and the
- * selected styling hangs off that same attribute in CSS, so the visible state
- * and the announced state cannot drift apart.
+ * The input is visually hidden but not `hidden`: a screen reader user gets a
+ * labelled spin button they can type into, and the steppers are the same edit
+ * made with a thumb.
+ */
+export function SleepStepper({
+  value,
+  onChange,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="font-display text-display-sleep text-ink" aria-hidden>
+        {value ?? "-"}
+        <span className="ml-0.5 font-sans text-unit text-muted">h</span>
+      </p>
+      <label className="sr-only">
+        Sleep last night, in hours
+        <input
+          type="number"
+          inputMode="decimal"
+          min={SLEEP_MIN}
+          max={SLEEP_MAX}
+          step={SLEEP_STEP}
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+        />
+      </label>
+      <div className="grid grid-cols-2 gap-2" aria-hidden>
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => onChange(stepSleep(value, -1))}
+          disabled={value != null && value <= SLEEP_MIN}
+          className="iki-tap iki-press iki-stepper"
+        >
+          <Icon name="minus" size={16} strokeWidth={2} />
+        </button>
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => onChange(stepSleep(value, 1))}
+          disabled={value != null && value >= SLEEP_MAX}
+          className="iki-tap iki-press iki-stepper"
+        >
+          <Icon name="plus" size={16} strokeWidth={2} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------- activities ------------------------------- */
+
+/** The sub line under an unselected tile, from the activity's category. */
+const CATEGORY_LABELS: Record<string, string> = {
+  low_cardio: "Low intensity",
+  cardio: "Cardio",
+  strength: "Strength",
+  mixed: "Mixed",
+  endurance_strength: "Endurance",
+  strength_skill: "Skill",
+  mobility: "Recovery",
+};
+
+/** Mobility work is recovery; everything else is training. */
+export function pillarForActivity(type: string): "recovery" | "performance" {
+  return categoryForType(type) === "mobility" ? "recovery" : "performance";
+}
+
+/**
+ * One activity, as a tile (v2 section 4.3).
  *
- * The icon is decorative. The label is the accessible name, which is why the
- * glyph is `aria-hidden` and a missing glyph costs nothing.
+ * `aria-pressed`, and the selected styling hangs off that same attribute in
+ * CSS, so the visible state and the announced state cannot drift apart. The
+ * sub line says what the tile needs next: its category when off, the chosen
+ * duration when set, and "Set duration" when selected without one.
  */
 export function ActivityTile({
   type,
   label,
   selected,
+  duration,
   onToggle,
 }: {
   type: string;
   label: string;
   selected: boolean;
+  duration: DurationBucket | null;
   onToggle: () => void;
 }) {
+  const pillar = pillarForActivity(type);
+  const sub = !selected
+    ? (CATEGORY_LABELS[categoryForType(type)] ?? "Activity")
+    : duration
+      ? `${DURATION_LABELS[duration]} · ${DURATION_HINTS[duration]}`
+      : null;
   return (
-    <button type="button" aria-pressed={selected} onClick={onToggle} className="iki-tile">
-      <span className="iki-tile-label">{label}</span>
-      <span className="iki-tile-icon">
-        <ActivityIcon type={type} />
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onToggle}
+      className="iki-tile"
+      data-pillar={pillar}
+    >
+      <span className="iki-tile-well" aria-hidden>
+        <ActivityIcon type={type} size={16} />
+      </span>
+      <span className="iki-tile-label mt-auto">{label}</span>
+      <span className={`text-micro ${sub ? "text-muted" : "font-semibold text-primary"}`}>
+        {sub ?? "Set duration ↓"}
       </span>
       {selected && (
-        <span className="iki-tile-check">
+        <span className="iki-tile-check" aria-hidden>
           <CheckIcon />
         </span>
       )}
+    </button>
+  );
+}
+
+/* --------------------------------- submit --------------------------------- */
+
+/** How long the press has to last, v2 section 5. */
+export const HOLD_MS = 600;
+
+/**
+ * "Hold to check in" (v2 section 4.3).
+ *
+ * A press that lasts HOLD_MS fills the ring and then fires; letting go early,
+ * or the pointer being cancelled, resets it. The hold is a small ceremony on
+ * the one action the app asks for daily, and it makes an accidental tap while
+ * scrolling a no-op.
+ *
+ * THE HOLD IS NEVER THE ONLY WAY IN. Enter and Space fire straight away, and
+ * under `prefers-reduced-motion` a plain tap fires, since an animation you have
+ * to wait out is exactly what that setting asks us not to impose. The button is
+ * a real submit button either way, so the form's own validation still runs.
+ */
+export function HoldToSubmit({
+  label,
+  busy,
+  onFire,
+}: {
+  label: string;
+  busy: boolean;
+  onFire: () => void;
+}) {
+  const [holding, setHolding] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancel = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    setHolding(false);
+  };
+
+  const reducedMotion = () =>
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+  return (
+    <button
+      type="button"
+      aria-busy={busy}
+      disabled={busy}
+      className="iki-hold"
+      data-holding={holding}
+      onPointerDown={(e) => {
+        if (busy || e.button !== 0) return;
+        if (reducedMotion()) return; // the click handler fires instead
+        setHolding(true);
+        timer.current = setTimeout(() => {
+          timer.current = null;
+          setHolding(false);
+          navigator.vibrate?.(10);
+          onFire();
+        }, HOLD_MS);
+      }}
+      onPointerUp={cancel}
+      onPointerLeave={cancel}
+      onPointerCancel={cancel}
+      onClick={(e) => {
+        // detail === 0 is a keyboard activation (Enter or Space): fire now.
+        if (e.detail === 0 || reducedMotion()) onFire();
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <svg width={24} height={24} viewBox="0 0 24 24" aria-hidden className="shrink-0">
+        <circle cx={12} cy={12} r={10} fill="none" stroke="currentColor" strokeOpacity={0.35} strokeWidth={2} />
+        <circle
+          className="iki-hold-arc"
+          cx={12}
+          cy={12}
+          r={10}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          transform="rotate(-90 12 12)"
+        />
+      </svg>
+      {busy ? "Saving…" : label}
     </button>
   );
 }

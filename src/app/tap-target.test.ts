@@ -43,7 +43,7 @@ const SAFE = [
   "iki-tile", //           --spacing-tile
   "iki-bento", //          --spacing-bento (164, Home tiles)
   "iki-segmented-option", // 44
-  "iki-energy-cell", //    46
+  "iki-hold", //           56, hold to check in
   "iki-code", //           44
   "iki-switch", //         28 tall, carries its own halo (see globals.css)
   "min-h-tap",
