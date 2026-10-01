@@ -1946,6 +1946,57 @@ summary {
     color: var(--ink);
   }
 
+  /* --- v2 Future You (§4.5) --------------------------------------------- */
+
+  /* The month of check-ins: 15 x 2, one dot per day of a 30-day window. */
+  .iki-dots-month {
+    grid-template-columns: repeat(15, calc(var(--spacing) * 3)); /* 12px dots */
+    justify-content: space-between;
+  }
+
+  /* "Needs inputs": a 14px dashed ring beside the word. */
+  .iki-dashed-ring {
+    width: calc(var(--spacing) * 3.5); /* 14 */
+    height: calc(var(--spacing) * 3.5);
+    border: 1.5px dashed currentColor;
+    border-radius: var(--radius-pill);
+  }
+
+  /*
+   * The scoreboard photo card. The photograph is a fixed brand asset, the same
+   * in both themes, so the scrim and the text on it are fixed values too.
+   */
+  .iki-photo-card {
+    position: relative;
+    display: flex;
+    min-height: calc(var(--spacing) * 62.5); /* 250 */
+    overflow: hidden;
+    border-radius: var(--radius-card);
+    background: var(--obsidian-stone);
+  }
+  .iki-photo-card-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .iki-photo-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--photo-scrim);
+  }
+  .iki-photo-card-body {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: calc(var(--spacing) * 2);
+    padding: var(--spacing-card);
+  }
+
   /* The page padding that keeps content clear of the nav and the status bar. */
   .iki-shell {
     padding-inline: calc(var(--spacing-gutter) + var(--spacing-safe-l));

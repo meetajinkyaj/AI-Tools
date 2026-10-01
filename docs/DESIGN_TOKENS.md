@@ -339,6 +339,15 @@ in `src/app/switch.tsx`, since Profile uses one too)
 - `.iki-insight` the two-tone sentence, HG 600 at 20px; the muted and
   terracotta parts are spans inside it.
 
+**v2 Future You** (section 4.5)
+- `.iki-dots-month` the 15 x 2 month of check-ins (12px dots).
+- `.iki-dashed-ring` the 14px dashed ring beside "Needs inputs".
+- `.iki-photo-card` / `-img` / `-body` the scoreboard photo card: the fixed
+  brand photo (`public/ikigaro-hero.jpg`) under `--photo-scrim`. Same in both
+  themes, so its text is fixed too: linen headline, `--photo-text` body, tan
+  eyebrow, and clay (not terracotta) for the reward, which holds AA on the
+  scrim.
+
 **Header and sheet**
 - `.iki-profile-chip` / `-initials` the v2 header chip: "Profile" plus a 30px
   initials circle, 38px tall. It replaced v1's bare `.iki-avatar`, because with

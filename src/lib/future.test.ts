@@ -7,6 +7,7 @@ import {
   projectLinear,
   retestMilestone,
 } from "./future";
+import { momentumOutlook } from "./future";
 import type { CheckinPoint } from "./trends";
 
 /** N consecutive daily check-ins ending 2026-01-30, newest first. */
@@ -136,5 +137,42 @@ describe("retestMilestone", () => {
   it("goes negative when overdue", () => {
     const m = retestMilestone("2025-01-01", "2026-02-01");
     expect(m.daysUntilDue).toBeLessThan(0);
+  });
+});
+
+describe("momentumOutlook (v2 Future card)", () => {
+  const day = (d: string, trained = false) => ({
+    checkin_date: d,
+    energy_score: 3,
+    sleep_hours: 7.5,
+    training_logged: trained,
+  });
+
+  it("projects a higher momentum when today's check-in with training is still to come", () => {
+    const rows = ["2026-09-27", "2026-09-28", "2026-09-29"].map((d) => day(d));
+    const o = momentumOutlook(rows, "2026-09-30");
+    expect(o.checkedInToday).toBe(false);
+    const now = computeMomentum(computeHabitSignals(rows)).score;
+    expect(o.projectedIfCheckedIn).not.toBeNull();
+    expect(o.projectedIfCheckedIn!).toBeGreaterThan(now);
+  });
+
+  it("has nothing to project once today is in", () => {
+    const o = momentumOutlook([day("2026-09-30")], "2026-09-30");
+    expect(o.checkedInToday).toBe(true);
+    expect(o.projectedIfCheckedIn).toBeNull();
+  });
+
+  it("reports no monthly change without history older than the window", () => {
+    expect(momentumOutlook([day("2026-09-30")], "2026-09-30").changeThisMonth).toBeNull();
+  });
+
+  it("compares with the window a month ago when there is one", () => {
+    const old = ["2026-08-20", "2026-08-25"].map((d) => day(d));
+    const recent = Array.from({ length: 20 }, (_, i) => day(`2026-09-${String(i + 10).padStart(2, "0")}`, i % 2 === 0));
+    const o = momentumOutlook([...old, ...recent], "2026-09-30");
+    expect(o.changeThisMonth).not.toBeNull();
+    expect(o.changeThisMonth!).toBeGreaterThan(0);
+    expect(o.checkinsThisMonth).toBe(20);
   });
 });
