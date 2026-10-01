@@ -82,6 +82,7 @@ export function ThemeControl() {
         </p>
       </div>
       <Segmented
+        quiet
         label="Appearance"
         value={preference}
         onChange={choose}

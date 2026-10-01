@@ -788,6 +788,13 @@ summary {
     color: var(--primary);
   }
 
+  /* The header's own button ("Edit profile"): 38px, the Profile chip's height. */
+  .iki-btn-header {
+    min-height: calc(var(--spacing) * 9.5); /* 38 */
+    padding-inline: calc(var(--spacing) * 3.5);
+    font-size: var(--text-small);
+  }
+
   /* A 40px button for a row's trailing action (Redeem). Needs .iki-tap. */
   .iki-btn-sm {
     min-height: calc(var(--spacing) * 10); /* 40 */
@@ -1488,6 +1495,15 @@ summary {
   .iki-segmented-option[aria-checked="true"] {
     color: var(--primary-fg);
   }
+  /* The quiet variant (Appearance): the pill is a raised surface with a
+     hairline, and the chosen word stays ink. */
+  .iki-segmented-quiet .iki-segmented-pill {
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+  }
+  .iki-segmented-quiet .iki-segmented-option[aria-checked="true"] {
+    color: var(--ink);
+  }
   .iki-segmented-sub {
     font-size: var(--text-eyebrow-sm);
     font-weight: 400;
@@ -2033,6 +2049,40 @@ summary {
   }
   .iki-voucher-well[data-pillar="performance"] {
     background: var(--pillar-performance);
+  }
+
+  /* --- v2 Profile (§4.8) ------------------------------------------------ */
+
+  .iki-identity-avatar {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--spacing) * 16); /* 64 */
+    height: calc(var(--spacing) * 16);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    color: var(--ink);
+    font-size: var(--text-body-lg);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  /* A quiet information chip: goal, member since. Not a control. */
+  .iki-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 1.5);
+    height: calc(var(--spacing) * 7); /* 28 */
+    padding-inline: calc(var(--spacing) * 3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: var(--text-small);
+    font-weight: 600;
+    white-space: nowrap;
   }
 
   /* The page padding that keeps content clear of the nav and the status bar. */
